@@ -23,6 +23,9 @@
 
 ## How it works
 - **Line amounts:** quantity × unit price is rounded to the fils by the helper. Example: 3 × 1.2345 = 3.7035 → 3.70.
-- **Stock value:** each item's stock value (per warehouse) is kept exactly in fils, matching the accounts. The average cost is that value ÷ quantity, kept to 4 decimals.
-- **Cost of goods leaving:** quantity × average, rounded to the fils. When the last unit leaves, exactly the remaining value leaves with it. Stock value and the accounts therefore always agree to the fils, with no rounding leftovers.
+- **Stock value** (per item and warehouse) is kept with 4-decimal precision, so the weighted-average cost is exact to 4 decimals.
+- **Cost of goods leaving** = quantity × average, at 4 decimals. When the last unit leaves, exactly the remaining value leaves with it.
+- **Books follow the stock to the fils.** The amount booked in the accounts for each stock movement is the change in the stock value **rounded to the fils**. The accounts therefore always equal the stock value rounded to the fils, and rounding never builds up.
+
+  Example: receive 10 × 1.2345 = 12.3450 (booked 12.35); issue 3 = 3.7035 (booked 3.71); issue the last 7 = 8.6415 (booked 8.64). Stock and books both end at exactly 0.00.
 - **One rounding rule in two places:** the same rule is used by the TypeScript helper and by the database's costing function. Both run one shared set of test cases.
