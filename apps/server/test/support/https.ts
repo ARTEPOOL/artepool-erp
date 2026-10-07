@@ -8,6 +8,7 @@ import type { FastifyInstance } from 'fastify';
 import { createCa, issueServerCert, type PemPair } from '@artepool/tls';
 import { buildApp } from '../../src/app';
 import { newTotpSecret } from '../../src/platform/auth/totp';
+import { normalizeCode } from '../../src/platform/crypto/codes';
 import { withBusinessTx } from '../../src/platform/db/tx';
 import { addUser, type TestServer, type UserOptions } from './server';
 
@@ -73,19 +74,27 @@ export async function listenHttps(
  */
 export async function addOwnerWithTwoStep(
   server: TestServer,
-  options: Omit<UserOptions, 'method' | 'roles'> & { roles?: string[] },
+  options: Omit<UserOptions, 'method' | 'roles'> & {
+    roles?: string[];
+    /** Recovery codes to store (as Argon2id hashes), as the 2-step setup would. */
+    recoveryCodes?: string[];
+  },
 ): Promise<{ id: bigint; secret: string }> {
+  const { recoveryCodes = [], ...user } = options;
   const id = await addUser(server, {
-    ...options,
+    ...user,
     method: 'password_totp',
-    roles: options.roles ?? ['owner'],
+    roles: user.roles ?? ['owner'],
   });
   const secret = newTotpSecret();
+  const hashes = await Promise.all(
+    recoveryCodes.map((c) => server.deps.hasher.hash(normalizeCode(c))),
+  );
   await withBusinessTx(
     server.db,
     { userId: id, requestId: randomUUID(), reason: 'test fixture' },
-    (trx) =>
-      trx
+    async (trx) => {
+      await trx
         .updateTable('auth.users')
         .set({
           totp_secret_enc: server.deps.secretBox.seal(
@@ -95,7 +104,14 @@ export async function addOwnerWithTwoStep(
           totp_enabled: true,
         })
         .where('id', '=', id)
-        .execute(),
+        .execute();
+      for (const code_hash of hashes) {
+        await trx
+          .insertInto('auth.recovery_codes')
+          .values({ user_id: id, code_hash } as never)
+          .execute();
+      }
+    },
   );
   return { id, secret };
 }

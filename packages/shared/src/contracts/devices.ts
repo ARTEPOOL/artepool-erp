@@ -16,6 +16,15 @@ export interface DeviceListItem {
   revokeReason: string | null;
   /** The PC making this request (cannot be revoked from itself). */
   isCurrent: boolean;
+  /** People who may sign in here without the phone code, until when (decision 0027). */
+  trustedFor: TrustedPerson[];
+}
+
+export interface TrustedPerson {
+  userId: string;
+  displayNameAr: string;
+  displayNameEn: string;
+  expiresAt: string;
 }
 
 export interface DevicesResponse {
