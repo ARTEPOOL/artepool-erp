@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | **Done — in review** (2026-10-07). Approved with the owner's answers recorded as decisions [0021](../decisions/0021-cashier-pin-sign-in-on-pos-pcs.md)–[0026](../decisions/0026-users-and-devices-never-deleted.md). Delivered on branch `m1-security-shell` (see [Delivered](#delivered)). |
+| **Status** | **Done** (2026-10-07): T1–T12 merged in pull request #4; T13 (easier owner sign-in) in a follow-up pull request. Approved with the owner's answers recorded as decisions [0021](../decisions/0021-cashier-pin-sign-in-on-pos-pcs.md)–[0026](../decisions/0026-users-and-devices-never-deleted.md). Delivered on branch `m1-security-shell` (see [Delivered](#delivered)). |
 | **Date** | 2026-10-07 |
 | **Milestone** | M1 of the [Phase 1 plan](../phase-1-plan.md) |
 | **Design reference** | [`design/screens/01-login.html`](../../design/screens/01-login.html), [`design/screens/13-settings.html`](../../design/screens/13-settings.html), tokens and components in [`design/`](../../design/) |
@@ -90,8 +90,8 @@ Also confirmed by the owner: nothing is ever deleted; users are deactivated and 
 | T9 | `161f997`, `cd15773`, `d4b8fe3` | Development bridge; sign-in screens; Playwright flows |
 | T10 | `c10369f` | App shell and Settings (users, roles, PCs, audit log) |
 | T11 | `ede591a` | Windows app (Tauri) with the Rust bridge |
-| T12 | `b501a6b`, `666d79b` | CI jobs (screens, Rust, Windows), Windows guide, docs |
-| T13 | `5ea768a`, `b2ec002`, this commit | Trusted PCs for the 2-step code (migration 0006) and forgot password, with screens and tests |
+| T12 | `b501a6b`, `666d79b` (merged in PR #4) | CI jobs (screens, Rust, Windows), Windows guide, docs |
+| T13 | `7f7194e`, `149eaa5`, `d787fae` | Trusted PCs for the 2-step code (migration 0006) and forgot password, with screens and tests |
 
 **Tests at the end of M1:** 163 unit and screen-component tests, 256 integration tests (real PostgreSQL), 26 Rust tests, 32 Playwright flows (16 in Arabic/light, 16 in English/dark).
 
