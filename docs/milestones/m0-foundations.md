@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | **Proposed: waiting for the owner's approval.** No code is written until this is approved. |
+| **Status** | **Done** (2026-10-07). Approved 2026-10-07, including both adjustments. Delivered on branch `m0-foundations`. |
 | **Date** | 2026-10-07 |
 | **Milestone** | M0 of the [Phase 1 plan](../phase-1-plan.md) |
 | **Where it runs** | This cloud environment (Linux) and GitHub Actions CI. From M1 onwards, development moves to the owner's Windows PC. |
@@ -78,3 +78,18 @@ You will need:
   - Visual Studio Code (recommended)
 - **From M1, for the desktop app:** the Rust toolchain and the Microsoft C++ Build Tools. WebView2 is already part of Windows 11.
 - **Rights:** administrator rights to install these. A GitHub login to download the private repository.
+
+## Outcome
+
+| Check | Result |
+|---|---|
+| Migrations 0001–0004 | Apply cleanly; checksums recorded |
+| Unit tests | 76 passed (money, VAT, allocation, parsing, translations, errors, time, settings) |
+| Integration tests | 100 passed (database rules, audit chain and tampering, numbering under concurrency, runner, server, audit tools) |
+| `pnpm check` | Lint, formatting, typecheck (9 packages), translations: clean |
+| `pnpm audit:verify` / `pnpm demo:audit-tamper` | OK / tampering caught at the exact entry |
+| Windows guide | [`docs/runbooks/dev-setup-windows.md`](../runbooks/dev-setup-windows.md) |
+
+Notes:
+- TypeScript is pinned to 6.0 because the lint tooling does not support the new TypeScript 7 compiler yet.
+- Databases are created with PostgreSQL's built-in `C.UTF-8` locale, so Windows and Linux behave identically. This needs PostgreSQL 18 (the tools check the version).

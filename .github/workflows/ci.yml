@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check-and-test:
+    name: Check and test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      # Throwaway CI database only — not real credentials.
+      PGHOST: localhost
+      PGPORT: '5432'
+      PG_SUPERUSER: postgres
+      PG_SUPERUSER_PASSWORD: postgres
+      ARTEPOOL_DB: artepool_dev
+      ARTEPOOL_TEST_DB: artepool_test
+      ARTEPOOL_MIGRATOR_PASSWORD: ci-only-migrator
+      ARTEPOOL_API_PASSWORD: ci-only-api
+      ARTEPOOL_BACKUP_PASSWORD: ci-only-backup
+      ARTEPOOL_MAINT_PASSWORD: ci-only-maint
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Lint, formatting, typecheck, translations
+        run: pnpm check
+      - name: Unit tests
+        run: pnpm test:unit
+      - name: Create database roles and the dev database
+        run: pnpm db:setup
+      - name: Apply migrations
+        run: pnpm db:migrate
+      - name: Migration checksums
+        run: pnpm db:status
+      - name: Generated database types are up to date
+        run: pnpm db:codegen:check
+      - name: Integration tests (database rules, concurrency, server)
+        run: pnpm test:integration
+      - name: Audit chain check
+        run: pnpm audit:verify
+      - name: Tamper demo is caught
+        run: pnpm demo:audit-tamper
