@@ -78,6 +78,9 @@ importers:
         specifier: 17.0.16
         version: 17.0.16(i18next@26.4.2(typescript@6.0.3))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3)
     devDependencies:
+      '@artepool/dev-bridge':
+        specifier: workspace:*
+        version: link:../../tools/dev-bridge
       '@testing-library/dom':
         specifier: 10.4.2
         version: 10.4.2
@@ -219,6 +222,28 @@ importers:
       '@types/pg':
         specifier: 8.23.1
         version: 8.23.1
+
+  tools/dev-bridge:
+    dependencies:
+      '@artepool/node-kit':
+        specifier: workspace:*
+        version: link:../../packages/node-kit
+      '@artepool/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
+      '@node-rs/argon2':
+        specifier: 2.2.2
+        version: 2.2.2
+    devDependencies:
+      '@artepool/server':
+        specifier: workspace:*
+        version: link:../../apps/server
+      '@artepool/testing':
+        specifier: workspace:*
+        version: link:../../packages/testing
+      vite:
+        specifier: 8.3.3
+        version: 8.3.3(@types/node@24.19.1)(esbuild@0.28.2)(tsx@4.23.15)
 
   tools/dev-db:
     dependencies:

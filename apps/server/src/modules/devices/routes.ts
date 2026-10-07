@@ -35,6 +35,12 @@ export function registerDeviceRoutes(app: FastifyInstance): void {
   });
 
   defineRoute(app, {
+    method: 'GET',
+    url: '/api/v1/devices/me',
+    access: { kind: 'device' },
+    handler: ({ request }) => devices.thisDevice(deps, request),
+  });
+  defineRoute(app, {
     method: 'POST',
     url: '/api/v1/devices/me/renew-key',
     access: { kind: 'device' },

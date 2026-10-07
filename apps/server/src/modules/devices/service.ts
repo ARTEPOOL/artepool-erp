@@ -19,6 +19,7 @@ import {
   type EnrollHelloResponse,
   type EnrollmentCodeResponse,
   type RenewKeyResponse,
+  type ThisDeviceResponse,
 } from '@artepool/shared/contracts';
 import { recordEvent } from '../../platform/audit/events';
 import { newEnrollmentCode } from '../../platform/crypto/codes';
@@ -277,6 +278,23 @@ export async function renewKey(
       return { renewed: false, keyExpiresAt: device.keyExpiresAt.toISOString() };
     },
   );
+}
+
+/** The PC making the request: its name and code for the sign-in screen, and its key date. */
+export async function thisDevice(
+  deps: AppDeps,
+  request: FastifyRequest,
+): Promise<ThisDeviceResponse> {
+  const device = request.device!;
+  const row = await deps.db
+    .selectFrom('auth.devices')
+    .select('name')
+    .where('id', '=', device.id)
+    .executeTakeFirstOrThrow();
+  return {
+    device: { id: device.id.toString(), code: device.code, name: row.name, kind: device.kind },
+    keyExpiresAt: device.keyExpiresAt.toISOString(),
+  };
 }
 
 // ---------------------------------------------------------------------------------------------

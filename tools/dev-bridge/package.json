@@ -1,0 +1,23 @@
+{
+  "name": "@artepool/dev-bridge",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./vite": "./src/vite-plugin.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@artepool/node-kit": "workspace:*",
+    "@artepool/shared": "workspace:*",
+    "@node-rs/argon2": "2.2.2"
+  },
+  "devDependencies": {
+    "@artepool/server": "workspace:*",
+    "@artepool/testing": "workspace:*",
+    "vite": "8.3.3"
+  }
+}

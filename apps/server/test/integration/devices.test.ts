@@ -14,6 +14,7 @@ import {
   type EnrollHelloResponse,
   type EnrollmentCodeResponse,
   type RenewKeyResponse,
+  type ThisDeviceResponse,
 } from '@artepool/shared/contracts';
 import { buildApp } from '../../src/app';
 import {
@@ -263,6 +264,25 @@ describe('enrolling a PC (decision 0024)', () => {
     expect(response.statusCode).toBe(503);
     expect(response.json()).toMatchObject({ error: { code: 'ENROLLMENT_UNAVAILABLE' } });
     await app.close();
+  });
+});
+
+describe('this PC', () => {
+  it('tells an enrolled PC its own name, code, kind and key date, and nobody else', async () => {
+    const pc = await addDevice(server, { code: 'SELF-PC', kind: 'pos' });
+    const response = await call(server, 'GET', '/api/v1/devices/me', { device: pc });
+    expect(response.statusCode).toBe(200);
+    const body = response.json<ThisDeviceResponse>();
+    expect(body.device).toEqual({
+      id: pc.id.toString(),
+      code: 'SELF-PC',
+      name: 'Test PC',
+      kind: 'pos',
+    });
+    expect(Date.parse(body.keyExpiresAt)).toBeGreaterThan(Date.now());
+    expect(errorCode(await call(server, 'GET', '/api/v1/devices/me', {}))).toBe(
+      'DEVICE_NOT_ENROLLED',
+    );
   });
 });
 

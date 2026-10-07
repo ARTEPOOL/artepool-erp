@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
-    "dev": "vite",
-    "build": "vite build"
+    "dev": "vite --configLoader runner",
+    "build": "vite build --configLoader runner"
   },
   "dependencies": {
     "@artepool/i18n": "workspace:*",
@@ -23,6 +23,7 @@
     "react-i18next": "17.0.16"
   },
   "devDependencies": {
+    "@artepool/dev-bridge": "workspace:*",
     "@testing-library/dom": "10.4.2",
     "@testing-library/react": "16.3.3",
     "@types/qrcode": "1.5.6",

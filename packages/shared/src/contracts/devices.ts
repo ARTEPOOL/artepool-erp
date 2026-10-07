@@ -24,6 +24,13 @@ export interface DevicesResponse {
   openCode: { expiresAt: string } | null;
 }
 
+/** This PC, as the server knows it (shown at the bottom of the sign-in screen). */
+export interface ThisDeviceResponse {
+  device: { id: string; code: string; name: string; kind: DeviceKind };
+  /** ISO time when the device key must have been renewed (the PC renews it 30 days before). */
+  keyExpiresAt: string;
+}
+
 export interface EnrollmentCodeResponse {
   /** `XXX-XXX-XXX`, shown once; null when this answer is a repeat of an earlier request. */
   code: string | null;
