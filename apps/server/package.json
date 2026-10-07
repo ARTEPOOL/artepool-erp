@@ -12,6 +12,7 @@
   "dependencies": {
     "@artepool/node-kit": "workspace:*",
     "@artepool/shared": "workspace:*",
+    "@artepool/tls": "workspace:*",
     "@node-rs/argon2": "2.2.2",
     "fastify": "5.12.5",
     "kysely": "0.29.6",

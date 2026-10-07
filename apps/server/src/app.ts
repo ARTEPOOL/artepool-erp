@@ -16,6 +16,8 @@ import { registerHealth } from './routes/health';
 export interface AppOptions extends Pick<ServerConfig, 'logLevel'> {
   /** Where logs go (tests capture them to prove that no secret is ever logged). */
   logStream?: DestinationStream;
+  /** Server certificate and key: the API is served over TLS 1.3 only (never plain HTTP). */
+  https?: { cert: string; key: string };
 }
 
 /** Fastify's own request errors (bad JSON, body too large, …) are the client's fault. */
@@ -32,6 +34,16 @@ function isClientError(error: unknown): boolean {
 
 export function buildApp(options: AppOptions, deps: AppDeps): FastifyInstance {
   const app = Fastify({
+    ...(options.https
+      ? {
+          https: {
+            cert: options.https.cert,
+            key: options.https.key,
+            minVersion: 'TLSv1.3' as const,
+            maxVersion: 'TLSv1.3' as const,
+          },
+        }
+      : {}),
     logger: {
       level: options.logLevel,
       redact: { paths: REDACT_PATHS, censor: '[redacted]' },
@@ -40,7 +52,7 @@ export function buildApp(options: AppOptions, deps: AppDeps): FastifyInstance {
     },
     genReqId: () => randomUUID(),
     exposeHeadRoutes: false,
-  });
+  }) as unknown as FastifyInstance;
   app.decorate('deps', deps);
 
   // bigint (ids, money in fils) is sent as exact text, never as a JSON number.

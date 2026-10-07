@@ -130,7 +130,8 @@ Run from the repository root. Setup on a new PC: [`docs/runbooks/dev-setup-windo
 | Verify the audit hash chain | `pnpm audit:verify` |
 | Tamper demonstration (throwaway database) | `pnpm demo:audit-tamper` |
 | Create the development master key (`.secrets/`, once per dev PC) | `pnpm dev:secrets` |
-| Run the API in dev mode | `pnpm dev:server` |
+| Create the ARTÉPOOL CA + server certificate (HTTPS, TLS 1.3); `--renew-server` for a new server certificate | `pnpm tls:init [--name host] [--ip address]` |
+| Run the API in dev mode (HTTPS: `https://localhost:3100/health`, trust `.secrets/tls/ca.crt`) | `pnpm dev:server` |
 | Server console: first owner / enrollment code / emergency owner 2-step reset (decisions 0022, 0025) | `pnpm owner:create` / `pnpm device:code` / `pnpm owner:reset-2fa` |
 
 Not yet available: `pnpm dev:desktop` (M1), `pnpm build:server` / `pnpm build:desktop` (M1/M6), `pnpm backup:run` / `pnpm backup:restore-test` (M6).
