@@ -35,6 +35,8 @@ There is one short file per decision, numbered in order.
 | [0026](0026-users-and-devices-never-deleted.md) | Users and devices never deleted: deactivate or revoke with a reason | Accepted |
 | [0027](0027-trust-this-pc-for-the-2-step-code.md) | "Trust this PC" for the 2-step code (30 days, never on POS PCs) | Accepted |
 | [0028](0028-forgot-password-with-phone-and-recovery-code.md) | Forgot password: recover it in the app with the phone code and one recovery code | Accepted |
+| [0029](0029-owner-password-reset-on-the-server-pc.md) | Emergency owner password reset on the server PC (`pnpm owner:reset-password`) | Accepted |
+| [0030](0030-company-details-owner-only.md) | Company details owner-only; the accountant keeps the audit log | Accepted |
 
 ## Template
 

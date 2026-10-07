@@ -151,6 +151,12 @@ describe('roles and permissions', () => {
     expect(perms.storekeeper).not.toContain('stock.view_cost');
     expect(perms.accountant).not.toContain('users.manage');
     expect(perms.accountant).toContain('periods.manage');
+    // Decision 0030: the accountant reads, verifies and exports the audit log, but company
+    // details (printed on every tax invoice) are the owner's alone.
+    expect(perms.accountant).toEqual(
+      expect.arrayContaining(['audit.view', 'audit.verify', 'audit.export']),
+    );
+    expect(perms.accountant).not.toContain('system.company.edit');
     expect(perms.technician).toEqual(['customers.view', 'items.view']);
   });
 

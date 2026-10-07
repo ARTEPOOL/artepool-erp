@@ -351,7 +351,7 @@ Seeded by migrations; read-only for the API.
 | name_ar, name_en | text | |
 | is_sensitive | boolean | |
 | approvable | boolean | A supervisor approval can stand in for it, once |
-| owner_only | boolean | Only the owner role may hold it (Settings are owner-only): `users.manage`, `users.reset_credentials`, `roles.manage`, `system.devices.manage`, `system.settings.edit`, `system.series.manage` |
+| owner_only | boolean | Only the owner role may hold it (Settings are owner-only): `users.manage`, `users.reset_credentials`, `roles.manage`, `system.devices.manage`, `system.settings.edit`, `system.series.manage`, and from 0007 `system.company.edit` ([0030](decisions/0030-company-details-owner-only.md)) |
 
 `auth.user_has_permission(user_id, code)` is true when an active user holds the permission through an active role.
 
@@ -384,7 +384,7 @@ Enrolled PCs only ([0024](decisions/0024-device-enrollment-proves-the-server.md)
 | name | text | Free description, 1–100 characters |
 | device_kind | text | `CHECK IN ('pos','office','warehouse','server')`. PIN sign-in only on `pos` |
 | branch_id | bigint → sys.branches | |
-| default_warehouse_id | bigint? → md.warehouses | FK added by 0008 (master data; the comment in 0005 says 0007, written before 0006 was used for trusted PCs) |
+| default_warehouse_id | bigint? → md.warehouses | FK added by 0009 (master data; the comment in 0005 says 0007, written before 0006 and 0007 were used in M1) |
 | status | text | `CHECK IN ('active','revoked')`, default `active` |
 | key_hash | bytea | Unique; SHA-256 of the 256-bit device key |
 | key_expires_at | timestamptz | `> enrolled_at`; renewed automatically (`security.device_key_days`) |
@@ -447,7 +447,7 @@ Not row-audited. Sign-in, sign-out, lock, unlock and switch are explicit audit e
 | requested_by | bigint → auth.users | Set from the request context |
 | approved_by | bigint → auth.users | `CHECK (approved_by <> requested_by)`; must hold the permission |
 | device_id | bigint → auth.devices | Set from the request context (required) |
-| reason_code_id | bigint? → sys.reason_codes | FK added by 0008 (master data) |
+| reason_code_id | bigint? → sys.reason_codes | FK added by 0009 (master data) |
 | reason_text | text | `CHECK (length(btrim(reason_text)) >= 3)` |
 | context | jsonb | e.g. `{"item_id":42,"qty_short":"2.000"}`, `{"discount_bp":1500,"limit_bp":1000}` |
 | approved_at | timestamptz | Server time |
@@ -1530,7 +1530,7 @@ See the one-page [posting map](accounting/posting-map.md) (**pending accountant 
 | Role | Permissions |
 |---|---|
 | **Owner** | All; 2FA required |
-| **Accountant** | All except users, roles, devices and system settings |
+| **Accountant** | All except users, roles, devices, system settings and company details (owner-only, [0030](decisions/0030-company-details-owner-only.md)); keeps viewing, verifying and exporting the audit log |
 | **Cashier** | `pos.sell`, `payments.receive`, `shifts.open` / `close`, `cash.drop`, `cash.paid_in`, `reports.x`, `items.view`, `customers.view` / `manage`, `labels.print`, `invoices.view`, `documents.reprint` |
 | **Storekeeper** | `stock.*` except `stock.view_cost`, plus `items.view`, `labels.print` |
 | **Technician** | `items.view`, `customers.view` |
@@ -1626,17 +1626,18 @@ Migrations are written **in build order** (milestones in [`phase-1-plan.md`](pha
 | 0004 | `sys_core` | M0 | `company_profile`, `settings` (defaults), `branches` (HQ), `document_series` (all 13 series) + `next_number`, `alerts`, `import_batches` | — |
 | 0005 | `auth_devices` | M1 | `devices`, `device_activity`, `enrollment_codes`, `sessions`, `approvals`, `recovery_codes`, `sys.idempotency_keys`; sign-in method and deactivation columns on `users`; `owner_only` permissions; owner and 2-step rules; security settings | — |
 | 0006 | `device_trust` | M1 | `auth.device_trust` ("trust this PC", decision 0027), `trusted_device` sign-in method, `security.trusted_device_days` | — |
-| 0007 | `gl_core` | M2 | `accounts` (provisional chart), `account_mappings`, `periods` (monthly, seeded) + period guard | — |
-| 0008 | `master_data` | M2 | All 15 `md.*` tables (with seeds) and `sys.reason_codes` (with seeds) | `auth.devices.default_warehouse_id`, `auth.approvals.reason_code_id` |
-| 0009 | `inventory` | M3 | All `inv.*` tables + `apply_movement` + stock views | — |
-| 0010 | `gl_journals` | M3 | `journal_entries`, `journal_lines` + balance trigger | — |
-| 0011 | `cash_core` | M4 | `registers`, `shifts`, `counts`, `count_lines` + shift-owner function | — |
-| 0012 | `sales` | M4 | All `sales.*` tables + allocation, advance-deduction, note and payment-allocation triggers + sales views | `inv.movements.sales_document_line_id`, `inv.adjustments.sales_document_id`, `gl.journal_entries` (sales document, payment, opening balance, shift) |
-| 0013 | `ops_outbox` | M4 | `ops.outbox` | — |
-| 0014 | `cash_events` | M5 | `cash.movements`, `cash.drawer_events` + shift summary view | `gl.journal_entries.cash_movement_id` |
-| 0015 | `ops_backup` | M6 | `ops.backup_runs`, `ops.integrity_runs` + backup role grants | — |
+| 0007 | `company_edit_owner_only` | M1 | — (data: `system.company.edit` becomes owner-only and leaves every other role, decision 0030) | — |
+| 0008 | `gl_core` | M2 | `accounts` (provisional chart), `account_mappings`, `periods` (monthly, seeded) + period guard | — |
+| 0009 | `master_data` | M2 | All 15 `md.*` tables (with seeds) and `sys.reason_codes` (with seeds) | `auth.devices.default_warehouse_id`, `auth.approvals.reason_code_id` |
+| 0010 | `inventory` | M3 | All `inv.*` tables + `apply_movement` + stock views | — |
+| 0011 | `gl_journals` | M3 | `journal_entries`, `journal_lines` + balance trigger | — |
+| 0012 | `cash_core` | M4 | `registers`, `shifts`, `counts`, `count_lines` + shift-owner function | — |
+| 0013 | `sales` | M4 | All `sales.*` tables + allocation, advance-deduction, note and payment-allocation triggers + sales views | `inv.movements.sales_document_line_id`, `inv.adjustments.sales_document_id`, `gl.journal_entries` (sales document, payment, opening balance, shift) |
+| 0014 | `ops_outbox` | M4 | `ops.outbox` | — |
+| 0015 | `cash_events` | M5 | `cash.movements`, `cash.drawer_events` + shift summary view | `gl.journal_entries.cash_movement_id` |
+| 0016 | `ops_backup` | M6 | `ops.backup_runs`, `ops.integrity_runs` + backup role grants | — |
 
-After 0015, a final check asserts that every business table has the audit trigger, the no-delete guard and the expected grants. The same check runs as an automated test.
+After 0016, a final check asserts that every business table has the audit trigger, the no-delete guard and the expected grants. The same check runs as an automated test.
 
 ---
 
