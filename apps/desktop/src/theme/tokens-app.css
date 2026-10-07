@@ -7,3 +7,9 @@
   --color-switch-knob: #ffffff;
   --font-mono: ui-monospace, consolas, monospace;
 }
+
+/* QR codes are always dark on light, in both themes, so every phone app can scan them. */
+:root {
+  --color-qr-dark: #000000;
+  --color-qr-light: #ffffff;
+}

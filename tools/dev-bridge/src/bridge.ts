@@ -70,6 +70,9 @@ export class DevBridge {
     return {
       enrolled: stored !== null,
       serverUrl: stored?.serverUrl ?? null,
+      device: stored
+        ? { code: stored.device.code, name: stored.device.name, kind: stored.device.kind }
+        : null,
       suggestedCode: suggestedCode(this.options.computerName),
     };
   }

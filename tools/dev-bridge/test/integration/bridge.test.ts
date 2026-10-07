@@ -67,6 +67,7 @@ describe('enrolling this PC', () => {
     expect(await pc.bridge.localDevice()).toEqual({
       enrolled: false,
       serverUrl: null,
+      device: null,
       suggestedCode: 'COUNTER-01',
     });
     expect(await meOf(pc.bridge)).toEqual({ kind: 'not_enrolled' });
@@ -81,6 +82,11 @@ describe('enrolling this PC', () => {
 
     const stored = await readDevice(pc.deviceFile);
     expect(stored?.caCertificatePem).toBe(https.ca.certPem);
+    expect((await pc.bridge.localDevice()).device).toEqual({
+      code: 'COUNTER-01',
+      name: 'Showroom counter',
+      kind: 'pos',
+    });
     expect((await stat(pc.deviceFile)).mode & 0o777).toBe(0o600);
     const text = await readFile(pc.deviceFile, 'utf8');
     expect(text).not.toContain(code);

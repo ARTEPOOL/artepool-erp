@@ -47,6 +47,8 @@ export interface LocalDevice {
   enrolled: boolean;
   /** The server this PC is enrolled with, e.g. `https://artepool-server:3100`. */
   serverUrl: string | null;
+  /** As enrolled (shown at the bottom of the sign-in screen even when the server is down). */
+  device: { code: string; name: string; kind: string } | null;
   /** The Windows computer name, suggested as the device code when enrolling. */
   suggestedCode: string;
 }

@@ -112,3 +112,8 @@ bdi {
     transition: none !important;
   }
 }
+
+/* Direction icons (back arrows, chevrons) point the reading way in both languages. */
+[dir='rtl'] .flip-rtl {
+  transform: scaleX(-1);
+}

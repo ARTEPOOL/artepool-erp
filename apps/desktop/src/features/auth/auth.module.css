@@ -1,0 +1,326 @@
+/* From design/screens/01-login.html: .box, .hello, .form, .people, .person, .dots, .pad, .otp */
+.box {
+  inline-size: min(26rem, 100%);
+  display: grid;
+  gap: var(--space-5);
+}
+
+.wide {
+  inline-size: min(28rem, 100%);
+}
+
+.hello {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.hello h1 {
+  font-size: var(--text-h1);
+  line-height: 1.35;
+  font-weight: 600;
+}
+
+.hello p {
+  color: var(--color-text-secondary);
+}
+
+.form {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.centered {
+  justify-self: center;
+}
+
+.link {
+  justify-self: center;
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: var(--text-label);
+  color: var(--color-primary);
+  cursor: pointer;
+}
+
+.link[data-hovered] {
+  text-decoration: underline;
+}
+
+.link[data-focus-visible] {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.caps {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-caption);
+  color: var(--color-warning);
+}
+
+.caps svg {
+  inline-size: 1rem;
+  block-size: 1rem;
+}
+
+.retry {
+  margin-block-start: var(--space-2);
+}
+
+.label {
+  font-size: var(--text-label);
+  font-weight: 600;
+}
+
+.field {
+  display: grid;
+  gap: var(--space-2);
+}
+
+/* PIN sign-in */
+.people {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.person {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding-block: var(--space-1);
+  padding-inline: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  font: inherit;
+  font-size: var(--text-label);
+  color: var(--color-text);
+  cursor: pointer;
+  transition:
+    border-color var(--motion-fast) var(--motion-ease),
+    background var(--motion-fast) var(--motion-ease);
+}
+
+.person > span:first-child {
+  inline-size: 1.75rem;
+  block-size: 1.75rem;
+  font-size: var(--text-caption);
+}
+
+.person[aria-pressed='true'] {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.person:disabled {
+  cursor: not-allowed;
+  color: var(--color-disabled-text);
+  background: var(--color-disabled-bg);
+}
+
+.person:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.blockedTag {
+  font-size: var(--text-caption);
+}
+
+.dots {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-3);
+  direction: ltr;
+  padding-block: var(--space-2);
+}
+
+.dots i {
+  inline-size: 0.875rem;
+  block-size: 0.875rem;
+  border-radius: 50%;
+  border: 2px solid var(--color-control-border);
+  transition:
+    background var(--motion-fast) var(--motion-ease),
+    border-color var(--motion-fast) var(--motion-ease),
+    transform var(--motion-fast) var(--motion-ease);
+}
+
+.dots i.on {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  transform: scale(1.1);
+}
+
+.pad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-2);
+  direction: ltr;
+}
+
+.pad button {
+  min-block-size: 3.25rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--text-h2);
+  font-weight: 600;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition:
+    background var(--motion-fast) var(--motion-ease),
+    transform 80ms var(--motion-ease);
+}
+
+.pad button:hover {
+  background: var(--color-primary-soft);
+  border-color: var(--color-primary);
+}
+
+.pad button:active {
+  transform: scale(0.95);
+}
+
+.pad button:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.pad .padText {
+  font-size: var(--text-label);
+  color: var(--color-text-secondary);
+}
+
+.pad svg {
+  inline-size: 1.25rem;
+  block-size: 1.25rem;
+}
+
+/* Owner code: six boxes */
+.otp {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-2);
+  direction: ltr;
+}
+
+.otp input {
+  inline-size: 3rem;
+  block-size: 3.5rem;
+  text-align: center;
+  font: inherit;
+  font-size: var(--text-h2);
+  font-weight: 600;
+  color: var(--color-text);
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.otp input:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 1px;
+}
+
+.otp.bad input {
+  border-color: var(--color-danger);
+}
+
+/* 2-step setup and recovery codes (same style, not shown in the design) */
+.qr {
+  justify-self: center;
+  inline-size: 11rem;
+  block-size: 11rem;
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-qr-light);
+}
+
+.qr rect {
+  fill: var(--color-qr-light);
+}
+
+.qr path {
+  fill: var(--color-qr-dark);
+}
+
+.secret {
+  direction: ltr;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: var(--text-label);
+  letter-spacing: 0.08em;
+  word-break: break-all;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-muted);
+  user-select: all;
+}
+
+.codes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+  direction: ltr;
+  margin: 0;
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-primary-soft);
+  list-style: none;
+}
+
+.codes li {
+  font-family: var(--font-mono);
+  font-size: var(--text-body);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--color-primary);
+  text-align: center;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.two {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.who {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.who > span:first-child {
+  inline-size: 3rem;
+  block-size: 3rem;
+  font-size: var(--text-h3);
+}
+
+.problems {
+  margin: 0;
+  padding-inline-start: var(--space-4);
+}
+
+@media print {
+  .noPrint {
+    display: none;
+  }
+}
