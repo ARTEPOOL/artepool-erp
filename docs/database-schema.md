@@ -249,6 +249,29 @@ Written in the same transaction as the operation.
 | committed_at | timestamptz? | |
 | committed_by | bigint? → auth.users | |
 
+### 4.10 `sys.print_templates` (added by decision 0020)
+
+| Column | Type | Rules |
+|---|---|---|
+| id | bigint PK | |
+| doc_kind | text | `CHECK IN ('tax_invoice_a4','quotation_a4','credit_note_a4','receipt_thermal','z_report','barcode_label')`, `UNIQUE` |
+| current_version_id | bigint? → sys.print_template_versions | The version used for new documents |
+| [ins] [upd] | | |
+
+### 4.11 `sys.print_template_versions` (append-only)
+
+| Column | Type | Rules |
+|---|---|---|
+| id | bigint PK | |
+| template_id | bigint → sys.print_templates | |
+| version_no | integer | `UNIQUE (template_id, version_no)`, gapless per template |
+| settings | jsonb | Logo position and size, main colour, print language, text size, optional-field switches, texts, margins, paper width. Validated by a Zod schema; locked tax fields are not stored as switches and are always rendered. |
+| logo_sha256 | bytea? | Logo file stored by hash (content-addressed) |
+| note | text? | |
+| [ins] | | Never updated or deleted (`sys.forbid_update`, `sys.forbid_delete`) |
+
+Every issued document (`sales.documents`, receipts, Z reports) stores `print_template_version_id` at issue, and reprints use that version. Permission: `print_templates.manage` (Owner only).
+
 ---
 
 ## 5. Schema `auth`

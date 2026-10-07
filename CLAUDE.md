@@ -59,6 +59,7 @@ It runs client–server on the local network: PostgreSQL and the API service on 
 - **Cart removals** before the invoice is issued need no approval. They are always written to the audit log as events. (0005)
 - **Shift-close recount:** at most one, with supervisor approval. Both counts are kept. (0006)
 - **Printing:** the POS prints thermal receipts silently. The "Invoices (A4)" section prints through the print dialog. A POS sale can be reprinted in A4 with the same number. (0008)
+- **Print designer:** the owner customises print templates (logo, colour, language, optional fields, texts, margins). Tax-required fields are locked. Templates are versioned; each document stores its template version and reprints with it. (0020)
 
 **Accounting**
 - **Defective returns** are held at cost in "Inventory – defective" until written off. (0015)
@@ -85,7 +86,7 @@ It runs client–server on the local network: PostgreSQL and the API service on 
 | `docs/phase-1-plan.md` | Project structure, migrations order, build order, test plan |
 | `docs/accounting/` | Provisional chart of accounts and posting map (for the accountant) |
 | `docs/decisions/` | One file per decision, with its status |
-| `design/` | Approved UI design reference (tokens, design system, screens 01–10). Build the client screens to match it. |
+| `design/` | Approved UI design reference v2 (simple style): tokens for light and dark, component styles, design system, screens 01–14. Build the client screens to match it. |
 
 ## Tech stack (confirmed — decision 0001)
 

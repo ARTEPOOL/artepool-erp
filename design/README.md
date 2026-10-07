@@ -1,15 +1,18 @@
-# ARTÉPOOL ERP — UI design reference (v1.3)
+# ARTÉPOOL ERP — UI design reference (v2, simple)
 
 Approved visual reference for the desktop client. Build the real screens (React + CSS Modules, decision 0001) to match these files. Do not ship these HTML files.
 
-Open `index.html` in a browser to browse every screen. Each screen has a dark preview bar at the top (not part of the product) with a state picker, and an AR/EN switch that flips the text and direction.
+Open `index.html` in a browser to browse every screen. Each screen has an AR/EN switch, a light/dark switch, and (where a screen has several states) a small dark preview pill at the bottom to pick the state. The pill is not part of the product.
+
+v2 replaces v1.3. The owner approved a simpler look: light grey background, white cards with thin borders and no shadows, turquoise only where it matters, short calm motion, and light and dark modes.
 
 ## Files
 
 | File | What it is |
 |---|---|
-| `artepool-tokens.css` | Design tokens (colors, type, spacing, radius, sizes). The client's token layer must use these names and values. |
-| `artepool-design-system.md` | Design system (Arabic): roles, components, RTL rules, keyboard shortcuts, and the decisions behind each screen. |
+| `artepool-tokens.css` | Design tokens for light and dark modes (colors, type, spacing, radius, sizes, motion). The client's token layer must use these names and values. |
+| `artepool-components.css` | Reference styles for shared components (cards, buttons, chips, fields, shell, motion keyframes). |
+| `artepool-design-system.md` | Design system v2 (Arabic): principles, colors in both modes, components, motion rules, screen list. |
 | `screens/01-login.html` | Sign-in: password, PIN for cashiers, owner 2-step code, server status, error states |
 | `screens/02-dashboard.html` | App shell (sidebar, top bar) and owner dashboard |
 | `screens/03-pos.html` | POS counter (1366×768, no page scroll) |
@@ -20,8 +23,21 @@ Open `index.html` in a browser to browse every screen. Each screen has a dark pr
 | `screens/08-shift-close.html` | Shift close: blind count, supervisor review, Z report |
 | `screens/09-a4-tax-invoice.html` | Printed A4 bilingual tax invoice (one page; original and copy) |
 | `screens/10-thermal-receipt.html` | 80 mm simplified tax invoice receipt (original and copy) |
+| `screens/11-print-designer.html` | Print designer (Settings): live preview, logo, colour, print language, optional fields, texts, paper; tax fields locked (decision 0020) |
+| `screens/12-reports.html` | Reports: sales, VAT return summary with the quarterly export package and annual archive, stock, cash and shifts, profit and loss |
+| `screens/13-settings.html` | Settings: company, users and role permissions, VAT and numbering, devices and printers, backup, audit log; links to the print designer |
+| `screens/14-customers.html` | Customers: VAT registration decides the invoice type, balances and overdue, statement and aging, new-customer form with TRN check |
 
-Screens 01–03 were designed in ChatGPT; 04–10 and the POS clipping fix were added in v1.3.
+
+## Interactive previews
+
+Every button, tab, filter, search box and form in the screens works, so the owner can try real flows before the app is built. Data lives only in the open page and resets on reload.
+
+- Sign in: password `password1`; a username containing `cashier` opens the POS, any other opens the owner 2-step code (any 6 digits). Cashier PIN `1234`.
+- Supervisor PIN in every approval dialog: `1234`.
+- Exports download real CSV files (open in Excel). Print buttons open the browser print dialog.
+- Nothing is ever deleted: customers, items and users are deactivated with a reason and can be reactivated; drafts are cancelled; posted documents are corrected with credit notes (golden rules 2 and 3).
+- Shared patterns (in `artepool-components.css`): modal dialog (`.dlg`), toast (`.toast`), confirm with the amount before any financial action, reason field and supervisor PIN for approvals, inline field errors.
 
 ## Rules for implementation
 
@@ -30,5 +46,8 @@ Screens 01–03 were designed in ChatGPT; 04–10 and the POS clipping fix were 
 - Do not use `scrollbar-gutter: stable` in containers that can be RTL; it clips content in Chromium (the v1.2 POS bug).
 - Money, codes, TRNs, barcodes and dates sit in LTR-isolated elements (`<bdi>`), with tabular numerals.
 - Every status is a name plus an icon, never color alone.
+- Motion: POS animations at most 150 ms, other screens at most 250 ms; never animate money amounts; disable all motion when the OS asks for reduced motion.
+- Printed documents (09, 10) and the print designer preview stay black on white in dark mode.
+- 09 and 10 show the default template. The print designer (11) changes the template; the real renderers must read the template version stored on each document.
 - Sample data in these files is fictional. The seller's legal name in English, address, phone, TRN and bank details must come from company settings.
 - Fonts (IBM Plex Sans Arabic) and icons (Lucide) are embedded here for offline preview; in the app, bundle them locally (no CDN).
