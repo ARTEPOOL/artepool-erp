@@ -30,6 +30,9 @@
     "demo:audit-tamper": "tsx tools/audit-verify/src/demo-tamper.ts",
     "dev:server": "tsx watch apps/server/src/main.ts",
     "dev:desktop:web": "pnpm --filter @artepool/desktop dev",
+    "dev:desktop": "pnpm --filter @artepool/desktop dev:app",
+    "build:desktop": "pnpm --filter @artepool/desktop build:app",
+    "test:rust": "cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --workspace",
     "owner:create": "tsx apps/server/src/cli/owner-create.ts",
     "device:code": "tsx apps/server/src/cli/device-code.ts",
     "owner:reset-2fa": "tsx apps/server/src/cli/owner-reset-2fa.ts"

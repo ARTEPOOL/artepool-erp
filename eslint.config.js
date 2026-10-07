@@ -8,7 +8,18 @@ import noLiteralUiText from './tools/lint/no-literal-ui-text.js';
 const noFloats = 'Money and quantities must never use floating point. Use @artepool/shared/money.';
 
 export default defineConfig(
-  { ignores: ['**/node_modules/**', '**/dist/**', '**/coverage/**', '**/*.generated.ts'] },
+  {
+    ignores: [
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/coverage/**',
+      '**/*.generated.ts',
+      '**/src-tauri/target/**',
+      '**/src-tauri/gen/**',
+      '**/test-results/**',
+      '**/playwright-report/**',
+    ],
+  },
   js.configs.recommended,
   tseslint.configs.recommendedTypeChecked,
   {

@@ -1,23 +1,22 @@
 import { useMemo } from 'react';
-import QRCode from 'qrcode';
+import { encode } from 'uqr';
 import styles from './auth.module.css';
-
-const QUIET_ZONE = 2;
 
 /**
  * A QR code drawn as one SVG path (no image file, nothing loaded from outside). Colours come
- * from the QR tokens, so it stays dark on light in both themes.
+ * from the QR tokens, so it stays dark on light in both themes. `uqr` leaves JavaScript's
+ * built-in objects alone, so the Windows app can keep them frozen (tauri.conf.json).
  */
 export function QrCode({ text, label }: { text: string; label: string }) {
   const { size, path } = useMemo(() => {
-    const { modules } = QRCode.create(text, { errorCorrectionLevel: 'M' });
+    const { data } = encode(text, { ecc: 'M', border: 2 });
     const parts: string[] = [];
-    for (let row = 0; row < modules.size; row++) {
-      for (let col = 0; col < modules.size; col++) {
-        if (modules.get(row, col)) parts.push(`M${col + QUIET_ZONE} ${row + QUIET_ZONE}h1v1h-1z`);
-      }
-    }
-    return { size: modules.size + QUIET_ZONE * 2, path: parts.join('') };
+    data.forEach((row, y) =>
+      row.forEach((dark, x) => {
+        if (dark) parts.push(`M${x} ${y}h1v1h-1z`);
+      }),
+    );
+    return { size: data.length, path: parts.join('') };
   }, [text]);
   return (
     <svg

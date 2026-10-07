@@ -88,6 +88,8 @@ export const test = base.extend<{
     await use((key, values) => tr(lang, key, values));
   },
   open: async ({ page, lang, theme }, use) => {
+    // Like the Windows app (tauri.conf.json freezePrototype): no library may change built-ins.
+    await page.addInitScript(() => Object.freeze(Object.prototype));
     await page.addInitScript(
       ([language, colour]) => {
         if (!sessionStorage.getItem('e2e-started')) {

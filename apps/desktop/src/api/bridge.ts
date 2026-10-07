@@ -2,6 +2,7 @@
  * How the screens reach the PC's native side (see `@artepool/shared/contracts` bridge). The
  * screens never hold the device key and never connect to the server themselves.
  */
+import { invoke, isTauri } from '@tauri-apps/api/core';
 import type {
   BridgeRequest,
   BridgeResponse,
@@ -50,7 +51,29 @@ export const devServerBridge: Bridge = {
   },
 };
 
-/** The bridge of this build. The Windows app (T11) replaces it with calls into Rust. */
+/**
+ * The Windows app: the Rust layer (`src-tauri`, crate artepool-bridge) holds the device key in
+ * Windows Credential Manager and makes every connection itself.
+ */
+export const tauriBridge: Bridge = {
+  localDevice: () => invoke<LocalDevice>('bridge_local_device'),
+  async enroll(input) {
+    try {
+      return await invoke<EnrollOutcome>('bridge_enroll', { input });
+    } catch {
+      return { ok: false, reason: 'unreachable' };
+    }
+  },
+  async request(request) {
+    try {
+      return await invoke<BridgeResponse>('bridge_request', { request });
+    } catch {
+      return { kind: 'unreachable' };
+    }
+  },
+};
+
+/** The Windows app talks to Rust; a browser in development talks to the Vite dev server. */
 export function defaultBridge(): Bridge {
-  return devServerBridge;
+  return isTauri() ? tauriBridge : devServerBridge;
 }
