@@ -46,7 +46,7 @@ const totpAad = (userId: bigint): string => `auth.users.totp_secret_enc:${userId
 /** Secrets of a 2-step setup in progress, by session (memory only, at most 10 minutes). */
 const pendingTwoStep = new Map<bigint, { secret: string; expires: number }>();
 
-function rateCheck(deps: AppDeps, request: FastifyRequest): void {
+export function rateCheck(deps: AppDeps, request: FastifyRequest): void {
   const key = `device:${request.device!.id}`;
   const wait = deps.limits.signIn.retryAfter(key);
   if (wait > 0) throw new AppError('RATE_LIMITED', 'Too many sign-in attempts', { seconds: wait });
@@ -87,7 +87,7 @@ async function passwordFailed(
 }
 
 /** A wrong PIN (sign-in, unlock, approval): counts towards the PIN block (decision 0021). */
-async function pinFailed(
+export async function pinFailed(
   trx: Transaction<DB>,
   deps: AppDeps,
   userId: bigint,

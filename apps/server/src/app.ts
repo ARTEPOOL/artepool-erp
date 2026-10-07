@@ -4,8 +4,11 @@ import type { DestinationStream } from 'pino';
 import { registerGuard } from './platform/auth/guard';
 import type { ServerConfig } from './platform/config';
 import { AppError, toAppError } from './platform/errors/app-error';
+import { registerApprovalRoutes } from './modules/approvals/routes';
+import { registerAuditRoutes } from './modules/audit/routes';
 import { registerAuthRoutes } from './modules/auth/routes';
 import { registerDeviceRoutes } from './modules/devices/routes';
+import { registerUserRoutes } from './modules/users/routes';
 import type { AppDeps } from './platform/http/deps';
 import { REDACT_PATHS, safeErrorSerializer } from './platform/http/logging';
 import { registerHealth } from './routes/health';
@@ -68,5 +71,8 @@ export function buildApp(options: AppOptions, deps: AppDeps): FastifyInstance {
   registerHealth(app, deps.db);
   registerAuthRoutes(app);
   registerDeviceRoutes(app);
+  registerUserRoutes(app);
+  registerApprovalRoutes(app);
+  registerAuditRoutes(app);
   return app;
 }
