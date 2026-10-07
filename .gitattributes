@@ -6,3 +6,6 @@
 *.ico binary
 *.ttf binary
 *.woff2 binary
+
+# Design reference screens embed fonts and images; do not diff them line by line.
+design/screens/*.html -diff linguist-generated=true
