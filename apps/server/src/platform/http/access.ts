@@ -14,8 +14,11 @@ export type Access =
    */
   | {
       readonly kind: 'session';
-      /** `second_factor`: only the short session waiting for the 2-step code. Default `full`. */
-      readonly stage?: 'second_factor' | 'full';
+      /**
+       * `second_factor`: only the short session waiting for the 2-step code; `any`: either
+       * (sign out). Default `full`.
+       */
+      readonly stage?: 'second_factor' | 'full' | 'any';
       /** Also allowed while the screen is locked (unlock, sign out). */
       readonly allowLocked?: boolean;
       /** Also allowed before the user has chosen their own password/PIN or set up 2-step. */

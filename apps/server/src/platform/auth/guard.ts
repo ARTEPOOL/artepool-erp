@@ -235,7 +235,7 @@ async function authenticateSession(
   }
 
   const wantStage = access.kind === 'session' ? (access.stage ?? 'full') : 'full';
-  if (row.stage !== wantStage) {
+  if (wantStage !== 'any' && row.stage !== wantStage) {
     if (row.stage === 'second_factor') {
       throw new AppError('SECOND_FACTOR_REQUIRED', 'The 2-step code is still needed');
     }
@@ -265,12 +265,7 @@ async function authenticateSession(
   const allowLocked = access.kind === 'session' && access.allowLocked === true;
   if (locked && !allowLocked) throw new AppError('SESSION_LOCKED', 'Session is locked');
 
-  const mustChange = row.sign_in_method === 'pin' ? row.pin_must_change : row.must_change_password;
-  const pending: AuthInfo['pending'] = mustChange
-    ? 'credential_change'
-    : row.sign_in_method === 'password_totp' && !row.totp_enabled
-      ? 'two_step_setup'
-      : null;
+  const pending = pendingStep(row);
   const allowPending = access.kind === 'session' && access.allowPending === true;
   if (pending && row.stage === 'full' && !allowPending) {
     throw new AppError(
@@ -295,11 +290,33 @@ async function authenticateSession(
     username: row.username,
     signInMethod: row.sign_in_method as AuthInfo['signInMethod'],
     authMethod: row.auth_method as AuthInfo['authMethod'],
-    stage: row.stage,
+    stage: row.stage as AuthInfo['stage'],
     locked,
     pending,
     permissions: new Set(),
   };
+}
+
+/**
+ * What the user must do before anything else: choose their own password/PIN, or set up the
+ * 2-step code (first time, or again after signing in with a recovery code, decision 0022).
+ */
+export function pendingStep(row: {
+  sign_in_method: string;
+  must_change_password: boolean;
+  pin_must_change: boolean;
+  totp_enabled: boolean;
+  auth_method: string;
+}): AuthInfo['pending'] {
+  const mustChange = row.sign_in_method === 'pin' ? row.pin_must_change : row.must_change_password;
+  if (mustChange) return 'credential_change';
+  if (
+    row.sign_in_method === 'password_totp' &&
+    (!row.totp_enabled || row.auth_method === 'recovery_code')
+  ) {
+    return 'two_step_setup';
+  }
+  return null;
 }
 
 async function requirePermission(
