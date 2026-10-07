@@ -91,7 +91,7 @@ Also confirmed by the owner: nothing is ever deleted; users are deactivated and 
 | T10 | `c10369f` | App shell and Settings (users, roles, PCs, audit log) |
 | T11 | `ede591a` | Windows app (Tauri) with the Rust bridge |
 | T12 | `b501a6b`, `666d79b` | CI jobs (screens, Rust, Windows), Windows guide, docs |
-| T13 | `5ea768a`, `b2ec002`, this commit | Trusted PCs for the 2-step code (migration 0006) and forgot password, with screens and tests |
+| T13 | `5ea768a`, `b2ec002`, `50895ff` | Trusted PCs for the 2-step code (migration 0006) and forgot password, with screens and tests |
 
 **Tests at the end of M1:** 163 unit and screen-component tests, 256 integration tests (real PostgreSQL), 26 Rust tests, 32 Playwright flows (16 in Arabic/light, 16 in English/dark).
 
