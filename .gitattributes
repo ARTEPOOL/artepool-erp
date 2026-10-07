@@ -1,0 +1,8 @@
+# Same line endings on Windows and Linux (migration checksums depend on it).
+* text=auto eol=lf
+*.sql text eol=lf
+*.png binary
+*.jpg binary
+*.ico binary
+*.ttf binary
+*.woff2 binary
