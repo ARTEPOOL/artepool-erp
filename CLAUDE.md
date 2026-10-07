@@ -86,7 +86,7 @@ It runs client–server on the local network: PostgreSQL and the API service on 
 | `docs/phase-1-plan.md` | Project structure, migrations order, build order, test plan |
 | `docs/accounting/` | Provisional chart of accounts and posting map (for the accountant) |
 | `docs/decisions/` | One file per decision, with its status |
-| `design/` | Approved UI design reference v2 (simple style): tokens for light and dark, component styles, design system, screens 01–13. Build the client screens to match it. |
+| `design/` | Approved UI design reference v2 (simple style): tokens for light and dark, component styles, design system, screens 01–14. Build the client screens to match it. |
 
 ## Tech stack (confirmed — decision 0001)
 
