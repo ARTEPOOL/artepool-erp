@@ -2,14 +2,17 @@
  * The sign-in flow (decisions 0021–0026), independent of the screens so it can be tested alone.
  *
  * Which screen shows is decided here: enroll this PC → sign in (password, or PIN on POS PCs)
- * → owner 2-step code → required steps (own password/PIN, 2-step setup) → the app; and back to
- * the lock screen or sign-in when the session locks or ends. The server enforces every rule;
- * this only follows its answers.
+ * → owner 2-step code (unless this PC is trusted, decision 0027) → required steps (own
+ * password/PIN, 2-step setup) → the app; and back to the lock screen or sign-in when the
+ * session locks or ends. "Forgot password" (decision 0028) leads from sign-in straight into the
+ * app. The server enforces every rule; this only follows its answers.
  */
 import type {
   LocalDevice,
   MeResponse,
   PinUsersResponse,
+  RecoverPasswordRequest,
+  RecoverPasswordResponse,
   SecondFactorRequest,
   SessionView,
   SignInResponse,
@@ -28,6 +31,8 @@ export type Phase =
   | { name: 'enroll'; notice: 'revoked' | 'expired' | null }
   | { name: 'outdated'; minVersion: string }
   | { name: 'signIn'; notice: SignInNotice }
+  | { name: 'recoverPassword' }
+  | { name: 'passwordRecovered'; codesLeft: number }
   | { name: 'secondFactor' }
   | { name: 'changeCredential'; credential: 'password' | 'pin' }
   | { name: 'twoStepSetup' }
@@ -53,6 +58,8 @@ export interface AuthState {
   session: SessionView | null;
   user: UserView | null;
   permissions: string[];
+  /** While the 2-step code is asked: days "Trust this PC" would last here, or null if not offered. */
+  trustDays: number | null;
 }
 
 const INITIAL: AuthState = {
@@ -63,6 +70,7 @@ const INITIAL: AuthState = {
   session: null,
   user: null,
   permissions: [],
+  trustDays: null,
 };
 
 /** While the person is active, tell the server at most this often (it locks idle sessions). */
@@ -180,7 +188,38 @@ export class AuthController {
 
   private async signedIn(response: SignInResponse): Promise<void> {
     this.api.setToken(response.token);
-    this.set({ session: response.session, user: response.user, server: 'ok' });
+    this.set({
+      session: response.session,
+      user: response.user,
+      server: 'ok',
+      trustDays: response.trustDays ?? null,
+    });
+    await this.next();
+  }
+
+  // ------------------------------------------------------------------ forgot password (0028)
+  /** "Forgot your password?" → the recovery screen (phone code + one recovery code). */
+  openPasswordRecovery(): void {
+    this.go({ name: 'recoverPassword' });
+  }
+
+  backToSignIn(): void {
+    this.go({ name: 'signIn', notice: null });
+  }
+
+  /** On success the person is signed in here; the next screen says how many codes are left. */
+  async recoverPassword(request: RecoverPasswordRequest): Promise<void> {
+    const response = await this.api.post<RecoverPasswordResponse>(
+      `${AUTH}/recover-password`,
+      request,
+    );
+    this.api.setToken(response.token);
+    this.set({ session: response.session, user: response.user, server: 'ok', trustDays: null });
+    this.go({ name: 'passwordRecovered', codesLeft: response.recoveryCodesLeft });
+  }
+
+  /** "Continue" after the new password was saved. */
+  async passwordRecoveredSeen(): Promise<void> {
     await this.next();
   }
 
@@ -299,7 +338,7 @@ export class AuthController {
   private clearSession(): void {
     this.api.setToken(null);
     this.pendingSecret = null;
-    this.set({ session: null, user: null, permissions: [] });
+    this.set({ session: null, user: null, permissions: [], trustDays: null });
   }
 
   // ------------------------------------------------------------------ server answers

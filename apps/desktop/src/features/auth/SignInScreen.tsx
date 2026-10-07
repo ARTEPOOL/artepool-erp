@@ -185,10 +185,19 @@ function PasswordForm() {
         {t('signIn.forgot')}
       </AriaButton>
       <Dialog isOpen={forgotOpen} onClose={() => setForgotOpen(false)} title={t('forgot.title')}>
-        <p>{t('forgot.body')}</p>
+        <p>{t('forgot.twoStep')}</p>
+        <p>{t('forgot.staff')}</p>
         <DialogFooter>
-          <Button variant="primary" onPress={() => setForgotOpen(false)}>
-            {t('forgot.ok')}
+          <Button onPress={() => setForgotOpen(false)}>{t('forgot.ok')}</Button>
+          <Button
+            variant="primary"
+            isDisabled={serverDown}
+            onPress={() => {
+              setForgotOpen(false);
+              controller.openPasswordRecovery();
+            }}
+          >
+            {t('forgot.recover')}
           </Button>
         </DialogFooter>
       </Dialog>

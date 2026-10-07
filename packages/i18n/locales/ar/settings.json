@@ -198,7 +198,12 @@
     "editTitle": "تعديل الجهاز",
     "name": "اسم الجهاز",
     "kind": "نوع الجهاز",
-    "saved": "حُفظ الجهاز"
+    "saved": "حُفظ الجهاز",
+    "trustedUntil": "بدون رمز الهاتف هنا لـ {name} حتى {date}",
+    "endTrust": "إلغاء الثقة",
+    "endTrustTitle": "إلغاء الثقة في هذا الجهاز؟",
+    "endTrustBody": "سيُطلب رمز الهاتف من جديد على {device} لكل من: {names}.",
+    "trustEnded": "أُلغيت الثقة: يلزم رمز الهاتف من جديد على هذا الجهاز"
   },
   "audit": {
     "title": "سجل المراقبة",
@@ -273,7 +278,9 @@
         "sign_in_refused": "رُفض الدخول",
         "signed_in": "تسجيل دخول",
         "two_step_enabled": "إعداد رمز التحقق",
-        "user_unlocked": "فك قفل حساب"
+        "user_unlocked": "فك قفل حساب",
+        "password_recovered": "استُرجعت كلمة المرور برمز الهاتف ورمز استرداد",
+        "password_recovery_failed": "محاولة فاشلة لاسترجاع كلمة المرور"
       },
       "other": "حدث: {name}"
     },
@@ -314,6 +321,10 @@
         "permissions": {
           "insert": "تعريف صلاحية",
           "update": "تعديل صلاحية"
+        },
+        "device_trust": {
+          "insert": "جهاز موثوق: بدون رمز الهاتف فيه لفترة",
+          "update": "انتهت الثقة في جهاز"
         }
       },
       "sys": {
@@ -377,7 +388,10 @@
       "cancelled_at": "وقت الإلغاء",
       "cancel_reason": "سبب الإلغاء",
       "language": "اللغة",
-      "requires_2fa": "يتطلب رمز تحقق"
+      "requires_2fa": "يتطلب رمز تحقق",
+      "expires_at": "حتى",
+      "ended_at": "انتهت في",
+      "end_reason": "سبب الانتهاء"
     }
   }
 }

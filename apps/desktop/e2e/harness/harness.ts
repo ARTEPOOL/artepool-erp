@@ -67,16 +67,16 @@ for (const pc of [
   if (!outcome.ok) throw new Error(`Could not enroll ${pc.deviceCode}: ${outcome.reason}`);
 }
 
-/** The owner's current 2-step code, never one already used (codes work once). */
-async function ownerCode(): Promise<string> {
+/** A 2-step user's current code (the owner's by default), never one already used. */
+async function currentCode(userId: bigint = owner.id): Promise<string> {
   const row = await server.db
     .selectFrom('auth.users')
     .select(['totp_secret_enc', 'totp_last_step'])
-    .where('id', '=', owner.id)
+    .where('id', '=', userId)
     .executeTakeFirstOrThrow();
-  if (!row.totp_secret_enc) throw new Error('The owner has no 2-step code set up.');
+  if (!row.totp_secret_enc) throw new Error('This user has no 2-step code set up.');
   const secret = server.deps.secretBox
-    .open(row.totp_secret_enc, `auth.users.totp_secret_enc:${owner.id}`)
+    .open(row.totp_secret_enc, `auth.users.totp_secret_enc:${userId}`)
     .toString('utf8');
   const current = Math.floor(Date.now() / 30_000);
   const step = Math.max(current, Number(row.totp_last_step ?? -1) + 1);
@@ -100,7 +100,16 @@ function send(response: ServerResponse, status: number, value: unknown): void {
 const routes: Record<string, (input: Record<string, unknown>) => Promise<unknown>> = {
   'GET /ready': () => Promise.resolve({ ready: true, api: https.url }),
   'GET /owner': () => Promise.resolve({ username: OWNER.username, password: OWNER.password }),
-  'POST /owner/code': async () => ({ code: await ownerCode() }),
+  'POST /owner/code': async () => ({ code: await currentCode() }),
+  /** A staff member who signs in with the 2-step code, with known recovery codes. */
+  'POST /two-step-users': async (input) => {
+    const { id } = await support.addOwnerWithTwoStep(server, {
+      ...(input as unknown as Parameters<typeof support.addOwnerWithTwoStep>[1]),
+      roles: ['accountant'],
+    });
+    return { id };
+  },
+  'POST /code': async (input) => ({ code: await currentCode(BigInt(String(input.userId))) }),
   'POST /owner/reset-2fa': async () => {
     await support.resetOwnerTwoStep(server.db, 'e2e: set up the 2-step code again');
     return {};

@@ -63,6 +63,12 @@ export const control = {
   addUser: (user: NewUser) => control.call<{ id: string }>('POST', '/users', user),
   owner: () => control.call<{ username: string; password: string }>('GET', '/owner'),
   ownerCode: async () => (await control.call<{ code: string }>('POST', '/owner/code')).code,
+  /** A staff member set to "password + 2-step code", with these recovery codes. */
+  addTwoStepUser: (user: NewUser & { password: string; recoveryCodes: string[] }) =>
+    control.call<{ id: string }>('POST', '/two-step-users', user),
+  /** That user's current 6-digit code (never one already used). */
+  codeFor: async (userId: string) =>
+    (await control.call<{ code: string }>('POST', '/code', { userId })).code,
   resetOwnerTwoStep: () => control.call('POST', '/owner/reset-2fa'),
   addDevice: (code: string, name: string) => control.call('POST', '/devices', { code, name }),
   enrollmentCode: async () =>

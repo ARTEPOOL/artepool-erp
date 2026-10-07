@@ -42,6 +42,7 @@ There are still no sales, stock or accounting features in M1.
 | T10 | **App shell + Settings (design 13):**<br>• sidebar, top bar, language and theme switches, user menu (lock, switch user, sign out)<br>• Settings: Users & permissions, Devices, Audit log<br>• Company, VAT & numbering, Backup, Print designer and printers are shown greyed "coming later" (their milestones: M2, M2, M6, M4/M5) | `apps/desktop/src/app/*`, `apps/desktop/src/features/{admin,audit}/*` | Playwright: create a user → temporary code shown once; deactivate with a reason; revoke a PC with a reason; each one appears in the audit log with before/after; a non-owner never sees Settings and the server refuses them anyway |
 | T11 | **Windows desktop shell (Tauri 2, Rust):**<br>• all server calls go through Rust: TLS 1.3, trusting **only** the ARTÉPOOL CA<br>• device key kept in Windows Credential Manager, never visible to the screen code<br>• single instance<br>• update check that requires a valid signature (the signing key itself is created with you in M6)<br>• `pnpm dev:desktop` | `apps/desktop/src-tauri/*` | Rust unit tests for the connection rules; Windows build in CI |
 | T12 | **CI and docs:**<br>• CI: desktop tests, Playwright, and a Windows build job<br>• Windows guide: Rust + C++ Build Tools, `pnpm dev:desktop`, enrolling your PC<br>• `CLAUDE.md` commands, decisions 0021+, changelog<br>• pull request with screenshots | `.github/workflows/ci.yml`, `docs/*` | Green CI |
+| T13 | **Easier owner sign-in** (asked by the owner after trying M1; decisions [0027](../decisions/0027-trust-this-pc-for-the-2-step-code.md), [0028](../decisions/0028-forgot-password-with-phone-and-recovery-code.md)):<br>• "Trust this PC for 30 days" under the phone code (never on POS PCs); Settings → Devices shows who is trusted until when and can end it<br>• "Forgot your password?" with the phone code and one recovery code | `db/migrations/0006_device_trust.sql`, `apps/server/src/modules/{auth,devices}/*`, `apps/desktop/src/features/auth/RecoverPasswordScreen.tsx` | Database rules (only the person, on that PC; never POS; ends by itself); API (trust offered/used/ended, recovery success, one answer for any wrong part, weak password wastes no code, works while locked, replay refused, no secret in logs); screens; Playwright in both languages |
 
 ## Differences from the approved design (to keep the design honest)
 
@@ -54,6 +55,7 @@ There are still no sales, stock or accounting features in M1.
 7. **Top bar:** the account chip shows the person's name and username, and opens a small menu (Lock screen, Sign out).
 8. **Settings sections not built yet** (Company, VAT & numbering, Print designer, Backup) are greyed with "Soon".
 9. **App icon:** a placeholder in the brand colour until the final logo is supplied.
+10. **Two more screens and one box** that the design does not show, in the same style (T13): "Choose a new password" (forgot password), "Your password was changed", and the "Trust this PC" box under the phone code.
 
 ## Questions for the owner (answered 2026-10-07)
 
@@ -88,11 +90,14 @@ Also confirmed by the owner: nothing is ever deleted; users are deactivated and 
 | T9 | `161f997`, `cd15773`, `d4b8fe3` | Development bridge; sign-in screens; Playwright flows |
 | T10 | `c10369f` | App shell and Settings (users, roles, PCs, audit log) |
 | T11 | `ede591a` | Windows app (Tauri) with the Rust bridge |
-| T12 | this commit | CI jobs (screens, Rust, Windows), Windows guide, docs |
+| T12 | `b501a6b`, `666d79b` | CI jobs (screens, Rust, Windows), Windows guide, docs |
+| T13 | `5ea768a`, `b2ec002`, this commit | Trusted PCs for the 2-step code (migration 0006) and forgot password, with screens and tests |
 
-**Tests at the end of M1:** 158 unit and screen-component tests, 233 integration tests (real PostgreSQL), 26 Rust tests, 28 Playwright flows (14 in Arabic/light, 14 in English/dark).
+**Tests at the end of M1:** 163 unit and screen-component tests, 256 integration tests (real PostgreSQL), 26 Rust tests, 32 Playwright flows (16 in Arabic/light, 16 in English/dark).
 
 **Open items:**
 - **Accountant and Settings** (asked, not blocking): with the current role matrix the accountant can view the audit log (so they see Settings → Audit log only) and has `system.company.edit`. Recommendation: keep audit-log viewing, make company details owner-only. Applied as role data when the owner answers.
 - **Update signing key and installer checksums:** created with the owner in M6 (until then no update can be installed).
 - **Final logo:** replaces the placeholder icon when supplied.
+- **Password command on the server PC** (asked, not blocking): if the phone, the recovery codes **and** the password are all lost, the app cannot recover the owner account. A server-PC `pnpm owner:reset-password` (reason required, audited) would close that gap.
+- **Migration numbers:** 0006 is now "trusted PCs", so the chart of accounts is 0007 and master data 0008. The comments inside 0005 still say "0007" for master data; they cannot be edited (applied migration).

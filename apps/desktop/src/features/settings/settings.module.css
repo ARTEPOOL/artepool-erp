@@ -288,6 +288,13 @@
   color: var(--color-text-secondary);
 }
 
+/* "No phone code here for … until …" under a trusted PC (decision 0027) */
+.trusted {
+  display: flex;
+  gap: var(--space-1);
+  align-items: center;
+}
+
 /* Audit */
 .hashrow {
   display: flex;
