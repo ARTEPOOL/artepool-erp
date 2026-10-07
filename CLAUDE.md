@@ -61,6 +61,14 @@ It runs client–server on the local network: PostgreSQL and the API service on 
 - **Printing:** the POS prints thermal receipts silently. The "Invoices (A4)" section prints through the print dialog. A POS sale can be reprinted in A4 with the same number. (0008)
 - **Print designer:** the owner customises print templates (logo, colour, language, optional fields, texts, margins). Tax-required fields are locked. Templates are versioned; each document stores its template version and reprints with it. (0020)
 
+**Security and access**
+- **Sign-in:** cashiers use a 4-digit PIN **only on PCs enrolled as POS** (weak PINs refused; 5 wrong → blocked until the owner unblocks). Office PCs always need a password. (0021)
+- **Owner 2-step:** TOTP, 10 one-time recovery codes, and an audited emergency reset that works only on the server PC. (0022)
+- **Passwords:** 10+ characters, common ones refused, no forced symbols or expiry; a change ends the user's other sessions. (0023)
+- **Devices:** a 10-minute one-time enrollment code that also proves the server is genuine; the PC then trusts only the ARTÉPOOL CA. (0024)
+- **First owner / first PC:** `pnpm owner:create` and `pnpm device:code` on the server PC. (0025)
+- **Never deleted:** users are deactivated and devices revoked, always with a reason; revoking a device is final. (0026)
+
 **Accounting**
 - **Defective returns** are held at cost in "Inventory – defective" until written off. (0015)
 - **Periods** are monthly and are locked after close. Nothing is ever deleted. (0016)

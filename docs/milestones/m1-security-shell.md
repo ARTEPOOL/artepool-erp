@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | **Proposed** — waiting for the owner's approval and answers to the questions below |
+| **Status** | **Approved** (2026-10-07), with the owner's answers recorded as decisions [0021](../decisions/0021-cashier-pin-sign-in-on-pos-pcs.md)–[0026](../decisions/0026-users-and-devices-never-deleted.md). In progress on branch `m1-security-shell`. |
 | **Date** | 2026-10-07 |
 | **Milestone** | M1 of the [Phase 1 plan](../phase-1-plan.md) |
 | **Design reference** | [`design/screens/01-login.html`](../../design/screens/01-login.html), [`design/screens/13-settings.html`](../../design/screens/13-settings.html), tokens and components in [`design/`](../../design/) |
@@ -50,16 +50,18 @@ There are still no sales, stock or accounting features in M1.
 3. **"Certificate until"** on the devices table becomes "Key valid until": each PC has a secret key that renews itself automatically before it expires.
 4. **Sample numbers in the design** (for example "3 failed sign-ins → locked") follow the real settings (5 failures, 15 minutes).
 
-## Questions for the owner (security — answers needed before T1)
+## Questions for the owner (answered 2026-10-07)
 
-| # | Question | Recommendation |
+| # | Question | Answer (all recommendations accepted) |
 |---|---|---|
-| 1 | **Cashier sign-in.** The design lets cashiers sign in with a PIN only. The PRD says a PIN is for switching users and approvals. Which one? | PIN sign-in **only on PCs enrolled as POS**, 4 digits, easy PINs (1234, 0000, 1111…) refused, PIN blocked after 5 wrong tries until the owner unlocks it. Office PCs always need a password. |
-| 2 | **Owner's phone lost.** How does the owner get back in? | 10 one-time recovery codes, shown once at setup, printed and kept in the safe. Plus an emergency reset command that only works on the server PC itself and is written to the audit log. |
-| 3 | **Password rules.** | At least 10 characters, no forced symbols, common passwords refused, no forced expiry. A changed password ends the user's other sessions. |
-| 4 | **How a new PC trusts the server.** | The one-time enrollment code also proves the server is genuine, so nothing needs copying by hand. (Alternative: copy a certificate file to each PC with a USB stick.) |
-| 5 | **Enrollment code lifetime.** The design says 10 minutes; the architecture says 15. | 10 minutes, as in the design. |
-| 6 | **The very first owner and PC.** There is no one to sign in yet. | Created once by commands run on the server PC (`pnpm owner:create`, `pnpm device:code`), in production by the installer in M6. |
+| 1 | **Cashier sign-in.** The design lets cashiers sign in with a PIN only. The PRD says a PIN is for switching users and approvals. Which one? | PIN sign-in **only on PCs enrolled as POS**, 4 digits, easy PINs (1234, 0000, 1111…) refused, PIN blocked after 5 wrong tries until the owner unlocks it. Office PCs always need a password. → [0021](../decisions/0021-cashier-pin-sign-in-on-pos-pcs.md) |
+| 2 | **Owner's phone lost.** How does the owner get back in? | 10 one-time recovery codes, shown once at setup, printed and kept in the safe. Plus an emergency reset command that only works on the server PC itself and is written to the audit log. → [0022](../decisions/0022-owner-2-step-recovery.md) |
+| 3 | **Password rules.** | At least 10 characters, no forced symbols, common passwords refused, no forced expiry. A changed password ends the user's other sessions. → [0023](../decisions/0023-password-rules.md) |
+| 4 | **How a new PC trusts the server.** | The one-time enrollment code also proves the server is genuine, so nothing needs copying by hand. (Alternative: copy a certificate file to each PC with a USB stick.) → [0024](../decisions/0024-device-enrollment-proves-the-server.md) |
+| 5 | **Enrollment code lifetime.** The design says 10 minutes; the architecture says 15. | 10 minutes, as in the design. → [0024](../decisions/0024-device-enrollment-proves-the-server.md) |
+| 6 | **The very first owner and PC.** There is no one to sign in yet. | Created once by commands run on the server PC (`pnpm owner:create`, `pnpm device:code`), in production by the installer in M6. → [0025](../decisions/0025-first-owner-and-pc-from-server-commands.md) |
+
+Also confirmed by the owner: nothing is ever deleted; users are deactivated and devices revoked, always with a reason → [0026](../decisions/0026-users-and-devices-never-deleted.md).
 
 ## Done when
 
