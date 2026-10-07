@@ -26,6 +26,7 @@ There is one short file per decision, numbered in order.
 | [0017](0017-quarterly-vat-export-and-annual-archive.md) | Quarterly VAT export package and annual archive | Accepted (Phase 2) |
 | [0018](0018-chart-of-accounts-and-posting-map.md) | Chart of accounts and posting map | **Pending accountant review** |
 | [0019](0019-einvoicing-via-accredited-provider.md) | E-invoicing via accredited service provider | Approach accepted; **go-live date pending** |
+| [0020](0020-print-template-designer.md) | Print template designer (versioned, locked tax fields) | Accepted |
 
 ## Template
 

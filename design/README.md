@@ -23,6 +23,7 @@ v2 replaces v1.3. The owner approved a simpler look: light grey background, whit
 | `screens/08-shift-close.html` | Shift close: blind count, supervisor review, Z report |
 | `screens/09-a4-tax-invoice.html` | Printed A4 bilingual tax invoice (one page; original and copy) |
 | `screens/10-thermal-receipt.html` | 80 mm simplified tax invoice receipt (original and copy) |
+| `screens/11-print-designer.html` | Print designer (Settings): live preview, logo, colour, print language, optional fields, texts, paper; tax fields locked (decision 0020) |
 
 
 ## Rules for implementation
@@ -33,6 +34,7 @@ v2 replaces v1.3. The owner approved a simpler look: light grey background, whit
 - Money, codes, TRNs, barcodes and dates sit in LTR-isolated elements (`<bdi>`), with tabular numerals.
 - Every status is a name plus an icon, never color alone.
 - Motion: POS animations at most 150 ms, other screens at most 250 ms; never animate money amounts; disable all motion when the OS asks for reduced motion.
-- Printed documents (09, 10) stay black on white in dark mode.
+- Printed documents (09, 10) and the print designer preview stay black on white in dark mode.
+- 09 and 10 show the default template. The print designer (11) changes the template; the real renderers must read the template version stored on each document.
 - Sample data in these files is fictional. The seller's legal name in English, address, phone, TRN and bank details must come from company settings.
 - Fonts (IBM Plex Sans Arabic) and icons (Lucide) are embedded here for offline preview; in the app, bundle them locally (no CDN).
