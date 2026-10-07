@@ -123,6 +123,17 @@ export interface AuthDevices {
   updated_by: bigint;
 }
 
+export interface AuthDeviceTrust {
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  device_id: bigint;
+  end_reason: string | null;
+  ended_at: Timestamp | null;
+  expires_at: Timestamp;
+  id: Generated<bigint>;
+  user_id: bigint;
+}
+
 export interface AuthEnrollmentCodes {
   cancel_reason: string | null;
   cancelled_at: Timestamp | null;
@@ -369,6 +380,7 @@ export interface DB {
   "audit.verifications": AuditVerifications;
   "auth.approvals": AuthApprovals;
   "auth.device_activity": AuthDeviceActivity;
+  "auth.device_trust": AuthDeviceTrust;
   "auth.devices": AuthDevices;
   "auth.enrollment_codes": AuthEnrollmentCodes;
   "auth.permissions": AuthPermissions;
