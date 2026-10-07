@@ -95,6 +95,9 @@ importers:
 
   packages/testing:
     dependencies:
+      '@artepool/dev-db':
+        specifier: workspace:*
+        version: link:../../tools/dev-db
       '@artepool/migrate':
         specifier: workspace:*
         version: link:../../tools/migrate
