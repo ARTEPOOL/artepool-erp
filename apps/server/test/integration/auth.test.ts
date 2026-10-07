@@ -4,7 +4,6 @@
  * no secret ever reaching the logs or the audit log.
  */
 import { randomUUID } from 'node:crypto';
-import { sql } from 'kysely';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type {
   MeResponse,
@@ -603,19 +602,34 @@ describe('own password, lock, unlock and sign out', () => {
   });
 });
 
+/** Every text value inside a JSON document (log line or audit entry), at any depth. */
+function textValues(value: unknown, out: string[] = []): string[] {
+  if (typeof value === 'string') out.push(value);
+  else if (Array.isArray(value)) value.forEach((v) => textValues(v, out));
+  else if (value && typeof value === 'object')
+    Object.values(value).forEach((v) => textValues(v, out));
+  return out;
+}
+
 describe('secrets', () => {
   it('never appear in the server logs or the audit log', async () => {
-    const logs = server.logs.join('\n');
-    const audit = (
-      await sql<{
-        t: string;
-      }>`SELECT string_agg(coalesce(old_values::text, '') || coalesce(new_values::text, ''), ' ') AS t
-                                FROM audit.log`.execute(server.db)
-    ).rows[0]!.t;
+    const audit = await server.db
+      .selectFrom('audit.log')
+      .select(['old_values', 'new_values'])
+      .execute();
+    const documents = [...server.logs.map((line) => JSON.parse(line) as unknown), ...audit];
+    const values = documents.flatMap((d) => textValues(d));
+    const everything = values.join('\n');
     expect(secrets.length).toBeGreaterThan(25);
     for (const secret of secrets) {
-      expect(logs, 'server log').not.toContain(secret);
-      expect(audit, 'audit log').not.toContain(secret);
+      if (secret.length >= 8) {
+        expect(everything).not.toContain(secret);
+      } else {
+        // A 4-digit PIN also occurs by chance inside timestamps and ids, so short secrets are
+        // checked as whole values: no logged or audited field may hold one.
+        expect(values).not.toContain(secret);
+        expect(values.some((v) => v.includes(`"${secret}"`))).toBe(false);
+      }
     }
   });
 });
