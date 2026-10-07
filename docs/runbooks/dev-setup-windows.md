@@ -127,7 +127,8 @@ Applied 0001_extensions_schemas_helpers.sql (… ms)
 Applied 0002_audit.sql (… ms)
 Applied 0003_auth_core.sql (… ms)
 Applied 0004_sys_core.sql (… ms)
-Database upgraded: 4 migration(s) applied.
+Applied 0005_auth_devices.sql (… ms)
+Database upgraded: 5 migration(s) applied.
 ```
 
 ## Step 10: Run every check and test
@@ -168,7 +169,7 @@ The practice database is deleted at the end. Your own database is never touched.
 ```
 pnpm dev:server
 ```
-1. Open your browser at http://127.0.0.1:3100/health. You should see a line that starts with `{"status":"ok"` and includes `"schemaVersion":4`.
+1. Open your browser at http://127.0.0.1:3100/health. You should see a line that starts with `{"status":"ok"` and includes `"schemaVersion":5` (the number of the latest database update).
 2. Stop the server with **Ctrl + C** in PowerShell.
 
 ---

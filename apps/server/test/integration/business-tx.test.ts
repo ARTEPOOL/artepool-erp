@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto';
+import { readdirSync } from 'node:fs';
 import { sql } from 'kysely';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { connectionFor } from '@artepool/node-kit';
+import { connectionFor, migrationsDir } from '@artepool/node-kit';
 import { createTestDatabase, type TestDatabase } from '@artepool/testing';
 import { buildApp } from '../../src/app';
 import { createDb, createPool, type Db } from '../../src/platform/db/pool';
@@ -141,7 +142,12 @@ describe('GET /health', () => {
       schemaVersion: number;
       auditChain: { lastSeq: string; fingerprint: string };
     }>();
-    expect(body).toMatchObject({ status: 'ok', database: 'up', schemaVersion: 4 });
+    const latest = Math.max(
+      ...readdirSync(migrationsDir)
+        .filter((f) => /^\d{4}_.+\.sql$/.test(f))
+        .map((f) => Number(f.slice(0, 4))),
+    );
+    expect(body).toMatchObject({ status: 'ok', database: 'up', schemaVersion: latest });
     expect(body.auditChain.lastSeq).toMatch(/^\d+$/);
     expect(body.auditChain.fingerprint).toMatch(/^[0-9a-f]{16}$/);
     await app.close();

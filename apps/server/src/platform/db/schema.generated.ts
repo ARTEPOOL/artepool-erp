@@ -77,6 +77,67 @@ export interface AuditVerifications {
   triggered_by: bigint;
 }
 
+export interface AuthApprovals {
+  approved_at: Generated<Timestamp>;
+  approved_by: bigint;
+  consumed_at: Timestamp | null;
+  consumed_entity: string | null;
+  context: Generated<Json>;
+  device_id: bigint;
+  expires_at: Timestamp;
+  id: Generated<bigint>;
+  permission_code: string;
+  reason_code_id: bigint | null;
+  reason_text: string;
+  requested_by: bigint;
+}
+
+export interface AuthDeviceActivity {
+  app_version: string | null;
+  device_id: bigint;
+  last_ip: string | null;
+  last_seen_at: Generated<Timestamp>;
+}
+
+export interface AuthDevices {
+  branch_id: bigint;
+  code: string;
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  default_warehouse_id: bigint | null;
+  device_kind: string;
+  enrolled_at: Generated<Timestamp>;
+  enrolled_by: bigint;
+  id: Generated<bigint>;
+  key_expires_at: Timestamp;
+  key_hash: Buffer;
+  key_renewed_at: Timestamp | null;
+  name: string;
+  printer_config: Generated<Json>;
+  revoke_reason: string | null;
+  revoked_at: Timestamp | null;
+  revoked_by: bigint | null;
+  row_version: Generated<number>;
+  status: Generated<string>;
+  updated_at: Generated<Timestamp>;
+  updated_by: bigint;
+}
+
+export interface AuthEnrollmentCodes {
+  cancel_reason: string | null;
+  cancelled_at: Timestamp | null;
+  code_key: Buffer;
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  expires_at: Timestamp;
+  failed_attempts: Generated<number>;
+  id: Generated<bigint>;
+  key_salt: Buffer;
+  origin: string;
+  used_at: Timestamp | null;
+  used_device_id: bigint | null;
+}
+
 export interface AuthPermissions {
   approvable: Generated<boolean>;
   code: string;
@@ -84,6 +145,17 @@ export interface AuthPermissions {
   module: string;
   name_ar: string;
   name_en: string;
+  owner_only: Generated<boolean>;
+}
+
+export interface AuthRecoveryCodes {
+  code_hash: string;
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  id: Generated<bigint>;
+  revoked_at: Timestamp | null;
+  used_at: Timestamp | null;
+  user_id: bigint;
 }
 
 export interface AuthRolePermissions {
@@ -110,6 +182,23 @@ export interface AuthRoles {
   updated_by: bigint;
 }
 
+export interface AuthSessions {
+  auth_method: string;
+  client_ip: string | null;
+  created_at: Generated<Timestamp>;
+  device_id: bigint;
+  end_reason: string | null;
+  ended_at: Timestamp | null;
+  expires_at: Timestamp;
+  id: Generated<bigint>;
+  idle_timeout_sec: number;
+  last_activity_at: Generated<Timestamp>;
+  locked_at: Timestamp | null;
+  stage: string;
+  token_hash: Buffer;
+  user_id: bigint;
+}
+
 export interface AuthUserRoles {
   granted_at: Generated<Timestamp>;
   granted_by: bigint;
@@ -120,6 +209,9 @@ export interface AuthUserRoles {
 export interface AuthUsers {
   created_at: Generated<Timestamp>;
   created_by: bigint;
+  deactivated_at: Timestamp | null;
+  deactivated_by: bigint | null;
+  deactivation_reason: string | null;
   display_name_ar: string;
   display_name_en: string;
   email: string | null;
@@ -135,9 +227,12 @@ export interface AuthUsers {
   password_changed_at: Timestamp | null;
   password_hash: string | null;
   phone: string | null;
+  pin_blocked_at: Timestamp | null;
   pin_failed_count: Generated<number>;
   pin_hash: string | null;
+  pin_must_change: Generated<boolean>;
   row_version: Generated<number>;
+  sign_in_method: Generated<string>;
   totp_enabled: Generated<boolean>;
   totp_last_step: bigint | null;
   totp_secret_enc: Buffer | null;
@@ -220,6 +315,17 @@ export interface SysDocumentSeries {
   updated_by: bigint;
 }
 
+export interface SysIdempotencyKeys {
+  created_at: Generated<Timestamp>;
+  device_id: bigint;
+  endpoint: string;
+  key: string;
+  request_sha256: Buffer;
+  response_body: Json;
+  response_status: number;
+  user_id: bigint;
+}
+
 export interface SysImportBatches {
   committed_at: Timestamp | null;
   committed_by: bigint | null;
@@ -261,15 +367,22 @@ export interface DB {
   "audit.chain_head": AuditChainHead;
   "audit.log": AuditLog;
   "audit.verifications": AuditVerifications;
+  "auth.approvals": AuthApprovals;
+  "auth.device_activity": AuthDeviceActivity;
+  "auth.devices": AuthDevices;
+  "auth.enrollment_codes": AuthEnrollmentCodes;
   "auth.permissions": AuthPermissions;
+  "auth.recovery_codes": AuthRecoveryCodes;
   "auth.role_permissions": AuthRolePermissions;
   "auth.roles": AuthRoles;
+  "auth.sessions": AuthSessions;
   "auth.user_roles": AuthUserRoles;
   "auth.users": AuthUsers;
   "sys.alerts": SysAlerts;
   "sys.branches": SysBranches;
   "sys.company_profile": SysCompanyProfile;
   "sys.document_series": SysDocumentSeries;
+  "sys.idempotency_keys": SysIdempotencyKeys;
   "sys.import_batches": SysImportBatches;
   "sys.schema_migrations": SysSchemaMigrations;
   "sys.settings": SysSettings;

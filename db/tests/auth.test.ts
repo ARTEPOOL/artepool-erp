@@ -1,6 +1,12 @@
 import type pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createTestDatabase, inContext, setContext, type TestDatabase } from '@artepool/testing';
+import {
+  createTestDatabase,
+  FAKE_ARGON2_HASH,
+  inContext,
+  setContext,
+  type TestDatabase,
+} from '@artepool/testing';
 
 let db: TestDatabase;
 let api: pg.Client;
@@ -23,7 +29,7 @@ async function attempt(sql: string, params: unknown[] = []): Promise<void> {
 
 const addUser = (username: string, extra = '') =>
   `INSERT INTO auth.users (username, display_name_ar, display_name_en, password_hash${extra ? ', ' + extra.split('=')[0] : ''})
-   VALUES ('${username}', 'اسم', 'Name', 'hash'${extra ? ', ' + extra.split('=')[1] : ''})`;
+   VALUES ('${username}', 'اسم', 'Name', '${FAKE_ARGON2_HASH}'${extra ? ', ' + extra.split('=')[1] : ''})`;
 
 describe('users', () => {
   it('has the built-in SYSTEM user, which cannot log in or be changed', async () => {

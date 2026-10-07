@@ -32,7 +32,7 @@ try {
     `INSERT INTO sys.branches (code, name_ar, name_en) VALUES ('DEMO', 'فرع تجريبي', 'Demo branch')`,
   );
   await api.query(`INSERT INTO auth.users (username, display_name_ar, display_name_en, password_hash)
-                   VALUES ('demo.cashier', 'أمين صندوق', 'Demo cashier', 'not-a-real-hash')`);
+                   VALUES ('demo.cashier', 'أمين صندوق', 'Demo cashier', '$argon2id$not-a-real-hash')`);
   await api.query('COMMIT');
 
   say('3. Checking the audit chain:');
