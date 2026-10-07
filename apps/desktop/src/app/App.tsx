@@ -1,13 +1,31 @@
-import { useState } from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useEffect, useMemo, useState } from 'react';
+import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
+import { RouterProvider } from '@tanstack/react-router';
 import { defaultBridge, type Bridge } from '../api/bridge';
 import { AuthGate } from '../features/auth/AuthGate';
-import { AuthProvider } from '../features/auth/context';
+import { AuthProvider, useAuthState } from '../features/auth/context';
 import { AuthController } from '../features/auth/controller';
 import { ToastProvider } from '../ui';
-import { Home } from './Home';
+import { createAppRouter } from './router';
 
-/** The app root: the sign-in flow first, then the app (the shell with Settings arrives in T10). */
+/**
+ * The signed-in app. The place in the app survives the lock screen; a different person always
+ * starts on the dashboard, and nothing loaded for the previous person stays in memory.
+ */
+function Root() {
+  const queryClient = useQueryClient();
+  const { user } = useAuthState();
+  const userId = user?.id ?? null;
+  const router = useMemo(() => createAppRouter(), [userId]);
+  useEffect(() => () => queryClient.clear(), [queryClient, userId]);
+  return (
+    <AuthGate>
+      <RouterProvider router={router} />
+    </AuthGate>
+  );
+}
+
+/** The app root: the sign-in flow first, then the app shell with Settings. */
 export function App({ bridge }: { bridge?: Bridge }) {
   const [queryClient] = useState(
     () =>
@@ -20,9 +38,7 @@ export function App({ bridge }: { bridge?: Bridge }) {
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
         <AuthProvider controller={controller}>
-          <AuthGate>
-            <Home />
-          </AuthGate>
+          <Root />
         </AuthProvider>
       </ToastProvider>
     </QueryClientProvider>

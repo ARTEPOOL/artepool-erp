@@ -109,6 +109,24 @@ const routes: Record<string, (input: Record<string, unknown>) => Promise<unknown
     id: await support.addUser(server, input as unknown as Parameters<typeof support.addUser>[1]),
   }),
   'POST /enrollment-code': async () => ({ code: await newCode() }),
+  /** Enrolls one more PC through the real protocol (for tests that revoke a PC). */
+  'POST /devices': async (input) => {
+    const deviceCode = typeof input.code === 'string' ? input.code : 'EXTRA-PC';
+    const deviceName = typeof input.name === 'string' ? input.name : deviceCode;
+    const bridge = new DevBridge({
+      deviceFile: `${E2E.stateDir}/${deviceCode}.json`,
+      clientVersion: '0.1.0',
+    });
+    const outcome = await bridge.enroll({
+      serverAddress: https.url,
+      code: await newCode(),
+      deviceCode,
+      deviceName,
+      deviceKind: 'office',
+    });
+    if (!outcome.ok) throw new Error(`Could not enroll ${deviceCode}: ${outcome.reason}`);
+    return outcome.device;
+  },
   'POST /server/stop': async () => {
     await https.stop();
     return {};

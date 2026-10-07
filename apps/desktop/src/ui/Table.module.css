@@ -1,0 +1,127 @@
+/* From design/screens/13-settings.html: .tbl, table, th, td, .n, .s, .who, tr.sel, .is-off */
+.tbl {
+  padding: var(--space-2) var(--space-5) var(--space-3);
+  overflow-x: auto;
+}
+
+.table {
+  inline-size: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-label);
+}
+
+.table th {
+  text-align: start;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  font-size: var(--text-caption);
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+
+.table td {
+  padding: var(--space-3) var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: middle;
+}
+
+.table tbody tr {
+  transition: background var(--motion-fast) var(--motion-ease);
+}
+
+.table tbody tr:hover {
+  background: var(--color-surface-muted);
+}
+
+.table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.selectable tbody tr {
+  cursor: pointer;
+}
+
+.selectable tbody tr:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: -3px;
+}
+
+.table tbody tr.sel {
+  background: var(--color-primary-soft);
+}
+
+.off {
+  opacity: 0.55;
+}
+
+.num {
+  text-align: end;
+  white-space: nowrap;
+}
+
+.sub {
+  display: block;
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+}
+
+.who {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.who > span:last-child {
+  display: grid;
+  line-height: 1.4;
+  min-inline-size: 0;
+}
+
+.who b {
+  font-weight: 600;
+}
+
+.empty td {
+  text-align: center;
+  color: var(--color-text-secondary);
+  padding-block: var(--space-6);
+}
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-block-size: var(--control-md);
+  padding-inline: var(--space-3);
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+}
+
+.search svg {
+  inline-size: 1rem;
+  block-size: 1rem;
+  flex-shrink: 0;
+}
+
+.search input {
+  flex: 1;
+  inline-size: 0;
+  min-inline-size: 0;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: var(--text-label);
+  color: var(--color-text);
+}
+
+.search input:focus-visible {
+  outline: none;
+}
+
+.search:focus-within {
+  border-color: var(--color-primary);
+  outline: 3px solid var(--color-primary-soft);
+}

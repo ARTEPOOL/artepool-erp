@@ -1,0 +1,65 @@
+/* A small menu in the style of the design's cards (the design shows the user chip only). */
+.trigger {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding-block: var(--space-1);
+  padding-inline: var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--text-label);
+  line-height: 1.35;
+  text-align: start;
+  cursor: pointer;
+}
+
+.trigger[data-hovered],
+.trigger[data-pressed] {
+  background: var(--color-surface-muted);
+}
+
+.trigger[data-focus-visible] {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.popover {
+  min-inline-size: 12rem;
+  padding: var(--space-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: 0 8px 24px var(--color-shadow);
+}
+
+.menu {
+  outline: none;
+  display: grid;
+  gap: 2px;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-label);
+  color: var(--color-text);
+  cursor: pointer;
+  outline: none;
+}
+
+.item svg {
+  inline-size: 1rem;
+  block-size: 1rem;
+  color: var(--color-text-secondary);
+}
+
+.item[data-focused] {
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+}

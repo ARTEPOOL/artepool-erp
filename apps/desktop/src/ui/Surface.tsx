@@ -13,21 +13,40 @@ interface BoxProps {
   children?: ReactNode;
 }
 
-/** The design's `.card`. `rise` animates it in (with `index` for the stagger). */
+/**
+ * The design's `.card`. `rise` animates it in (with `index` for the stagger). `padding`: the
+ * design's `.tbl` for tables, `.sub` for the Settings side list.
+ */
 export function Card({
   className,
   style,
   children,
   rise,
   index,
-}: BoxProps & { rise?: boolean; index?: number }) {
+  as: Element = 'div',
+  padding = 'normal',
+  ...aria
+}: BoxProps & {
+  rise?: boolean;
+  index?: number;
+  as?: 'div' | 'nav' | 'section';
+  padding?: 'normal' | 'table' | 'compact';
+  'aria-label'?: string;
+}) {
   return (
-    <div
-      className={cx(styles.card, rise && 'rise', className)}
+    <Element
+      {...aria}
+      className={cx(
+        styles.card,
+        padding === 'table' && styles.cardTable,
+        padding === 'compact' && styles.cardCompact,
+        rise && 'rise',
+        className,
+      )}
       style={index !== undefined ? ({ ...style, '--i': index } as CSSProperties) : style}
     >
       {children}
-    </div>
+    </Element>
   );
 }
 

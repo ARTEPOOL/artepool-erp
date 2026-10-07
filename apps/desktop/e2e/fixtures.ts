@@ -64,6 +64,7 @@ export const control = {
   owner: () => control.call<{ username: string; password: string }>('GET', '/owner'),
   ownerCode: async () => (await control.call<{ code: string }>('POST', '/owner/code')).code,
   resetOwnerTwoStep: () => control.call('POST', '/owner/reset-2fa'),
+  addDevice: (code: string, name: string) => control.call('POST', '/devices', { code, name }),
   enrollmentCode: async () =>
     (await control.call<{ code: string }>('POST', '/enrollment-code')).code,
   stopServer: () => control.call('POST', '/server/stop'),
@@ -143,4 +144,26 @@ export function authenticatorCode(key: string, at = Date.now()): string {
     (hash[offset + 2]! << 8) |
     hash[offset + 3]!;
   return String(value % 1_000_000).padStart(6, '0');
+}
+
+/** Opens the account menu in the top bar and picks "Lock screen" or "Sign out". */
+export async function accountMenu(
+  page: Page,
+  t: (key: string) => string,
+  action: 'lock' | 'signOut',
+): Promise<void> {
+  await page.getByRole('button', { name: t('settings:user.menu') }).click();
+  await page.getByRole('menuitem', { name: t(`settings:user.${action}`) }).click();
+}
+
+/** Signs in as the owner on the open PC: password, then the current 2-step code. */
+export async function signInAsOwner(page: Page, t: (key: string) => string): Promise<void> {
+  const owner = await control.owner();
+  await page.getByLabel(t('auth:signIn.username'), { exact: true }).fill(owner.username);
+  await page.getByLabel(t('auth:signIn.password'), { exact: true }).fill(owner.password);
+  await page.getByRole('button', { name: t('auth:signIn.submit') }).click();
+  await expect(page.getByRole('heading', { name: t('auth:secondFactor.title') })).toBeVisible();
+  await typeCode(page, await control.ownerCode());
+  await page.getByRole('button', { name: t('auth:secondFactor.confirm') }).click();
+  await expect(page.getByRole('button', { name: t('settings:user.menu') })).toBeVisible();
 }

@@ -1,5 +1,5 @@
 /** Password sign-in on an office PC (design 01, decisions 0021 and 0023). */
-import { control, expect, snap, test, unique } from './fixtures';
+import { accountMenu, control, expect, snap, test, unique } from './fixtures';
 
 test('wrong password, sign in, sign out; the language switch mirrors the layout', async ({
   page,
@@ -31,9 +31,11 @@ test('wrong password, sign in, sign out; the language switch mirrors the layout'
   await page.getByLabel(t('auth:signIn.password'), { exact: true }).fill('blue-pool-water-1');
   await page.getByRole('button', { name: t('auth:signIn.submit') }).click();
   const name = lang === 'ar' ? 'سارة علي' : 'Sara Ali';
-  await expect(page.getByRole('heading', { name: t('auth:home.welcome', { name }) })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: t('settings:home.welcome', { name }) }),
+  ).toBeVisible();
 
-  await page.getByRole('button', { name: t('auth:home.signOut') }).click();
+  await accountMenu(page, t, 'signOut');
   await expect(page.getByText(t('auth:signIn.signedOut'))).toBeVisible();
   // Remembered on this PC (the checkbox is on by default).
   await expect(page.getByLabel(t('auth:signIn.username'), { exact: true })).toHaveValue(username);
@@ -83,7 +85,7 @@ test('first sign-in with a temporary password: the person chooses their own', as
     .fill('a calm pool in al ain');
   await page.getByLabel(t('auth:change.again'), { exact: true }).fill('a calm pool in al ain');
   await page.getByRole('button', { name: t('auth:change.save') }).click();
-  await expect(page.getByRole('button', { name: t('auth:home.signOut') })).toBeVisible();
+  await expect(page.getByRole('button', { name: t('settings:user.menu') })).toBeVisible();
 });
 
 test('"Forgot your password?" explains who resets it', async ({ page, open, t }) => {

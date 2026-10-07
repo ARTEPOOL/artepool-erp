@@ -1,0 +1,348 @@
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import {
+  Ban,
+  CheckCircle2,
+  Monitor,
+  Pencil,
+  RefreshCw,
+  Server,
+  ShoppingCart,
+  Timer,
+  Warehouse,
+} from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { useQuery } from '@tanstack/react-query';
+import type {
+  DeviceKind,
+  DeviceListItem,
+  DevicesResponse,
+  EnrollmentCodeResponse,
+} from '@artepool/shared/contracts';
+import { formatDate, formatDateTime, formatTime } from '../../../lib/format';
+import {
+  Alert,
+  Button,
+  Card,
+  Chip,
+  cx,
+  Dialog,
+  DialogFooter,
+  iconClass,
+  Note,
+  Segmented,
+  tableClasses,
+  TextField,
+  Tile,
+  useToast,
+} from '../../../ui';
+import { useCan, useErrorText } from '../../auth/context';
+import { KEYS, useApi, useSave } from '../api';
+import { CardHead, NoAccess, PanelHeader, settingsClasses as styles } from '../parts';
+import { ReasonDialog } from '../users/dialogs';
+
+const KIND_ICON: Record<DeviceKind, ReactNode> = {
+  pos: <ShoppingCart aria-hidden="true" />,
+  office: <Monitor aria-hidden="true" />,
+  warehouse: <Warehouse aria-hidden="true" />,
+  server: <Server aria-hidden="true" />,
+};
+
+/** Minutes:seconds left until `expiresAt`, ticking every second; null once expired. */
+function useCountdown(expiresAt: string | null): string | null {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    if (!expiresAt) return;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [expiresAt]);
+  if (!expiresAt) return null;
+  const left = Math.max(0, Math.floor((Date.parse(expiresAt) - now) / 1000));
+  if (left === 0) return null;
+  return `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
+}
+
+/** Design 13: Settings → Devices & printers (decisions 0024, 0026). */
+export function DevicesPanel() {
+  const { t } = useTranslation('settings');
+  const api = useApi();
+  const can = useCan();
+  const toast = useToast();
+  const errorText = useErrorText();
+  const devices = useQuery({
+    queryKey: KEYS.devices,
+    queryFn: () => api.get<DevicesResponse>('/api/v1/devices'),
+    enabled: can('system.devices.manage'),
+  });
+  const [shownCode, setShownCode] = useState<EnrollmentCodeResponse | null>(null);
+  const [revoking, setRevoking] = useState<DeviceListItem | null>(null);
+  const [editing, setEditing] = useState<DeviceListItem | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const newCode = useSave(
+    (client, _: null, key) =>
+      client.post<EnrollmentCodeResponse>(
+        '/api/v1/devices/enrollment-codes',
+        {},
+        {
+          idempotencyKey: key,
+        },
+      ),
+    {
+      invalidate: [KEYS.devices],
+      onSuccess: (result) => {
+        setShownCode(result);
+        toast(t('devices.codeCreated'));
+      },
+    },
+  );
+  const countdown = useCountdown(shownCode?.code ? shownCode.expiresAt : null);
+
+  if (!can('system.devices.manage')) return <NoAccess />;
+  const list = devices.data?.devices ?? [];
+  const openCode = devices.data?.openCode ?? null;
+
+  return (
+    <>
+      <PanelHeader title={t('devices.title')} subtitle={t('devices.subtitle')} />
+      <div className={styles.two}>
+        <Card rise index={1} padding="table">
+          <div className={styles.tblHead}>
+            <CardHead title={t('devices.enrolled')} />
+          </div>
+          <table className={tableClasses.table}>
+            <thead>
+              <tr>
+                <th>{t('devices.colDevice')}</th>
+                <th>{t('devices.colStatus')}</th>
+                <th className={tableClasses.num}>{t('devices.colKey')}</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {list.map((device) => {
+                const revoked = device.status === 'revoked';
+                const fixed = device.isCurrent || device.kind === 'server';
+                return (
+                  <tr key={device.id} className={cx(revoked && tableClasses.off)}>
+                    <td>
+                      <div className={tableClasses.who}>
+                        <Tile>{KIND_ICON[device.kind]}</Tile>
+                        <span>
+                          <b>
+                            <bdi>{device.code}</bdi>
+                          </b>
+                          <span className={tableClasses.sub}>
+                            <bdi>{device.name}</bdi> · {t(`devices.kinds.${device.kind}`)}
+                          </span>
+                          {device.lastSeenAt && (
+                            <span className={tableClasses.sub}>
+                              {t('devices.colSeen')}: <bdi>{formatDateTime(device.lastSeenAt)}</bdi>
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                    </td>
+                    <td>
+                      {revoked ? (
+                        <Chip tone="danger" icon={<Ban aria-hidden="true" />}>
+                          {t('devices.revoked')}
+                        </Chip>
+                      ) : (
+                        <Chip tone="ok" icon={<CheckCircle2 aria-hidden="true" />}>
+                          {t('devices.active')}
+                        </Chip>
+                      )}
+                      {revoked && device.revokeReason && (
+                        <span className={tableClasses.sub}>
+                          <bdi>{device.revokeReason}</bdi>
+                        </span>
+                      )}
+                    </td>
+                    <td className={tableClasses.num}>
+                      {revoked ? '—' : <bdi>{formatDate(device.keyExpiresAt)}</bdi>}
+                    </td>
+                    <td className={tableClasses.num}>
+                      {!revoked && (
+                        <span className={styles.tools}>
+                          <Button
+                            variant="ghost"
+                            aria-label={`${t('devices.edit')} ${device.code}`}
+                            onPress={() => setEditing(device)}
+                          >
+                            <Pencil className={iconClass.sm} aria-hidden="true" />
+                          </Button>
+                          {fixed ? (
+                            <span className={tableClasses.sub}>
+                              {device.isCurrent ? t('devices.thisDevice') : t('devices.server')}
+                            </span>
+                          ) : (
+                            <Button variant="dangerGhost" onPress={() => setRevoking(device)}>
+                              <Ban className={iconClass.sm} aria-hidden="true" />
+                              {t('devices.revoke')}
+                            </Button>
+                          )}
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+              {devices.isLoading && (
+                <tr className={tableClasses.empty}>
+                  <td colSpan={4}>{t('common.loading')}</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+          <Note className={styles.tableNote}>{t('devices.neverAgain')}</Note>
+        </Card>
+        <Card rise index={2}>
+          <CardHead title={t('devices.enrollTitle')} />
+          <p className={styles.helpText}>{t('devices.enrollHelp')}</p>
+          {shownCode?.code && countdown ? (
+            <>
+              <p className={styles.code}>
+                <bdi data-testid="enrollment-code">{shownCode.code}</bdi>
+              </p>
+              <Chip tone="warn" icon={<Timer aria-hidden="true" />}>
+                {t('devices.codeValid', { time: countdown })}
+              </Chip>
+            </>
+          ) : shownCode?.code ? (
+            <Alert tone="warn">{t('devices.codeExpired')}</Alert>
+          ) : (
+            <Note className={styles.tableNote}>
+              {openCode
+                ? t('devices.openCode', { time: formatTime(openCode.expiresAt) })
+                : t('devices.noCode')}
+            </Note>
+          )}
+          {error && <Alert>{error}</Alert>}
+          <div className={styles.savebar}>
+            <span />
+            <Button
+              busy={newCode.isPending}
+              isDisabled={newCode.isPending}
+              onPress={() => {
+                setError(null);
+                newCode.mutate(null, { onError: (caught) => setError(errorText(caught)) });
+              }}
+            >
+              <RefreshCw className={iconClass.sm} aria-hidden="true" />
+              {t('devices.newCode')}
+            </Button>
+          </div>
+        </Card>
+      </div>
+      <Card rise index={3}>
+        <CardHead title={t('devices.printers')} />
+        <Note>{t('devices.printersLater')}</Note>
+      </Card>
+      {revoking && <RevokeDialog device={revoking} onClose={() => setRevoking(null)} />}
+      {editing && <EditDeviceDialog device={editing} onClose={() => setEditing(null)} />}
+    </>
+  );
+}
+
+/** Revoking is final and needs a reason (decision 0026). */
+function RevokeDialog({ device, onClose }: { device: DeviceListItem; onClose: () => void }) {
+  const { t } = useTranslation('settings');
+  const errorText = useErrorText();
+  const toast = useToast();
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const revoke = useSave(
+    (api, body: { reason: string }, key) =>
+      api.post(`/api/v1/devices/${device.id}/revoke`, body, { idempotencyKey: key }),
+    {
+      invalidate: [KEYS.devices],
+      onSuccess: () => {
+        toast(t('devices.revoked_toast', { code: device.code }));
+        onClose();
+      },
+    },
+  );
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    if (reason.trim().length < 3) return setError(t('common.reasonShort'));
+    setError(null);
+    revoke.mutate({ reason: reason.trim() }, { onError: (c) => setError(errorText(c)) });
+  };
+  return (
+    <ReasonDialog
+      title={t('devices.revokeTitle')}
+      who={`${device.code} · ${device.name}`}
+      note={t('devices.revokeNote')}
+      confirm={t('devices.revokeConfirm')}
+      reason={reason}
+      onReason={setReason}
+      error={error}
+      busy={revoke.isPending}
+      onSubmit={submit}
+      onClose={onClose}
+    />
+  );
+}
+
+/** The owner can rename a PC and change its type later (decision 0024). */
+function EditDeviceDialog({ device, onClose }: { device: DeviceListItem; onClose: () => void }) {
+  const { t } = useTranslation('settings');
+  const errorText = useErrorText();
+  const toast = useToast();
+  const [name, setName] = useState(device.name);
+  const [kind, setKind] = useState<DeviceKind>(device.kind);
+  const [error, setError] = useState<string | null>(null);
+  const save = useSave(
+    (api, body: { name: string; kind: DeviceKind }, key) =>
+      api.patch(`/api/v1/devices/${device.id}`, body, { idempotencyKey: key }),
+    {
+      invalidate: [KEYS.devices],
+      onSuccess: () => {
+        toast(t('devices.saved'));
+        onClose();
+      },
+    },
+  );
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    if (!name.trim()) return;
+    setError(null);
+    save.mutate({ name: name.trim(), kind }, { onError: (c) => setError(errorText(c)) });
+  };
+  const kinds: DeviceKind[] =
+    device.kind === 'server' ? ['server'] : ['pos', 'office', 'warehouse'];
+  return (
+    <Dialog isOpen onClose={onClose} title={`${t('devices.editTitle')} · ${device.code}`}>
+      <form className={styles.ucard} onSubmit={submit} noValidate>
+        {error && <Alert>{error}</Alert>}
+        <TextField
+          label={t('devices.name')}
+          value={name}
+          onChange={setName}
+          autoFocus
+          maxLength={100}
+        />
+        <div className={styles.ucard}>
+          <span className={styles.helpText}>{t('devices.kind')}</span>
+          <Segmented
+            label={t('devices.kind')}
+            block
+            value={kind}
+            onChange={setKind}
+            options={kinds.map((value) => ({ value, label: t(`devices.kinds.${value}`) }))}
+          />
+        </div>
+        <DialogFooter>
+          <Button onPress={onClose}>{t('common.cancel')}</Button>
+          <Button
+            type="submit"
+            variant="primary"
+            busy={save.isPending}
+            isDisabled={save.isPending || !name.trim()}
+          >
+            {t('common.save')}
+          </Button>
+        </DialogFooter>
+      </form>
+    </Dialog>
+  );
+}

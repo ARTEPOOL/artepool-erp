@@ -84,7 +84,9 @@ export class FakeBridge implements Bridge {
 
   /** Calls made to one route (method and path). */
   callsTo(method: string, path: string): BridgeRequest[] {
-    return this.calls.filter((c) => c.method === method && c.path === path);
+    return this.calls.filter(
+      (c) => c.method === method && (c.path === path || c.path.split('?')[0] === path),
+    );
   }
 
   localDevice(): Promise<LocalDevice> {
@@ -98,7 +100,10 @@ export class FakeBridge implements Bridge {
 
   request(request: BridgeRequest): Promise<BridgeResponse> {
     this.calls.push(request);
-    const list = this.answers.get(`${request.method} ${request.path}`);
+    // An exact path first, then the same path without its query (?limit=…).
+    const list =
+      this.answers.get(`${request.method} ${request.path}`) ??
+      this.answers.get(`${request.method} ${request.path.split('?')[0]}`);
     if (!list || list.length === 0) return Promise.resolve(failure(404, 'NOT_FOUND'));
     const answer = list.length > 1 ? list.shift()! : list[0]!;
     return Promise.resolve(typeof answer === 'function' ? answer(request) : answer);

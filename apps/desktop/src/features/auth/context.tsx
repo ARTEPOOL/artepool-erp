@@ -32,6 +32,12 @@ export function useAuthState(): AuthState {
   return useSyncExternalStore(controller.subscribe, controller.getState);
 }
 
+/** Does the signed-in person have this permission? (The server checks again on every call.) */
+export function useCan(): (permission: string) => boolean {
+  const { permissions } = useAuthState();
+  return useCallback((permission: string) => permissions.includes(permission), [permissions]);
+}
+
 /** The person's name in the current language. */
 export function useDisplayName(): (person: {
   displayNameAr: string;

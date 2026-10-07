@@ -7,6 +7,15 @@
   min-inline-size: 0;
 }
 
+.cardTable {
+  padding: var(--space-2) var(--space-5) var(--space-3);
+  overflow-x: auto;
+}
+
+.cardCompact {
+  padding: var(--space-2);
+}
+
 .cardHeader {
   display: flex;
   align-items: center;

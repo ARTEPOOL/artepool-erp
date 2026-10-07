@@ -28,6 +28,12 @@ function type(label: string | RegExp, value: string) {
   fireEvent.change(screen.getByLabelText(label), { target: { value } });
 }
 
+/** Opens the account menu in the top bar and picks an action. */
+async function accountMenu(action: string) {
+  fireEvent.click(await screen.findByRole('button', { name: 'قائمة الحساب' }));
+  fireEvent.click(await screen.findByRole('menuitem', { name: action }));
+}
+
 async function startApp(bridge: FakeBridge) {
   render(<App bridge={bridge} />);
   await screen.findByRole('heading', { level: 1 });
@@ -91,7 +97,7 @@ describe('password sign-in (design 01)', () => {
     type('اسم المستخدم', 'sara.office');
     type('كلمة المرور', 'blue-pool-water');
     fireEvent.click(screen.getByRole('button', { name: 'دخول' }));
-    await screen.findByRole('heading', { name: 'مرحبًا، سارة علي' });
+    await screen.findByRole('heading', { name: 'أهلًا، سارة علي' });
     expect(bridge.callsTo('POST', '/api/v1/auth/sign-in')[0]?.body).toEqual({
       username: 'sara.office',
       password: 'blue-pool-water',
@@ -250,7 +256,7 @@ describe('owner 2-step code (decision 0022)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'فقدت هاتفك؟ استخدم رمز استرداد' }));
     type('رمز الاسترداد', 'abcde-fghjk');
     fireEvent.click(screen.getByRole('button', { name: 'تأكيد' }));
-    await screen.findByRole('heading', { name: 'مرحبًا، سارة علي' });
+    await screen.findByRole('heading', { name: 'أهلًا، سارة علي' });
     expect(bridge.callsTo('POST', '/api/v1/auth/second-factor')[1]?.body).toEqual({
       recoveryCode: 'abcde-fghjk',
     });
@@ -306,7 +312,7 @@ describe('owner 2-step code (decision 0022)', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: 'طبعت هذه الرموز أو كتبتها' }));
     expect(screen.getByRole('button', { name: 'متابعة' }).hasAttribute('disabled')).toBe(false);
     fireEvent.click(screen.getByRole('button', { name: 'متابعة' }));
-    await screen.findByRole('heading', { name: 'مرحبًا، سارة علي' });
+    await screen.findByRole('heading', { name: 'أهلًا، سارة علي' });
     expect(screen.queryByText(codes[0]!)).toBeNull();
   });
 });
@@ -343,7 +349,7 @@ describe('first sign-in: choose your own password or PIN (decision 0023)', () =>
     type('كلمة المرور الجديدة', 'a quiet blue pool at noon');
     type('اكتبها مرة أخرى', 'a quiet blue pool at noon');
     fireEvent.click(screen.getByRole('button', { name: 'حفظ ومتابعة' }));
-    await screen.findByRole('heading', { name: 'مرحبًا، سارة علي' });
+    await screen.findByRole('heading', { name: 'أهلًا، سارة علي' });
     expect(bridge.callsTo('POST', '/api/v1/auth/change-password')[1]?.body).toEqual({
       currentPassword: 'ABCD-EFGH-JKLM',
       newPassword: 'a quiet blue pool at noon',
@@ -363,7 +369,7 @@ describe('lock and session end', () => {
     type('اسم المستخدم', 'sara.office');
     type('كلمة المرور', 'blue-pool-water');
     fireEvent.click(screen.getByRole('button', { name: 'دخول' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'قفل الشاشة' }));
+    await accountMenu('قفل الشاشة');
     await screen.findByRole('heading', { name: 'الشاشة مقفلة' });
     expect(screen.getByText('سارة علي، أدخل كلمة المرور للمتابعة.')).toBeTruthy();
     type('كلمة المرور', 'wrong');
@@ -371,9 +377,9 @@ describe('lock and session end', () => {
     expect(await screen.findByText('اسم المستخدم أو كلمة المرور غير صحيح.')).toBeTruthy();
     type('كلمة المرور', 'blue-pool-water');
     fireEvent.click(screen.getByRole('button', { name: 'فتح القفل' }));
-    await screen.findByRole('heading', { name: 'مرحبًا، سارة علي' });
+    await screen.findByRole('heading', { name: 'أهلًا، سارة علي' });
 
-    fireEvent.click(screen.getByRole('button', { name: 'قفل الشاشة' }));
+    await accountMenu('قفل الشاشة');
     fireEvent.click(await screen.findByRole('button', { name: 'الدخول باسم شخص آخر' }));
     await screen.findByRole('heading', { name: 'أهلًا بك' });
     expect(bridge.callsTo('POST', '/api/v1/auth/sign-out')).toHaveLength(1);
@@ -388,7 +394,7 @@ describe('lock and session end', () => {
     type('اسم المستخدم', 'sara.office');
     type('كلمة المرور', 'blue-pool-water');
     fireEvent.click(screen.getByRole('button', { name: 'دخول' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'قفل الشاشة' }));
+    await accountMenu('قفل الشاشة');
     await waitFor(() =>
       expect(screen.getByText('انتهت جلستك. سجّل الدخول مرة أخرى.')).toBeTruthy(),
     );

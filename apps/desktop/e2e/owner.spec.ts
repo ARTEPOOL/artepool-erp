@@ -37,7 +37,7 @@ test('first time: scan, confirm, and keep the 10 recovery codes shown once', asy
   await expect(page.getByRole('button', { name: t('auth:recovery.continue') })).toBeDisabled();
   await page.getByText(t('auth:recovery.saved')).click();
   await page.getByRole('button', { name: t('auth:recovery.continue') }).click();
-  await expect(page.getByRole('button', { name: t('auth:home.signOut') })).toBeVisible();
+  await expect(page.getByRole('button', { name: t('settings:user.menu') })).toBeVisible();
 });
 
 test('daily sign-in: a wrong code shows the design message, the right one opens the app', async ({
@@ -55,7 +55,7 @@ test('daily sign-in: a wrong code shows the design message, the right one opens 
 
   await typeCode(page, await control.ownerCode());
   await page.getByRole('button', { name: t('auth:secondFactor.confirm') }).click();
-  await expect(page.getByRole('button', { name: t('auth:home.signOut') })).toBeVisible();
+  await expect(page.getByRole('button', { name: t('settings:user.menu') })).toBeVisible();
 });
 
 test('a recovery code works once, then the 2-step code must be set up again', async ({
