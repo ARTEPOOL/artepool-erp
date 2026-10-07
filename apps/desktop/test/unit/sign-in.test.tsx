@@ -169,11 +169,9 @@ describe('password sign-in (design 01)', () => {
     type('Password', 'nope-nope-nope');
     fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
     expect(await screen.findByText('Username or password is incorrect.')).toBeTruthy();
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Forgot your password? Ask the system admin' }),
-    );
+    fireEvent.click(screen.getByRole('button', { name: 'Forgot your password?' }));
     const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByText(/Ask the owner to reset it/)).toBeTruthy();
+    expect(within(dialog).getByText(/ask the owner to reset it/)).toBeTruthy();
   });
 });
 
@@ -314,6 +312,125 @@ describe('owner 2-step code (decision 0022)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'متابعة' }));
     await screen.findByRole('heading', { name: 'أهلًا، سارة علي' });
     expect(screen.queryByText(codes[0]!)).toBeNull();
+  });
+});
+
+describe('"Trust this PC" (decision 0027)', () => {
+  it('is offered when the server offers it, and sent only when ticked', async () => {
+    const bridge = new FakeBridge()
+      .on(
+        'POST',
+        '/api/v1/auth/sign-in',
+        ok({ ...signInAnswer({ stage: 'second_factor' }), trustDays: 30 }),
+      )
+      .on('POST', '/api/v1/auth/second-factor', ok(signInAnswer({}, {}, 'token-2')))
+      .on('GET', '/api/v1/auth/me', me());
+    await startApp(bridge);
+    type('اسم المستخدم', 'owner');
+    type('كلمة المرور', 'long-owner-password');
+    fireEvent.click(screen.getByRole('button', { name: 'دخول' }));
+    await screen.findByRole('heading', { name: 'تأكيد هوية المالك' });
+    const box = screen.getByRole('checkbox', { name: 'ثق في هذا الجهاز لمدة 30 يومًا' });
+    expect((box as HTMLInputElement).checked).toBe(false);
+    expect(screen.getByText(/لا تفعّلها على جهاز يستخدمه غيرك/)).toBeTruthy();
+    fireEvent.click(box);
+    fireEvent.paste(screen.getByLabelText('رقم 1'), { clipboardData: { getData: () => '123456' } });
+    fireEvent.click(screen.getByRole('button', { name: 'تأكيد' }));
+    await screen.findByRole('heading', { name: 'أهلًا، سارة علي' });
+    expect(bridge.callsTo('POST', '/api/v1/auth/second-factor')[0]?.body).toEqual({
+      code: '123456',
+      trustDevice: true,
+    });
+  });
+
+  it('is not shown where the server does not offer it, nor with a recovery code', async () => {
+    const bridge = new FakeBridge().on(
+      'POST',
+      '/api/v1/auth/sign-in',
+      ok(signInAnswer({ stage: 'second_factor' })),
+    );
+    await startApp(bridge);
+    type('اسم المستخدم', 'owner');
+    type('كلمة المرور', 'long-owner-password');
+    fireEvent.click(screen.getByRole('button', { name: 'دخول' }));
+    await screen.findByRole('heading', { name: 'تأكيد هوية المالك' });
+    expect(screen.queryByRole('checkbox')).toBeNull();
+  });
+});
+
+describe('forgot password (decision 0028)', () => {
+  async function openRecovery(bridge: FakeBridge) {
+    await startApp(bridge);
+    fireEvent.click(screen.getByRole('button', { name: 'نسيت كلمة المرور؟' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/اطلب من المالك إعادة تعيينها/)).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'اختيار كلمة مرور جديدة' }));
+    await screen.findByRole('heading', { name: 'اختيار كلمة مرور جديدة' });
+  }
+
+  function fill(password = 'a-new-pool-password', again = password) {
+    type('اسم المستخدم', 'owner');
+    fireEvent.paste(screen.getByLabelText('رقم 1'), { clipboardData: { getData: () => '246810' } });
+    type(/^رمز الاسترداد/, 'abcde-fghjk');
+    type(/^كلمة المرور الجديدة/, password);
+    type('اكتبها مرة أخرى', again);
+  }
+
+  it('checks the form, then signs in and says how many recovery codes are left', async () => {
+    const bridge = new FakeBridge()
+      .on(
+        'POST',
+        '/api/v1/auth/recover-password',
+        ok({
+          ...signInAnswer({ authMethod: 'password_totp' }, {}, 'token-9'),
+          recoveryCodesLeft: 2,
+        }),
+      )
+      .on('GET', '/api/v1/auth/me', me());
+    await openRecovery(bridge);
+    fireEvent.click(screen.getByRole('button', { name: 'حفظ والدخول' }));
+    expect(await screen.findByText('املأ كل الخانات.')).toBeTruthy();
+    fill('a-new-pool-password', 'something-else');
+    fireEvent.click(screen.getByRole('button', { name: 'حفظ والدخول' }));
+    expect(await screen.findByText('الإدخالان غير متطابقين.')).toBeTruthy();
+    expect(bridge.callsTo('POST', '/api/v1/auth/recover-password')).toHaveLength(0);
+
+    fill();
+    fireEvent.click(screen.getByRole('button', { name: 'حفظ والدخول' }));
+    await screen.findByRole('heading', { name: 'تم تغيير كلمة المرور' });
+    expect(bridge.callsTo('POST', '/api/v1/auth/recover-password')[0]?.body).toEqual({
+      username: 'owner',
+      code: '246810',
+      recoveryCode: 'abcde-fghjk',
+      newPassword: 'a-new-pool-password',
+    });
+    // Few codes left: shown as a warning.
+    expect(screen.getByRole('alert').textContent).toContain('بقي لك 2 من رموز الاسترداد');
+    expect(screen.getByText(/خرجت من كل الأجهزة الأخرى/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'متابعة' }));
+    await screen.findByRole('heading', { name: 'أهلًا، سارة علي' });
+    expect(bridge.callsTo('GET', '/api/v1/auth/me')[0]?.token).toBe('token-9');
+  });
+
+  it('shows one message for any wrong part, lists password problems, and "Back" returns', async () => {
+    const bridge = new FakeBridge().on(
+      'POST',
+      '/api/v1/auth/recover-password',
+      failure(401, 'RECOVERY_REFUSED'),
+      failure(422, 'PASSWORD_REJECTED', { problems: ['common'], minLength: 10 }),
+    );
+    await openRecovery(bridge);
+    fill();
+    fireEvent.click(screen.getByRole('button', { name: 'حفظ والدخول' }));
+    expect(
+      await screen.findByText(/اسم المستخدم أو الرمز المكوّن من 6 أرقام أو رمز الاسترداد غير صحيح/),
+    ).toBeTruthy();
+    expect(screen.getByLabelText<HTMLInputElement>(/^رمز الاسترداد/).value).toBe('');
+    fill();
+    fireEvent.click(screen.getByRole('button', { name: 'حفظ والدخول' }));
+    expect(await screen.findByText('كلمة المرور هذه شائعة جدًا.')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'رجوع' }));
+    await screen.findByRole('heading', { name: 'أهلًا بك' });
   });
 });
 

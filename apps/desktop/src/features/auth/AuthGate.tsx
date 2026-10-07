@@ -6,6 +6,7 @@ import { useAuthController, useAuthState } from './context';
 import { EnrollScreen } from './EnrollScreen';
 import { LockScreen } from './LockScreen';
 import { AuthFrame, Hello } from './parts';
+import { PasswordRecoveredScreen, RecoverPasswordScreen } from './RecoverPasswordScreen';
 import { SecondFactorScreen } from './SecondFactorScreen';
 import { SignInScreen } from './SignInScreen';
 import { RecoveryCodesScreen, TwoStepSetupScreen } from './TwoStepScreens';
@@ -44,6 +45,10 @@ export function AuthGate({ children }: { children: ReactNode }) {
       );
     case 'signIn':
       return <SignInScreen />;
+    case 'recoverPassword':
+      return <RecoverPasswordScreen />;
+    case 'passwordRecovered':
+      return <PasswordRecoveredScreen codesLeft={phase.codesLeft} />;
     case 'secondFactor':
       return <SecondFactorScreen />;
     case 'changeCredential':
