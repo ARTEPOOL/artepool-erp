@@ -2,11 +2,11 @@
 
 | | |
 |---|---|
-| **Status** | **Approved** (2026-10-07), with the owner's answers recorded as decisions [0021](../decisions/0021-cashier-pin-sign-in-on-pos-pcs.md)–[0026](../decisions/0026-users-and-devices-never-deleted.md). In progress on branch `m1-security-shell`. |
+| **Status** | **Done — in review** (2026-10-07). Approved with the owner's answers recorded as decisions [0021](../decisions/0021-cashier-pin-sign-in-on-pos-pcs.md)–[0026](../decisions/0026-users-and-devices-never-deleted.md). Delivered on branch `m1-security-shell` (see [Delivered](#delivered)). |
 | **Date** | 2026-10-07 |
 | **Milestone** | M1 of the [Phase 1 plan](../phase-1-plan.md) |
 | **Design reference** | [`design/screens/01-login.html`](../../design/screens/01-login.html), [`design/screens/13-settings.html`](../../design/screens/13-settings.html), tokens and components in [`design/`](../../design/) |
-| **Where it runs** | Server, database and the React screens are built and tested in this cloud environment (Chromium + Playwright). The Windows desktop shell (Tauri/Rust) is compiled by GitHub Actions on a Windows machine. The owner runs and tests the desktop app on their own Windows PC. |
+| **Where it runs** | Server, database and the React screens are built and tested in this cloud environment (Chromium + Playwright). The desktop shell (Tauri/Rust) is compiled and smoke-tested here on Linux, and built into the Windows installer by GitHub Actions on a Windows machine. The owner runs and tests the desktop app on their own Windows PC. |
 
 ## Goal (in plain words)
 
@@ -49,6 +49,11 @@ There are still no sales, stock or accounting features in M1.
 2. **Four extra screens** that the design does not include are built in the same style as the sign-in screen: first sign-in, owner 2-step setup, enroll this PC, and the idle lock screen.
 3. **"Certificate until"** on the devices table becomes "Key valid until": each PC has a secret key that renews itself automatically before it expires.
 4. **Sample numbers in the design** (for example "3 failed sign-ins → locked") follow the real settings (5 failures, 15 minutes).
+5. **PIN option on the sign-in screen:** shown on POS PCs only (decision 0021); office PCs show the password form alone.
+6. **Owner role permissions:** instead of 64 locked switches, the owner role shows one line: it always has every permission.
+7. **Top bar:** the account chip shows the person's name and username, and opens a small menu (Lock screen, Sign out).
+8. **Settings sections not built yet** (Company, VAT & numbering, Print designer, Backup) are greyed with "Soon".
+9. **App icon:** a placeholder in the brand colour until the final logo is supplied.
 
 ## Questions for the owner (answered 2026-10-07)
 
@@ -67,3 +72,27 @@ Also confirmed by the owner: nothing is ever deleted; users are deactivated and 
 
 - All tests pass here and in CI, including the Windows build.
 - You can follow the updated Windows guide to enroll your PC, sign in, lock the account with 5 wrong passwords, switch language and theme, see "server unreachable" when the server stops, and manage users and devices with every change visible in the audit log.
+
+## Delivered
+
+| Task | Commit(s) | Result |
+|---|---|---|
+| T1 | `abb647e` | Migration 0005 and its database tests |
+| T2 | `174acea` | Argon2id, secret box, tokens, TOTP, password and PIN rules |
+| T3 | `1cb6dfb` | Device, session and permission checks on every route; idempotency; rate limits; log redaction |
+| T4 | `a69d914`, `1686c7e` | Sign-in API (password, PIN, owner 2-step, recovery codes, first-sign-in change, lock, sign out) |
+| T5 | `4502aab` | Enrollment protocol v1, devices API, `pnpm owner:create` / `device:code` / `owner:reset-2fa` |
+| T6 | `5f5e85a` | Users, roles, approvals, audit API |
+| T7 | `0ec68fc` | `pnpm tls:init`; HTTPS with TLS 1.3 only |
+| T8 | `ba02bab` | Desktop app foundation; lint rules for UI text, colours and logical CSS |
+| T9 | `161f997`, `cd15773`, `d4b8fe3` | Development bridge; sign-in screens; Playwright flows |
+| T10 | `c10369f` | App shell and Settings (users, roles, PCs, audit log) |
+| T11 | `ede591a` | Windows app (Tauri) with the Rust bridge |
+| T12 | this commit | CI jobs (screens, Rust, Windows), Windows guide, docs |
+
+**Tests at the end of M1:** 158 unit and screen-component tests, 233 integration tests (real PostgreSQL), 26 Rust tests, 28 Playwright flows (14 in Arabic/light, 14 in English/dark).
+
+**Open items:**
+- **Accountant and Settings** (asked, not blocking): with the current role matrix the accountant can view the audit log (so they see Settings → Audit log only) and has `system.company.edit`. Recommendation: keep audit-log viewing, make company details owner-only. Applied as role data when the owner answers.
+- **Update signing key and installer checksums:** created with the owner in M6 (until then no update can be installed).
+- **Final logo:** replaces the placeholder icon when supplied.

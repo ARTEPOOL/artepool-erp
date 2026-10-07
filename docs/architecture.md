@@ -321,6 +321,12 @@ App (POS section)                     API                                       
 - **TLS:**
   - A local CA with **name constraints**, so it can only vouch for the ARTÉPOOL server.
   - TLS 1.3 only, never disabled.
+- **The PC's secure side (M1):**
+  - The screens never hold the device key and never open a network connection. They ask a small "bridge" to enroll the PC or to send an API request; the contract is `packages/shared/src/contracts/bridge.ts`.
+  - In the Windows app the bridge is Rust (`apps/desktop/src-tauri/bridge`): TLS 1.3 only (rustls), trusting only the pinned ARTÉPOOL CA, with the server name and the CA's name constraints checked; the device key lives in Windows Credential Manager. It checks every request from the screens again (API paths only, no DELETE).
+  - In development in a browser, the Vite dev server plays the same part (`tools/dev-bridge`), with the device key in `.secrets/`.
+  - The session token is kept in memory only; closing the app ends the sign-in.
+  - The app window has a strict Content-Security-Policy (no outside content, no direct connections) and JavaScript built-ins are frozen.
 - **Releases ([0007](decisions/0007-no-code-signing-certificate-for-now.md)):**
   - Tauri update signatures are mandatory.
   - Installers are unsigned for now, with SHA-256 checksums published and installation documented in the runbook.
