@@ -35,7 +35,8 @@
     "test:rust": "cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --workspace",
     "owner:create": "tsx apps/server/src/cli/owner-create.ts",
     "device:code": "tsx apps/server/src/cli/device-code.ts",
-    "owner:reset-2fa": "tsx apps/server/src/cli/owner-reset-2fa.ts"
+    "owner:reset-2fa": "tsx apps/server/src/cli/owner-reset-2fa.ts",
+    "owner:reset-password": "tsx apps/server/src/cli/owner-reset-password.ts"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

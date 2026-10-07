@@ -70,6 +70,8 @@ It runs client–server on the local network: PostgreSQL and the API service on 
 - **Never deleted:** users are deactivated and devices revoked, always with a reason; revoking a device is final. (0026)
 - **Trust this PC:** after the phone code, a 2-step user may trust that PC for 30 days (password alone there); never on POS PCs; ends on a password/2-step change, deactivation, revoke; the owner can end it in Settings → Devices. Enforced in the database. (0027)
 - **Forgot password:** 2-step users recover it in the app with the phone code + one recovery code; ends all their sessions and trusted PCs. (0028)
+- **Last resort:** `pnpm owner:reset-password` on the server PC only — reason required, temporary password shown once, optional 2-step reset if the phone is lost, audited; the owner sees a notice when choosing their own password. (0029)
+- **Company details** (name, TRN, address, logo) are edited by the owner only (`system.company.edit` is owner-only); the accountant keeps viewing/verifying/exporting the audit log. (0030)
 
 **Accounting**
 - **Defective returns** are held at cost in "Inventory – defective" until written off. (0015)
@@ -138,7 +140,7 @@ Run from the repository root. Setup on a new PC: [`docs/runbooks/dev-setup-windo
 | Run the screens in a browser (`http://localhost:1420`; the dev server plays the PC's secure side, device file `.secrets/dev-device.json`) | `pnpm dev:desktop:web` |
 | Run the Windows app (Tauri; Rust + Microsoft C++ Build Tools needed) / build its installer | `pnpm dev:desktop` / `pnpm build:desktop` |
 | Rust tests (the PC's secure side: enrollment, TLS rules, device key) | `pnpm test:rust` |
-| Server console: first owner / enrollment code / emergency owner 2-step reset (decisions 0022, 0025) | `pnpm owner:create` / `pnpm device:code` / `pnpm owner:reset-2fa` |
+| Server console: first owner / enrollment code / emergency owner 2-step reset / emergency owner password reset (decisions 0022, 0025, 0029) | `pnpm owner:create` / `pnpm device:code` / `pnpm owner:reset-2fa` / `pnpm owner:reset-password` |
 
 Not yet available: `pnpm build:server` (M6), `pnpm backup:run` / `pnpm backup:restore-test` (M6).
 

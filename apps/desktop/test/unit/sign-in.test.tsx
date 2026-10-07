@@ -472,6 +472,26 @@ describe('first sign-in: choose your own password or PIN (decision 0023)', () =>
       newPassword: 'a quiet blue pool at noon',
     });
   });
+
+  it('after a reset on the server PC, says when and why (decision 0029)', async () => {
+    const bridge = new FakeBridge().on(
+      'POST',
+      '/api/v1/auth/sign-in',
+      ok({
+        ...signInAnswer({ pending: 'credential_change' }),
+        serverReset: { at: '2026-10-07T13:05:00.000Z', reason: 'ضاع الهاتف وكلمة المرور' },
+      }),
+    );
+    await startApp(bridge);
+    type('اسم المستخدم', 'owner');
+    type('كلمة المرور', 'ABCD-EFGH-JKLM');
+    fireEvent.click(screen.getByRole('button', { name: 'دخول' }));
+    await screen.findByRole('heading', { name: 'اختر كلمة مرورك الخاصة' });
+    const notice = screen.getByRole('alert');
+    expect(notice.textContent).toContain('أُعيد تعيين كلمة مرورك من جهاز السيرفر يوم 07/10/2026');
+    expect(notice.textContent).toContain('17:05'); // Al Ain time (UTC+4)
+    expect(notice.textContent).toContain('«ضاع الهاتف وكلمة المرور»');
+  });
 });
 
 describe('lock and session end', () => {

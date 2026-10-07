@@ -280,7 +280,8 @@
         "two_step_enabled": "إعداد رمز التحقق",
         "user_unlocked": "فك قفل حساب",
         "password_recovered": "استُرجعت كلمة المرور برمز الهاتف ورمز استرداد",
-        "password_recovery_failed": "محاولة فاشلة لاسترجاع كلمة المرور"
+        "password_recovery_failed": "محاولة فاشلة لاسترجاع كلمة المرور",
+        "owner_password_reset": "أُعيد تعيين كلمة مرور المالك من جهاز السيرفر"
       },
       "other": "حدث: {name}"
     },

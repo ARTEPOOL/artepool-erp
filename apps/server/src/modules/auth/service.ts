@@ -147,6 +147,28 @@ async function matchRecoveryCode(
   return match;
 }
 
+/**
+ * The latest server-PC password reset of this person that they have not yet replaced with a
+ * password of their own (decision 0029), read from the audit log.
+ */
+async function serverResetNotice(
+  db: Kysely<DB>,
+  user: { id: bigint; must_change_password: boolean; password_changed_at: Date | null },
+): Promise<SignInResponse['serverReset']> {
+  if (!user.must_change_password) return undefined;
+  const reset = await db
+    .selectFrom('audit.log')
+    .select(['occurred_at', 'reason'])
+    .where('action', '=', 'event:auth.owner_password_reset')
+    .where('entity_type', '=', 'auth.users')
+    .where('entity_id', '=', user.id.toString())
+    .orderBy('id', 'desc')
+    .executeTakeFirst();
+  if (!reset) return undefined;
+  if (user.password_changed_at && user.password_changed_at > reset.occurred_at) return undefined;
+  return { at: reset.occurred_at.toISOString(), reason: reset.reason ?? '' };
+}
+
 /** Days "Trust this PC" lasts here now: 0 on POS PCs or when turned off (decision 0027). */
 async function trustDaysHere(db: Kysely<DB>, device: DeviceInfo): Promise<number> {
   if (device.kind === 'pos') return 0;
@@ -183,6 +205,7 @@ function selectUser(deps: AppDeps) {
       'pin_hash',
       'pin_blocked_at',
       'locked_until',
+      'password_changed_at',
       'totp_secret_enc',
       'totp_last_step',
       sql<number>`greatest(0, ceil(extract(epoch FROM locked_until - now()) / 60))::int`.as(
@@ -266,11 +289,13 @@ export async function signInWithPassword(
       data: { method, stage, sessionId: opened.id },
     });
     const trustDays = stage === 'second_factor' ? await trustDaysHere(trx, request.device!) : 0;
+    const serverReset = await serverResetNotice(trx, user);
     return {
       token: opened.token,
       session: opened.session,
       user: userView(user),
       ...(trustDays > 0 ? { trustDays } : {}),
+      ...(serverReset ? { serverReset } : {}),
     };
   });
 }
@@ -463,7 +488,13 @@ export async function verifySecondFactor(
       ...userEntity(user.id),
       data: { method: result.method, stage: 'full', sessionId: opened.id },
     });
-    return { token: opened.token, session: opened.session, user: userView(user) };
+    const serverReset = await serverResetNotice(trx, user);
+    return {
+      token: opened.token,
+      session: opened.session,
+      user: userView(user),
+      ...(serverReset ? { serverReset } : {}),
+    };
   });
 }
 

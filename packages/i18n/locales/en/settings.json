@@ -280,7 +280,8 @@
         "two_step_enabled": "2-step code set up",
         "user_unlocked": "Account unlocked",
         "password_recovered": "Password recovered with the phone code and a recovery code",
-        "password_recovery_failed": "Failed password recovery"
+        "password_recovery_failed": "Failed password recovery",
+        "owner_password_reset": "Owner password reset on the server PC"
       },
       "other": "Event: {name}"
     },

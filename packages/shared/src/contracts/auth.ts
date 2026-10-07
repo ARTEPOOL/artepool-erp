@@ -98,6 +98,11 @@ export interface SignInResponse {
    * PCs, not when turned off): how many days the trust would last (decision 0027).
    */
   trustDays?: number;
+  /**
+   * When the password was reset on the server PC (decision 0029) and the person has not chosen
+   * their own since: when, and the reason typed there. Shown on "Choose your own password".
+   */
+  serverReset?: { at: string; reason: string };
 }
 
 export interface RecoverPasswordResponse extends SignInResponse {

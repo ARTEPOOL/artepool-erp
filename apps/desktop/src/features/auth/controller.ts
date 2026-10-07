@@ -60,6 +60,8 @@ export interface AuthState {
   permissions: string[];
   /** While the 2-step code is asked: days "Trust this PC" would last here, or null if not offered. */
   trustDays: number | null;
+  /** The password was reset on the server PC (decision 0029): when, and the reason given. */
+  serverReset: { at: string; reason: string } | null;
 }
 
 const INITIAL: AuthState = {
@@ -71,6 +73,7 @@ const INITIAL: AuthState = {
   user: null,
   permissions: [],
   trustDays: null,
+  serverReset: null,
 };
 
 /** While the person is active, tell the server at most this often (it locks idle sessions). */
@@ -193,6 +196,7 @@ export class AuthController {
       user: response.user,
       server: 'ok',
       trustDays: response.trustDays ?? null,
+      serverReset: response.serverReset ?? null,
     });
     await this.next();
   }
@@ -268,7 +272,7 @@ export class AuthController {
       currentPassword: current,
       newPassword,
     });
-    this.set({ session });
+    this.set({ session, serverReset: null });
     await this.next();
   }
 
@@ -338,7 +342,7 @@ export class AuthController {
   private clearSession(): void {
     this.api.setToken(null);
     this.pendingSecret = null;
-    this.set({ session: null, user: null, permissions: [], trustDays: null });
+    this.set({ session: null, user: null, permissions: [], trustDays: null, serverReset: null });
   }
 
   // ------------------------------------------------------------------ server answers
