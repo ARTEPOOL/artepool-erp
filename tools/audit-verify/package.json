@@ -10,6 +10,7 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@artepool/dev-db": "workspace:*",
     "@artepool/migrate": "workspace:*",
     "@artepool/node-kit": "workspace:*",
     "pg": "8.23.1"

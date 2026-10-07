@@ -114,6 +114,9 @@ importers:
 
   tools/audit-verify:
     dependencies:
+      '@artepool/dev-db':
+        specifier: workspace:*
+        version: link:../dev-db
       '@artepool/migrate':
         specifier: workspace:*
         version: link:../migrate

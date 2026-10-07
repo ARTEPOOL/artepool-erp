@@ -6,6 +6,7 @@ export default defineConfig({
       {
         test: {
           name: 'unit',
+          sequence: { groupOrder: 0 },
           include: [
             'packages/*/test/**/*.test.ts',
             'apps/*/test/unit/**/*.test.ts',
@@ -16,6 +17,7 @@ export default defineConfig({
       {
         test: {
           name: 'integration',
+          sequence: { groupOrder: 1 },
           include: [
             'db/tests/**/*.test.ts',
             'apps/*/test/integration/**/*.test.ts',
