@@ -29,6 +29,16 @@ v2 replaces v1.3. The owner approved a simpler look: light grey background, whit
 | `screens/14-customers.html` | Customers: VAT registration decides the invoice type, balances and overdue, statement and aging, new-customer form with TRN check |
 
 
+## Interactive previews
+
+Every button, tab, filter, search box and form in the screens works, so the owner can try real flows before the app is built. Data lives only in the open page and resets on reload.
+
+- Sign in: password `password1`; a username containing `cashier` opens the POS, any other opens the owner 2-step code (any 6 digits). Cashier PIN `1234`.
+- Supervisor PIN in every approval dialog: `1234`.
+- Exports download real CSV files (open in Excel). Print buttons open the browser print dialog.
+- Nothing is ever deleted: customers, items and users are deactivated with a reason and can be reactivated; drafts are cancelled; posted documents are corrected with credit notes (golden rules 2 and 3).
+- Shared patterns (in `artepool-components.css`): modal dialog (`.dlg`), toast (`.toast`), confirm with the amount before any financial action, reason field and supervisor PIN for approvals, inline field errors.
+
 ## Rules for implementation
 
 - Use the tokens; never hard-code colors, fonts or spacing (golden rule 12).
