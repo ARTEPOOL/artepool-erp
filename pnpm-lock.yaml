@@ -79,7 +79,11 @@ importers:
         specifier: 8.23.1
         version: 8.23.1
 
-  packages/i18n: {}
+  packages/i18n:
+    dependencies:
+      '@artepool/shared':
+        specifier: workspace:*
+        version: link:../shared
 
   packages/node-kit: {}
 

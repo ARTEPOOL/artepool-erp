@@ -1,0 +1,27 @@
+{
+  "app": {
+    "name": "ARTÉPOOL ERP"
+  },
+  "language": {
+    "ar": "العربية",
+    "en": "English"
+  },
+  "errors": {
+    "CONTEXT_MISSING": "This change was refused because no signed-in user was recorded for it.",
+    "DELETE_FORBIDDEN": "Records cannot be deleted. Cancel or deactivate them instead.",
+    "ROW_IMMUTABLE": "This record is final and can no longer be changed.",
+    "AUDIT_PROTECTED": "The audit log can never be changed or deleted.",
+    "NUMBERING_TAMPER": "Document numbers can only advance one at a time.",
+    "DRAFT_REQUIRED": "Lines can only be changed while the document is a draft.",
+    "SERIES_NOT_FOUND": "The numbering series was not found or is not active.",
+    "VALIDATION_FAILED": "Some information is missing or not valid.",
+    "DUPLICATE": "A record with the same details already exists.",
+    "REFERENCE_MISSING": "A linked record does not exist.",
+    "PERMISSION_DENIED": "You do not have permission to do this.",
+    "BUSY_RETRY": "The system is busy with the same records. Please try again.",
+    "TIMEOUT": "The operation took too long and was cancelled. Nothing was saved.",
+    "MONEY_FORMAT": "The amount {value} is not a valid number.",
+    "MONEY_RULE": "The amounts are not valid: {detail}",
+    "INTERNAL": "Something went wrong and nothing was saved. Please try again or contact the administrator."
+  }
+}
