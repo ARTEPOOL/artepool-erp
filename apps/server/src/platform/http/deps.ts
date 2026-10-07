@@ -11,6 +11,11 @@ export interface AppDeps {
   readonly secretBox: SecretBox;
   readonly settings: SettingsCache;
   readonly limits: RateLimits;
+  /**
+   * The ARTÉPOOL CA certificate (PEM) that enrolling PCs learn to trust (decision 0024).
+   * Null until the secure connection is set up (`pnpm tls:init`): enrollment is then refused.
+   */
+  readonly caCertificatePem: string | null;
 }
 
 export function createDeps(input: {
@@ -18,9 +23,11 @@ export function createDeps(input: {
   secretBox: SecretBox;
   hasher?: SecretHasher;
   limits?: RateLimits;
+  caCertificatePem?: string | null;
 }): AppDeps {
   return {
     db: input.db,
+    caCertificatePem: input.caCertificatePem ?? null,
     secretBox: input.secretBox,
     hasher: input.hasher ?? new SecretHasher(),
     settings: new SettingsCache(input.db),

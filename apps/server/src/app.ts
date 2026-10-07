@@ -5,6 +5,7 @@ import { registerGuard } from './platform/auth/guard';
 import type { ServerConfig } from './platform/config';
 import { AppError, toAppError } from './platform/errors/app-error';
 import { registerAuthRoutes } from './modules/auth/routes';
+import { registerDeviceRoutes } from './modules/devices/routes';
 import type { AppDeps } from './platform/http/deps';
 import { REDACT_PATHS, safeErrorSerializer } from './platform/http/logging';
 import { registerHealth } from './routes/health';
@@ -66,5 +67,6 @@ export function buildApp(options: AppOptions, deps: AppDeps): FastifyInstance {
   registerGuard(app, deps);
   registerHealth(app, deps.db);
   registerAuthRoutes(app);
+  registerDeviceRoutes(app);
   return app;
 }

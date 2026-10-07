@@ -129,7 +129,9 @@ Run from the repository root. Setup on a new PC: [`docs/runbooks/dev-setup-windo
 | Unit tests / integration tests (real PostgreSQL) / all | `pnpm test:unit` / `pnpm test:integration` / `pnpm test` |
 | Verify the audit hash chain | `pnpm audit:verify` |
 | Tamper demonstration (throwaway database) | `pnpm demo:audit-tamper` |
-| Run the API in dev mode (GET /health) | `pnpm dev:server` |
+| Create the development master key (`.secrets/`, once per dev PC) | `pnpm dev:secrets` |
+| Run the API in dev mode | `pnpm dev:server` |
+| Server console: first owner / enrollment code / emergency owner 2-step reset (decisions 0022, 0025) | `pnpm owner:create` / `pnpm device:code` / `pnpm owner:reset-2fa` |
 
 Not yet available: `pnpm dev:desktop` (M1), `pnpm build:server` / `pnpm build:desktop` (M1/M6), `pnpm backup:run` / `pnpm backup:restore-test` (M6).
 

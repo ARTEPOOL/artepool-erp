@@ -1,0 +1,46 @@
+{
+  "protocol": "artepool-enroll-v1",
+  "note": "Argon2id m=65536 t=3 p=1, 32-byte output; HMAC-SHA256; base64url without padding. Codes are normalized (upper case, no spaces or dashes) before Argon2id.",
+  "vectors": [
+    {
+      "code": "K7Q-4MX-92P",
+      "keySaltB64": "AAECAwQFBgcICQoLDA0ODw",
+      "clientNonce": "ERERERERERERERERERERERERERERERERERERERERERE",
+      "serverNonce": "IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiI",
+      "caCertificatePem": "-----BEGIN CERTIFICATE-----\nMIIBexampleARTEPOOLCA\n-----END CERTIFICATE-----\n",
+      "device": {
+        "deviceCode": "COUNTER-01",
+        "deviceName": "الكاشير",
+        "deviceKind": "pos",
+        "deviceKeyHash": "MzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzM"
+      },
+      "expected": {
+        "codeKeyHex": "3d87446df60cbf9e3138a543e5845f47984fda2e9cbc04e0b056c1cb2f7ba774",
+        "caSha256Hex": "2609c2f69af0d838e09053a98cb40e6d666e1af24c064db4c59e3dd8c9b3c579",
+        "transcript": "artepool-enroll-v1\nERERERERERERERERERERERERERERERERERERERERERE\nIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiI\n2609c2f69af0d838e09053a98cb40e6d666e1af24c064db4c59e3dd8c9b3c579",
+        "serverProof": "FXWH1y0KTvqCUmvPs6MzRzCjrBEfg2LqpX7ImqkRE4A",
+        "clientProof": "O_8XKP6W69QozYzwzBBD1fMB33yOoJI8jk0Bg0gDqbA"
+      }
+    },
+    {
+      "code": "zz2 9ab hk7",
+      "keySaltB64": "QEFCQ0RFRkdISUpLTE1OTw",
+      "clientNonce": "VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVU",
+      "serverNonce": "ZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmY",
+      "caCertificatePem": "-----BEGIN CERTIFICATE-----\nMIIBexampleARTEPOOLCA\n-----END CERTIFICATE-----\n",
+      "device": {
+        "deviceCode": "OFFICE-01",
+        "deviceName": "Office · this device",
+        "deviceKind": "office",
+        "deviceKeyHash": "d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3c"
+      },
+      "expected": {
+        "codeKeyHex": "2e7a337fc63fbdcf5cb29d149954d5325ab2e9510fe772094221a3df8466ce3a",
+        "caSha256Hex": "2609c2f69af0d838e09053a98cb40e6d666e1af24c064db4c59e3dd8c9b3c579",
+        "transcript": "artepool-enroll-v1\nVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVU\nZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmY\n2609c2f69af0d838e09053a98cb40e6d666e1af24c064db4c59e3dd8c9b3c579",
+        "serverProof": "JsvdV0aUzCy3agBxycFLGwJ_7wd01wW17BjXZ8aL3Xg",
+        "clientProof": "UFCAAraP4cREHEukNtpuqEZoCuIt5BQXdvjkOUH_pN0"
+      }
+    }
+  ]
+}

@@ -136,10 +136,14 @@ describe('every route declares who may use it', () => {
     await app.close();
   });
 
-  it('keeps the public surface to the health check', () => {
+  it('keeps the public surface to the health check and the two enrollment steps', () => {
     const app = buildApp({ logLevel: 'silent' }, server.deps);
     const publicRoutes = app.accessTable.filter((r) => r.access.kind === 'public');
-    expect(publicRoutes.map((r) => `${r.method} ${r.url}`)).toEqual(['GET /health']);
+    expect(publicRoutes.map((r) => `${r.method} ${r.url}`)).toEqual([
+      'GET /health',
+      'POST /api/v1/enroll/hello',
+      'POST /api/v1/enroll/complete',
+    ]);
     void app.close();
   });
 

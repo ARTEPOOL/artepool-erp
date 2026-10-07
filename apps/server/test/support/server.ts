@@ -22,6 +22,10 @@ export const TEST_ARGON2 = { memoryCost: 1024, timeCost: 1, parallelism: 1 } as 
 
 export const CLIENT_VERSION = '0.1.0';
 
+/** Stands in for the ARTÉPOOL CA certificate in tests (the real one comes from `pnpm tls:init`). */
+export const TEST_CA_PEM =
+  '-----BEGIN CERTIFICATE-----\nTEST-ARTEPOOL-CA\n-----END CERTIFICATE-----\n';
+
 export interface TestServer {
   app: FastifyInstance;
   db: Db;
@@ -44,6 +48,7 @@ export async function startTestServer(
     db,
     secretBox: SecretBox.fromKey(Buffer.alloc(32, 42)),
     hasher: new SecretHasher(TEST_ARGON2),
+    caCertificatePem: TEST_CA_PEM,
   });
   const app = buildApp({ logLevel: 'info', logStream: { write: (line) => logs.push(line) } }, deps);
   register?.(app);
@@ -218,4 +223,20 @@ export async function ageRow(
   await server.admin.query('SET LOCAL session_replication_role = replica');
   await server.admin.query(statement, params);
   await server.admin.query('COMMIT');
+}
+
+/** The owner, with the 2-step code already set up, so full owner sessions can be opened. */
+export async function addOwner(server: TestServer, username = 'owner.main'): Promise<bigint> {
+  const id = await addUser(server, { username, method: 'password_totp', roles: ['owner'] });
+  await withBusinessTx(
+    server.db,
+    { userId: id, requestId: randomUUID(), reason: 'test fixture' },
+    (trx) =>
+      trx
+        .updateTable('auth.users')
+        .set({ totp_secret_enc: Buffer.from([1]), totp_enabled: true })
+        .where('id', '=', id)
+        .execute(),
+  );
+  return id;
 }
