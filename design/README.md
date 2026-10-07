@@ -24,6 +24,8 @@ v2 replaces v1.3. The owner approved a simpler look: light grey background, whit
 | `screens/09-a4-tax-invoice.html` | Printed A4 bilingual tax invoice (one page; original and copy) |
 | `screens/10-thermal-receipt.html` | 80 mm simplified tax invoice receipt (original and copy) |
 | `screens/11-print-designer.html` | Print designer (Settings): live preview, logo, colour, print language, optional fields, texts, paper; tax fields locked (decision 0020) |
+| `screens/12-reports.html` | Reports: sales, VAT return summary with the quarterly export package and annual archive, stock, cash and shifts, profit and loss |
+| `screens/13-settings.html` | Settings: company, users and role permissions, VAT and numbering, devices and printers, backup, audit log; links to the print designer |
 
 
 ## Rules for implementation
