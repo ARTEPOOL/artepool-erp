@@ -1,0 +1,25 @@
+{
+  "brand": "ARTÉPOOL",
+  "version": "ARTÉPOOL ERP v{version}",
+  "close": "إغلاق",
+  "language": {
+    "label": "اللغة",
+    "ar": "AR",
+    "en": "EN",
+    "arName": "العربية",
+    "enName": "English"
+  },
+  "theme": {
+    "toggle": "الوضع الفاتح أو الغامق"
+  },
+  "server": {
+    "connected": "متصل بالخادم الرئيسي",
+    "unreachable": "الخادم الرئيسي غير متاح",
+    "connectedShort": "متصل بالخادم",
+    "checking": "جارٍ التحقق من الاتصال…"
+  },
+  "device": {
+    "label": "{name} · {code}",
+    "notEnrolled": "هذا الجهاز غير مسجّل بعد"
+  }
+}

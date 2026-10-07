@@ -1,0 +1,25 @@
+{
+  "brand": "ARTÉPOOL",
+  "version": "ARTÉPOOL ERP v{version}",
+  "close": "Close",
+  "language": {
+    "label": "Language",
+    "ar": "AR",
+    "en": "EN",
+    "arName": "العربية",
+    "enName": "English"
+  },
+  "theme": {
+    "toggle": "Light or dark"
+  },
+  "server": {
+    "connected": "Connected to main server",
+    "unreachable": "Main server unreachable",
+    "connectedShort": "Server connected",
+    "checking": "Checking the connection…"
+  },
+  "device": {
+    "label": "{name} · {code}",
+    "notEnrolled": "This PC is not enrolled yet"
+  }
+}

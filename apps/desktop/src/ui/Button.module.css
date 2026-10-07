@@ -1,0 +1,129 @@
+/* From design/artepool-components.css: .btn, .btn-*, .icon-btn */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-block-size: var(--control-md);
+  padding-inline: var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: var(--text-label);
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    background var(--motion-fast) var(--motion-ease),
+    border-color var(--motion-fast) var(--motion-ease),
+    transform var(--motion-fast) var(--motion-ease);
+}
+
+.btn[data-hovered] {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+
+.btn[data-pressed] {
+  transform: scale(0.97);
+}
+
+.primary {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.primary[data-hovered] {
+  background: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
+}
+
+.fin {
+  background: var(--color-financial);
+  border-color: var(--color-financial);
+  color: var(--color-on-financial);
+}
+
+.fin[data-hovered] {
+  background: var(--color-financial-hover);
+  border-color: var(--color-financial-hover);
+}
+
+.ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--color-primary);
+}
+
+.danger {
+  background: var(--color-danger);
+  border-color: var(--color-danger);
+  color: var(--color-on-danger);
+}
+
+.danger[data-hovered] {
+  background: var(--color-danger);
+  filter: brightness(1.08);
+}
+
+.dangerText {
+  color: var(--color-danger);
+}
+
+.lg {
+  min-block-size: var(--control-lg);
+  padding-inline: var(--space-5);
+  font-size: var(--text-body);
+}
+
+.block {
+  inline-size: 100%;
+}
+
+.btn[data-disabled] {
+  background: var(--color-disabled-bg);
+  border-color: transparent;
+  color: var(--color-disabled-text);
+  cursor: not-allowed;
+  transform: none;
+}
+
+.busy {
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+.iconBtn {
+  display: grid;
+  place-items: center;
+  inline-size: var(--control-md);
+  block-size: var(--control-md);
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition:
+    background var(--motion-fast) var(--motion-ease),
+    color var(--motion-fast) var(--motion-ease);
+}
+
+.iconBtn[data-hovered] {
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+}
+
+.icon {
+  inline-size: 1.25rem;
+  block-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.iconSm {
+  inline-size: 1rem;
+  block-size: 1rem;
+  flex-shrink: 0;
+}

@@ -1,0 +1,28 @@
+/* From design/screens/01-login.html: .login, .login-top, .login-mid, .login-foot */
+.login {
+  min-block-size: 100dvh;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  padding: var(--space-4) var(--space-6);
+}
+
+.top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.middle {
+  display: grid;
+  place-items: center;
+  padding-block: var(--space-4);
+}
+
+.foot {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+}
