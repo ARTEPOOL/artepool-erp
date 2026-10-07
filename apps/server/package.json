@@ -17,6 +17,7 @@
     "kysely": "0.29.6",
     "otpauth": "9.5.2",
     "pg": "8.23.1",
+    "pino": "10.4.0",
     "zod": "4.6.5"
   },
   "devDependencies": {

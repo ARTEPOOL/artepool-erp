@@ -5,6 +5,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { connectionFor, migrationsDir } from '@artepool/node-kit';
 import { createTestDatabase, type TestDatabase } from '@artepool/testing';
 import { buildApp } from '../../src/app';
+import { SecretBox } from '../../src/platform/crypto/secret-box';
+import { createDeps } from '../../src/platform/http/deps';
 import { createDb, createPool, type Db } from '../../src/platform/db/pool';
 import { withBusinessTx, type RequestContext } from '../../src/platform/db/tx';
 
@@ -134,7 +136,10 @@ describe('withBusinessTx: one business operation = one transaction', () => {
 
 describe('GET /health', () => {
   it('reports the database, schema version and audit chain head', async () => {
-    const app = buildApp({ logLevel: 'silent' }, db);
+    const app = buildApp(
+      { logLevel: 'silent' },
+      createDeps({ db, secretBox: SecretBox.fromKey(Buffer.alloc(32, 1)) }),
+    );
     const response = await app.inject({ method: 'GET', url: '/health' });
     expect(response.statusCode).toBe(200);
     const body = response.json<{
