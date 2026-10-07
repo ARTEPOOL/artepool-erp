@@ -68,3 +68,144 @@ jobs:
         run: pnpm audit:verify
       - name: Tamper demo is caught
         run: pnpm demo:audit-tamper
+
+  screens:
+    name: Screen tests (Playwright, Arabic + English)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      # Throwaway CI database only — not real credentials.
+      PGHOST: localhost
+      PGPORT: '5432'
+      PG_SUPERUSER: postgres
+      PG_SUPERUSER_PASSWORD: postgres
+      ARTEPOOL_DB: artepool_dev
+      ARTEPOOL_TEST_DB: artepool_test
+      ARTEPOOL_MIGRATOR_PASSWORD: ci-only-migrator
+      ARTEPOOL_API_PASSWORD: ci-only-api
+      ARTEPOOL_BACKUP_PASSWORD: ci-only-backup
+      ARTEPOOL_MAINT_PASSWORD: ci-only-maint
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Chromium for Playwright
+        run: pnpm --filter @artepool/desktop exec playwright install --with-deps chromium
+      - name: Screen flows against the real API (throwaway database)
+        run: pnpm test:e2e
+      - name: Screenshots and report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screens
+          path: |
+            apps/desktop/e2e-screens/
+            apps/desktop/playwright-report/
+            apps/desktop/test-results/
+          retention-days: 14
+          if-no-files-found: ignore
+
+  rust:
+    name: PC secure side (Rust)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      PGHOST: localhost
+      PGPORT: '5432'
+      PG_SUPERUSER: postgres
+      PG_SUPERUSER_PASSWORD: postgres
+      ARTEPOOL_DB: artepool_dev
+      ARTEPOOL_TEST_DB: artepool_test
+      ARTEPOOL_MIGRATOR_PASSWORD: ci-only-migrator
+      ARTEPOOL_API_PASSWORD: ci-only-api
+      ARTEPOOL_BACKUP_PASSWORD: ci-only-backup
+      ARTEPOOL_MAINT_PASSWORD: ci-only-maint
+    defaults:
+      run:
+        working-directory: apps/desktop/src-tauri
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri
+      - name: Formatting
+        run: cargo fmt --all --check
+      - name: Lints
+        run: cargo clippy -p artepool-bridge --all-targets -- -D warnings
+      - name: Tests (protocol vectors, TLS rules, enrollment and renewal)
+        run: cargo test -p artepool-bridge
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Install
+        working-directory: .
+        run: pnpm install --frozen-lockfile
+      - name: Enroll through the Rust bridge against the real API
+        run: |
+          cd ../ && (pnpm exec tsx e2e/harness/harness.ts > harness.log 2>&1 &) && cd src-tauri
+          for i in $(seq 1 90); do curl -sf http://127.0.0.1:1529/ready > ready.json && break; sleep 2; done
+          API=$(node -e "console.log(new URL(require('./ready.json').api).host)")
+          CODE=$(curl -sf -X POST -H 'content-type: application/json' -d '{}' http://127.0.0.1:1529/enrollment-code | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.parse(s).code))")
+          cargo run -p artepool-bridge --example enroll_check -- "$API" "$CODE" RUST-CI
+
+  windows:
+    name: Windows app (build and test)
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Rust tests on Windows (including Windows Credential Manager)
+        run: cargo test --workspace --manifest-path apps/desktop/src-tauri/Cargo.toml
+      - name: Build the installer
+        run: pnpm build:desktop
+      - name: Installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: artepool-erp-windows
+          path: apps/desktop/src-tauri/target/release/bundle/nsis/*.exe
+          retention-days: 14
