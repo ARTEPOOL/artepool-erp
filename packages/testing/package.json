@@ -1,0 +1,21 @@
+{
+  "name": "@artepool/testing",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@artepool/migrate": "workspace:*",
+    "@artepool/node-kit": "workspace:*",
+    "pg": "8.23.1",
+    "@artepool/dev-db": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/pg": "8.23.1"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "name": "@artepool/audit-verify",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@artepool/dev-db": "workspace:*",
+    "@artepool/migrate": "workspace:*",
+    "@artepool/node-kit": "workspace:*",
+    "pg": "8.23.1"
+  },
+  "devDependencies": {
+    "@artepool/testing": "workspace:*",
+    "@types/pg": "8.23.1"
+  }
+}

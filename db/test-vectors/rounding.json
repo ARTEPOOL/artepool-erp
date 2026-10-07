@@ -1,0 +1,63 @@
+{
+  "description": "Shared rounding cases for ARTÉPOOL ERP: integer division rounded half away from zero. The TypeScript money module (packages/shared) and the database function sys.round_div must both pass every case.",
+  "round_div": [
+    { "n": "0", "d": "1", "q": "0", "note": "zero" },
+    { "n": "5", "d": "10", "q": "1", "note": "exact half rounds up" },
+    { "n": "-5", "d": "10", "q": "-1", "note": "negative half rounds away from zero" },
+    { "n": "4", "d": "10", "q": "0" },
+    { "n": "-4", "d": "10", "q": "0" },
+    { "n": "15", "d": "10", "q": "2" },
+    { "n": "25", "d": "10", "q": "3", "note": "not banker's rounding" },
+    { "n": "-25", "d": "10", "q": "-3" },
+    { "n": "5", "d": "-10", "q": "-1", "note": "negative divisor" },
+    { "n": "-5", "d": "-10", "q": "1" },
+    { "n": "1", "d": "3", "q": "0" },
+    { "n": "2", "d": "3", "q": "1" },
+    { "n": "-2", "d": "3", "q": "-1" },
+    { "n": "7", "d": "2", "q": "4" },
+    { "n": "-7", "d": "2", "q": "-4" },
+    { "n": "499500", "d": "10500", "q": "48", "note": "VAT inside 9.99 AED at 5% = 0.48" },
+    { "n": "37035000", "d": "100000", "q": "370", "note": "3 × 1.2345 AED = 3.70" },
+    { "n": "123450000", "d": "100000", "q": "1235", "note": "10 × 1.2345 AED = 12.35" },
+    { "n": "3705", "d": "10", "q": "371", "note": "3 of 10 units worth 12.35 = 3.71" },
+    {
+      "n": "1575000000",
+      "d": "10500",
+      "q": "150000",
+      "note": "VAT in a 31,500 AED advance = 1,500"
+    },
+    { "n": "9223372036854775807", "d": "2", "q": "4611686018427387904", "note": "largest bigint" },
+    {
+      "n": "92233720368547758070000",
+      "d": "10000",
+      "q": "9223372036854775807",
+      "note": "product larger than bigint"
+    }
+  ],
+  "vat_inclusive": [
+    { "gross": "9.99", "rate_bp": "500", "vat": "0.48" },
+    { "gross": "31500.00", "rate_bp": "500", "vat": "1500.00" },
+    { "gross": "42000.00", "rate_bp": "500", "vat": "2000.00" },
+    { "gross": "105000.00", "rate_bp": "500", "vat": "5000.00" },
+    { "gross": "0.01", "rate_bp": "500", "vat": "0.00" },
+    { "gross": "0.21", "rate_bp": "500", "vat": "0.01" },
+    { "gross": "1.11", "rate_bp": "500", "vat": "0.05" },
+    { "gross": "100.00", "rate_bp": "0", "vat": "0.00" }
+  ],
+  "vat_exclusive": [
+    { "net": "100.00", "rate_bp": "500", "vat": "5.00" },
+    { "net": "0.10", "rate_bp": "500", "vat": "0.01" },
+    { "net": "0.09", "rate_bp": "500", "vat": "0.00" },
+    { "net": "3.70", "rate_bp": "500", "vat": "0.19" },
+    { "net": "-0.10", "rate_bp": "500", "vat": "-0.01" }
+  ],
+  "line_amount": [
+    { "quantity": "3.000", "unit_price": "1.2345", "amount": "3.70" },
+    { "quantity": "10.000", "unit_price": "1.2345", "amount": "12.35" },
+    { "quantity": "2.500", "unit_price": "4.1000", "amount": "10.25" },
+    { "quantity": "0.333", "unit_price": "3.0000", "amount": "1.00" },
+    { "quantity": "1.000", "unit_price": "9.9900", "amount": "9.99" },
+    { "quantity": "7.000", "unit_price": "0.0015", "amount": "0.01" },
+    { "quantity": "1.000", "unit_price": "0.0050", "amount": "0.01" }
+  ]
+}

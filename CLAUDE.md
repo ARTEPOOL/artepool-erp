@@ -98,30 +98,32 @@ It runs client–server on the local network: PostgreSQL and the API service on 
 | Transport | HTTPS, TLS 1.3 only, private ARTÉPOOL CA with name constraints; enrolled devices |
 | Migrations | Numbered plain-SQL files in `db/migrations/`, run by our own runner with checksums |
 | Tests | Vitest (unit + integration against a real PostgreSQL test database), fast-check (property tests), Playwright (UI flows, both languages) |
+| Pinned versions (M0) | Node 24, pnpm 10, TypeScript 6.0 (TypeScript 7 is not yet supported by typescript-eslint — revisit), Vitest 5, ESLint 10, Fastify 5, Kysely 0.29, Zod 4, PostgreSQL 18 |
 | Tooling | pnpm workspaces, ESLint, Prettier, Stylelint, GitHub Actions (Linux for API/DB; Windows runner for the Tauri build) |
 | Releases | Tauri updater signatures, mandatory. No installer code-signing certificate for now (decision 0007). |
 
 ## Commands
 
-These are the **planned** commands. They are created in milestone M0 and do not work until the scaffold exists. Update this section if anything changes during M0.
+Run from the repository root. Setup on a new PC: [`docs/runbooks/dev-setup-windows.md`](docs/runbooks/dev-setup-windows.md).
 
 | Task | Command |
 |---|---|
 | Install dependencies | `pnpm install` |
-| Run API in dev mode | `pnpm dev:server` |
-| Run desktop app in dev mode | `pnpm dev:desktop` |
-| Lint + typecheck + i18n key check | `pnpm check` |
-| Unit tests | `pnpm test:unit` |
-| Integration tests (real PostgreSQL; needs `TEST_DATABASE_URL`) | `pnpm test:integration` |
-| All tests | `pnpm test` |
-| Apply migrations | `pnpm db:migrate` |
-| Show migration status / verify checksums | `pnpm db:status` |
-| Create a new migration file | `pnpm db:new <name>` |
+| Create database roles + dev database (dev PCs only) | `pnpm db:setup` |
+| Apply migrations / dry run | `pnpm db:migrate` / `pnpm db:migrate --dry-run` |
+| Migration status + checksum verification | `pnpm db:status` |
+| Create the next migration file | `pnpm db:new <lower_snake_name>` |
+| Regenerate / verify database types (after migrations) | `pnpm db:codegen` / `pnpm db:codegen:check` |
+| Lint + formatting + typecheck + translations | `pnpm check` |
+| Format all files | `pnpm format` |
+| Unit tests / integration tests (real PostgreSQL) / all | `pnpm test:unit` / `pnpm test:integration` / `pnpm test` |
 | Verify the audit hash chain | `pnpm audit:verify` |
-| Build server bundle | `pnpm build:server` |
-| Build Windows installer + signed update | `pnpm build:desktop` |
-| Manual backup now | `pnpm backup:run` |
-| Restore latest backup to the test database + integrity checks | `pnpm backup:restore-test` |
+| Tamper demonstration (throwaway database) | `pnpm demo:audit-tamper` |
+| Run the API in dev mode (GET /health) | `pnpm dev:server` |
+
+Not yet available: `pnpm dev:desktop` (M1), `pnpm build:server` / `pnpm build:desktop` (M1/M6), `pnpm backup:run` / `pnpm backup:restore-test` (M6).
+
+Rules for migrations: one file per change in `db/migrations/NNNN_name.sql`; no `BEGIN`/`COMMIT` inside (the runner wraps each file); every new table gets `sys.add_touch`/`sys.add_stamp`, `audit.enable_for`, `sys.forbid_delete` and explicit grants — `db/tests/privileges.test.ts` fails otherwise; run `pnpm db:codegen` and commit the regenerated types.
 
 ## Definition of done (every task)
 

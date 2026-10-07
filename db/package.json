@@ -1,0 +1,17 @@
+{
+  "name": "@artepool/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {},
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@artepool/shared": "workspace:*",
+    "@artepool/testing": "workspace:*",
+    "pg": "8.23.1",
+    "@types/pg": "8.23.1"
+  }
+}
