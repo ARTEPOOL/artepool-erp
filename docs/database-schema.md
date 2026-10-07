@@ -86,6 +86,7 @@ Phase 1 has **68 tables in 9 schemas**, plus reporting views and the functions a
  auth.users ◄─ auth.user_roles ─► auth.roles ◄─ auth.role_permissions ─► auth.permissions
      ▲     auth.devices (+ device_activity) · auth.enrollment_codes · auth.sessions
      │     auth.approvals (single-use supervisor approvals) · auth.recovery_codes (owner 2-step)
+     │     auth.device_trust ("trust this PC" for the 2-step code, 0006)
      │
  sys.company_profile · sys.settings · sys.branches · sys.document_series (POS-, INV-, CN-, …)
 
@@ -383,7 +384,7 @@ Enrolled PCs only ([0024](decisions/0024-device-enrollment-proves-the-server.md)
 | name | text | Free description, 1–100 characters |
 | device_kind | text | `CHECK IN ('pos','office','warehouse','server')`. PIN sign-in only on `pos` |
 | branch_id | bigint → sys.branches | |
-| default_warehouse_id | bigint? → md.warehouses | FK added by 0007 |
+| default_warehouse_id | bigint? → md.warehouses | FK added by 0008 (master data; the comment in 0005 says 0007, written before 0006 was used for trusted PCs) |
 | status | text | `CHECK IN ('active','revoked')`, default `active` |
 | key_hash | bytea | Unique; SHA-256 of the 256-bit device key |
 | key_expires_at | timestamptz | `> enrolled_at`; renewed automatically (`security.device_key_days`) |
@@ -426,7 +427,7 @@ Not row-audited. Sign-in, sign-out, lock, unlock and switch are explicit audit e
 | user_id | bigint → auth.users | |
 | device_id | bigint → auth.devices | |
 | stage | text | `CHECK IN ('second_factor','full')`. A password + 2-step sign-in first gets a short `second_factor` session, then a new `full` session with a new token |
-| auth_method | text | `CHECK IN ('password','password_totp','recovery_code','pin')`; `second_factor` only with `password` |
+| auth_method | text | `CHECK IN ('password','password_totp','recovery_code','pin','trusted_device')` (`trusted_device` from 0006); `second_factor` only with `password` |
 | created_at, last_activity_at | timestamptz | Server time at insert |
 | idle_timeout_sec | integer | `> 0` (5 / 15 minutes by device kind) |
 | expires_at | timestamptz | `> created_at`, at most 24 hours later |
@@ -435,7 +436,7 @@ Not row-audited. Sign-in, sign-out, lock, unlock and switch are explicit audit e
 | end_reason | text? | `CHECK IN ('logout','expired','revoked','user_switch','credential_changed','device_revoked','user_deactivated','upgraded','locked_out')` |
 | client_ip | inet? | |
 
-**Insert rules** (`AP010`, [0021](decisions/0021-cashier-pin-sign-in-on-pos-pcs.md)): the user is active and not SYSTEM; the device is active with an unexpired key; `pin` only for PIN users on `pos` devices; `password_totp` / `recovery_code` only for 2-step users (`password_totp` needs `totp_enabled`); a `full` password-only session only while the 2-step code is not set up.
+**Insert rules** (`AP010`, [0021](decisions/0021-cashier-pin-sign-in-on-pos-pcs.md)): the user is active and not SYSTEM; the device is active with an unexpired key; `pin` only for PIN users on `pos` devices; `password_totp` / `recovery_code` / `trusted_device` only for 2-step users (`password_totp` and `trusted_device` need `totp_enabled`); a `full` password-only session only while the 2-step code is not set up; `trusted_device` only on a non-POS PC with an open, unexpired `auth.device_trust` row that is also younger than the current `security.trusted_device_days` (and never when that setting is 0).
 
 ### 5.8 `auth.approvals` (single-use)
 
@@ -446,7 +447,7 @@ Not row-audited. Sign-in, sign-out, lock, unlock and switch are explicit audit e
 | requested_by | bigint → auth.users | Set from the request context |
 | approved_by | bigint → auth.users | `CHECK (approved_by <> requested_by)`; must hold the permission |
 | device_id | bigint → auth.devices | Set from the request context (required) |
-| reason_code_id | bigint? → sys.reason_codes | FK added by 0007 |
+| reason_code_id | bigint? → sys.reason_codes | FK added by 0008 (master data) |
 | reason_text | text | `CHECK (length(btrim(reason_text)) >= 3)` |
 | context | jsonb | e.g. `{"item_id":42,"qty_short":"2.000"}`, `{"discount_bp":1500,"limit_bp":1000}` |
 | approved_at | timestamptz | Server time |
@@ -468,6 +469,29 @@ The owner's 10 one-time 2-step recovery codes ([0022](decisions/0022-owner-2-ste
 | used_at | timestamptz? | Set once, server time |
 | revoked_at | timestamptz? | Set when a new set replaces it; never both used and revoked |
 | [ins] | | |
+
+Also used, together with the 6-digit code, to recover a forgotten password in the app ([0028](decisions/0028-forgot-password-with-phone-and-recovery-code.md)).
+
+### 5.10 `auth.device_trust` (migration 0006)
+
+"Trust this PC" for the 2-step code ([0027](decisions/0027-trust-this-pc-for-the-2-step-code.md)): on a trusted PC, the person signs in with the password alone until the trust ends. Row-audited; ended with a reason, never deleted.
+
+| Column | Type | Rules |
+|---|---|---|
+| id | bigint PK | |
+| user_id | bigint → auth.users | Must have an active 2-step code |
+| device_id | bigint → auth.devices | Active and not `pos` |
+| created_at, created_by | timestamptz, bigint → auth.users | Stamped; `created_by = user_id` |
+| expires_at | timestamptz | Set by the server: `created_at + security.trusted_device_days` (default 30, range 0–90); at most 90 days |
+| ended_at | timestamptz? | Server time; an ended trust is final |
+| end_reason | text? | `CHECK IN ('replaced','ended_in_settings','password_changed','two_step_changed','user_deactivated','device_revoked','device_kind_changed')` |
+
+**Rules:**
+- **Insert** (`AP010`): only the person themselves, on that same PC (from the request context), while the setting is above 0.
+- **One open trust** per person and PC (unique partial index).
+- **Automatic ending** (triggers):
+  - on `auth.users`: a new password (`password_changed_at` changes, or a reset sets `must_change_password` with a new hash), a 2-step change (`totp_enabled` or `totp_secret_enc`), or deactivation;
+  - on `auth.devices`: revoke, or the type changing to `pos`.
 
 ---
 
@@ -1601,17 +1625,18 @@ Migrations are written **in build order** (milestones in [`phase-1-plan.md`](pha
 | 0003 | `auth_core` | M0 | `users` (+ SYSTEM), `roles` (5 defaults), `permissions` (seeded), `role_permissions`, `user_roles` | — |
 | 0004 | `sys_core` | M0 | `company_profile`, `settings` (defaults), `branches` (HQ), `document_series` (all 13 series) + `next_number`, `alerts`, `import_batches` | — |
 | 0005 | `auth_devices` | M1 | `devices`, `device_activity`, `enrollment_codes`, `sessions`, `approvals`, `recovery_codes`, `sys.idempotency_keys`; sign-in method and deactivation columns on `users`; `owner_only` permissions; owner and 2-step rules; security settings | — |
-| 0006 | `gl_core` | M2 | `accounts` (provisional chart), `account_mappings`, `periods` (monthly, seeded) + period guard | — |
-| 0007 | `master_data` | M2 | All 15 `md.*` tables (with seeds) and `sys.reason_codes` (with seeds) | `auth.devices.default_warehouse_id`, `auth.approvals.reason_code_id` |
-| 0008 | `inventory` | M3 | All `inv.*` tables + `apply_movement` + stock views | — |
-| 0009 | `gl_journals` | M3 | `journal_entries`, `journal_lines` + balance trigger | — |
-| 0010 | `cash_core` | M4 | `registers`, `shifts`, `counts`, `count_lines` + shift-owner function | — |
-| 0011 | `sales` | M4 | All `sales.*` tables + allocation, advance-deduction, note and payment-allocation triggers + sales views | `inv.movements.sales_document_line_id`, `inv.adjustments.sales_document_id`, `gl.journal_entries` (sales document, payment, opening balance, shift) |
-| 0012 | `ops_outbox` | M4 | `ops.outbox` | — |
-| 0013 | `cash_events` | M5 | `cash.movements`, `cash.drawer_events` + shift summary view | `gl.journal_entries.cash_movement_id` |
-| 0014 | `ops_backup` | M6 | `ops.backup_runs`, `ops.integrity_runs` + backup role grants | — |
+| 0006 | `device_trust` | M1 | `auth.device_trust` ("trust this PC", decision 0027), `trusted_device` sign-in method, `security.trusted_device_days` | — |
+| 0007 | `gl_core` | M2 | `accounts` (provisional chart), `account_mappings`, `periods` (monthly, seeded) + period guard | — |
+| 0008 | `master_data` | M2 | All 15 `md.*` tables (with seeds) and `sys.reason_codes` (with seeds) | `auth.devices.default_warehouse_id`, `auth.approvals.reason_code_id` |
+| 0009 | `inventory` | M3 | All `inv.*` tables + `apply_movement` + stock views | — |
+| 0010 | `gl_journals` | M3 | `journal_entries`, `journal_lines` + balance trigger | — |
+| 0011 | `cash_core` | M4 | `registers`, `shifts`, `counts`, `count_lines` + shift-owner function | — |
+| 0012 | `sales` | M4 | All `sales.*` tables + allocation, advance-deduction, note and payment-allocation triggers + sales views | `inv.movements.sales_document_line_id`, `inv.adjustments.sales_document_id`, `gl.journal_entries` (sales document, payment, opening balance, shift) |
+| 0013 | `ops_outbox` | M4 | `ops.outbox` | — |
+| 0014 | `cash_events` | M5 | `cash.movements`, `cash.drawer_events` + shift summary view | `gl.journal_entries.cash_movement_id` |
+| 0015 | `ops_backup` | M6 | `ops.backup_runs`, `ops.integrity_runs` + backup role grants | — |
 
-After 0014, a final check asserts that every business table has the audit trigger, the no-delete guard and the expected grants. The same check runs as an automated test.
+After 0015, a final check asserts that every business table has the audit trigger, the no-delete guard and the expected grants. The same check runs as an automated test.
 
 ---
 

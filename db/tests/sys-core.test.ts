@@ -54,8 +54,10 @@ describe('settings', () => {
       'print.pos_receipt_auto': true,
       'einvoice.mandatory_from': null,
       'security.max_failed_logins': 5,
+      'security.trusted_device_days': 30,
     });
-    expect(rows).toHaveLength(28); // 22 from 0004 + 6 security settings from 0005
+    // 22 from 0004 + 6 security settings from 0005 + 1 from 0006
+    expect(rows).toHaveLength(29);
   });
 
   it('values can be edited (audited, versioned); keys cannot be added by the app', async () => {
