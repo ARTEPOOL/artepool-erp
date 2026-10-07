@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Stack accepted ([0001](decisions/0001-tech-stack.md)). Detailed design part of the Phase 1 plan, **awaiting approval**. |
+| **Status** | Stack accepted ([0001](decisions/0001-tech-stack.md)). Detailed design approved with the Phase 1 plan (2026-10-07). |
 | **Date** | 2026-10-06 |
 | **Related** | [`database-schema.md`](database-schema.md) · [`phase-1-plan.md`](phase-1-plan.md) · [`decisions/`](decisions/README.md) · [`accounting/`](accounting/posting-map.md) |
 

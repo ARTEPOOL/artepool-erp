@@ -9,7 +9,7 @@ ARTÉPOOL ERP is an offline-first Windows desktop system for **ARTÉPOOL** (swim
 
 It runs client–server on the local network: PostgreSQL and an API service on a Main Server PC, and Tauri desktop clients on any number of PCs. It is bilingual Arabic/English and for internal use only.
 
-**Status:** planning. The Phase 1 plan is awaiting approval, and no application code exists yet.
+**Status:** the Phase 1 plan is approved. Milestone M0 (foundations) is being planned; no application code exists yet.
 
 | Start here | |
 |---|---|

@@ -28,4 +28,5 @@
 - **Books follow the stock to the fils.** The amount booked in the accounts for each stock movement is the change in the stock value **rounded to the fils**. The accounts therefore always equal the stock value rounded to the fils, and rounding never builds up.
 
   Example: receive 10 × 1.2345 = 12.3450 (booked 12.35); issue 3 = 3.7035 (booked 3.71); issue the last 7 = 8.6415 (booked 8.64). Stock and books both end at exactly 0.00.
+- **Confirmed by the owner (2026-10-07):** a 1-fils difference in a single movement's cost is acceptable, because the books always match the stock value exactly.
 - **One rounding rule in two places:** the same rule is used by the TypeScript helper and by the database's costing function. Both run one shared set of test cases.

@@ -15,7 +15,7 @@
 - **Thermal receipts** are rendered as an image in the app and sent straight to the receipt printer. Arabic always prints correctly this way.
 - **A4 documents** are rendered as a PDF by the server from bilingual templates, then shown in the print dialog.
 - **Every print is counted** (`print_count`) and logged in the audit trail with the format (thermal or A4).
-- **Reprint marking:** by default, every print after the first is marked **"Copy / نسخة"** (setting `print.mark_reprints_as_copy`, on by default). This can be switched off if the accountant prefers.
+- **Reprint marking:** by default, every print after the first is marked **"Copy / نسخة"** (setting `print.mark_reprints_as_copy`, on by default). This default was **confirmed by the owner (2026-10-07)** and stays a setting.
 
 ## Consequences
 - **A simplified invoice can never be edited into a full one.** If a VAT-registered customer was sold to on a simplified invoice and later needs a full tax invoice with their TRN, issue a credit note for the original and then a new full invoice.

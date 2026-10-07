@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Part of the Phase 1 plan, **awaiting approval**. This is a design document; the SQL migrations are written after approval. |
+| **Status** | Approved with the Phase 1 plan (2026-10-07). This is a design document; the SQL migrations implement it milestone by milestone. |
 | **Date** | 2026-10-06 |
 | **Database** | PostgreSQL 18 (≥ 16 compatible, except `uuidv7()`, which the API can generate on 16/17) |
 | **Related** | [`architecture.md`](architecture.md) · [`phase-1-plan.md`](phase-1-plan.md) · [`decisions/`](decisions/README.md) · [`accounting/`](accounting/chart-of-accounts.md) |

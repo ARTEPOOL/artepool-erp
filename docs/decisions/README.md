@@ -17,7 +17,7 @@ There is one short file per decision, numbered in order.
 | [0008](0008-printing-pos-silent-a4-section.md) | Printing: silent POS receipts, separate A4 section | Accepted |
 | [0009](0009-vat-per-line.md) | VAT calculated per line | Accepted |
 | [0010](0010-invoice-format-by-vat-registration.md) | Invoice format follows VAT registration | Accepted |
-| [0011](0011-document-numbering-series.md) | Document numbering series (POS- / INV- …) | Accepted |
+| [0011](0011-document-numbering-series.md) | Document numbering series (POS- / INV- …) | Accepted (other prefixes approved as defaults) |
 | [0012](0012-discounts-net-revenue-per-line.md) | Discounts: revenue net, stored per line | Accepted |
 | [0013](0013-advance-and-progress-payments-vat.md) | Advance and progress payments: VAT on receipt | Accepted |
 | [0014](0014-money-precision-and-rounding.md) | Money precision (fils + 4 decimals) and rounding | Accepted |

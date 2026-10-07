@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | **Awaiting owner approval.** No application code is written until this plan is approved. |
+| **Status** | **Approved by the owner (2026-10-07).** Each milestone still starts with a short task plan for approval ([`milestones/`](milestones/)). |
 | **Date** | 2026-10-06 |
 | **Scope source** | [`PRD.md`](../PRD.md) v1.1 + [`decisions/`](decisions/README.md) 0001–0019 |
 | **Detail** | [`architecture.md`](architecture.md) · [`database-schema.md`](database-schema.md) · [`accounting/`](accounting/posting-map.md) |

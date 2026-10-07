@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Accepted (the two invoice series were decided by the owner; the other prefixes are defaults and can be changed before go-live) |
+| **Status** | Accepted. The owner decided the two invoice series and approved the other prefixes as defaults (2026-10-07); they can be changed before go-live. |
 | **Date** | 2026-10-06 |
 | **Decided by** | Owner |
 

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Accepted |
+| **Status** | Accepted (interpretation confirmed by the owner, 2026-10-07) |
 | **Date** | 2026-10-06 |
 | **Decided by** | Owner / accountant |
 
@@ -13,6 +13,8 @@
 - This **replaces** the earlier P1 restriction "payments against invoices only".
 
 ## How it is applied
+**Confirmed by the owner (2026-10-07):** VAT is charged only on payments received **before** an invoice is issued (advances and progress payments). Payments against an already-issued invoice never create new VAT.
+
 - **When a payment creates its own tax invoice:** a payment that is **not** settling an already-issued tax invoice gets its own tax invoice. This covers advances, progress payments, payments after completion before the final invoice, and any excess paid above an invoice.
 - **When it does not:** a payment that settles an already-issued tax invoice does **not** create VAT again, because that invoice already charged it. This is what keeps VAT from being counted twice.
 - **The amount received includes VAT** at the rate of the agreed work (normally 5%): VAT = amount × 5/105.
