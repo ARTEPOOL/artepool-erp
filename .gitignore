@@ -11,3 +11,7 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 target/
+# Playwright output
+apps/desktop/test-results/
+apps/desktop/playwright-report/
+apps/desktop/e2e-screens/

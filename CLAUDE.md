@@ -127,11 +127,13 @@ Run from the repository root. Setup on a new PC: [`docs/runbooks/dev-setup-windo
 | Lint + formatting + typecheck + translations | `pnpm check` |
 | Format all files | `pnpm format` |
 | Unit tests / integration tests (real PostgreSQL) / all | `pnpm test:unit` / `pnpm test:integration` / `pnpm test` |
+| Screen tests in a real browser (Playwright, Arabic + English, light + dark; real API on a throwaway database) | `pnpm test:e2e` (once: `pnpm --filter @artepool/desktop exec playwright install chromium`) |
 | Verify the audit hash chain | `pnpm audit:verify` |
 | Tamper demonstration (throwaway database) | `pnpm demo:audit-tamper` |
 | Create the development master key (`.secrets/`, once per dev PC) | `pnpm dev:secrets` |
 | Create the ARTÉPOOL CA + server certificate (HTTPS, TLS 1.3); `--renew-server` for a new server certificate | `pnpm tls:init [--name host] [--ip address]` |
 | Run the API in dev mode (HTTPS: `https://localhost:3100/health`, trust `.secrets/tls/ca.crt`) | `pnpm dev:server` |
+| Run the screens in a browser (`http://localhost:1420`; the dev server plays the PC's secure side, device file `.secrets/dev-device.json`) | `pnpm dev:desktop:web` |
 | Server console: first owner / enrollment code / emergency owner 2-step reset (decisions 0022, 0025) | `pnpm owner:create` / `pnpm device:code` / `pnpm owner:reset-2fa` |
 
 Not yet available: `pnpm dev:desktop` (M1), `pnpm build:server` / `pnpm build:desktop` (M1/M6), `pnpm backup:run` / `pnpm backup:restore-test` (M6).

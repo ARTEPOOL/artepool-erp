@@ -13,6 +13,7 @@ import { createDb, createPool, type Db } from '../../src/platform/db/pool';
 import { stamped } from '../../src/platform/db/stamped';
 import { withBusinessTx } from '../../src/platform/db/tx';
 import { createDeps, type AppDeps } from '../../src/platform/http/deps';
+import type { RateLimits } from '../../src/platform/http/rate-limit';
 
 /**
  * Tests hash with a small Argon2id cost to stay fast. Production always uses ARGON2_PARAMS
@@ -40,6 +41,7 @@ export interface TestServer {
 
 export async function startTestServer(
   register?: (app: FastifyInstance) => void,
+  options: { limits?: RateLimits } = {},
 ): Promise<TestServer> {
   const testDb = await createTestDatabase();
   const db = createDb(createPool(connectionFor('api', testDb.name), 5));
@@ -49,6 +51,7 @@ export async function startTestServer(
     secretBox: SecretBox.fromKey(Buffer.alloc(32, 42)),
     hasher: new SecretHasher(TEST_ARGON2),
     caCertificatePem: TEST_CA_PEM,
+    ...(options.limits ? { limits: options.limits } : {}),
   });
   const app = buildApp({ logLevel: 'info', logStream: { write: (line) => logs.push(line) } }, deps);
   register?.(app);
@@ -114,6 +117,8 @@ export interface UserOptions {
   password?: string;
   pin?: string;
   mustChange?: boolean;
+  displayNameAr?: string;
+  displayNameEn?: string;
 }
 
 export async function addUser(server: TestServer, options: UserOptions): Promise<bigint> {
@@ -128,8 +133,8 @@ export async function addUser(server: TestServer, options: UserOptions): Promise
       .values(
         stamped('auth.users', {
           username: options.username,
-          display_name_ar: 'مستخدم',
-          display_name_en: 'User',
+          display_name_ar: options.displayNameAr ?? 'مستخدم',
+          display_name_en: options.displayNameEn ?? 'User',
           sign_in_method: method,
           password_hash: password,
           pin_hash: pin,
