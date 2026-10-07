@@ -293,21 +293,24 @@ App (POS section)                     API                                       
 
 ## 6. Security design
 
-- **Device enrollment:**
-  1. An admin creates the device.
-  2. A one-time code (15 minutes) is typed on the new PC.
-  3. The PC receives a 256-bit secret, stored in Windows Credential Manager.
+- **Device enrollment ([0024](decisions/0024-device-enrollment-proves-the-server.md)):**
+  1. The owner creates a one-time code in Settings → Devices (10 minutes, single use; a new code cancels the previous one). The first PC uses `pnpm device:code` on the server PC ([0025](decisions/0025-first-owner-and-pc-from-server-commands.md)).
+  2. The server address and the code are typed on the new PC. The code never crosses the network: both sides prove they know it (HMAC over the server's CA certificate and fresh nonces, keyed by an Argon2id-derived key), so the PC knows it is talking to the genuine server before it trusts the CA.
+  3. The PC receives a random 256-bit device key, kept in Windows Credential Manager (the server stores only its SHA-256). The key is valid for a year and renews itself automatically.
 
-  Unknown PCs cannot reach the login screen. Revoking a device takes one click.
+  Unknown PCs cannot reach the login screen. Revoking a device takes one click plus a reason and cannot be undone ([0026](decisions/0026-users-and-devices-never-deleted.md)).
 - **Users:**
-  - Argon2id passwords and PINs.
-  - Lockout after N failures, with a separate PIN failure counter and per-device rate limits.
-  - Mandatory TOTP for roles flagged `requires_2fa`, with replay blocked.
-  - The PIN only works on enrolled devices, for user switching and approvals.
+  - Argon2id passwords, PINs and recovery codes. Passwords: 10+ characters, common ones refused, no forced expiry ([0023](decisions/0023-password-rules.md)).
+  - Lockout after N failures (15 minutes), with a separate PIN failure counter (blocked until the owner unblocks it) and per-device rate limits.
+  - Each user has one sign-in method: **PIN** (4 digits, **POS PCs only**), **password**, or **password + TOTP** (mandatory for roles flagged `requires_2fa`) ([0021](decisions/0021-cashier-pin-sign-in-on-pos-pcs.md)). Office PCs always need a password. A password user's PIN is used only for approvals.
+  - TOTP replay is blocked. 10 one-time recovery codes; an emergency 2-step reset works only on the server PC ([0022](decisions/0022-owner-2-step-recovery.md)).
+  - The first owner is created with `pnpm owner:create` on the server PC. There is exactly one active owner; it cannot be deactivated.
+  - Users are deactivated with a reason, never deleted ([0026](decisions/0026-users-and-devices-never-deleted.md)).
 - **Sessions:**
   - Random 256-bit tokens; only their SHA-256 is stored.
   - Server-side idle lock and absolute expiry; instant revoke.
-  - A password change or device revoke ends the affected sessions.
+  - A password change, user deactivation or device revoke ends the affected sessions. Sessions are ended with a reason, never deleted.
+  - A password + TOTP sign-in first gets a short "second factor" session; after the code it is replaced by a new full session with a new token.
 - **Permissions:**
   - Granular `module.action` codes, checked by the server on every route.
   - The UI only hides buttons.
@@ -318,6 +321,12 @@ App (POS section)                     API                                       
 - **TLS:**
   - A local CA with **name constraints**, so it can only vouch for the ARTÉPOOL server.
   - TLS 1.3 only, never disabled.
+- **The PC's secure side (M1):**
+  - The screens never hold the device key and never open a network connection. They ask a small "bridge" to enroll the PC or to send an API request; the contract is `packages/shared/src/contracts/bridge.ts`.
+  - In the Windows app the bridge is Rust (`apps/desktop/src-tauri/bridge`): TLS 1.3 only (rustls), trusting only the pinned ARTÉPOOL CA, with the server name and the CA's name constraints checked; the device key lives in Windows Credential Manager. It checks every request from the screens again (API paths only, no DELETE).
+  - In development in a browser, the Vite dev server plays the same part (`tools/dev-bridge`), with the device key in `.secrets/`.
+  - The session token is kept in memory only; closing the app ends the sign-in.
+  - The app window has a strict Content-Security-Policy (no outside content, no direct connections) and JavaScript built-ins are frozen.
 - **Releases ([0007](decisions/0007-no-code-signing-certificate-for-now.md)):**
   - Tauri update signatures are mandatory.
   - Installers are unsigned for now, with SHA-256 checksums published and installation documented in the runbook.

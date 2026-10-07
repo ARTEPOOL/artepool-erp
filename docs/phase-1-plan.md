@@ -239,12 +239,12 @@ artepool-erp/
 
 ## 3. Database schema (summary)
 
-The full definition of every column, constraint, trigger and seed is in [`database-schema.md`](database-schema.md). **65 tables in 9 schemas:**
+The full definition of every column, constraint, trigger and seed is in [`database-schema.md`](database-schema.md). **68 tables in 9 schemas:**
 
 | Schema | Tables | Purpose |
 |---|---|---|
 | `sys` (9) | schema_migrations, company_profile, settings, branches, document_series, reason_codes, idempotency_keys, alerts, import_batches | System settings, gapless numbering (`POS-`, `INV-`, …), safe retries, alerts |
-| `auth` (8) | users, roles, permissions, role_permissions, user_roles, devices, sessions, approvals | Who may do what, from which PC; single-use supervisor approvals |
+| `auth` (11) | users, roles, permissions, role_permissions, user_roles, devices, device_activity, enrollment_codes, sessions, approvals, recovery_codes | Who may do what, from which PC; single-use supervisor approvals; owner 2-step recovery |
 | `audit` (4) | log, chain_head, anchors, verifications | Tamper-evident diary of every change and event |
 | `md` (15) | units, vat_categories, business_lines, item_categories, items, item_barcodes, bundle_components, price_lists, item_prices, customers, suppliers, technicians, payment_methods, warehouses, cash_denominations | Master data; 4-decimal prices; VAT per item; lines of business |
 | `inv` (6) | movements, balances, adjustments, adjustment_lines, counts, count_lines | Stock ledger; balances maintained by the database only; oversell review |
@@ -265,7 +265,7 @@ The detail is in [`database-schema.md` §16](database-schema.md#16-migration-ord
 | 0002 | audit log + hash chain | M0 |
 | 0003 | users, roles, permissions | M0 |
 | 0004 | company, settings, branches, numbering series, alerts, imports | M0 |
-| 0005 | devices, sessions, approvals, idempotency | M1 |
+| 0005 | devices, enrollment codes, sessions, approvals, recovery codes, idempotency | M1 |
 | 0006 | chart of accounts, mappings, monthly periods | M2 |
 | 0007 | master data + reason codes | M2 |
 | 0008 | inventory | M3 |

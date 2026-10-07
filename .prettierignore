@@ -3,3 +3,4 @@ pnpm-lock.yaml
 **/*.generated.ts
 coverage/
 design/
+apps/desktop/src/theme/tokens.css

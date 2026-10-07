@@ -61,6 +61,14 @@ It runs client–server on the local network: PostgreSQL and the API service on 
 - **Printing:** the POS prints thermal receipts silently. The "Invoices (A4)" section prints through the print dialog. A POS sale can be reprinted in A4 with the same number. (0008)
 - **Print designer:** the owner customises print templates (logo, colour, language, optional fields, texts, margins). Tax-required fields are locked. Templates are versioned; each document stores its template version and reprints with it. (0020)
 
+**Security and access**
+- **Sign-in:** cashiers use a 4-digit PIN **only on PCs enrolled as POS** (weak PINs refused; 5 wrong → blocked until the owner unblocks). Office PCs always need a password. (0021)
+- **Owner 2-step:** TOTP, 10 one-time recovery codes, and an audited emergency reset that works only on the server PC. (0022)
+- **Passwords:** 10+ characters, common ones refused, no forced symbols or expiry; a change ends the user's other sessions. (0023)
+- **Devices:** a 10-minute one-time enrollment code that also proves the server is genuine; the PC then trusts only the ARTÉPOOL CA. (0024)
+- **First owner / first PC:** `pnpm owner:create` and `pnpm device:code` on the server PC. (0025)
+- **Never deleted:** users are deactivated and devices revoked, always with a reason; revoking a device is final. (0026)
+
 **Accounting**
 - **Defective returns** are held at cost in "Inventory – defective" until written off. (0015)
 - **Periods** are monthly and are locked after close. Nothing is ever deleted. (0016)
@@ -119,11 +127,18 @@ Run from the repository root. Setup on a new PC: [`docs/runbooks/dev-setup-windo
 | Lint + formatting + typecheck + translations | `pnpm check` |
 | Format all files | `pnpm format` |
 | Unit tests / integration tests (real PostgreSQL) / all | `pnpm test:unit` / `pnpm test:integration` / `pnpm test` |
+| Screen tests in a real browser (Playwright, Arabic + English, light + dark; real API on a throwaway database) | `pnpm test:e2e` (once: `pnpm --filter @artepool/desktop exec playwright install chromium`) |
 | Verify the audit hash chain | `pnpm audit:verify` |
 | Tamper demonstration (throwaway database) | `pnpm demo:audit-tamper` |
-| Run the API in dev mode (GET /health) | `pnpm dev:server` |
+| Create the development master key (`.secrets/`, once per dev PC) | `pnpm dev:secrets` |
+| Create the ARTÉPOOL CA + server certificate (HTTPS, TLS 1.3); `--renew-server` for a new server certificate | `pnpm tls:init [--name host] [--ip address]` |
+| Run the API in dev mode (HTTPS: `https://localhost:3100/health`, trust `.secrets/tls/ca.crt`) | `pnpm dev:server` |
+| Run the screens in a browser (`http://localhost:1420`; the dev server plays the PC's secure side, device file `.secrets/dev-device.json`) | `pnpm dev:desktop:web` |
+| Run the Windows app (Tauri; Rust + Microsoft C++ Build Tools needed) / build its installer | `pnpm dev:desktop` / `pnpm build:desktop` |
+| Rust tests (the PC's secure side: enrollment, TLS rules, device key) | `pnpm test:rust` |
+| Server console: first owner / enrollment code / emergency owner 2-step reset (decisions 0022, 0025) | `pnpm owner:create` / `pnpm device:code` / `pnpm owner:reset-2fa` |
 
-Not yet available: `pnpm dev:desktop` (M1), `pnpm build:server` / `pnpm build:desktop` (M1/M6), `pnpm backup:run` / `pnpm backup:restore-test` (M6).
+Not yet available: `pnpm build:server` (M6), `pnpm backup:run` / `pnpm backup:restore-test` (M6).
 
 Rules for migrations: one file per change in `db/migrations/NNNN_name.sql`; no `BEGIN`/`COMMIT` inside (the runner wraps each file); every new table gets `sys.add_touch`/`sys.add_stamp`, `audit.enable_for`, `sys.forbid_delete` and explicit grants — `db/tests/privileges.test.ts` fails otherwise; run `pnpm db:codegen` and commit the regenerated types.
 

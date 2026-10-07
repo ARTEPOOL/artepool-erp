@@ -11,6 +11,11 @@ const NOT_ROW_AUDITED = [
   'audit.chain_head',
   'audit.anchors',
   'audit.verifications',
+  // Technical tables (docs/database-schema.md §4.7, §5.6–5.7): sign-in, sign-out and lock are
+  // explicit audit events instead.
+  'auth.device_activity',
+  'auth.sessions',
+  'sys.idempotency_keys',
 ];
 /** Link and technical tables the API may delete from (docs/database-schema.md §2). */
 const API_MAY_DELETE = ['auth.role_permissions', 'auth.user_roles'];

@@ -1,0 +1,33 @@
+/* From design/artepool-components.css: .top-tools, .lang */
+.tools {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.lang {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-muted);
+  direction: ltr;
+}
+
+.lang button {
+  min-inline-size: 2.5rem;
+  min-block-size: 2rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--text-caption);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.lang button[aria-pressed='true'] {
+  background: var(--color-surface);
+  color: var(--color-primary);
+  box-shadow: 0 1px 3px var(--color-shadow);
+}

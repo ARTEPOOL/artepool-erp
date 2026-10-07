@@ -1,0 +1,15 @@
+/* App-level tokens that the design files use as literal values. Kept here (not in the
+   components) so components stay free of raw colours; tokens.css itself stays identical to
+   design/artepool-tokens.css (a test checks it). */
+:root {
+  --color-on-brand: #ffffff;
+  --color-on-danger: #ffffff;
+  --color-switch-knob: #ffffff;
+  --font-mono: ui-monospace, consolas, monospace;
+}
+
+/* QR codes are always dark on light, in both themes, so every phone app can scan them. */
+:root {
+  --color-qr-dark: #000000;
+  --color-qr-light: #ffffff;
+}

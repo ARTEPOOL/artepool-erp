@@ -1,0 +1,54 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "ARTEPOOL ERP",
+  "mainBinaryName": "artepool-erp",
+  "version": "../package.json",
+  "identifier": "ae.artepool.erp",
+  "build": {
+    "beforeDevCommand": "pnpm exec vite --configLoader runner",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "pnpm exec vite build --configLoader runner",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "windows": [
+      {
+        "label": "main",
+        "title": "ARTÉPOOL ERP",
+        "width": 1366,
+        "height": 860,
+        "minWidth": 1024,
+        "minHeight": 680,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self'; connect-src ipc: http://ipc.localhost",
+      "freezePrototype": true
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "publisher": "ARTEPOOL",
+    "shortDescription": "ARTÉPOOL ERP",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "nsis": { "installMode": "perMachine", "languages": ["Arabic", "English"] }
+    },
+    "createUpdaterArtifacts": false
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "",
+      "endpoints": []
+    }
+  }
+}

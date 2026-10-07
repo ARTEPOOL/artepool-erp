@@ -27,6 +27,12 @@ There is one short file per decision, numbered in order.
 | [0018](0018-chart-of-accounts-and-posting-map.md) | Chart of accounts and posting map | **Pending accountant review** |
 | [0019](0019-einvoicing-via-accredited-provider.md) | E-invoicing via accredited service provider | Approach accepted; **go-live date pending** |
 | [0020](0020-print-template-designer.md) | Print template designer (versioned, locked tax fields) | Accepted |
+| [0021](0021-cashier-pin-sign-in-on-pos-pcs.md) | Cashier PIN sign-in only on POS PCs | Accepted |
+| [0022](0022-owner-2-step-recovery.md) | Owner 2-step code: recovery codes and server-only emergency reset | Accepted |
+| [0023](0023-password-rules.md) | Password rules (10+ characters, common ones refused, no expiry) | Accepted |
+| [0024](0024-device-enrollment-proves-the-server.md) | Device enrollment: 10-minute one-time code that also proves the server | Accepted |
+| [0025](0025-first-owner-and-pc-from-server-commands.md) | First owner and first PC created by server commands | Accepted |
+| [0026](0026-users-and-devices-never-deleted.md) | Users and devices never deleted: deactivate or revoke with a reason | Accepted |
 
 ## Template
 

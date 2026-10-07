@@ -10,10 +10,11 @@ export async function setContext(
   client: pg.Client,
   userId: bigint = SYSTEM_USER_ID,
   reason: string | null = null,
+  deviceId: bigint | null = null,
 ): Promise<void> {
   await client.query(
-    'SELECT sys.set_context($1::bigint, NULL, NULL, gen_random_uuid(), NULL, NULL, $2, NULL)',
-    [userId.toString(), reason],
+    'SELECT sys.set_context($1::bigint, $3::bigint, NULL, gen_random_uuid(), NULL, NULL, $2, NULL)',
+    [userId.toString(), reason, deviceId?.toString() ?? null],
   );
 }
 
@@ -22,10 +23,11 @@ export async function inContext<T>(
   client: pg.Client,
   work: () => Promise<T>,
   userId: bigint = SYSTEM_USER_ID,
+  deviceId: bigint | null = null,
 ): Promise<T> {
   await client.query('BEGIN');
   try {
-    await setContext(client, userId);
+    await setContext(client, userId, null, deviceId);
     const result = await work();
     await client.query('COMMIT');
     return result;

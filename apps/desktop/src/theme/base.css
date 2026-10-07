@@ -1,0 +1,119 @@
+/* Global base styles, from design/artepool-components.css (the `.ap` root rules). */
+html,
+body {
+  margin: 0;
+  min-block-size: 100%;
+  background: var(--color-background);
+}
+
+body {
+  font: 400 var(--text-body) / 1.7 var(--font-family);
+  color: var(--color-text);
+}
+
+#root {
+  min-block-size: 100vh;
+  min-block-size: 100dvh;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+:where(button, input, select, textarea) {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+/* Numbers, codes and dates: always left-to-right, tabular digits. */
+bdi {
+  direction: ltr;
+  unicode-bidi: isolate;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Motion (design: short and calm; none when the user asks for reduced motion). */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(var(--motion-rise));
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: none;
+  }
+
+  25% {
+    transform: translateX(-6px);
+  }
+
+  75% {
+    transform: translateX(6px);
+  }
+}
+
+.rise {
+  animation: rise var(--motion-slow) var(--motion-ease) both;
+  animation-delay: calc(var(--i, 0) * var(--motion-stagger));
+}
+
+.pop {
+  animation: pop var(--motion-normal) var(--motion-ease) both;
+}
+
+.shake {
+  animation: shake 240ms var(--motion-ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* Direction icons (back arrows, chevrons) point the reading way in both languages. */
+[dir='rtl'] .flip-rtl {
+  transform: scaleX(-1);
+}

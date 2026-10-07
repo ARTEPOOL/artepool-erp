@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/app.ts"
+    ".": "./src/app.ts",
+    "./test-support": "./test/support/index.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json"
@@ -12,13 +13,18 @@
   "dependencies": {
     "@artepool/node-kit": "workspace:*",
     "@artepool/shared": "workspace:*",
+    "@artepool/tls": "workspace:*",
+    "@node-rs/argon2": "2.2.2",
     "fastify": "5.12.5",
     "kysely": "0.29.6",
+    "otpauth": "9.5.2",
     "pg": "8.23.1",
+    "pino": "10.4.0",
     "zod": "4.6.5"
   },
   "devDependencies": {
     "@artepool/testing": "workspace:*",
-    "@types/pg": "8.23.1"
+    "@types/pg": "8.23.1",
+    "fast-check": "4.10.2"
   }
 }

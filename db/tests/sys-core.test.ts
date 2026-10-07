@@ -55,7 +55,7 @@ describe('settings', () => {
       'einvoice.mandatory_from': null,
       'security.max_failed_logins': 5,
     });
-    expect(rows).toHaveLength(22);
+    expect(rows).toHaveLength(28); // 22 from 0004 + 6 security settings from 0005
   });
 
   it('values can be edited (audited, versioned); keys cannot be added by the app', async () => {

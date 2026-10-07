@@ -97,7 +97,7 @@ describe('standard columns (who and when, optimistic locking)', () => {
     const tester = await inContext(api, async () => {
       const { rows } = await api.query<{ id: string }>(
         `INSERT INTO auth.users (username, display_name_ar, display_name_en, password_hash)
-         VALUES ('tester', 'مختبر', 'Tester', 'x') RETURNING id`,
+         VALUES ('tester', 'مختبر', 'Tester', '$argon2id$x') RETURNING id`,
       );
       return BigInt(rows[0]!.id);
     });

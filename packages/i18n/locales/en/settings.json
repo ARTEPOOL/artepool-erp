@@ -1,0 +1,383 @@
+{
+  "nav": {
+    "label": "Main menu",
+    "dashboard": "Dashboard",
+    "pos": "Point of sale",
+    "invoices": "A4 invoices",
+    "items": "Items & stock",
+    "customers": "Customers",
+    "shifts": "Shifts & cash",
+    "reports": "Reports",
+    "settings": "Settings",
+    "comingLater": "Coming later"
+  },
+  "user": {
+    "menu": "Account menu",
+    "lock": "Lock screen",
+    "signOut": "Sign out"
+  },
+  "home": {
+    "welcome": "Welcome, {name}",
+    "next": "The dashboard arrives with sales. For now, the owner can manage users, PCs and the audit log in Settings.",
+    "openSettings": "Open Settings"
+  },
+  "noAccess": {
+    "title": "No access",
+    "body": "Your role does not include this page. The server refuses it too."
+  },
+  "hub": {
+    "title": "Settings",
+    "subtitle": "Owner only. Every change is written to the audit log.",
+    "label": "Settings",
+    "company": "Company",
+    "users": "Users & permissions",
+    "tax": "VAT & numbering",
+    "devices": "Devices & printers",
+    "print": "Print designer",
+    "backup": "Backup",
+    "audit": "Audit log",
+    "comingLater": "Soon"
+  },
+  "common": {
+    "cancel": "Cancel",
+    "save": "Save",
+    "close": "Close",
+    "done": "Done",
+    "reason": "Reason (required)",
+    "reasonPlaceholder": "Write the reason",
+    "reasonShort": "Write at least 3 characters.",
+    "loading": "Loading…",
+    "never": "Never",
+    "yesterday": "Yesterday",
+    "today": "Today",
+    "loadMore": "Load older entries",
+    "refresh": "Refresh",
+    "nothing": "Nothing to show yet."
+  },
+  "users": {
+    "title": "Users & permissions",
+    "subtitle": "Click a user to see their account and role permissions",
+    "newUser": "New user",
+    "newRole": "New role",
+    "colUser": "User",
+    "colSignIn": "Sign-in",
+    "colStatus": "Status",
+    "colLast": "Last sign-in",
+    "neverDeleted": "Users are never deleted; they are deactivated and stay in documents and the log.",
+    "methods": {
+      "pin": "PIN",
+      "password": "Password",
+      "password_totp": "Password + 2-step code"
+    },
+    "status": {
+      "active": "Active",
+      "locked": "Locked {minutes} min",
+      "pin_blocked": "PIN blocked",
+      "inactive": "Deactivated"
+    },
+    "mustChange": "Must choose own password",
+    "role": "Role",
+    "noRole": "No role",
+    "resetPassword": "Reset password",
+    "newPin": "New PIN",
+    "unlock": "Unlock",
+    "unblockPin": "Unblock PIN",
+    "deactivate": "Deactivate",
+    "reactivate": "Reactivate",
+    "ownerNote": "The owner account cannot be deactivated or change role, and always uses the 2-step code.",
+    "deactivatedBy": "Deactivated · {reason}",
+    "roleChanged": "Role changed and logged",
+    "unlocked": "Account unlocked",
+    "pinUnblocked": "PIN unblocked",
+    "reactivated": "User reactivated",
+    "deactivated": "User deactivated; they can no longer sign in",
+    "select": "Select a user to see their account."
+  },
+  "newUser": {
+    "title": "New user",
+    "nameAr": "Name in Arabic",
+    "nameEn": "Name in English",
+    "username": "Username",
+    "usernameHint": "Lowercase letters, digits and dots, e.g. sara.cashier",
+    "role": "Role",
+    "method": "Sign-in method",
+    "methods": {
+      "pin": "PIN (for cashiers, POS PCs only)",
+      "password": "Password",
+      "password_totp": "Password + 2-step code"
+    },
+    "note": "A temporary code is created and must be changed at first sign-in. Never send passwords by email or chat.",
+    "create": "Create user",
+    "missing": "Fill in both names, the username and the role.",
+    "usernameInvalid": "Use 3 to 32 lowercase letters, digits, dots, dashes or underscores."
+  },
+  "temp": {
+    "title": "Temporary code",
+    "password": "Temporary password for {name}",
+    "pin": "Temporary PIN for {name}",
+    "note": "Shown once only. Hand it to the employee in person; they must change it at first sign-in.",
+    "repeat": "This code was already shown once and cannot be shown again. Create a new one if it was lost."
+  },
+  "deactivate": {
+    "title": "Deactivate user",
+    "note": "They can no longer sign in; their name stays in documents and the log. You can reactivate them.",
+    "confirm": "Deactivate"
+  },
+  "roles": {
+    "permissionsOf": "Role permissions: {name}",
+    "users": "{count} active user(s)",
+    "ownerOnly": "Owner only",
+    "approvable": "A supervisor can approve it once",
+    "ownerLocked": "The owner role always has every permission.",
+    "discount": "Discount limit without approval",
+    "discountPercent": "Percent",
+    "discountAmount": "Amount (AED)",
+    "discountInvalid": "Enter a percent from 0 to 100 and an amount in AED with up to 2 decimals.",
+    "serverChecks": "The server checks permissions on every action; hiding buttons is not enough.",
+    "unsaved": "Unsaved changes",
+    "savePermissions": "Save permissions",
+    "saved": "Permissions saved; they apply to everyone in the role at once",
+    "unsavedSwitch": "You have unsaved permission changes; save or cancel them first",
+    "modules": {
+      "system": "System",
+      "users": "Users",
+      "audit": "Audit log",
+      "masterdata": "Master data",
+      "inventory": "Stock",
+      "sales": "Sales",
+      "pos": "Point of sale",
+      "cash": "Cash & shifts",
+      "ledger": "Accounting",
+      "export": "Export"
+    }
+  },
+  "newRole": {
+    "title": "New role",
+    "nameAr": "Role name in Arabic",
+    "nameEn": "Role name in English",
+    "copyFrom": "Copy permissions from",
+    "create": "Create role",
+    "created": "Role created. Assign it from a user’s card.",
+    "missing": "Fill in both names."
+  },
+  "devices": {
+    "title": "Devices & printers",
+    "subtitle": "Only enrolled devices can connect to the server",
+    "enrolled": "Enrolled devices",
+    "colDevice": "Device",
+    "colStatus": "Status",
+    "colKey": "Key valid until",
+    "colSeen": "Last seen",
+    "kinds": {
+      "pos": "POS counter",
+      "office": "Office",
+      "warehouse": "Warehouse",
+      "server": "Main server"
+    },
+    "active": "Active",
+    "revoked": "Revoked",
+    "thisDevice": "This device",
+    "server": "Server",
+    "revoke": "Revoke",
+    "edit": "Edit",
+    "neverAgain": "A revoked device can never connect again, and stays in the log.",
+    "enrollTitle": "Enroll a new device",
+    "enrollHelp": "Install the app on the new device, then enter this code on it with the server address.",
+    "newCode": "New code",
+    "codeValid": "Valid {time} min, once",
+    "codeExpired": "The code expired. Create a new one.",
+    "openCode": "A code is open until {time}. It was shown once; create a new one if it was lost.",
+    "noCode": "No code is open.",
+    "codeCreated": "New code created; any earlier code no longer works",
+    "printers": "Printers & cash drawer",
+    "printersLater": "Receipt printers, the cash drawer and the A4 printer are set up with the POS and invoices (coming later).",
+    "revokeTitle": "Revoke device",
+    "revokeNote": "This cannot be undone: a revoked device can only connect again after a new enrollment.",
+    "revokeConfirm": "Revoke",
+    "revoked_toast": "{code} revoked. It can no longer reach the server.",
+    "editTitle": "Edit device",
+    "name": "PC name",
+    "kind": "Type of PC",
+    "saved": "Device saved"
+  },
+  "audit": {
+    "title": "Audit log",
+    "subtitle": "Every action: who, when, from which device, and what changed",
+    "export": "Export",
+    "exported": "Exported, and recorded in the audit log",
+    "chainOk": "Chain intact",
+    "chainBad": "Chain broken at entry {seq}",
+    "chainUnknown": "Not checked yet",
+    "chainInfo": "{count} entries · last verified {when}",
+    "chainInfoNever": "{count} entries · never verified",
+    "verify": "Verify now",
+    "verifying": "Verifying…",
+    "verifiedOk": "Chain intact: {count} entries checked, none altered",
+    "verifiedBad": "The chain is broken. Tell the owner and the IT support at once.",
+    "search": "Search the log",
+    "allUsers": "All users",
+    "dates": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "all": "All dates"
+    },
+    "kinds": {
+      "all": "All actions",
+      "security": "Sign-in & security",
+      "settings": "Settings",
+      "data": "Data"
+    },
+    "colTime": "Time",
+    "colAction": "Action",
+    "colUser": "User",
+    "colDevice": "Device",
+    "system": "System",
+    "empty": "No matching entries",
+    "details": "Change details",
+    "action": "Action",
+    "user": "User",
+    "device": "Device",
+    "serverTime": "Server time",
+    "reason": "Reason",
+    "field": "Field",
+    "before": "Before",
+    "after": "After",
+    "noChanges": "No field values recorded for this entry.",
+    "readOnly": "Read only: no entry can be edited or deleted, and each entry is linked to the one before it.",
+    "select": "Select an entry to see what changed.",
+    "events": {
+      "audit": {
+        "exported": "Audit log exported",
+        "verify": "Audit chain verified"
+      },
+      "auth": {
+        "account_locked": "Account locked after failed sign-ins",
+        "credentials_reset": "Sign-in reset by the owner",
+        "device_enrolled": "Device enrolled",
+        "device_key_renewed": "Device key renewed",
+        "enrollment_code_created": "Enrollment code created",
+        "enrollment_failed": "Failed enrollment attempt",
+        "owner_created": "Owner account created",
+        "owner_two_step_reset": "Owner 2-step code reset on the server PC",
+        "password_accepted": "Password accepted; waiting for the 2-step code",
+        "password_changed": "Password changed",
+        "permission_denied": "Action refused: no permission",
+        "pin_blocked": "PIN blocked after wrong tries",
+        "pin_changed": "PIN changed",
+        "pin_failed": "Wrong PIN",
+        "recovery_code_used": "Recovery code used",
+        "session_ended": "Session ended",
+        "session_locked": "Screen locked",
+        "session_unlocked": "Screen unlocked",
+        "sign_in_failed": "Failed sign-in",
+        "sign_in_refused": "Sign-in refused",
+        "signed_in": "Signed in",
+        "two_step_enabled": "2-step code set up",
+        "user_unlocked": "Account unlocked"
+      },
+      "other": "Event: {name}"
+    },
+    "tables": {
+      "auth": {
+        "users": {
+          "insert": "User created",
+          "update": "User changed"
+        },
+        "roles": {
+          "insert": "Role created",
+          "update": "Role changed"
+        },
+        "role_permissions": {
+          "insert": "Permission given to a role",
+          "delete": "Permission taken from a role"
+        },
+        "user_roles": {
+          "insert": "Role given to a user",
+          "delete": "Role taken from a user"
+        },
+        "devices": {
+          "insert": "Device added",
+          "update": "Device changed"
+        },
+        "enrollment_codes": {
+          "insert": "Enrollment code stored",
+          "update": "Enrollment code used or cancelled"
+        },
+        "recovery_codes": {
+          "insert": "Recovery code stored",
+          "update": "Recovery code used or replaced"
+        },
+        "approvals": {
+          "insert": "Supervisor approval given",
+          "update": "Supervisor approval used"
+        },
+        "permissions": {
+          "insert": "Permission defined",
+          "update": "Permission changed"
+        }
+      },
+      "sys": {
+        "settings": {
+          "insert": "Setting created",
+          "update": "Setting changed"
+        },
+        "company_profile": {
+          "insert": "Company details created",
+          "update": "Company details changed"
+        },
+        "document_series": {
+          "insert": "Numbering series created",
+          "update": "Numbering series changed"
+        },
+        "branches": {
+          "insert": "Branch created",
+          "update": "Branch changed"
+        }
+      }
+    },
+    "generic": {
+      "insert": "Record added · {table}",
+      "update": "Record changed · {table}",
+      "delete": "Record removed · {table}"
+    },
+    "fields": {
+      "username": "Username",
+      "display_name_ar": "Name in Arabic",
+      "display_name_en": "Name in English",
+      "sign_in_method": "Sign-in method",
+      "is_active": "Active",
+      "must_change_password": "Must change password",
+      "pin_must_change": "Must change PIN",
+      "failed_login_count": "Failed sign-ins",
+      "locked_until": "Locked until",
+      "pin_failed_count": "Wrong PINs",
+      "pin_blocked_at": "PIN blocked at",
+      "totp_enabled": "2-step code on",
+      "totp_secret_enc": "2-step secret",
+      "password_hash": "Password",
+      "pin_hash": "PIN",
+      "deactivated_at": "Deactivated at",
+      "deactivation_reason": "Deactivation reason",
+      "name": "Name",
+      "name_ar": "Name in Arabic",
+      "name_en": "Name in English",
+      "code": "Code",
+      "device_kind": "Type",
+      "status": "Status",
+      "revoke_reason": "Revoke reason",
+      "revoked_at": "Revoked at",
+      "key_hash": "Device key",
+      "key_expires_at": "Key valid until",
+      "role_id": "Role",
+      "permission_code": "Permission",
+      "max_discount_bp": "Discount limit (basis points)",
+      "max_discount_fils": "Discount limit (fils)",
+      "value": "Value",
+      "used_at": "Used at",
+      "cancelled_at": "Cancelled at",
+      "cancel_reason": "Cancel reason",
+      "language": "Language",
+      "requires_2fa": "Requires 2-step code"
+    }
+  }
+}

@@ -12,6 +12,20 @@ export default defineConfig({
             'apps/*/test/unit/**/*.test.ts',
             'tools/*/test/unit/**/*.test.ts',
           ],
+          exclude: ['apps/desktop/**'],
+        },
+      },
+      {
+        // The desktop screens: React components in a simulated browser, in Arabic and English.
+        extends: './apps/desktop/vite.config.ts',
+        test: {
+          name: 'desktop',
+          sequence: { groupOrder: 0 },
+          root: './apps/desktop',
+          include: ['test/unit/**/*.test.{ts,tsx}'],
+          environment: 'jsdom',
+          setupFiles: ['test/setup.ts'],
+          css: { modules: { classNameStrategy: 'non-scoped' } },
         },
       },
       {

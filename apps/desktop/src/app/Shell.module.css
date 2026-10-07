@@ -1,0 +1,149 @@
+/* From design/artepool-components.css: .shell, .side, .nav, .side-foot, .main, .top, .user, .page */
+.shell {
+  display: grid;
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+  min-block-size: 100dvh;
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  padding: var(--space-5) var(--space-3);
+  background: var(--color-surface);
+  border-inline-end: 1px solid var(--color-border);
+}
+
+.brand {
+  align-self: flex-start;
+  margin-inline-start: var(--space-2);
+}
+
+.nav {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.nav a,
+.nav .later {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-block-size: var(--touch-target);
+  padding-inline: var(--space-3);
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  font-size: var(--text-label);
+  font-weight: 500;
+  transition:
+    background var(--motion-fast) var(--motion-ease),
+    color var(--motion-fast) var(--motion-ease);
+}
+
+.nav svg {
+  inline-size: 1.25rem;
+  block-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.nav a:hover {
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+}
+
+.nav a:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.nav a[aria-current='page'] {
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.nav .later {
+  color: var(--color-disabled-text);
+  cursor: default;
+}
+
+.sideFoot {
+  margin-block-start: auto;
+  padding-inline: var(--space-2);
+}
+
+.main {
+  min-inline-size: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  min-block-size: var(--topbar-height);
+  padding-inline: var(--space-6);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.crumb {
+  font-size: var(--text-label);
+  color: var(--color-text-secondary);
+}
+
+.user {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.userText {
+  display: grid;
+}
+
+.role {
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+}
+
+.page {
+  padding: var(--space-8) var(--space-6);
+  display: grid;
+  align-content: start;
+  gap: var(--space-6);
+  max-inline-size: 84rem;
+  inline-size: 100%;
+  margin-inline: auto;
+}
+
+@media (max-width: 1100px) {
+  .shell {
+    grid-template-columns: 4.5rem minmax(0, 1fr);
+  }
+
+  .nav a span,
+  .nav .later span,
+  .brand {
+    display: none;
+  }
+
+  .nav a,
+  .nav .later {
+    justify-content: center;
+  }
+}
+
+@media print {
+  .side,
+  .top {
+    display: none;
+  }
+
+  .shell {
+    display: block;
+  }
+}

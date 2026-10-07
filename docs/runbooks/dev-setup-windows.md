@@ -1,12 +1,12 @@
 # Set up ARTÉPOOL ERP on your Windows PC (development)
 
-This guide gets the project running on your own Windows PC, so you can test it yourself and continue development there from milestone M1.
+This guide gets the project running on your own Windows PC, so you can test it yourself and continue development there.
 
 | | |
 |---|---|
-| **Time needed** | About 45 minutes, most of it downloads and installers |
-| **You need** | Windows 10 or 11 (64-bit), administrator rights, about 15 GB of free disk space, internet for the downloads, and your GitHub login |
-| **At the end** | All checks and tests pass on your PC, and you have watched the system catch a tampered record |
+| **Time needed** | About 90 minutes, most of it downloads, installers and the first build of the Windows app |
+| **You need** | Windows 10 or 11 (64-bit), administrator rights, about 25 GB of free disk space, internet for the downloads, your GitHub login, and your phone with an authenticator app (Microsoft Authenticator or Google Authenticator) |
+| **At the end** | All checks and tests pass on your PC, you have watched the system catch a tampered record, and the ARTÉPOOL app runs on your PC: enrolled, with you signed in as the owner |
 
 Type commands exactly as shown. Wherever this guide says **PowerShell**:
 1. Press the Windows key.
@@ -80,9 +80,9 @@ cd artepool-erp
 ```
 
 - **Login:** a browser window may open asking you to sign in to GitHub. Sign in with the account that owns the `artepool-erp` repository.
-- **Before the M0 pull request is merged:** if you haven't merged it on GitHub yet, also run this command to see the M0 work:
+- **Before the M1 pull request is merged:** if you haven't merged it on GitHub yet, also run this command to see the M1 work:
   ```
-  git checkout m0-foundations
+  git checkout m1-security-shell
   ```
 
 ## Step 7: Create your private settings file (.env)
@@ -127,7 +127,8 @@ Applied 0001_extensions_schemas_helpers.sql (… ms)
 Applied 0002_audit.sql (… ms)
 Applied 0003_auth_core.sql (… ms)
 Applied 0004_sys_core.sql (… ms)
-Database upgraded: 4 migration(s) applied.
+Applied 0005_auth_devices.sql (… ms)
+Database upgraded: 5 migration(s) applied.
 ```
 
 ## Step 10: Run every check and test
@@ -138,13 +139,13 @@ pnpm test
 ```
 
 - `pnpm check` ends with `i18n OK: ar, en have the same texts and placeholders.`
-- `pnpm test` runs two groups. Both must say **passed**, with no failures:
+- `pnpm test` runs two groups. Both must say **passed**, with no failures (the numbers grow as the project grows; at the end of M1 they are):
   ```
-   Test Files  9 passed (9)
-        Tests  76 passed (76)
+   Test Files  23 passed (23)
+        Tests  158 passed (158)
   ...
-   Test Files  9 passed (9)
-        Tests  100 passed (100)
+   Test Files  20 passed (20)
+        Tests  233 passed (233)
   ```
 
 ## Step 11: See the safety features with your own eyes
@@ -163,13 +164,84 @@ This creates a throwaway practice database and does some normal work in it. Then
 
 The practice database is deleted at the end. Your own database is never touched.
 
-## Step 12: Start the server
+## Step 12: Start the server (HTTPS)
 
+The server only speaks HTTPS (TLS 1.3), with ARTÉPOOL's own certificate. Create the master key and the certificates once:
+```
+pnpm dev:secrets
+pnpm tls:init
+```
+- `dev:secrets` creates the key that protects your 2-step secret (`.secrets\master.key`).
+- `tls:init` creates the private ARTÉPOOL certificate authority and the server's certificate (`.secrets\tls\`). It covers this PC's name, `localhost` and `127.0.0.1`.
+- The `.secrets` folder stays on your PC; Git never uploads it.
+
+Then start the server and leave this PowerShell window open:
 ```
 pnpm dev:server
 ```
-1. Open your browser at http://127.0.0.1:3100/health. You should see a line that starts with `{"status":"ok"` and includes `"schemaVersion":4`.
-2. Stop the server with **Ctrl + C** in PowerShell.
+In a **second** PowerShell window, in the `artepool-erp` folder, check it answers:
+```
+curl.exe --cacert .secrets\tls\ca.crt https://localhost:3100/health
+```
+You should see a line that starts with `{"status":"ok"` and includes `"schemaVersion":5`.
+
+> A web browser would warn that the connection is "not private": your browser does not know the ARTÉPOOL certificate, and that is correct. The ARTÉPOOL app learns it safely when you enroll the PC (Step 16).
+
+## Step 13: Create the owner account
+
+In the second PowerShell window:
+```
+pnpm owner:create
+```
+It asks for your name in Arabic and English, a username, and a password (at least 10 characters; a short sentence is easy to remember). You set up the 2-step code on your phone at your first sign-in.
+
+## Step 14: Install Rust and the Microsoft C++ Build Tools (for the Windows app)
+
+1. **C++ Build Tools:** go to https://visualstudio.microsoft.com/visual-cpp-build-tools/ and download **Build Tools for Visual Studio**. Run it, tick **Desktop development with C++**, and click **Install** (about 6 GB).
+2. **Rust:** go to https://rustup.rs and download **rustup-init.exe** (64-bit). Run it and press **Enter** to accept the default installation.
+3. **Close and reopen PowerShell**, then type:
+   ```
+   cargo --version
+   ```
+   You should see `cargo 1.` followed by more numbers.
+4. **WebView2** (the browser engine inside the app) is already part of Windows 11. On Windows 10, if the app later shows a blank window, install the **Evergreen Standalone Installer** from https://developer.microsoft.com/microsoft-edge/webview2/.
+
+## Step 15: Start the ARTÉPOOL app
+
+Keep the server from Step 12 running. In the second PowerShell window:
+```
+pnpm dev:desktop
+```
+The first time, Rust builds the app: about 5–10 minutes. Later starts take seconds. The ARTÉPOOL window opens on **Enroll this PC**.
+
+## Step 16: Enroll this PC and sign in
+
+1. Open a **third** PowerShell window in the `artepool-erp` folder and type:
+   ```
+   pnpm device:code
+   ```
+   It shows a code like `K7Q-4MX-92P`. It works **once**, for **10 minutes**.
+2. In the app:
+   - **Server address:** `localhost`
+   - **Enrollment code:** the code from step 1
+   - **PC name:** for example `My office PC`; **Type of PC:** **Office**
+   - Click **Enroll this PC**. The sign-in screen appears, with "Connected to main server".
+3. Sign in with the owner username and password from Step 13.
+4. **Set up the 2-step code:** open your authenticator app on your phone, add an account, and scan the QR code on the screen. Type the 6-digit code the phone shows.
+5. **Recovery codes:** print them (or write them down) and keep them in a safe place. Tick the box and click **Continue**.
+6. You are in. Open **Settings** to see Users & permissions, Devices and the Audit log.
+
+> The device key is kept in **Windows Credential Manager** under "ARTEPOOL ERP". The app never shows it, and the server stores only a fingerprint of it.
+
+## Step 17 (optional): Run the screen tests and the Rust tests
+
+```
+pnpm --filter @artepool/desktop exec playwright install chromium
+pnpm test:e2e
+pnpm test:rust
+```
+- `test:e2e` opens the real screens in a hidden browser against a throwaway database, in Arabic and English, light and dark. It ends with `28 passed`. Screenshots are saved in `apps\desktop\e2e-screens\`.
+- `test:rust` checks the app's secure side (enrollment, TLS rules, the device key). Every group says `test result: ok`.
 
 ---
 
@@ -181,6 +253,9 @@ pnpm dev:server
 | Run all checks / all tests | `pnpm check` / `pnpm test` |
 | Check the audit diary | `pnpm audit:verify` |
 | Start the server | `pnpm dev:server` |
+| Start the ARTÉPOOL app | `pnpm dev:desktop` |
+| A one-time code to enroll another PC (or use Settings → Devices) | `pnpm device:code` |
+| Screen tests / Rust tests | `pnpm test:e2e` / `pnpm test:rust` |
 
 ## If something goes wrong
 
@@ -193,12 +268,14 @@ pnpm dev:server
 | `connect ECONNREFUSED 127.0.0.1:5432` | The database is not running. Press Windows + R, type `services.msc`, find **postgresql-x64-18** and click **Start**. |
 | `Filename too long` during `git clone` | Run `git config --global core.longpaths true`, delete the half-downloaded folder, and repeat Step 6. |
 | `Missing setting …` | A line in `.env` is empty. Compare it with `.env.example`. |
+| `The secure connection is not set up … Run: pnpm tls:init` | Run `pnpm tls:init` (Step 12). |
+| `The master key file … could not be read` | Run `pnpm dev:secrets` (Step 12). |
+| `linker 'link.exe' not found` while building the app | The C++ Build Tools are missing. Repeat Step 14.1, then reopen PowerShell. |
+| The app shows "Can't reach the main server" | The server from Step 12 is not running. Start it and click **Try again**. |
+| "The code is wrong or expired, or the server … is not the ARTÉPOOL server" | Check the code; each code works once for 10 minutes. Create a new one with `pnpm device:code`. |
+| You want to enroll this PC again from scratch (development only) | Open **Credential Manager** → **Windows Credentials**, remove **ARTEPOOL ERP**, and restart the app. |
 | A test fails | Run `pnpm test` again once. If it still fails, copy the full message and send it to Claude. |
 
 ## Working with Claude on your PC
 
 Open the `artepool-erp` folder in Claude Code (the Code tab of the Claude desktop app, or `claude` in PowerShell). Claude reads `CLAUDE.md` automatically and continues from the plan in `docs/phase-1-plan.md`.
-
-## Coming in M1 (no need to install yet)
-
-The desktop app needs two more free tools: the **Rust** toolchain and the **Microsoft C++ Build Tools**. Step-by-step instructions will come at the start of M1.

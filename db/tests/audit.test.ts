@@ -106,7 +106,7 @@ describe('audit capture and sealing', () => {
     const id = await inContext(api, async () => {
       const { rows } = await api.query<{ id: string }>(
         `INSERT INTO auth.users (username, display_name_ar, display_name_en, password_hash)
-         VALUES ('sara', 'سارة', 'Sara', 'argon2id$super-secret-hash') RETURNING id`,
+         VALUES ('sara', 'سارة', 'Sara', '$argon2id$super-secret-hash') RETURNING id`,
       );
       return rows[0]!.id;
     });
@@ -118,7 +118,7 @@ describe('audit capture and sealing', () => {
 
     await inContext(api, () =>
       api.query(
-        `UPDATE auth.users SET display_name_en = 'Sarah', password_hash = 'argon2id$new' WHERE id = $1`,
+        `UPDATE auth.users SET display_name_en = 'Sarah', password_hash = '$argon2id$new' WHERE id = $1`,
         [id],
       ),
     );

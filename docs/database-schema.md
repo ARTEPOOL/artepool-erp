@@ -7,7 +7,7 @@
 | **Database** | PostgreSQL 18 (≥ 16 compatible, except `uuidv7()`, which the API can generate on 16/17) |
 | **Related** | [`architecture.md`](architecture.md) · [`phase-1-plan.md`](phase-1-plan.md) · [`decisions/`](decisions/README.md) · [`accounting/`](accounting/chart-of-accounts.md) |
 
-Phase 1 has **65 tables in 9 schemas**, plus reporting views and the functions and triggers that enforce the rules. Tables for later phases are listed in §17.
+Phase 1 has **68 tables in 9 schemas**, plus reporting views and the functions and triggers that enforce the rules. Tables for later phases are listed in §17.
 
 ---
 
@@ -48,7 +48,7 @@ Phase 1 has **65 tables in 9 schemas**, plus reporting views and the functions a
 | `artepool_migrator` | yes (server only) | Migration runner | Member of `artepool_owner` |
 | `artepool_api` | yes (server only) | API service | See below |
 | `artepool_backup` | yes (server only) | Backup agent | `pg_read_all_data`, `REPLICATION`; write `ops.backup_runs`, `ops.integrity_runs`; `audit.add_anchor()` |
-| `artepool_maint` | yes (server only) | Nightly maintenance | `DELETE` only on `sys.idempotency_keys` older than 30 days and ended `auth.sessions` older than 1 year (technical rows, never business records) |
+| `artepool_maint` | yes (server only) | Nightly maintenance | `DELETE` only on `sys.idempotency_keys` older than 30 days (a trigger enforces both the role and the age). Sessions are never deleted ([0026](decisions/0026-users-and-devices-never-deleted.md)). |
 
 **`artepool_api` privileges:**
 
@@ -66,7 +66,7 @@ Phase 1 has **65 tables in 9 schemas**, plus reporting views and the functions a
   - `sys.document_series.next_number`
 
   These are changed only by `SECURITY DEFINER` functions and triggers.
-- **Functions it may call:** `sys.set_context`, `sys.next_number`, `audit.record_event`, `audit.verify_chain`.
+- **Functions it may call:** `sys.set_context`, `sys.next_number`, `audit.record_event`, `audit.verify_chain`, `auth.user_has_permission`, and the rule checks that its triggers call (`auth.owner_role_id`, `auth.assert_single_owner`, `auth.assert_two_step`).
 - **No** `TRUNCATE`, DDL or `CREATE`.
 
 **Connection settings:**
@@ -84,7 +84,8 @@ Phase 1 has **65 tables in 9 schemas**, plus reporting views and the functions a
 
 ```
  auth.users ◄─ auth.user_roles ─► auth.roles ◄─ auth.role_permissions ─► auth.permissions
-     ▲     auth.devices · auth.sessions · auth.approvals (single-use supervisor approvals)
+     ▲     auth.devices (+ device_activity) · auth.enrollment_codes · auth.sessions
+     │     auth.approvals (single-use supervisor approvals) · auth.recovery_codes (owner 2-step)
      │
  sys.company_profile · sys.settings · sys.branches · sys.document_series (POS-, INV-, CN-, …)
 
@@ -217,7 +218,9 @@ Technical; not row-audited.
 | response_body | jsonb | Returned unchanged on retry |
 | created_at | timestamptz | Purged after 30 days by `artepool_maint` |
 
-Written in the same transaction as the operation.
+Written in the same transaction as the operation. Insert-only (a trigger stamps `created_at` with server time and refuses updates).
+
+**One-time secrets are never stored here.** A response that carries a temporary password or PIN, a device key, an enrollment code or recovery codes is stored without the secret. A retry of that request is told the action already happened, and the person repeats the reset if they missed the secret.
 
 ### 4.8 `sys.alerts`
 
@@ -278,21 +281,24 @@ Every issued document (`sales.documents`, receipts, Z reports) stores `print_tem
 
 ### 5.1 `auth.users`
 
-The audit trigger **redacts** `password_hash`, `pin_hash` and `totp_secret_enc`; it records only that they changed. It ignores `last_login_at`.
+The audit trigger **redacts** `password_hash`, `pin_hash` and `totp_secret_enc`; it records only that they changed. It ignores `last_login_at`, `failed_login_count`, `pin_failed_count` and `totp_last_step` (lockouts and blocks are audited through `locked_until`, `pin_blocked_at` and explicit events).
 
 | Column | Type | Rules |
 |---|---|---|
-| id | bigint PK | 1 = SYSTEM |
+| id | bigint PK | 1 = SYSTEM (cannot sign in or be changed) |
 | username | text | Unique `lower(username)`; `CHECK (username ~ '^[a-z0-9._-]{3,32}$')` |
 | display_name_ar, display_name_en | text | |
 | phone, email | text? | |
-| password_hash | text? | Argon2id. `CHECK (id = 1 OR password_hash IS NOT NULL)` |
+| sign_in_method | text | `CHECK IN ('pin','password','password_totp')`, default `password` ([0021](decisions/0021-cashier-pin-sign-in-on-pos-pcs.md)) |
+| password_hash | text? | Argon2id ([0023](decisions/0023-password-rules.md)). PIN users have none; everyone else must have one |
 | password_changed_at | timestamptz? | |
-| must_change_password | boolean | `DEFAULT true` |
-| pin_hash | text? | Argon2id of a 4–6 digit PIN (user switch + supervisor approvals) |
+| must_change_password | boolean | `DEFAULT true` (temporary password from the owner) |
+| pin_hash | text? | Argon2id of a 4-digit PIN. PIN users: sign-in on POS PCs; password users: supervisor approvals only |
+| pin_must_change | boolean | `DEFAULT false` (temporary PIN from the owner) |
 | pin_failed_count | smallint | `DEFAULT 0` |
-| totp_secret_enc | bytea? | AES-256-GCM; key outside the DB (DPAPI) |
-| totp_enabled | boolean | `CHECK (NOT totp_enabled OR totp_secret_enc IS NOT NULL)` |
+| pin_blocked_at | timestamptz? | Set after `security.max_failed_pins` wrong PINs; cleared only by the owner |
+| totp_secret_enc | bytea? | AES-256-GCM; key outside the DB (DPAPI). Present but not enabled while 2-step setup is pending |
+| totp_enabled | boolean | Only for `password_totp` users |
 | totp_last_step | bigint? | Blocks replay |
 | failed_login_count | smallint | `DEFAULT 0` |
 | locked_until | timestamptz? | |
@@ -300,7 +306,23 @@ The audit trigger **redacts** `password_hash`, `pin_hash` and `totp_secret_enc`;
 | language | text | `DEFAULT 'ar'`, `CHECK IN ('ar','en')` |
 | max_discount_bp | integer? | Overrides the role limit, `0..10000` |
 | max_discount_fils | bigint? | `>= 0` |
+| deactivated_at, deactivated_by | timestamptz?, bigint? | Set by a trigger from the server clock and the request context ([0026](decisions/0026-users-and-devices-never-deleted.md)) |
+| deactivation_reason | text? | Required (3+ characters) while inactive; cleared on reactivation (the audit log keeps it) |
 | [active], [std] | | |
+
+**Checks:**
+- `users_sign_in_ck`: PIN users have `pin_hash` and no `password_hash`; password users have `password_hash`.
+- `users_hash_format_ck`: every hash starts with `$argon2id$`, so plain text can never be stored.
+- `users_totp_method_ck`: `totp_enabled` only for `password_totp`.
+- `users_deactivation_ck`: active ⇔ no deactivation fields; inactive ⇔ who, when and a reason.
+
+**Owner protection** ([0025](decisions/0025-first-owner-and-pc-from-server-commands.md), [0026](decisions/0026-users-and-devices-never-deleted.md)), all `AP008`:
+- at most one active user holds the `owner` role (checked under an advisory lock)
+- the owner cannot be deactivated or lose the role
+- the owner role cannot lose a permission or its `requires_2fa`
+- `owner_only` permissions cannot be granted to any other role
+
+**2-step rule** (`AP010`, checked at commit by deferred constraint triggers on users, user roles and roles): anyone holding an active role with `requires_2fa` must use `password_totp`.
 
 ### 5.2 `auth.roles`
 
@@ -310,7 +332,7 @@ The audit trigger **redacts** `password_hash`, `pin_hash` and `totp_secret_enc`;
 | code | text | unique |
 | name_ar, name_en | text | |
 | is_system | boolean | The 5 default roles: code fixed, cannot be deactivated |
-| requires_2fa | boolean | `true` for Owner |
+| requires_2fa | boolean | `true` for Owner, and cannot be turned off there |
 | max_discount_bp | integer | `DEFAULT 0`, `0..10000` |
 | max_discount_fils | bigint | `DEFAULT 0`, `>= 0` |
 | [active], [std] | | |
@@ -328,6 +350,9 @@ Seeded by migrations; read-only for the API.
 | name_ar, name_en | text | |
 | is_sensitive | boolean | |
 | approvable | boolean | A supervisor approval can stand in for it, once |
+| owner_only | boolean | Only the owner role may hold it (Settings are owner-only): `users.manage`, `users.reset_credentials`, `roles.manage`, `system.devices.manage`, `system.settings.edit`, `system.series.manage` |
+
+`auth.user_has_permission(user_id, code)` is true when an active user holds the permission through an active role.
 
 ### 5.4 `auth.role_permissions` (link; DELETE allowed)
 
@@ -349,48 +374,68 @@ Seeded by migrations; read-only for the API.
 
 ### 5.6 `auth.devices`
 
-The audit trigger ignores `last_seen_at`, `last_ip` and `app_version`.
+Enrolled PCs only ([0024](decisions/0024-device-enrollment-proves-the-server.md)). The audit trigger redacts `key_hash`. A revoked device can never change again ([0026](decisions/0026-users-and-devices-never-deleted.md)); the same PC comes back only as a new row.
 
 | Column | Type | Rules |
 |---|---|---|
 | id | bigint PK | |
-| code | text | unique (`POS-01`) |
-| name | text | |
-| device_kind | text | `CHECK IN ('pos','office','warehouse','server')` |
+| code | text | `CHECK (code ~ '^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$')` (the Windows computer name, e.g. `COUNTER-01`); unique `upper(code)` among active devices |
+| name | text | Free description, 1–100 characters |
+| device_kind | text | `CHECK IN ('pos','office','warehouse','server')`. PIN sign-in only on `pos` |
 | branch_id | bigint → sys.branches | |
-| default_warehouse_id | bigint? → md.warehouses | |
-| status | text | `CHECK IN ('pending','active','revoked')` |
-| enrollment_code_hash | bytea? | One-time code |
-| enrollment_expires_at | timestamptz? | 15 minutes |
-| secret_hash | bytea? | Unique; SHA-256 of the device secret. `CHECK (status <> 'active' OR secret_hash IS NOT NULL)` |
-| enrolled_at | timestamptz? | |
-| enrolled_by | bigint? → auth.users | |
-| last_seen_at | timestamptz? | |
-| last_ip | inet? | |
-| app_version | text? | |
+| default_warehouse_id | bigint? → md.warehouses | FK added by 0007 |
+| status | text | `CHECK IN ('active','revoked')`, default `active` |
+| key_hash | bytea | Unique; SHA-256 of the 256-bit device key |
+| key_expires_at | timestamptz | `> enrolled_at`; renewed automatically (`security.device_key_days`) |
+| key_renewed_at | timestamptz? | Server time, set by trigger when `key_hash` changes |
+| enrolled_at | timestamptz | Server time, set by trigger |
+| enrolled_by | bigint → auth.users | The user who created the enrollment code |
 | printer_config | jsonb | `DEFAULT '{}'`: thermal / label / A4 printer names, receipt width and language |
-| revoked_at | timestamptz? | |
-| revoked_by | bigint? → auth.users | |
-| revoke_reason | text? | |
+| revoked_at, revoked_by | timestamptz?, bigint? | Set by trigger from the server clock and the request context |
+| revoke_reason | text? | Required (3+ characters) when revoked |
 | [std] | | |
+
+**`auth.device_activity`** (technical, not row-audited, never deleted): `device_id` PK → devices, `last_seen_at`, `last_ip` inet, `app_version`. Updated on every request without a user context.
+
+### 5.6a `auth.enrollment_codes`
+
+One-time codes for enrolling a PC ([0024](decisions/0024-device-enrollment-proves-the-server.md)). The code itself is never stored.
+
+| Column | Type | Rules |
+|---|---|---|
+| id | bigint PK | |
+| origin | text | `CHECK IN ('settings','console')` |
+| key_salt | bytea | 16 bytes |
+| code_key | bytea | 32 bytes: Argon2id(code, salt). Redacted in the audit log |
+| expires_at | timestamptz | `> created_at` and at most 1 hour later (default `security.enrollment_code_minutes` = 10) |
+| failed_attempts | smallint | Ignored by the audit trigger (failures are explicit events); cancelled at `security.enrollment_max_attempts` |
+| used_at, used_device_id | timestamptz?, bigint? → devices | Set once, before expiry; server time |
+| cancelled_at, cancel_reason | timestamptz?, text? | `replaced`, `too_many_attempts`, `cancelled` |
+| [ins] | | |
+
+At most one open code (unique partial index); used or cancelled codes are final.
 
 ### 5.7 `auth.sessions`
 
-Not row-audited. Login, logout, lock and switch are explicit audit events.
+Not row-audited. Sign-in, sign-out, lock, unlock and switch are explicit audit events. Ended with a reason, never deleted.
 
 | Column | Type | Rules |
 |---|---|---|
 | id | bigint PK | |
-| token_hash | bytea | unique; SHA-256 of the opaque token |
+| token_hash | bytea | Unique; SHA-256 of the opaque 256-bit token |
 | user_id | bigint → auth.users | |
 | device_id | bigint → auth.devices | |
-| auth_method | text | `CHECK IN ('password','password_totp','pin_switch')` |
-| created_at, last_activity_at | timestamptz | |
-| idle_timeout_sec | integer | `> 0` |
-| expires_at | timestamptz | `CHECK (expires_at > created_at)` |
-| ended_at | timestamptz? | |
-| end_reason | text? | `CHECK IN ('logout','idle_lock','expired','revoked','user_switch','password_changed','device_revoked')` |
+| stage | text | `CHECK IN ('second_factor','full')`. A password + 2-step sign-in first gets a short `second_factor` session, then a new `full` session with a new token |
+| auth_method | text | `CHECK IN ('password','password_totp','recovery_code','pin')`; `second_factor` only with `password` |
+| created_at, last_activity_at | timestamptz | Server time at insert |
+| idle_timeout_sec | integer | `> 0` (5 / 15 minutes by device kind) |
+| expires_at | timestamptz | `> created_at`, at most 24 hours later |
+| locked_at | timestamptz? | Idle or manual lock; unlocked by re-entering the same credential |
+| ended_at | timestamptz? | Server time; an ended session is final |
+| end_reason | text? | `CHECK IN ('logout','expired','revoked','user_switch','credential_changed','device_revoked','user_deactivated','upgraded','locked_out')` |
 | client_ip | inet? | |
+
+**Insert rules** (`AP010`, [0021](decisions/0021-cashier-pin-sign-in-on-pos-pcs.md)): the user is active and not SYSTEM; the device is active with an unexpired key; `pin` only for PIN users on `pos` devices; `password_totp` / `recovery_code` only for 2-step users (`password_totp` needs `totp_enabled`); a `full` password-only session only while the 2-step code is not set up.
 
 ### 5.8 `auth.approvals` (single-use)
 
@@ -398,18 +443,31 @@ Not row-audited. Login, logout, lock and switch are explicit audit events.
 |---|---|---|
 | id | bigint PK | |
 | permission_code | text → auth.permissions | The action approved (must be `approvable`) |
-| requested_by | bigint → auth.users | |
-| approved_by | bigint → auth.users | `CHECK (approved_by <> requested_by)` |
-| device_id | bigint → auth.devices | |
-| reason_code_id | bigint? → sys.reason_codes | |
+| requested_by | bigint → auth.users | Set from the request context |
+| approved_by | bigint → auth.users | `CHECK (approved_by <> requested_by)`; must hold the permission |
+| device_id | bigint → auth.devices | Set from the request context (required) |
+| reason_code_id | bigint? → sys.reason_codes | FK added by 0007 |
 | reason_text | text | `CHECK (length(btrim(reason_text)) >= 3)` |
 | context | jsonb | e.g. `{"item_id":42,"qty_short":"2.000"}`, `{"discount_bp":1500,"limit_bp":1000}` |
-| approved_at | timestamptz | |
-| expires_at | timestamptz | Default `approved_at + 5 min` |
-| consumed_at | timestamptz? | Set exactly once |
+| approved_at | timestamptz | Server time |
+| expires_at | timestamptz | `approved_at + security.approval_validity_seconds` (default 5 min), at most 1 hour |
+| consumed_at | timestamptz? | Set exactly once, server time |
 | consumed_entity | text? | e.g. `sales.documents:123` |
 
-The guard allows only `consumed_*` to change, only from NULL, and only before `expires_at`.
+Insert and use refusals raise `AP009`: self-approval, an approver without the permission, a non-approvable permission, a second use, use after expiry, or use by anyone other than the requester.
+
+### 5.9 `auth.recovery_codes`
+
+The owner's 10 one-time 2-step recovery codes ([0022](decisions/0022-owner-2-step-recovery.md)).
+
+| Column | Type | Rules |
+|---|---|---|
+| id | bigint PK | |
+| user_id | bigint → auth.users | |
+| code_hash | text | Argon2id (`$argon2id$…`); redacted in the audit log |
+| used_at | timestamptz? | Set once, server time |
+| revoked_at | timestamptz? | Set when a new set replaces it; never both used and revoked |
+| [ins] | | |
 
 ---
 
@@ -1415,6 +1473,12 @@ See the one-page [posting map](accounting/posting-map.md) (**pending accountant 
 | `gl.check_entry_balanced()` | deferred constraint trigger | Balanced, ≥ 2 lines |
 | `gl.check_period_open()` | trigger | Journal entries, document issue, stock and cash postings |
 | `sys.clock_guard()` | function | Detects the server clock going backwards |
+| `sys.check_setting()` | trigger | Safe whole-number ranges for every `security.*` setting (password length never below 10); `client.min_version` format |
+| `auth.user_has_permission(user, code)` | function | Active user + active role + role permission |
+| `auth.assert_single_owner()` | function | At most one active owner (advisory lock) |
+| `auth.check_two_step()` | deferred constraint trigger | Roles with `requires_2fa` ⇒ `password_totp` users |
+| `auth.session_before_insert()` | trigger | Sign-in rules of decision 0021 |
+| `auth.approval_before_insert()` / `auth.guard_approval()` | triggers | Approval rules (context, expiry, single use) |
 
 ---
 
@@ -1501,6 +1565,11 @@ All series use 6 digits and continuous numbering ([0011](decisions/0011-document
 | `security.idle_lock_minutes.office` / `.pos` | `15` / `5` | |
 | `security.session_max_hours` | `12` | |
 | `security.approval_validity_seconds` | `300` | |
+| `security.max_failed_pins` | `5` | PIN blocked until the owner unblocks it ([0021](decisions/0021-cashier-pin-sign-in-on-pos-pcs.md)) |
+| `security.password_min_length` | `10` | Never below 10 ([0023](decisions/0023-password-rules.md)) |
+| `security.enrollment_code_minutes` / `security.enrollment_max_attempts` | `10` / `5` | [0024](decisions/0024-device-enrollment-proves-the-server.md) |
+| `security.device_key_days` | `365` | Device keys renew themselves before expiry |
+| `client.min_version` | `"0.1.0"` | Oldest desktop app allowed to connect |
 | `clock.max_client_skew_seconds` | `120` | |
 | `pos.out_of_stock_mode` | `"allow_with_approval"` | [0003](decisions/0003-pos-oversell-with-approval.md) |
 | `pos.default_business_line` | `"supplies"` | |
@@ -1531,7 +1600,7 @@ Migrations are written **in build order** (milestones in [`phase-1-plan.md`](pha
 | 0002 | `audit` | M0 | `audit.log`, `chain_head`, `anchors`, `verifications`; capture / seal / verify / event / anchor functions | — |
 | 0003 | `auth_core` | M0 | `users` (+ SYSTEM), `roles` (5 defaults), `permissions` (seeded), `role_permissions`, `user_roles` | — |
 | 0004 | `sys_core` | M0 | `company_profile`, `settings` (defaults), `branches` (HQ), `document_series` (all 13 series) + `next_number`, `alerts`, `import_batches` | — |
-| 0005 | `auth_devices` | M1 | `devices`, `sessions`, `approvals`, `sys.idempotency_keys` | — |
+| 0005 | `auth_devices` | M1 | `devices`, `device_activity`, `enrollment_codes`, `sessions`, `approvals`, `recovery_codes`, `sys.idempotency_keys`; sign-in method and deactivation columns on `users`; `owner_only` permissions; owner and 2-step rules; security settings | — |
 | 0006 | `gl_core` | M2 | `accounts` (provisional chart), `account_mappings`, `periods` (monthly, seeded) + period guard | — |
 | 0007 | `master_data` | M2 | All 15 `md.*` tables (with seeds) and `sys.reason_codes` (with seeds) | `auth.devices.default_warehouse_id`, `auth.approvals.reason_code_id` |
 | 0008 | `inventory` | M3 | All `inv.*` tables + `apply_movement` + stock views | — |
