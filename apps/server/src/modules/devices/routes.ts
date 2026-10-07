@@ -77,6 +77,16 @@ export function registerDeviceRoutes(app: FastifyInstance): void {
   });
   defineWrite(app, {
     method: 'POST',
+    url: '/api/v1/devices/:id/end-trust',
+    access: manage,
+    params: DeviceParams,
+    reason: () => 'end trust: the phone code is needed again on this PC',
+    handler: async ({ trx, params }) => ({
+      body: { ended: await devices.endDeviceTrust(trx, BigInt(params.id)) },
+    }),
+  });
+  defineWrite(app, {
+    method: 'POST',
     url: '/api/v1/devices/:id/revoke',
     access: manage,
     params: DeviceParams,

@@ -1,15 +1,18 @@
 /**
- * Sign-in, 2-step code, PIN, own password/PIN changes, lock and unlock (decisions 0021–0023).
- * Every attempt, good or bad, is written to the audit log; secrets never are.
+ * Sign-in, 2-step code, trusted PCs, PIN, own password/PIN changes, password recovery, lock and
+ * unlock (decisions 0021–0023, 0027, 0028). Every attempt, good or bad, is written to the audit
+ * log; secrets never are.
  */
 import type { FastifyRequest } from 'fastify';
-import { sql, type Transaction } from 'kysely';
+import { sql, type Kysely, type Transaction } from 'kysely';
 import type {
   ChangePasswordRequest,
   ChangePinRequest,
   MeResponse,
   PinSignInRequest,
   PinUsersResponse,
+  RecoverPasswordRequest,
+  RecoverPasswordResponse,
   SecondFactorRequest,
   SessionView,
   SignInRequest,
@@ -25,6 +28,7 @@ import { newRecoveryCode, normalizeCode } from '../../platform/crypto/codes';
 import type { DB } from '../../platform/db/schema.generated';
 import { withBusinessTx } from '../../platform/db/tx';
 import { AppError } from '../../platform/errors/app-error';
+import type { DeviceInfo } from '../../platform/http/access';
 import { contextOf } from '../../platform/http/context';
 import type { AppDeps } from '../../platform/http/deps';
 import { permissionsOf } from '../../platform/permissions';
@@ -113,6 +117,62 @@ export async function pinFailed(
 const lockedError = (minutes: number) =>
   new AppError('ACCOUNT_LOCKED', 'Account locked', { minutes: Math.max(1, minutes) });
 
+/**
+ * The unused recovery code that matches, if any. Always does the same amount of hashing work
+ * (one check per possible code), so the time taken reveals neither the user nor the codes left.
+ */
+async function matchRecoveryCode(
+  deps: AppDeps,
+  userId: bigint | null,
+  typed: string,
+): Promise<bigint | null> {
+  const normalized = normalizeCode(typed);
+  const codes =
+    userId === null
+      ? []
+      : await deps.db
+          .selectFrom('auth.recovery_codes')
+          .select(['id', 'code_hash'])
+          .where('user_id', '=', userId)
+          .where('used_at', 'is', null)
+          .where('revoked_at', 'is', null)
+          .execute();
+  let match: bigint | null = null;
+  for (const code of codes.slice(0, RECOVERY_CODE_COUNT)) {
+    if ((await deps.hasher.verify(code.code_hash, normalized)) && match === null) match = code.id;
+  }
+  for (let i = codes.length; i < RECOVERY_CODE_COUNT; i++) {
+    await deps.hasher.verifyOrDummy(null, normalized);
+  }
+  return match;
+}
+
+/** Days "Trust this PC" lasts here now: 0 on POS PCs or when turned off (decision 0027). */
+async function trustDaysHere(db: Kysely<DB>, device: DeviceInfo): Promise<number> {
+  if (device.kind === 'pos') return 0;
+  const { rows } = await sql<{ days: number }>`SELECT auth.trusted_device_days() AS days`.execute(
+    db,
+  );
+  return rows[0]?.days ?? 0;
+}
+
+/** Whether this person may sign in here with the password alone: the database's own rule. */
+async function isTrustedHere(db: Kysely<DB>, userId: bigint, device: DeviceInfo): Promise<boolean> {
+  if (device.kind === 'pos') return false;
+  const trust = await db
+    .selectFrom('auth.device_trust')
+    .select('id')
+    .where('user_id', '=', userId)
+    .where('device_id', '=', device.id)
+    .where('ended_at', 'is', null)
+    .where(
+      sql<boolean>`expires_at > now() AND auth.trusted_device_days() > 0
+        AND created_at + make_interval(days => auth.trusted_device_days()) > now()`,
+    )
+    .executeTakeFirst();
+  return trust !== undefined;
+}
+
 function selectUser(deps: AppDeps) {
   return deps.db
     .selectFrom('auth.users')
@@ -188,21 +248,30 @@ export async function signInWithPassword(
       })
       .where('id', '=', user.id)
       .execute();
-    const stage =
-      user.sign_in_method === 'password_totp' && user.totp_enabled ? 'second_factor' : 'full';
+    // A 2-step user gives the phone code next, unless they trusted this PC (decision 0027).
+    const twoStep = user.sign_in_method === 'password_totp' && user.totp_enabled;
+    const trusted = twoStep && (await isTrustedHere(trx, user.id, request.device!));
+    const stage = twoStep && !trusted ? 'second_factor' : 'full';
+    const method = trusted ? 'trusted_device' : 'password';
     if (stage === 'full') await endSessions(trx, { deviceId: request.device!.id }, 'user_switch');
     const opened = await openSession(trx, deps, {
       user,
       device: request.device!,
       stage,
-      method: 'password',
+      method,
       clientIp: request.ip,
     });
     await recordEvent(trx, stage === 'full' ? 'auth.signed_in' : 'auth.password_accepted', {
       ...userEntity(user.id),
-      data: { method: 'password', stage, sessionId: opened.id },
+      data: { method, stage, sessionId: opened.id },
     });
-    return { token: opened.token, session: opened.session, user: userView(user) };
+    const trustDays = stage === 'second_factor' ? await trustDaysHere(trx, request.device!) : 0;
+    return {
+      token: opened.token,
+      session: opened.session,
+      user: userView(user),
+      ...(trustDays > 0 ? { trustDays } : {}),
+    };
   });
 }
 
@@ -285,7 +354,10 @@ export async function signInWithPin(
   });
 }
 
-/** The second step for password + 2-step users: the 6-digit code, or one recovery code. */
+/**
+ * The second step for password + 2-step users: the 6-digit code (optionally trusting this PC,
+ * decision 0027), or one recovery code.
+ */
 export async function verifySecondFactor(
   deps: AppDeps,
   request: FastifyRequest,
@@ -297,29 +369,17 @@ export async function verifySecondFactor(
   const context = contextOf(request);
 
   let accepted:
-    { method: 'password_totp'; step: bigint } | { method: 'recovery_code'; codeId: bigint } | null =
-    null;
+    | { method: 'password_totp'; step: bigint; trust: boolean }
+    | { method: 'recovery_code'; codeId: bigint }
+    | null = null;
   if (user.locked_minutes === 0 && user.totp_enabled && user.totp_secret_enc) {
     if ('code' in body) {
       const secret = deps.secretBox.open(user.totp_secret_enc, totpAad(user.id)).toString('utf8');
       const step = verifyTotp(secret, body.code, user.totp_last_step);
-      if (step !== null) accepted = { method: 'password_totp', step };
+      if (step !== null) accepted = { method: 'password_totp', step, trust: !!body.trustDevice };
     } else {
-      const typed = normalizeCode(body.recoveryCode);
-      const codes = await deps.db
-        .selectFrom('auth.recovery_codes')
-        .select(['id', 'code_hash'])
-        .where('user_id', '=', user.id)
-        .where('used_at', 'is', null)
-        .where('revoked_at', 'is', null)
-        .execute();
-      for (const code of codes) {
-        if (await deps.hasher.verify(code.code_hash, typed)) {
-          accepted = { method: 'recovery_code', codeId: code.id };
-          break;
-        }
-      }
-      if (codes.length === 0) await deps.hasher.verifyOrDummy(null, typed);
+      const codeId = await matchRecoveryCode(deps, user.id, body.recoveryCode);
+      if (codeId !== null) accepted = { method: 'recovery_code', codeId };
     }
   }
 
@@ -368,6 +428,23 @@ export async function verifySecondFactor(
       .execute();
     if (result.method === 'recovery_code') {
       await recordEvent(trx, 'auth.recovery_code_used', userEntity(user.id));
+    }
+    if (
+      result.method === 'password_totp' &&
+      result.trust &&
+      (await trustDaysHere(trx, request.device!)) > 0
+    ) {
+      await trx
+        .updateTable('auth.device_trust')
+        .set({ ended_at: sql`now()`, end_reason: 'replaced' })
+        .where('user_id', '=', user.id)
+        .where('device_id', '=', request.device!.id)
+        .where('ended_at', 'is', null)
+        .execute();
+      await trx
+        .insertInto('auth.device_trust')
+        .values({ user_id: user.id, device_id: request.device!.id } as never)
+        .execute();
     }
     await endSessions(
       trx,
@@ -572,6 +649,128 @@ export async function changePassword(
     await endSessions(trx, { userId: auth.userId, exceptId: auth.sessionId }, 'credential_changed');
   });
   return sessionView(deps, request);
+}
+
+/**
+ * Forgot password (decision 0028): a 2-step user proves who they are with the phone code and one
+ * recovery code, then chooses a new password and is signed in here. Works even while the account
+ * is locked; every other session and every trusted PC of theirs ends (the database ends the
+ * trusts when the password changes).
+ */
+export async function recoverPassword(
+  deps: AppDeps,
+  request: FastifyRequest,
+  body: RecoverPasswordRequest,
+): Promise<RecoverPasswordResponse> {
+  rateCheck(deps, request);
+  const username = body.username.trim().toLowerCase();
+  // The rules first, so a refused password never uses up a recovery code. They are public.
+  const minLength = await deps.settings.number('security.password_min_length');
+  const problems = checkPassword(body.newPassword, { minLength, username });
+  if (problems.length > 0) {
+    throw new AppError('PASSWORD_REJECTED', 'New password refused', { problems, minLength });
+  }
+
+  const user = await selectUser(deps)
+    .where(sql`lower(username)`, '=', username)
+    .executeTakeFirst();
+  const usable =
+    user !== undefined &&
+    user.id !== 1n &&
+    user.is_active &&
+    user.sign_in_method === 'password_totp' &&
+    user.totp_enabled &&
+    user.totp_secret_enc !== null;
+  let step: bigint | null = null;
+  if (usable) {
+    const secret = deps.secretBox.open(user.totp_secret_enc!, totpAad(user.id)).toString('utf8');
+    step = verifyTotp(secret, body.code, user.totp_last_step);
+  }
+  const codeId = await matchRecoveryCode(deps, usable ? user.id : null, body.recoveryCode);
+
+  if (!usable || step === null || codeId === null) {
+    await withBusinessTx(deps.db, contextOf(request), async (trx) => {
+      if (!usable) {
+        // The typed username is not stored: people sometimes type a secret there.
+        await recordEvent(trx, 'auth.password_recovery_failed', {
+          ...(user && user.id !== 1n ? userEntity(user.id) : {}),
+          data: { reason: user ? 'not_allowed' : 'unknown_user' },
+        });
+        return;
+      }
+      await recordEvent(trx, 'auth.password_recovery_failed', {
+        ...userEntity(user.id),
+        data: { reason: step === null ? 'wrong_code' : 'wrong_recovery_code' },
+      });
+      await passwordFailed(trx, deps, user.id, 'password_recovery');
+    });
+    throw new AppError('RECOVERY_REFUSED', 'Wrong username, 2-step code or recovery code');
+  }
+
+  const hash = await deps.hasher.hash(body.newPassword);
+  return withBusinessTx(deps.db, contextOf(request, { userId: user.id }), async (trx) => {
+    // Claim both codes atomically: if they arrive twice at once, only one attempt wins.
+    const claimedStep = await trx
+      .updateTable('auth.users')
+      .set({ totp_last_step: step })
+      .where('id', '=', user.id)
+      .where((eb) => eb.or([eb('totp_last_step', 'is', null), eb('totp_last_step', '<', step)]))
+      .executeTakeFirst();
+    const claimedCode = await trx
+      .updateTable('auth.recovery_codes')
+      .set({ used_at: sql`now()` })
+      .where('id', '=', codeId)
+      .where('used_at', 'is', null)
+      .where('revoked_at', 'is', null)
+      .executeTakeFirst();
+    if (claimedStep.numUpdatedRows === 0n || claimedCode.numUpdatedRows === 0n) {
+      throw new AppError('RECOVERY_REFUSED', 'Code already used');
+    }
+    await trx
+      .updateTable('auth.users')
+      .set({
+        password_hash: hash,
+        password_changed_at: sql`now()`,
+        must_change_password: false,
+        failed_login_count: 0,
+        locked_until: null,
+        last_login_at: sql`now()`,
+      })
+      .where('id', '=', user.id)
+      .execute();
+    const { left } = await trx
+      .selectFrom('auth.recovery_codes')
+      .select((eb) => eb.fn.countAll<string>().as('left'))
+      .where('user_id', '=', user.id)
+      .where('used_at', 'is', null)
+      .where('revoked_at', 'is', null)
+      .executeTakeFirstOrThrow();
+    const recoveryCodesLeft = Number(left);
+    await recordEvent(trx, 'auth.recovery_code_used', userEntity(user.id));
+    await recordEvent(trx, 'auth.password_recovered', {
+      ...userEntity(user.id),
+      data: { recoveryCodesLeft },
+    });
+    await endSessions(trx, { userId: user.id }, 'credential_changed');
+    await endSessions(trx, { deviceId: request.device!.id }, 'user_switch');
+    const opened = await openSession(trx, deps, {
+      user: { ...user, must_change_password: false },
+      device: request.device!,
+      stage: 'full',
+      method: 'password_totp',
+      clientIp: request.ip,
+    });
+    await recordEvent(trx, 'auth.signed_in', {
+      ...userEntity(user.id),
+      data: { method: 'password_totp', stage: 'full', sessionId: opened.id, via: 'recovery' },
+    });
+    return {
+      token: opened.token,
+      session: opened.session,
+      user: userView(user),
+      recoveryCodesLeft,
+    };
+  });
 }
 
 export async function changePin(

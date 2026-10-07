@@ -305,7 +305,7 @@ export async function listDevices(
   deps: AppDeps,
   request: FastifyRequest,
 ): Promise<DevicesResponse> {
-  const [rows, open] = await Promise.all([
+  const [rows, open, trusts] = await Promise.all([
     deps.db
       .selectFrom('auth.devices as d')
       .leftJoin('auth.device_activity as a', 'a.device_id', 'd.id')
@@ -327,6 +327,24 @@ export async function listDevices(
       .orderBy('d.code')
       .execute(),
     openCode(deps.db),
+    // Only trusts that still work (the same rule the database applies at sign-in).
+    deps.db
+      .selectFrom('auth.device_trust as t')
+      .innerJoin('auth.users as u', 'u.id', 't.user_id')
+      .select([
+        't.device_id',
+        't.user_id',
+        't.expires_at',
+        'u.display_name_ar',
+        'u.display_name_en',
+      ])
+      .where('t.ended_at', 'is', null)
+      .where(
+        sql<boolean>`t.expires_at > now() AND auth.trusted_device_days() > 0
+          AND t.created_at + make_interval(days => auth.trusted_device_days()) > now()`,
+      )
+      .orderBy('t.expires_at')
+      .execute(),
   ]);
   const devices: DeviceListItem[] = rows.map((r) => ({
     id: r.id.toString(),
@@ -342,8 +360,36 @@ export async function listDevices(
     revokedAt: r.revoked_at?.toISOString() ?? null,
     revokeReason: r.revoke_reason,
     isCurrent: r.id === request.device!.id,
+    trustedFor: trusts
+      .filter((t) => t.device_id === r.id)
+      .map((t) => ({
+        userId: t.user_id.toString(),
+        displayNameAr: t.display_name_ar,
+        displayNameEn: t.display_name_en,
+        expiresAt: t.expires_at.toISOString(),
+      })),
   }));
   return { devices, openCode: open ? { expiresAt: open.expires_at.toISOString() } : null };
+}
+
+/**
+ * Settings → Devices → End trust (decision 0027): everyone who trusted this PC needs the phone
+ * code here again. Returns how many trusts ended.
+ */
+export async function endDeviceTrust(trx: Transaction<DB>, id: bigint): Promise<number> {
+  const device = await trx
+    .selectFrom('auth.devices')
+    .select('id')
+    .where('id', '=', id)
+    .executeTakeFirst();
+  if (!device) throw new AppError('NOT_FOUND', 'No such device');
+  const ended = await trx
+    .updateTable('auth.device_trust')
+    .set({ ended_at: sql`now()`, end_reason: 'ended_in_settings' })
+    .where('device_id', '=', id)
+    .where('ended_at', 'is', null)
+    .executeTakeFirst();
+  return Number(ended.numUpdatedRows);
 }
 
 export async function updateDevice(

@@ -129,6 +129,7 @@ const device = (patch: Partial<DeviceListItem>): DeviceListItem => ({
   revokedAt: null,
   revokeReason: null,
   isCurrent: false,
+  trustedFor: [],
   ...patch,
 });
 

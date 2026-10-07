@@ -3,6 +3,7 @@ import {
   ChangePasswordRequest,
   ChangePinRequest,
   PinSignInRequest,
+  RecoverPasswordRequest,
   SecondFactorRequest,
   SignInRequest,
   TwoStepConfirmRequest,
@@ -39,6 +40,13 @@ export function registerAuthRoutes(app: FastifyInstance): void {
     access: { kind: 'device' },
     body: PinSignInRequest,
     handler: ({ request, body }) => auth.signInWithPin(deps, request, body),
+  });
+  defineRoute(app, {
+    method: 'POST',
+    url: `${base}/recover-password`,
+    access: { kind: 'device' },
+    body: RecoverPasswordRequest,
+    handler: ({ request, body }) => auth.recoverPassword(deps, request, body),
   });
   defineRoute(app, {
     method: 'POST',
