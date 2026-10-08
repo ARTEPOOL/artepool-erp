@@ -22,7 +22,8 @@ export interface DevBridgePluginOptions {
   deviceFile?: string;
 }
 
-const MAX_BODY = 256 * 1024;
+/** Excel imports send up to 5 MB as base64 inside JSON (decision 0031). */
+const MAX_BODY = 8 * 1024 * 1024;
 
 function readBody(request: IncomingMessage): Promise<unknown> {
   return new Promise((resolve, reject) => {

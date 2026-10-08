@@ -132,6 +132,8 @@ export type ItemsQuery = z.infer<typeof ItemsQuery>;
 export interface ItemsResponse {
   items: ItemListItem[];
   total: number;
+  /** Active items by type, for the summary tiles. */
+  counts: { active: number; stock: number; service: number; bundle: number };
 }
 
 export interface BarcodeItem {

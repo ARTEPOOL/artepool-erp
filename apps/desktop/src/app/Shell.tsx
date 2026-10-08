@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import {
+  BookOpen,
   CheckCircle2,
   FileText,
   LayoutGrid,
@@ -9,6 +10,7 @@ import {
   Package,
   Settings,
   ShoppingCart,
+  Truck,
   Users,
   Wallet,
   XCircle,
@@ -21,15 +23,49 @@ import { ActionMenu, Avatar, Brand, Chip, iconClass } from '../ui';
 import styles from './Shell.module.css';
 import { LanguageSwitch, ThemeToggle } from './TopTools';
 
-/** Sections that arrive in later milestones: shown, greyed, so the layout matches the design. */
-const LATER: { key: string; icon: ReactNode }[] = [
-  { key: 'pos', icon: <ShoppingCart aria-hidden="true" /> },
-  { key: 'invoices', icon: <FileText aria-hidden="true" /> },
-  { key: 'items', icon: <Package aria-hidden="true" /> },
-  { key: 'customers', icon: <Users aria-hidden="true" /> },
-  { key: 'shifts', icon: <Wallet aria-hidden="true" /> },
-  { key: 'reports', icon: <LineChart aria-hidden="true" /> },
+type NavItem =
+  | {
+      key: string;
+      icon: ReactNode;
+      to: '/items' | '/customers' | '/suppliers' | '/accounting';
+      permission: string;
+    }
+  /** Arrives in a later milestone: shown, greyed, so the layout matches the design. */
+  | { key: string; icon: ReactNode; later: true };
+
+/** The side menu (design 02; decision 0034): every entry needs its permission. */
+const NAV: NavItem[] = [
+  { key: 'pos', icon: <ShoppingCart aria-hidden="true" />, later: true },
+  { key: 'invoices', icon: <FileText aria-hidden="true" />, later: true },
+  { key: 'items', icon: <Package aria-hidden="true" />, to: '/items', permission: 'items.view' },
+  {
+    key: 'customers',
+    icon: <Users aria-hidden="true" />,
+    to: '/customers',
+    permission: 'customers.view',
+  },
+  {
+    key: 'suppliers',
+    icon: <Truck aria-hidden="true" />,
+    to: '/suppliers',
+    permission: 'suppliers.manage',
+  },
+  { key: 'shifts', icon: <Wallet aria-hidden="true" />, later: true },
+  { key: 'reports', icon: <LineChart aria-hidden="true" />, later: true },
+  {
+    key: 'accounting',
+    icon: <BookOpen aria-hidden="true" />,
+    to: '/accounting',
+    permission: 'ledger.view',
+  },
 ];
+
+/** The menu entry a page belongs to (shown at the top of the page). */
+function crumbOf(path: string): string {
+  if (path.startsWith('/settings')) return 'settings';
+  const found = NAV.find((item) => 'to' in item && path.startsWith(item.to));
+  return found?.key ?? 'dashboard';
+}
 
 /** The app frame (design 02–14): sidebar, top bar with switches and the account menu. */
 export function Shell() {
@@ -51,17 +87,30 @@ export function Shell() {
             <LayoutGrid aria-hidden="true" />
             <span>{t('nav.dashboard')}</span>
           </Link>
-          {LATER.map((item) => (
-            <span
-              key={item.key}
-              className={styles.later}
-              aria-disabled="true"
-              title={t('nav.comingLater')}
-            >
-              {item.icon}
-              <span>{t(`nav.${item.key}`)}</span>
-            </span>
-          ))}
+          {NAV.map((item) =>
+            'later' in item ? (
+              <span
+                key={item.key}
+                className={styles.later}
+                aria-disabled="true"
+                title={t('nav.comingLater')}
+              >
+                {item.icon}
+                <span>{t(`nav.${item.key}`)}</span>
+              </span>
+            ) : (
+              can(item.permission) && (
+                <Link
+                  key={item.key}
+                  to={item.to}
+                  aria-current={path.startsWith(item.to) ? 'page' : undefined}
+                >
+                  {item.icon}
+                  <span>{t(`nav.${item.key}`)}</span>
+                </Link>
+              )
+            ),
+          )}
           {canSeeSettings(can) && (
             <Link to="/settings" aria-current={inSettings ? 'page' : undefined}>
               <Settings aria-hidden="true" />
@@ -83,9 +132,7 @@ export function Shell() {
       </aside>
       <div className={styles.main}>
         <header className={styles.top}>
-          <span className={styles.crumb}>
-            {inSettings ? t('nav.settings') : t('nav.dashboard')}
-          </span>
+          <span className={styles.crumb}>{t(`nav.${crumbOf(path)}`)}</span>
           <div className={styles.user}>
             <LanguageSwitch />
             <ThemeToggle />

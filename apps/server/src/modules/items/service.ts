@@ -107,8 +107,19 @@ export async function listItems(db: Kysely<DB>, query: ItemsQuery): Promise<Item
     .limit(query.pageSize)
     .offset((query.page - 1) * query.pageSize)
     .execute();
+  const counts = await db
+    .selectFrom('md.items')
+    .select([
+      sql<number>`count(*)::int`.as('active'),
+      sql<number>`count(*) FILTER (WHERE item_type = 'stock')::int`.as('stock'),
+      sql<number>`count(*) FILTER (WHERE item_type = 'service')::int`.as('service'),
+      sql<number>`count(*) FILTER (WHERE item_type = 'bundle')::int`.as('bundle'),
+    ])
+    .where('is_active', '=', true)
+    .executeTakeFirstOrThrow();
   return {
     total: Number(total.n),
+    counts,
     items: rows.map((r): ItemListItem => ({
       id: r.id.toString(),
       code: r.code,

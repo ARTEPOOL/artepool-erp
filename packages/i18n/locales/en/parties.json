@@ -1,0 +1,10 @@
+{
+  "customers": {
+    "title": "Customers",
+    "subtitle": "The invoice type follows the customer's VAT registration"
+  },
+  "suppliers": {
+    "title": "Suppliers",
+    "subtitle": "Purchasing arrives in Phase 2; keep your suppliers' details here"
+  }
+}

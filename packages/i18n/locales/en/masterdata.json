@@ -1,0 +1,115 @@
+{
+  "actions": {
+    "cancel": "Cancel",
+    "save": "Save",
+    "edit": "Edit",
+    "add": "Add",
+    "remove": "Remove",
+    "close": "Close",
+    "deactivate": "Deactivate",
+    "reactivate": "Reactivate",
+    "import": "Import Excel",
+    "export": "Export Excel",
+    "reload": "Reload"
+  },
+  "status": {
+    "active": "Active",
+    "inactive": "Deactivated"
+  },
+  "filters": {
+    "active": "Active",
+    "inactive": "Deactivated",
+    "all": "All"
+  },
+  "yes": "Yes",
+  "no": "No",
+  "none": "—",
+  "saved": "Saved.",
+  "reactivated": "Reactivated.",
+  "deactivated": "Deactivated.",
+  "stale": "Someone else changed this while you were editing it. Reload to see their changes, then make yours again.",
+  "deactivate": {
+    "neverDeleted": "Nothing is ever deleted: its history must be kept. Deactivating hides it from new work; you can reactivate it later.",
+    "reason": "Reason (required)",
+    "reasonHint": "Write the reason",
+    "reasonTooShort": "Write a reason of at least 3 characters.",
+    "confirm": "Deactivate"
+  },
+  "fields": {
+    "required": "Required.",
+    "invalid": "Not valid.",
+    "invalid_trn": "A TRN is 15 digits starting with 100.",
+    "invalid_phone": "Write a valid phone number, e.g. 050 123 4567.",
+    "invalid_email": "Write a valid e-mail address.",
+    "duplicate": "Already used by another record.",
+    "too_small": "Must be more than zero.",
+    "stock_only": "Only stock items have this.",
+    "kits_only": "Only kits have components.",
+    "one_primary": "Choose one main barcode.",
+    "unknown": "Not found.",
+    "invalid_number": "Write a number."
+  },
+  "emirates": {
+    "abu_dhabi": "Abu Dhabi",
+    "dubai": "Dubai",
+    "sharjah": "Sharjah",
+    "ajman": "Ajman",
+    "umm_al_quwain": "Umm Al Quwain",
+    "ras_al_khaimah": "Ras Al Khaimah",
+    "fujairah": "Fujairah"
+  },
+  "import": {
+    "template": "Download template",
+    "file": {
+      "label": "Excel file",
+      "hint": "The filled template (.xlsx), at most 5 MB and 5,000 rows.",
+      "not_excel": "This is not an Excel (.xlsx) file.",
+      "too_large": "The file is larger than 5 MB.",
+      "too_many_rows": "The file has more than 5,000 rows. Split it into smaller files.",
+      "wrong_template": "The columns do not match the template. Download the template and use its headers.",
+      "empty": "The file has no rows to import."
+    },
+    "check": "Check the file",
+    "commit_one": "Import {count} row",
+    "commit_other": "Import {count} rows",
+    "done_one": "{count} row imported.",
+    "done_other": "{count} rows imported.",
+    "allOrNothing": "Checking saves nothing. Importing saves every row together, or none: a file is never half-imported.",
+    "report": {
+      "label": "Problems found",
+      "rows": "Rows",
+      "valid": "Without problems",
+      "invalid": "With problems",
+      "ready_one": "The file is ready: {count} row can be imported.",
+      "ready_other": "The file is ready: {count} rows can be imported.",
+      "fix_one": "{count} problem found. Fix it in Excel, then choose the file and check it again.",
+      "fix_other": "{count} problems found. Fix them in Excel, then choose the file and check it again.",
+      "row": "Row",
+      "column": "Column",
+      "problem": "Problem",
+      "more_one": "And {count} more problem.",
+      "more_other": "And {count} more problems."
+    },
+    "problems": {
+      "required": "Required, but empty",
+      "invalid": "Not valid",
+      "too_long": "Too long",
+      "invalid_code": "Not a valid code (letters, digits, . _ - only)",
+      "invalid_number": "Not a valid number",
+      "invalid_price": "Not a valid price",
+      "invalid_quantity": "Not a valid quantity",
+      "invalid_trn": "A TRN is 15 digits starting with 100",
+      "invalid_phone": "Not a valid phone number",
+      "invalid_email": "Not a valid e-mail address",
+      "invalid_choice": "Not one of the allowed values (see the Lists sheet)",
+      "duplicate_in_file": "Appears more than once in the file",
+      "already_exists": "Already exists",
+      "unknown_reference": "Not found (see the Lists sheet)",
+      "inactive_reference": "Deactivated",
+      "price_required": "An item for sale needs a price above zero",
+      "stock_fields_for_stock_only": "Only stock items have this",
+      "too_many_decimals": "More decimals than the unit allows",
+      "trn_needs_registration": "A TRN needs \"VAT-registered\" = yes"
+    }
+  }
+}

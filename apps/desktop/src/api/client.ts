@@ -69,6 +69,10 @@ export class ApiClient {
     return this.send<T>({ method: 'PATCH', path, body }, options);
   }
 
+  put<T>(path: string, body: unknown, options: CallOptions = {}): Promise<T> {
+    return this.send<T>({ method: 'PUT', path, body }, options);
+  }
+
   private async send<T>(
     request: Pick<BridgeRequest, 'method' | 'path' | 'body'>,
     options: CallOptions,
