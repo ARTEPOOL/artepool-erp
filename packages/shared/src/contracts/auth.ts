@@ -17,11 +17,24 @@ export type SignInRequest = z.infer<typeof SignInRequest>;
 export const PinSignInRequest = z.object({ userId: IdText, pin: z.string().min(1).max(16) });
 export type PinSignInRequest = z.infer<typeof PinSignInRequest>;
 
+/**
+ * The 6-digit code (optionally trusting this PC, decision 0027), or one recovery code. A recovery
+ * code never trusts the PC: the 2-step code must be set up again first.
+ */
 export const SecondFactorRequest = z.union([
-  z.object({ code: z.string().min(1).max(16) }).strict(),
+  z.object({ code: z.string().min(1).max(16), trustDevice: z.boolean().optional() }).strict(),
   z.object({ recoveryCode: z.string().min(1).max(32) }).strict(),
 ]);
 export type SecondFactorRequest = z.infer<typeof SecondFactorRequest>;
+
+/** Forgot password (decision 0028): the phone code and one recovery code prove who it is. */
+export const RecoverPasswordRequest = z.object({
+  username: z.string().min(1).max(64),
+  code: z.string().min(1).max(16),
+  recoveryCode: z.string().min(1).max(32),
+  newPassword: z.string().min(1).max(256),
+});
+export type RecoverPasswordRequest = z.infer<typeof RecoverPasswordRequest>;
 
 export const TwoStepConfirmRequest = z.object({ code: z.string().min(1).max(16) });
 export type TwoStepConfirmRequest = z.infer<typeof TwoStepConfirmRequest>;
@@ -44,7 +57,8 @@ export const UnlockRequest = z.object({ secret: z.string().min(1).max(256) });
 export type UnlockRequest = z.infer<typeof UnlockRequest>;
 
 export type SignInMethod = 'pin' | 'password' | 'password_totp';
-export type AuthMethod = 'password' | 'password_totp' | 'recovery_code' | 'pin';
+/** `trusted_device`: the password alone, on a PC the person trusted (decision 0027). */
+export type AuthMethod = 'password' | 'password_totp' | 'recovery_code' | 'pin' | 'trusted_device';
 export type SessionStage = 'second_factor' | 'full';
 export type PendingStep = 'credential_change' | 'two_step_setup' | null;
 
@@ -79,6 +93,21 @@ export interface SignInResponse {
   token: string;
   session: SessionView;
   user: UserView;
+  /**
+   * Only while the 2-step code is awaited, and only where "Trust this PC" is offered (not on POS
+   * PCs, not when turned off): how many days the trust would last (decision 0027).
+   */
+  trustDays?: number;
+  /**
+   * When the password was reset on the server PC (decision 0029) and the person has not chosen
+   * their own since: when, and the reason typed there. Shown on "Choose your own password".
+   */
+  serverReset?: { at: string; reason: string };
+}
+
+export interface RecoverPasswordResponse extends SignInResponse {
+  /** Recovery codes still unused after this one (decision 0028). */
+  recoveryCodesLeft: number;
 }
 
 export interface MeResponse {

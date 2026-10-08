@@ -316,7 +316,8 @@ describe('roles and permissions', () => {
     expect(fromOwner.code).toMatch(/^shop-manager-[0-9a-f]{6}$/);
     expect(fromOwner.permissions).toContain('pos.sell');
     expect(fromOwner.permissions).not.toContain('users.manage');
-    expect(fromOwner.permissions).toHaveLength(58);
+    expect(fromOwner.permissions).not.toContain('system.company.edit'); // decision 0030
+    expect(fromOwner.permissions).toHaveLength(57); // 64 minus the 7 owner-only ones
   });
 
   it('edits permissions and discount limits; the owner role and owner-only permissions stay locked', async () => {

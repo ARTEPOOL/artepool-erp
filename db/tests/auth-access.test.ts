@@ -194,6 +194,7 @@ describe('the owner is protected (decisions 0025, 0026)', () => {
     );
     expect(rows.map((r) => r.code)).toEqual([
       'roles.manage',
+      'system.company.edit', // company details are printed on tax invoices (decision 0030)
       'system.devices.manage',
       'system.series.manage',
       'system.settings.edit',
@@ -203,6 +204,12 @@ describe('the owner is protected (decisions 0025, 0026)', () => {
     await expect(
       attempt(
         `INSERT INTO auth.role_permissions (role_id, permission_code) VALUES ($1, 'users.manage')`,
+        [await roleId('accountant')],
+      ),
+    ).rejects.toMatchObject({ code: 'AP008' });
+    await expect(
+      attempt(
+        `INSERT INTO auth.role_permissions (role_id, permission_code) VALUES ($1, 'system.company.edit')`,
         [await roleId('accountant')],
       ),
     ).rejects.toMatchObject({ code: 'AP008' });

@@ -266,15 +266,17 @@ The detail is in [`database-schema.md` §16](database-schema.md#16-migration-ord
 | 0003 | users, roles, permissions | M0 |
 | 0004 | company, settings, branches, numbering series, alerts, imports | M0 |
 | 0005 | devices, enrollment codes, sessions, approvals, recovery codes, idempotency | M1 |
-| 0006 | chart of accounts, mappings, monthly periods | M2 |
-| 0007 | master data + reason codes | M2 |
-| 0008 | inventory | M3 |
-| 0009 | journal entries and lines | M3 |
-| 0010 | cash registers, shifts, counts | M4 |
-| 0011 | sales documents, payments, allocations | M4 |
-| 0012 | e-invoice outbox | M4 |
-| 0013 | cash movements, drawer events | M5 |
-| 0014 | backup and integrity records | M6 |
+| 0006 | trusted PCs for the 2-step code (decision 0027) | M1 |
+| 0007 | company details owner-only (decision 0030) | M1 |
+| 0008 | chart of accounts, mappings, monthly periods | M2 |
+| 0009 | master data + reason codes | M2 |
+| 0010 | inventory | M3 |
+| 0011 | journal entries and lines | M3 |
+| 0012 | cash registers, shifts, counts | M4 |
+| 0013 | sales documents, payments, allocations | M4 |
+| 0014 | e-invoice outbox | M4 |
+| 0015 | cash movements, drawer events | M5 |
+| 0016 | backup and integrity records | M6 |
 
 ---
 
@@ -315,7 +317,7 @@ A milestone is done only when its tests pass in CI.
 ### M1 — Security core and app shell
 
 **Delivers:**
-- Migration 0005.
+- Migrations 0005–0007.
 - Login with Argon2id, lockout, owner TOTP, PIN user switch, idle lock, sessions with revoke.
 - Device enrollment with a one-time code.
 - The local CA and TLS 1.3.
@@ -338,7 +340,7 @@ A milestone is done only when its tests pass in CI.
 ### M2 — Master data and chart of accounts
 
 **Delivers:**
-- Migrations 0006–0007.
+- Migrations 0008–0009.
 - Screens for: company profile, settings, items (stock, service, bundle) and barcodes, price lists with 4-decimal prices, customers (VAT registered + TRN), suppliers, technicians, payment methods, warehouse, lines of business, reason codes.
 - The provisional chart of accounts and its mappings (editable).
 - Excel templates and import with a dry-run report.
@@ -358,7 +360,7 @@ A milestone is done only when its tests pass in CI.
 ### M3 — Inventory and the posting engine
 
 **Delivers:**
-- Migrations 0008–0009.
+- Migrations 0010–0011.
 - The movement engine: costing in the database, the negative-stock block, 4-dp average cost.
 - Opening stock, adjustments, move to defective, write-off, stock counts.
 - The oversell adjustment type with review status and the storekeeper review screen.
@@ -382,7 +384,7 @@ A milestone is done only when its tests pass in CI.
 ### M4 — Invoices (A4) section
 
 **Delivers:**
-- Migrations 0010–0012.
+- Migrations 0012–0014.
 - Quotations (with revisions) → invoices (`INV-`).
 - Simplified or full format chosen automatically from the customer's VAT registration.
 - Per-line price, discount, net and VAT; the document discount spread across lines.
@@ -412,7 +414,7 @@ A milestone is done only when its tests pass in CI.
 ### M5 — POS and cash
 
 **Delivers:**
-- Migration 0013.
+- Migration 0015.
 - The POS screen: keyboard and scanner, split tender, hold/resume.
 - **Silent thermal receipts** (simplified or full), the drawer kick only on cash.
 - Cart-removal events logged without approval.
@@ -447,7 +449,7 @@ A milestone is done only when its tests pass in CI.
 ### M6 — Operations
 
 **Delivers:**
-- Migration 0014.
+- Migration 0016.
 - The backup agent: WAL archive, hourly dump, nightly base backup, `age`-encrypted daily off-site upload, external-drive reminders.
 - The restore test into `artepool_restore_test`, the nightly integrity checks and the system-health screen.
 - The server installer (PostgreSQL configuration, roles, CA and certificates, firewall, services) and the client installer (CA trust, offline WebView2).

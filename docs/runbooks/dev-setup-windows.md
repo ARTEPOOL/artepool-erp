@@ -128,7 +128,9 @@ Applied 0002_audit.sql (… ms)
 Applied 0003_auth_core.sql (… ms)
 Applied 0004_sys_core.sql (… ms)
 Applied 0005_auth_devices.sql (… ms)
-Database upgraded: 5 migration(s) applied.
+Applied 0006_device_trust.sql (… ms)
+Applied 0007_company_edit_owner_only.sql (… ms)
+Database upgraded: 7 migration(s) applied.
 ```
 
 ## Step 10: Run every check and test
@@ -142,10 +144,10 @@ pnpm test
 - `pnpm test` runs two groups. Both must say **passed**, with no failures (the numbers grow as the project grows; at the end of M1 they are):
   ```
    Test Files  23 passed (23)
-        Tests  158 passed (158)
+        Tests  164 passed (164)
   ...
-   Test Files  20 passed (20)
-        Tests  233 passed (233)
+   Test Files  22 passed (22)
+        Tests  260 passed (260)
   ```
 
 ## Step 11: See the safety features with your own eyes
@@ -183,7 +185,7 @@ In a **second** PowerShell window, in the `artepool-erp` folder, check it answer
 ```
 curl.exe --cacert .secrets\tls\ca.crt https://localhost:3100/health
 ```
-You should see a line that starts with `{"status":"ok"` and includes `"schemaVersion":5`.
+You should see a line that starts with `{"status":"ok"` and includes `"schemaVersion":7`.
 
 > A web browser would warn that the connection is "not private": your browser does not know the ARTÉPOOL certificate, and that is correct. The ARTÉPOOL app learns it safely when you enroll the PC (Step 16).
 
@@ -228,6 +230,7 @@ The first time, Rust builds the app: about 5–10 minutes. Later starts take sec
    - Click **Enroll this PC**. The sign-in screen appears, with "Connected to main server".
 3. Sign in with the owner username and password from Step 13.
 4. **Set up the 2-step code:** open your authenticator app on your phone, add an account, and scan the QR code on the screen. Type the 6-digit code the phone shows.
+   - Next time, under the 6-digit code, you can tick **Trust this PC for 30 days**. On this PC you will then sign in with the password alone; every other PC still asks for the phone code. Do not tick it on a PC other people use.
 5. **Recovery codes:** print them (or write them down) and keep them in a safe place. Tick the box and click **Continue**.
 6. You are in. Open **Settings** to see Users & permissions, Devices and the Audit log.
 
@@ -240,7 +243,7 @@ pnpm --filter @artepool/desktop exec playwright install chromium
 pnpm test:e2e
 pnpm test:rust
 ```
-- `test:e2e` opens the real screens in a hidden browser against a throwaway database, in Arabic and English, light and dark. It ends with `28 passed`. Screenshots are saved in `apps\desktop\e2e-screens\`.
+- `test:e2e` opens the real screens in a hidden browser against a throwaway database, in Arabic and English, light and dark. It ends with `32 passed`. Screenshots are saved in `apps\desktop\e2e-screens\`.
 - `test:rust` checks the app's secure side (enrollment, TLS rules, the device key). Every group says `test result: ok`.
 
 ---
@@ -255,6 +258,7 @@ pnpm test:rust
 | Start the server | `pnpm dev:server` |
 | Start the ARTÉPOOL app | `pnpm dev:desktop` |
 | A one-time code to enroll another PC (or use Settings → Devices) | `pnpm device:code` |
+| Emergency: owner password lost together with the phone or the recovery codes (server PC only) | `pnpm owner:reset-password` |
 | Screen tests / Rust tests | `pnpm test:e2e` / `pnpm test:rust` |
 
 ## If something goes wrong
@@ -273,6 +277,9 @@ pnpm test:rust
 | `linker 'link.exe' not found` while building the app | The C++ Build Tools are missing. Repeat Step 14.1, then reopen PowerShell. |
 | The app shows "Can't reach the main server" | The server from Step 12 is not running. Start it and click **Try again**. |
 | "The code is wrong or expired, or the server … is not the ARTÉPOOL server" | Check the code; each code works once for 10 minutes. Create a new one with `pnpm device:code`. |
+| You forgot your password (owner, or anyone with the 2-step code) | On the sign-in screen click **Forgot your password?** → **Choose a new password**. You need the 6-digit code from the phone and one of your printed recovery codes. |
+| The owner lost the password **and** the phone or the recovery codes | On the server PC, in the `artepool-erp` folder: `pnpm owner:reset-password`. Type the reason, answer whether the phone is lost too, then type `RESET`. Sign in with the temporary password it shows (once) and choose your own. |
+| You forgot your username | It is the name you typed after `Username` in `pnpm owner:create`: lower-case English letters and digits. |
 | You want to enroll this PC again from scratch (development only) | Open **Credential Manager** → **Windows Credentials**, remove **ARTEPOOL ERP**, and restart the app. |
 | A test fails | Run `pnpm test` again once. If it still fails, copy the full message and send it to Claude. |
 

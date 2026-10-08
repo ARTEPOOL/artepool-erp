@@ -6,6 +6,8 @@ import {
   Pencil,
   RefreshCw,
   Server,
+  ShieldCheck,
+  ShieldOff,
   ShoppingCart,
   Timer,
   Warehouse,
@@ -35,7 +37,7 @@ import {
   Tile,
   useToast,
 } from '../../../ui';
-import { useCan, useErrorText } from '../../auth/context';
+import { useCan, useDisplayName, useErrorText } from '../../auth/context';
 import { KEYS, useApi, useSave } from '../api';
 import { CardHead, NoAccess, PanelHeader, settingsClasses as styles } from '../parts';
 import { ReasonDialog } from '../users/dialogs';
@@ -61,11 +63,12 @@ function useCountdown(expiresAt: string | null): string | null {
   return `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
 }
 
-/** Design 13: Settings → Devices & printers (decisions 0024, 0026). */
+/** Design 13: Settings → Devices & printers (decisions 0024, 0026, 0027). */
 export function DevicesPanel() {
   const { t } = useTranslation('settings');
   const api = useApi();
   const can = useCan();
+  const nameOf = useDisplayName();
   const toast = useToast();
   const errorText = useErrorText();
   const devices = useQuery({
@@ -76,6 +79,7 @@ export function DevicesPanel() {
   const [shownCode, setShownCode] = useState<EnrollmentCodeResponse | null>(null);
   const [revoking, setRevoking] = useState<DeviceListItem | null>(null);
   const [editing, setEditing] = useState<DeviceListItem | null>(null);
+  const [untrusting, setUntrusting] = useState<DeviceListItem | null>(null);
   const [error, setError] = useState<string | null>(null);
   const newCode = useSave(
     (client, _: null, key) =>
@@ -138,6 +142,18 @@ export function DevicesPanel() {
                               {t('devices.colSeen')}: <bdi>{formatDateTime(device.lastSeenAt)}</bdi>
                             </span>
                           )}
+                          {device.trustedFor.map((person) => (
+                            <span
+                              key={person.userId}
+                              className={cx(tableClasses.sub, styles.trusted)}
+                            >
+                              <ShieldCheck className={iconClass.sm} aria-hidden="true" />
+                              {t('devices.trustedUntil', {
+                                name: nameOf(person),
+                                date: formatDate(person.expiresAt),
+                              })}
+                            </span>
+                          ))}
                         </span>
                       </div>
                     </td>
@@ -170,6 +186,12 @@ export function DevicesPanel() {
                           >
                             <Pencil className={iconClass.sm} aria-hidden="true" />
                           </Button>
+                          {device.trustedFor.length > 0 && (
+                            <Button variant="ghost" onPress={() => setUntrusting(device)}>
+                              <ShieldOff className={iconClass.sm} aria-hidden="true" />
+                              {t('devices.endTrust')}
+                            </Button>
+                          )}
                           {fixed ? (
                             <span className={tableClasses.sub}>
                               {device.isCurrent ? t('devices.thisDevice') : t('devices.server')}
@@ -239,7 +261,51 @@ export function DevicesPanel() {
       </Card>
       {revoking && <RevokeDialog device={revoking} onClose={() => setRevoking(null)} />}
       {editing && <EditDeviceDialog device={editing} onClose={() => setEditing(null)} />}
+      {untrusting && <EndTrustDialog device={untrusting} onClose={() => setUntrusting(null)} />}
     </>
+  );
+}
+
+/** Everyone who trusted this PC needs the phone code here again (decision 0027). */
+function EndTrustDialog({ device, onClose }: { device: DeviceListItem; onClose: () => void }) {
+  const { t, i18n } = useTranslation('settings');
+  const nameOf = useDisplayName();
+  const errorText = useErrorText();
+  const toast = useToast();
+  const [error, setError] = useState<string | null>(null);
+  const end = useSave(
+    (api, _: null, key) =>
+      api.post(`/api/v1/devices/${device.id}/end-trust`, {}, { idempotencyKey: key }),
+    {
+      invalidate: [KEYS.devices],
+      onSuccess: () => {
+        toast(t('devices.trustEnded'));
+        onClose();
+      },
+    },
+  );
+  const names = new Intl.ListFormat(i18n.language, { type: 'conjunction' }).format(
+    device.trustedFor.map((person) => nameOf(person)),
+  );
+  return (
+    <Dialog isOpen onClose={onClose} title={t('devices.endTrustTitle')}>
+      {error && <Alert>{error}</Alert>}
+      <p>{t('devices.endTrustBody', { device: device.code, names })}</p>
+      <DialogFooter>
+        <Button onPress={onClose}>{t('common.cancel')}</Button>
+        <Button
+          variant="danger"
+          busy={end.isPending}
+          isDisabled={end.isPending}
+          onPress={() => {
+            setError(null);
+            end.mutate(null, { onError: (caught) => setError(errorText(caught)) });
+          }}
+        >
+          {t('devices.endTrust')}
+        </Button>
+      </DialogFooter>
+    </Dialog>
   );
 }
 

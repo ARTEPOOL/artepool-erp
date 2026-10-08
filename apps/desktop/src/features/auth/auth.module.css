@@ -324,3 +324,16 @@
     display: none;
   }
 }
+
+/* "Trust this PC" under the 2-step code (decision 0027) */
+.trust {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.trustHint {
+  margin: 0;
+  padding-inline-start: var(--space-6);
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+}

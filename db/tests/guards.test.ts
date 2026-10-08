@@ -54,7 +54,8 @@ describe('no hard deletes (golden rule 2)', () => {
       old_values: { permission_code: string };
     }>(
       `SELECT entity_id, old_values FROM audit.log
-        WHERE entity_type = 'auth.role_permissions' AND action = 'delete'`,
+        WHERE entity_type = 'auth.role_permissions' AND action = 'delete'
+          AND old_values ->> 'permission_code' = 'customers.view'`,
     );
     expect(rows).toHaveLength(1);
     expect(rows[0]!.entity_id).toMatch(/^\d+:customers\.view$/);

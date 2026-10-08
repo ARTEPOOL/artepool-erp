@@ -129,6 +129,7 @@ const device = (patch: Partial<DeviceListItem>): DeviceListItem => ({
   revokedAt: null,
   revokeReason: null,
   isCurrent: false,
+  trustedFor: [],
   ...patch,
 });
 
@@ -393,6 +394,54 @@ describe('Settings → Devices', () => {
     fireEvent.click(screen.getByRole('button', { name: 'رمز جديد' }));
     expect((await screen.findByTestId('enrollment-code')).textContent).toBe('K7Q-4MX-92P');
     expect(screen.getByText(/صالح (10:00|9:5\d) دقيقة ولمرة واحدة/)).toBeTruthy();
+  });
+
+  it('shows who may sign in without the phone code, and ends that trust (decision 0027)', async () => {
+    const trusted = {
+      userId: '1',
+      displayNameAr: 'محمد',
+      displayNameEn: 'Mohammed',
+      expiresAt: '2026-11-06T08:00:00.000Z',
+    };
+    const bridge = signedInBridge(OWNER_PERMISSIONS)
+      .on(
+        'GET',
+        '/api/v1/devices',
+        ok({
+          devices: [
+            device({
+              id: '2',
+              code: 'OFFICE-01',
+              name: 'مكتب المالك',
+              kind: 'office',
+              isCurrent: true,
+              trustedFor: [trusted],
+            }),
+            device({}),
+          ],
+          openCode: null,
+        }),
+      )
+      .on('POST', '/api/v1/devices/2/end-trust', ok({ ended: 1 }));
+    await signIn(bridge);
+    await openSettings('الأجهزة والطابعات');
+    const office = await row('OFFICE-01');
+    expect(within(office).getByText('بدون رمز الهاتف هنا لـ محمد حتى 06/11/2026')).toBeTruthy();
+    expect(
+      within(await row('COUNTER-01')).queryByRole('button', { name: 'إلغاء الثقة' }),
+    ).toBeNull();
+
+    fireEvent.click(within(office).getByRole('button', { name: 'إلغاء الثقة' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(
+      within(dialog).getByText(/سيُطلب رمز الهاتف من جديد على OFFICE-01 لكل من: محمد/),
+    ).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'إلغاء الثقة' }));
+    expect(await screen.findByText(/أُلغيت الثقة/)).toBeTruthy();
+    expect(bridge.callsTo('POST', '/api/v1/devices/2/end-trust')).toHaveLength(1);
+    expect(bridge.callsTo('POST', '/api/v1/devices/2/end-trust')[0]?.idempotencyKey).toMatch(
+      /^[0-9a-f-]{36}$/,
+    );
   });
 });
 

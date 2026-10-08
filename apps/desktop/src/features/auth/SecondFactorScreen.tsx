@@ -3,19 +3,25 @@ import { ArrowLeft } from 'lucide-react';
 import { Button as AriaButton } from 'react-aria-components';
 import { useTranslation } from 'react-i18next';
 import { ApiError } from '../../api/client';
-import { Alert, Button, cx, iconClass, TextField } from '../../ui';
+import { Alert, Button, Checkbox, cx, iconClass, TextField } from '../../ui';
 import styles from './auth.module.css';
-import { useAuthController, useErrorText } from './context';
+import { useAuthController, useAuthState, useErrorText } from './context';
 import { OtpInput } from './OtpInput';
 import { AuthFrame, Hello, ServerChip, ServerDown } from './parts';
 
-/** Design 01 "owner code": the 6-digit code, or one recovery code (decision 0022). */
+/**
+ * Design 01 "owner code": the 6-digit code, or one recovery code (decision 0022). With the code,
+ * the person may trust this PC for a while (decision 0027; offered by the server, never on POS
+ * PCs). A recovery code never trusts the PC.
+ */
 export function SecondFactorScreen() {
   const { t } = useTranslation('auth');
   const controller = useAuthController();
+  const { trustDays } = useAuthState();
   const errorText = useErrorText();
   const [mode, setMode] = useState<'app' | 'recovery'>('app');
   const [code, setCode] = useState('');
+  const [trust, setTrust] = useState(false);
   const [recoveryCode, setRecoveryCode] = useState('');
   const [error, setError] = useState<{ text: string; attempt: number } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -30,7 +36,9 @@ export function SecondFactorScreen() {
     setBusy(true);
     try {
       await controller.secondFactor(
-        mode === 'app' ? { code } : { recoveryCode: recoveryCode.trim() },
+        mode === 'app'
+          ? { code, ...(trust && trustDays ? { trustDevice: true } : {}) }
+          : { recoveryCode: recoveryCode.trim() },
       );
     } catch (caught) {
       setCode('');
@@ -83,6 +91,14 @@ export function SecondFactorScreen() {
             maxLength={32}
             invalid={error !== null}
           />
+        )}
+        {mode === 'app' && trustDays !== null && (
+          <div className={styles.trust}>
+            <Checkbox isSelected={trust} onChange={setTrust}>
+              {t('secondFactor.trust', { days: trustDays })}
+            </Checkbox>
+            <p className={styles.trustHint}>{t('secondFactor.trustHint')}</p>
+          </div>
         )}
         {error && (
           <Alert key={error.attempt} shake>

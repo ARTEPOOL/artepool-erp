@@ -4,5 +4,5 @@ export * from './server';
 export { createEnrollmentCode } from '../../src/modules/devices/service';
 export { totpCode } from '../../src/platform/auth/totp';
 export { withBusinessTx } from '../../src/platform/db/tx';
-export { resetOwnerTwoStep } from '../../src/cli/bootstrap';
+export { resetOwnerPassword, resetOwnerTwoStep } from '../../src/cli/bootstrap';
 export { RateLimiter, type RateLimits } from '../../src/platform/http/rate-limit';

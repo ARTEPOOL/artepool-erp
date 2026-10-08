@@ -3,7 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { ApiError } from '../../api/client';
 import { Alert, Button, cx, TextField } from '../../ui';
 import styles from './auth.module.css';
-import { useAuthController, useErrorText } from './context';
+import { formatDateTime } from '../../lib/format';
+import { useAuthController, useAuthState, useErrorText } from './context';
 import { toAsciiDigits } from './OtpInput';
 import { AuthFrame, Hello, ServerDown } from './parts';
 
@@ -14,6 +15,7 @@ import { AuthFrame, Hello, ServerDown } from './parts';
 export function ChangeCredentialScreen({ credential }: { credential: 'password' | 'pin' }) {
   const { t } = useTranslation('auth');
   const controller = useAuthController();
+  const { serverReset } = useAuthState();
   const errorText = useErrorText();
   const isPin = credential === 'pin';
   // The temporary secret typed at sign-in is reused; it is asked again only if it has lapsed.
@@ -75,6 +77,14 @@ export function ChangeCredentialScreen({ credential }: { credential: 'password' 
         noValidate
       >
         <ServerDown />
+        {serverReset && !isPin && (
+          <Alert tone="warn">
+            {t('change.serverReset', {
+              when: formatDateTime(serverReset.at),
+              reason: serverReset.reason,
+            })}
+          </Alert>
+        )}
         {error && (
           <Alert key={error.attempt} shake>
             {error.text}

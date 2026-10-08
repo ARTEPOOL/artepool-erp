@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | **Done — in review** (2026-10-07). Approved with the owner's answers recorded as decisions [0021](../decisions/0021-cashier-pin-sign-in-on-pos-pcs.md)–[0026](../decisions/0026-users-and-devices-never-deleted.md). Delivered on branch `m1-security-shell` (see [Delivered](#delivered)). |
+| **Status** | **Done** (2026-10-07): T1–T12 merged in pull request #4; T13 (easier owner sign-in) in a follow-up pull request. Approved with the owner's answers recorded as decisions [0021](../decisions/0021-cashier-pin-sign-in-on-pos-pcs.md)–[0026](../decisions/0026-users-and-devices-never-deleted.md). Delivered on branch `m1-security-shell` (see [Delivered](#delivered)). |
 | **Date** | 2026-10-07 |
 | **Milestone** | M1 of the [Phase 1 plan](../phase-1-plan.md) |
 | **Design reference** | [`design/screens/01-login.html`](../../design/screens/01-login.html), [`design/screens/13-settings.html`](../../design/screens/13-settings.html), tokens and components in [`design/`](../../design/) |
@@ -42,6 +42,8 @@ There are still no sales, stock or accounting features in M1.
 | T10 | **App shell + Settings (design 13):**<br>• sidebar, top bar, language and theme switches, user menu (lock, switch user, sign out)<br>• Settings: Users & permissions, Devices, Audit log<br>• Company, VAT & numbering, Backup, Print designer and printers are shown greyed "coming later" (their milestones: M2, M2, M6, M4/M5) | `apps/desktop/src/app/*`, `apps/desktop/src/features/{admin,audit}/*` | Playwright: create a user → temporary code shown once; deactivate with a reason; revoke a PC with a reason; each one appears in the audit log with before/after; a non-owner never sees Settings and the server refuses them anyway |
 | T11 | **Windows desktop shell (Tauri 2, Rust):**<br>• all server calls go through Rust: TLS 1.3, trusting **only** the ARTÉPOOL CA<br>• device key kept in Windows Credential Manager, never visible to the screen code<br>• single instance<br>• update check that requires a valid signature (the signing key itself is created with you in M6)<br>• `pnpm dev:desktop` | `apps/desktop/src-tauri/*` | Rust unit tests for the connection rules; Windows build in CI |
 | T12 | **CI and docs:**<br>• CI: desktop tests, Playwright, and a Windows build job<br>• Windows guide: Rust + C++ Build Tools, `pnpm dev:desktop`, enrolling your PC<br>• `CLAUDE.md` commands, decisions 0021+, changelog<br>• pull request with screenshots | `.github/workflows/ci.yml`, `docs/*` | Green CI |
+| T13 | **Easier owner sign-in** (asked by the owner after trying M1; decisions [0027](../decisions/0027-trust-this-pc-for-the-2-step-code.md), [0028](../decisions/0028-forgot-password-with-phone-and-recovery-code.md)):<br>• "Trust this PC for 30 days" under the phone code (never on POS PCs); Settings → Devices shows who is trusted until when and can end it<br>• "Forgot your password?" with the phone code and one recovery code | `db/migrations/0006_device_trust.sql`, `apps/server/src/modules/{auth,devices}/*`, `apps/desktop/src/features/auth/RecoverPasswordScreen.tsx` | Database rules (only the person, on that PC; never POS; ends by itself); API (trust offered/used/ended, recovery success, one answer for any wrong part, weak password wastes no code, works while locked, replay refused, no secret in logs); screens; Playwright in both languages |
+| T14 | **Owner's last resort and accountant permissions** (owner's answers; decisions [0029](../decisions/0029-owner-password-reset-on-the-server-pc.md), [0030](../decisions/0030-company-details-owner-only.md)):<br>• `pnpm owner:reset-password` on the server PC (reason, temporary password shown once, optional 2-step reset, audited) and a notice on the owner's "choose your own password" screen<br>• migration 0007: company details owner-only; the accountant keeps the audit log | `db/migrations/0007_company_edit_owner_only.sql`, `apps/server/src/cli/owner-reset-password.ts`, `apps/server/src/cli/bootstrap.ts` | Reset ends sessions and trusted PCs, unlocks, keeps or clears the 2-step code, audited with the reason; notice shown once until a new password; `system.company.edit` refused for other roles |
 
 ## Differences from the approved design (to keep the design honest)
 
@@ -54,6 +56,7 @@ There are still no sales, stock or accounting features in M1.
 7. **Top bar:** the account chip shows the person's name and username, and opens a small menu (Lock screen, Sign out).
 8. **Settings sections not built yet** (Company, VAT & numbering, Print designer, Backup) are greyed with "Soon".
 9. **App icon:** a placeholder in the brand colour until the final logo is supplied.
+10. **Two more screens and one box** that the design does not show, in the same style (T13): "Choose a new password" (forgot password), "Your password was changed", and the "Trust this PC" box under the phone code.
 
 ## Questions for the owner (answered 2026-10-07)
 
@@ -88,11 +91,13 @@ Also confirmed by the owner: nothing is ever deleted; users are deactivated and 
 | T9 | `161f997`, `cd15773`, `d4b8fe3` | Development bridge; sign-in screens; Playwright flows |
 | T10 | `c10369f` | App shell and Settings (users, roles, PCs, audit log) |
 | T11 | `ede591a` | Windows app (Tauri) with the Rust bridge |
-| T12 | this commit | CI jobs (screens, Rust, Windows), Windows guide, docs |
+| T12 | `b501a6b`, `666d79b` (merged in PR #4) | CI jobs (screens, Rust, Windows), Windows guide, docs |
+| T13 | `7f7194e`, `149eaa5`, `d787fae` | Trusted PCs for the 2-step code (migration 0006) and forgot password, with screens and tests |
+| T14 | `b1ea69d` and the commit after it | Company details owner-only (migration 0007); `pnpm owner:reset-password` with the notice on the owner's next "choose your own password" screen |
 
-**Tests at the end of M1:** 158 unit and screen-component tests, 233 integration tests (real PostgreSQL), 26 Rust tests, 28 Playwright flows (14 in Arabic/light, 14 in English/dark).
+**Tests at the end of M1:** 164 unit and screen-component tests, 260 integration tests (real PostgreSQL), 26 Rust tests, 32 Playwright flows (16 in Arabic/light, 16 in English/dark).
 
 **Open items:**
-- **Accountant and Settings** (asked, not blocking): with the current role matrix the accountant can view the audit log (so they see Settings → Audit log only) and has `system.company.edit`. Recommendation: keep audit-log viewing, make company details owner-only. Applied as role data when the owner answers.
 - **Update signing key and installer checksums:** created with the owner in M6 (until then no update can be installed).
 - **Final logo:** replaces the placeholder icon when supplied.
+- **Migration numbers:** 0006 (trusted PCs) and 0007 (company details owner-only) were added in M1, so the chart of accounts is 0008 and master data 0009. The comments inside 0005 still say "0007" for master data; they cannot be edited (applied migration).

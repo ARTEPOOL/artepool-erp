@@ -88,11 +88,12 @@ test('first sign-in with a temporary password: the person chooses their own', as
   await expect(page.getByRole('button', { name: t('settings:user.menu') })).toBeVisible();
 });
 
-test('"Forgot your password?" explains who resets it', async ({ page, open, t }) => {
+test('"Forgot your password?" explains both ways back', async ({ page, open, t }) => {
   await open('office');
   await page.getByRole('button', { name: t('auth:signIn.forgot') }).click();
   const dialog = page.getByRole('dialog');
-  await expect(dialog.getByText(t('auth:forgot.body'))).toBeVisible();
+  await expect(dialog.getByText(t('auth:forgot.twoStep'))).toBeVisible();
+  await expect(dialog.getByText(t('auth:forgot.staff'))).toBeVisible();
   await dialog.getByRole('button', { name: t('auth:forgot.ok') }).click();
   await expect(dialog).toHaveCount(0);
 });

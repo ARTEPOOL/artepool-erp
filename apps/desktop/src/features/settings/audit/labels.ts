@@ -6,7 +6,7 @@ import { formatDateTime } from '../../../lib/format';
 export type Tone = 'neutral' | 'warn' | 'danger';
 
 const DANGER = /failed|locked|blocked|denied|refused/;
-const WARN = /reset|recovery_code_used|exported/;
+const WARN = /reset|recovery_code_used|password_recovered|exported/;
 
 /** "Signed in", "User changed", "Role created"…; unknown ones fall back to a generic text. */
 export function actionLabel(entry: AuditEntry, t: TFunction, i18n: I18n): string {
@@ -40,6 +40,7 @@ export function actionArea(
   }
   if (
     table === 'auth.devices' ||
+    table === 'auth.device_trust' ||
     table === 'auth.enrollment_codes' ||
     /device|enrollment/.test(a)
   ) {

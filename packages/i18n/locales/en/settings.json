@@ -198,7 +198,12 @@
     "editTitle": "Edit device",
     "name": "PC name",
     "kind": "Type of PC",
-    "saved": "Device saved"
+    "saved": "Device saved",
+    "trustedUntil": "No phone code here for {name} until {date}",
+    "endTrust": "End trust",
+    "endTrustTitle": "End trust on this PC?",
+    "endTrustBody": "The code from the phone will be asked again on {device} for: {names}.",
+    "trustEnded": "Trust ended: the phone code is needed again on this PC"
   },
   "audit": {
     "title": "Audit log",
@@ -273,7 +278,10 @@
         "sign_in_refused": "Sign-in refused",
         "signed_in": "Signed in",
         "two_step_enabled": "2-step code set up",
-        "user_unlocked": "Account unlocked"
+        "user_unlocked": "Account unlocked",
+        "password_recovered": "Password recovered with the phone code and a recovery code",
+        "password_recovery_failed": "Failed password recovery",
+        "owner_password_reset": "Owner password reset on the server PC"
       },
       "other": "Event: {name}"
     },
@@ -314,6 +322,10 @@
         "permissions": {
           "insert": "Permission defined",
           "update": "Permission changed"
+        },
+        "device_trust": {
+          "insert": "PC trusted: no phone code there for a while",
+          "update": "Trust in a PC ended"
         }
       },
       "sys": {
@@ -377,7 +389,10 @@
       "cancelled_at": "Cancelled at",
       "cancel_reason": "Cancel reason",
       "language": "Language",
-      "requires_2fa": "Requires 2-step code"
+      "requires_2fa": "Requires 2-step code",
+      "expires_at": "Until",
+      "ended_at": "Ended at",
+      "end_reason": "Why it ended"
     }
   }
 }
