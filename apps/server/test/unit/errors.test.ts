@@ -18,6 +18,33 @@ describe('error mapping', () => {
     });
   });
 
+  it('passes on the broken business rule and the duplicate field, never other database text', () => {
+    expect(
+      toAppError({ code: 'AP011', message: 'x', hint: 'ACCOUNT_IN_USE', detail: 'event_link' }),
+    ).toMatchObject({
+      code: 'RULE_VIOLATION',
+      httpStatus: 422,
+      details: { rule: 'ACCOUNT_IN_USE', why: 'event_link' },
+    });
+    expect(toAppError({ code: 'AP012', message: 'x', hint: 'CREDIT_PERMISSION' })).toMatchObject({
+      code: 'PERMISSION_DENIED',
+      details: { rule: 'CREDIT_PERMISSION' },
+    });
+    const unknownHint = toAppError({
+      code: 'AP011',
+      message: 'x',
+      hint: 'Secret <b>',
+      detail: 'a b',
+    });
+    expect(unknownHint.details).toEqual({ sqlState: 'AP011' });
+    expect(
+      toAppError({ code: '23505', message: 'x', constraint: 'customers_phone_uq' }).details,
+    ).toEqual({ sqlState: '23505', field: 'phone' });
+    expect(toAppError({ code: '23505', message: 'x', constraint: 'other_uq' }).details).toEqual({
+      sqlState: '23505',
+    });
+  });
+
   it('maps money errors and keeps AppErrors as they are', () => {
     expect(toAppError(new MoneyRuleError('too much discount'))).toMatchObject({
       code: 'MONEY_RULE',
