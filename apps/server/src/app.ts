@@ -9,7 +9,11 @@ import { registerAuditRoutes } from './modules/audit/routes';
 import { registerAuthRoutes } from './modules/auth/routes';
 import { registerCompanyRoutes } from './modules/company/routes';
 import { registerDeviceRoutes } from './modules/devices/routes';
+import { registerImportRoutes } from './modules/imports/routes';
+import { registerItemRoutes } from './modules/items/routes';
 import { registerLedgerRoutes } from './modules/ledger/routes';
+import { registerListRoutes } from './modules/lists/routes';
+import { registerPartyRoutes } from './modules/parties/routes';
 import { registerSettingsRoutes } from './modules/settings/routes';
 import { registerUserRoutes } from './modules/users/routes';
 import type { AppDeps } from './platform/http/deps';
@@ -92,5 +96,9 @@ export function buildApp(options: AppOptions, deps: AppDeps): FastifyInstance {
   registerCompanyRoutes(app);
   registerSettingsRoutes(app);
   registerLedgerRoutes(app);
+  registerItemRoutes(app);
+  registerPartyRoutes(app);
+  registerListRoutes(app);
+  registerImportRoutes(app);
   return app;
 }
