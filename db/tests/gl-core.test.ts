@@ -144,8 +144,16 @@ describe('the provisional chart of accounts', () => {
 
   it('lets an unused account be renamed, moved and deactivated, but nothing goes under an inactive header', async () => {
     await run(`UPDATE gl.accounts SET name_en = 'Sundry' WHERE code = '6051'`);
-    await run(`UPDATE gl.accounts SET is_active = false WHERE code IN ('6051', '6052')`);
-    await run(`UPDATE gl.accounts SET is_active = false WHERE code = '6050'`);
+    await expect(
+      run(`UPDATE gl.accounts SET is_active = false WHERE code = '6051'`),
+    ).rejects.toMatchObject(rule('REASON_REQUIRED'));
+    await run(
+      `UPDATE gl.accounts SET is_active = false WHERE code IN ('6051', '6052')`,
+      [],
+      1n,
+      'Not used',
+    );
+    await run(`UPDATE gl.accounts SET is_active = false WHERE code = '6050'`, [], 1n, 'Not used');
     await expect(addAccount('6053', '6050')).rejects.toMatchObject(rule('ACCOUNT_PARENT_INACTIVE'));
     await expect(
       run(`UPDATE gl.accounts SET is_active = true WHERE code = '6051'`),
@@ -204,7 +212,7 @@ describe('event links (mappings)', () => {
       old_values: { account_id: Number(await accountId('6910')) },
       new_values: { account_id: Number(await accountId('6051')) },
     });
-    await run(`UPDATE gl.accounts SET is_active = false WHERE code = '6910'`);
+    await run(`UPDATE gl.accounts SET is_active = false WHERE code = '6910'`, [], 1n, 'Test');
     await run(`UPDATE gl.accounts SET is_active = true WHERE code = '6910'`);
     await setMapping('cash_over_short', '6910');
   });

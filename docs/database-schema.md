@@ -34,6 +34,7 @@ Phase 1 has **68 tables in 9 schemas**, plus reporting views and the functions a
 | **[ins]** | `created_at timestamptz NOT NULL DEFAULT now()`, `created_by bigint NOT NULL → auth.users` (append-only tables) |
 | SYSTEM user | `auth.users` id 1 = `system` (cannot log in): seeds and scheduled jobs |
 | Foreign keys | `ON DELETE RESTRICT` everywhere |
+| Rule errors | Custom SQLSTATEs `AP001`–`AP0xx`. From M2: `AP011` = a business rule, `AP012` = a permission rule, each with a machine-readable `HINT` (e.g. `ACCOUNT_IN_USE`, `CREDIT_PERMISSION`) that the API passes on and the app translates |
 
 **Notation:** `→ x.y` means a foreign key. A type followed by `?` is nullable; every other column is `NOT NULL`.
 
@@ -199,7 +200,7 @@ The counter is changed only by `sys.next_number()`.
 | code | text | `UNIQUE (category, code)` |
 | name_ar, name_en | text | |
 | requires_note | boolean | `DEFAULT false` |
-| gl_account_id | bigint? → gl.accounts | Account for paid-in/paid-out reasons |
+| gl_account_id | bigint? → gl.accounts | Account for paid-in/paid-out reasons: `CHECK ((category IN ('paid_in','paid_out')) = (gl_account_id IS NOT NULL))`; active, postable, not control |
 | [active], [std] | | |
 
 There is no `line_void` category: cart removals need no reason ([0005](decisions/0005-cart-removals-logged-without-approval.md)).
@@ -646,7 +647,7 @@ The average cost is not stored on the item. It lives in `inv.balances.avg_unit_c
 |---|---|---|
 | id | bigint PK | |
 | item_id | bigint → md.items | |
-| barcode | text | `CHECK (barcode ~ '^[0-9A-Za-z.\-]{3,64}$')`; unique `WHERE is_active` |
+| barcode | text | `CHECK (barcode ~ '^[0-9A-Za-z.\-]{3,64}$')`; unique on `upper(barcode)` `WHERE is_active`; never changes or moves to another item (deactivate and add a new one) |
 | qty_per_scan | numeric(14,3) | `DEFAULT 1`, `> 0` (pack barcodes) |
 | is_primary | boolean | One primary active barcode per item |
 | [active], [std] | | |
@@ -768,7 +769,7 @@ One level (`STANDARD`) in P1. A second level (for example "Contractors & compani
 | branch_id | bigint → sys.branches | |
 | warehouse_type | text | `CHECK IN ('store','van','site')` |
 | technician_id | bigint? → md.technicians | Required for `van` |
-| is_default | boolean | |
+| is_default | boolean | Exactly one per branch: choosing a new default takes the mark from the old one; the mark cannot simply be removed |
 | [active], [std] | | |
 
 ### 7.15 `md.cash_denominations`
@@ -1349,6 +1350,7 @@ Revenue and cost of sales come from `md.business_lines`, payment accounts from `
 | [std] | | |
 
 **Status rules:**
+- Open → closed → locked, one step at a time, in month order. A month closes only after it ends; reopening a closed month needs a reason; who and when are stamped by the database.
 - `closed` and `locked` both reject every posting and every document issue ([0016](decisions/0016-monthly-period-lock.md)).
 - `locked` can never be reopened.
 
@@ -1505,6 +1507,10 @@ See the one-page [posting map](accounting/posting-map.md) (**pending accountant 
 | `gl.check_entry_balanced()` | deferred constraint trigger | Balanced, ≥ 2 lines |
 | `gl.check_period_open()` | trigger | Journal entries, document issue, stock and cash postings |
 | `sys.clock_guard()` | function | Detects the server clock going backwards |
+| `sys.require_reason_to_deactivate()` | trigger | Deactivating master data or an account needs a reason in the request context ([0037](decisions/0037-master-data-defaults.md)) |
+| `gl.account_in_use(id)` | function | Why an account is in use (event link, line of business, payment method, reason code; postings from 0011), or NULL |
+| `gl.ensure_periods(n)` | security definer | Creates the missing months up to n months ahead ([0035](decisions/0035-fiscal-year-and-provisional-chart.md)) |
+| `md.item_in_use(id)` | function | Why an item is in use (kit component or kit contents; movements and document lines later), or NULL |
 | `sys.check_setting()` | trigger | Safe whole-number ranges for every `security.*` setting (password length never below 10); `client.min_version` format |
 | `auth.user_has_permission(user, code)` | function | Active user + active role + role permission |
 | `auth.assert_single_owner()` | function | At most one active owner (advisory lock) |
@@ -1568,7 +1574,8 @@ All series use 6 digits and continuous numbering ([0011](decisions/0011-document
 ### 15.3 Other seeds
 
 - **VAT categories:** `SR` 5%, `ZR` 0%, `EX`, `OS`.
-- **Units:** `PCS`, `BOX`, `SET`, `KG`, `L`, `M`, `M2`, `HR`, `VISIT`, `JOB`.
+- **Units:** `PCS`, `BOX`, `BAG`, `BTL`, `SET` (0 decimals), `KG`, `L` (3), `M`, `M2`, `HR` (2), `VISIT`, `JOB` (0). E-invoice codes only where certain (`H87`, `KGM`, `LTR`, `MTR`, `MTK`, `HUR`).
+- **Item categories:** `CHEM` Chemicals, `EQUIP` Equipment, `CLEAN` Cleaning, `PARTS` Spare parts, `SERV` Services.
 - **Lines of business:** supplies (4100/5100), construction (4200/5200), maintenance (4300/5300), cleaning (4400/5400).
 - **Chart of accounts and mappings:** the provisional chart from [`accounting/chart-of-accounts.md`](accounting/chart-of-accounts.md).
 - **Payment methods:** Cash (1110), Card (1150), Bank transfer (1140), Cheque (1160).
@@ -1636,7 +1643,7 @@ Migrations are written **in build order** (milestones in [`phase-1-plan.md`](pha
 | 0006 | `device_trust` | M1 | `auth.device_trust` ("trust this PC", decision 0027), `trusted_device` sign-in method, `security.trusted_device_days` | — |
 | 0007 | `company_edit_owner_only` | M1 | — (data: `system.company.edit` becomes owner-only and leaves every other role, decision 0030) | — |
 | 0008 | `gl_core` | M2 | `accounts` (provisional chart), `account_mappings`, `periods` (monthly, seeded) + period guard | — |
-| 0009 | `master_data` | M2 | All 15 `md.*` tables (with seeds) and `sys.reason_codes` (with seeds) | `auth.devices.default_warehouse_id`, `auth.approvals.reason_code_id` |
+| 0009 | `master_data` | M2 | All 15 `md.*` tables (with seeds) and `sys.reason_codes` (with seeds); permission `customers.credit`; deactivation needs a reason; company TRN starts with 100 and the logo is PNG/JPEG; series prefix changeable until first use (decisions 0031–0037) | `auth.devices.default_warehouse_id`, `auth.approvals.reason_code_id` |
 | 0010 | `inventory` | M3 | All `inv.*` tables + `apply_movement` + stock views | — |
 | 0011 | `gl_journals` | M3 | `journal_entries`, `journal_lines` + balance trigger | — |
 | 0012 | `cash_core` | M4 | `registers`, `shifts`, `counts`, `count_lines` + shift-owner function | — |
