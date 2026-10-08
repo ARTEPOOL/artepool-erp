@@ -252,6 +252,53 @@ export interface AuthUsers {
   username: string;
 }
 
+export interface GlAccountMappings {
+  account_id: bigint;
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  key: string;
+  needs_control: boolean;
+  required_type: string;
+  row_version: Generated<number>;
+  updated_at: Generated<Timestamp>;
+  updated_by: bigint;
+}
+
+export interface GlAccounts {
+  account_type: string;
+  code: string;
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  id: Generated<bigint>;
+  is_active: Generated<boolean>;
+  is_contra: Generated<boolean>;
+  is_control: Generated<boolean>;
+  is_postable: Generated<boolean>;
+  name_ar: string;
+  name_en: string;
+  parent_id: bigint | null;
+  row_version: Generated<number>;
+  updated_at: Generated<Timestamp>;
+  updated_by: bigint;
+}
+
+export interface GlPeriods {
+  closed_at: Timestamp | null;
+  closed_by: bigint | null;
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  fiscal_year: number;
+  id: Generated<bigint>;
+  locked_at: Timestamp | null;
+  locked_by: bigint | null;
+  period_end: string;
+  period_start: string;
+  row_version: Generated<number>;
+  status: Generated<string>;
+  updated_at: Generated<Timestamp>;
+  updated_by: bigint;
+}
+
 export interface SysAlerts {
   ack_note: string | null;
   acknowledged_at: Timestamp | null;
@@ -390,6 +437,9 @@ export interface DB {
   "auth.sessions": AuthSessions;
   "auth.user_roles": AuthUserRoles;
   "auth.users": AuthUsers;
+  "gl.account_mappings": GlAccountMappings;
+  "gl.accounts": GlAccounts;
+  "gl.periods": GlPeriods;
   "sys.alerts": SysAlerts;
   "sys.branches": SysBranches;
   "sys.company_profile": SysCompanyProfile;
