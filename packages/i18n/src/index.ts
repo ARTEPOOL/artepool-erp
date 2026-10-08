@@ -2,17 +2,21 @@ import arAccounting from '../locales/ar/accounting.json';
 import arAuth from '../locales/ar/auth.json';
 import arCommon from '../locales/ar/common.json';
 import arItems from '../locales/ar/items.json';
+import arLists from '../locales/ar/lists.json';
 import arMasterdata from '../locales/ar/masterdata.json';
 import arParties from '../locales/ar/parties.json';
 import arSettings from '../locales/ar/settings.json';
+import arSetup from '../locales/ar/setup.json';
 import arShell from '../locales/ar/shell.json';
 import enAccounting from '../locales/en/accounting.json';
 import enAuth from '../locales/en/auth.json';
 import enCommon from '../locales/en/common.json';
 import enItems from '../locales/en/items.json';
+import enLists from '../locales/en/lists.json';
 import enMasterdata from '../locales/en/masterdata.json';
 import enParties from '../locales/en/parties.json';
 import enSettings from '../locales/en/settings.json';
+import enSetup from '../locales/en/setup.json';
 import enShell from '../locales/en/shell.json';
 
 export const LANGUAGES = ['ar', 'en'] as const;
@@ -31,6 +35,8 @@ export const resources = {
     items: arItems,
     parties: arParties,
     accounting: arAccounting,
+    setup: arSetup,
+    lists: arLists,
   },
   en: {
     common: enCommon,
@@ -41,6 +47,8 @@ export const resources = {
     items: enItems,
     parties: enParties,
     accounting: enAccounting,
+    setup: enSetup,
+    lists: enLists,
   },
 } as const;
 

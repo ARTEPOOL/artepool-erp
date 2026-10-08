@@ -3,6 +3,6 @@ import { PanelHeader } from '../parts';
 
 /** Settings → Tax (design 13; decision 0034). */
 export function TaxPanel() {
-  const { t } = useTranslation('settings');
-  return <PanelHeader title={t('hub.tax')} />;
+  const { t } = useTranslation('setup');
+  return <PanelHeader title={t('tax.title')} />;
 }

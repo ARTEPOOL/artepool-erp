@@ -3,6 +3,6 @@ import { PanelHeader } from '../parts';
 
 /** Settings → Company (design 13; decision 0034). */
 export function CompanyPanel() {
-  const { t } = useTranslation('settings');
-  return <PanelHeader title={t('hub.company')} />;
+  const { t } = useTranslation('setup');
+  return <PanelHeader title={t('company.title')} />;
 }
