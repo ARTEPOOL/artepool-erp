@@ -246,7 +246,7 @@ The full definition of every column, constraint, trigger and seed is in [`databa
 | `sys` (9) | schema_migrations, company_profile, settings, branches, document_series, reason_codes, idempotency_keys, alerts, import_batches | System settings, gapless numbering (`POS-`, `INV-`, …), safe retries, alerts |
 | `auth` (11) | users, roles, permissions, role_permissions, user_roles, devices, device_activity, enrollment_codes, sessions, approvals, recovery_codes | Who may do what, from which PC; single-use supervisor approvals; owner 2-step recovery |
 | `audit` (4) | log, chain_head, anchors, verifications | Tamper-evident diary of every change and event |
-| `md` (15) | units, vat_categories, business_lines, item_categories, items, item_barcodes, bundle_components, price_lists, item_prices, customers, suppliers, technicians, payment_methods, warehouses, cash_denominations | Master data; 4-decimal prices; VAT per item; lines of business |
+| `md` (15) | units, vat_categories, business_lines, item_categories, items, item_barcodes, bundle_components, price_levels, item_prices, customers, suppliers, technicians, payment_methods, warehouses, cash_denominations | Master data; 4-decimal prices; VAT per item; lines of business |
 | `inv` (6) | movements, balances, adjustments, adjustment_lines, counts, count_lines | Stock ledger; balances maintained by the database only; oversell review |
 | `sales` (9) | quotations, quotation_lines, documents, document_lines, payments, payment_allocations, credit_allocations, opening_balances, held_carts | Invoices (POS and A4), advance/progress payment invoices and deductions, notes, payments |
 | `cash` (6) | registers, shifts, counts, count_lines, movements, drawer_events | One cashier per drawer shift, blind count + one recount, cash vouchers |
@@ -341,9 +341,9 @@ A milestone is done only when its tests pass in CI.
 
 **Delivers:**
 - Migrations 0008–0009.
-- Screens for: company profile, settings, items (stock, service, bundle) and barcodes, price lists with 4-decimal prices, customers (VAT registered + TRN), suppliers, technicians, payment methods, warehouse, lines of business, reason codes.
+- Screens for: company profile, settings, items (stock, service, bundle) and barcodes, one 4-decimal sale price per item with a "price includes VAT" switch ([0032](decisions/0032-one-sale-price-with-vat-flag-and-customer-types.md)), customers (type, VAT registered + TRN, cash or credit), suppliers, technicians, payment methods, warehouse, lines of business, reason codes.
 - The provisional chart of accounts and its mappings (editable).
-- Excel templates and import with a dry-run report.
+- Excel templates and import with a dry-run report, all or nothing ([0031](decisions/0031-excel-import-all-or-nothing.md)).
 
 **Key tests:**
 - TRN rules (15 digits, required when registered).

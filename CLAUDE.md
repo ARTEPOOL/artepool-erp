@@ -52,6 +52,26 @@ It runs client–server on the local network: PostgreSQL and the API service on 
   - Tax documents get their number only at issue. (0011)
 - **Discounts** are stored per line (original price, discount, net). Revenue is posted net of discount. (0012)
 - **Advance and progress payments:** a payment that does not settle an already-issued tax invoice gets its own tax invoice with VAT. The final invoice deducts earlier payments and their VAT. (0013)
+- **Prices:**
+  - Each item has one sale price (4 dp) with a "price includes VAT" switch.
+  - An inclusive price is split back into net and VAT; an exclusive price has VAT added.
+  - Every tax invoice shows net, VAT and total for every customer.
+  - Prices live in `md.item_prices` per price level. Only `STANDARD` exists now; a level by customer type can be added later. (0032)
+- **VAT categories:** four fixed UAE categories (SR 5%, ZR, EX, OS). Only the owner changes a rate, with a reason; it applies to new documents only. (0033)
+
+**Master data**
+- **Excel import:** check first (row-by-row report), then all rows in one transaction or none. (0031)
+- **Customer types:** individual / contractor / company (required); the type never changes VAT. (0032)
+- **Credit:** customers start as cash (limit 0, on receipt). Credit changes need `customers.credit` and a reason; the database enforces it. (0036)
+- **Rules:**
+  - Item code: suggested, fixed after creation.
+  - Customer phone: required, unique.
+  - TRN: 15 digits starting with 100, unique per customers / suppliers.
+  - Logo: PNG/JPEG only.
+  - Deactivate with a reason, never delete. (0037)
+- **Screens:**
+  - side menu: Items & stock, Customers, Suppliers, Accounting
+  - Settings: Company, VAT & numbering, Lists (0034)
 
 **POS and cash**
 - **Oversell** at the POS is allowed only with supervisor approval. It posts an oversell adjustment that the storekeeper reviews. (0003)
@@ -76,7 +96,8 @@ It runs client–server on the local network: PostgreSQL and the API service on 
 **Accounting**
 - **Defective returns** are held at cost in "Inventory – defective" until written off. (0015)
 - **Periods** are monthly and are locked after close. Nothing is ever deleted. (0016)
-- **Chart of accounts and posting map** are provisional and **pending accountant review**. Account mappings must stay configurable data, never hard-coded. (0018)
+- **Fiscal year** runs January–December. Months are kept 3 months ahead. (0035)
+- **Chart of accounts and posting map** are provisional and **pending accountant review**; go-live waits for the approval. Account mappings must stay configurable data, never hard-coded. (0018, 0035)
 - **E-invoicing** goes through an accredited service provider API. The ERP stays the system of record. The go-live date is **pending** and lives in the setting `einvoice.mandatory_from`. (0019)
 
 ## How to work
