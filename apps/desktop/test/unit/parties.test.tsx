@@ -499,7 +499,7 @@ describe('Suppliers', () => {
     const dialog = await screen.findByRole('dialog');
     fill(dialog, 'الاسم', 'مؤسسة الواحة للمضخات');
     fill(dialog, 'الهاتف', '03 765 4321');
-    fill(dialog, 'شروط الدفع (أيام)', '30');
+    fill(dialog, 'شروط الدفع (أيام)', '٣٠'); // Arabic digits are read as 30
     fireEvent.click(within(dialog).getByRole('button', { name: 'حفظ المورد' }));
     await detailPanel('مؤسسة الواحة للمضخات');
     expect(bridge.callsTo('POST', '/api/v1/suppliers')[0]!.body).toEqual({

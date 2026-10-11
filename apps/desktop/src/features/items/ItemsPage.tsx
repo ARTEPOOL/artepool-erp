@@ -119,10 +119,8 @@ export function ItemsPage() {
     if (selectedId === null && firstId !== null) setSelectedId(firstId);
   }, [selectedId, firstId]);
 
-  const changeSearch = (value: string) => {
-    setSearch(value);
-    setSelectedId(null);
-  };
+  // A new search starts on its own first result (once the search has actually run).
+  useEffect(() => setSelectedId(null), [q]);
   const changeSegment = (value: string) => {
     setSegment(value);
     setSelectedId(null);
@@ -178,7 +176,7 @@ export function ItemsPage() {
             aria-label={t('search')}
             placeholder={t('search')}
             value={search}
-            onChange={(event) => changeSearch(event.target.value)}
+            onChange={(event) => setSearch(event.target.value)}
           />
           <kbd className={styles.kbd}>{t('searchKey')}</kbd>
         </label>

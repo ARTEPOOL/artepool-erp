@@ -42,6 +42,7 @@ import {
   useServerFieldError,
 } from '../settings/lists/parts';
 import { branchOf, indent, treeOrder } from '../settings/lists/tree';
+import { ApiError } from '../../api/client';
 
 const byCode = (a: AccountItem, b: AccountItem) => a.code.localeCompare(b.code);
 
@@ -256,7 +257,21 @@ export function ChartTab({ data }: { data: AccountsResponse }) {
           explanation={t('chart.deactivateNote')}
           busy={deactivate.isPending}
           error={deactivate.error}
-          onConfirm={(reason) => deactivate.mutate({ account: deactivating, reason })}
+          onConfirm={(reason) =>
+            deactivate.mutate(
+              { account: deactivating, reason },
+              {
+                // Someone else changed it: close and offer Reload above the table, since
+                // retrying with the old version can never succeed.
+                onError: (error) => {
+                  if (error instanceof ApiError && error.code === 'STALE_VERSION') {
+                    setDeactivating(null);
+                    setRowError(error);
+                  }
+                },
+              },
+            )
+          }
           onClose={() => setDeactivating(null)}
         />
       )}

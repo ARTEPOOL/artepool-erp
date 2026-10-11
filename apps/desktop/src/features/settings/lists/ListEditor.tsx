@@ -24,6 +24,7 @@ import { localName } from '../../masterdata/refs';
 import { DeactivateDialog } from '../../masterdata/DeactivateDialog';
 import { useSave } from '../api';
 import { CardHead } from '../parts';
+import { ApiError } from '../../../api/client';
 import {
   ActiveFilter,
   listClasses as styles,
@@ -273,7 +274,21 @@ export function ListEditor<R extends ListRow, F extends BaseForm>(props: ListEdi
           }
           busy={deactivate.isPending}
           error={deactivate.error}
-          onConfirm={(reason) => deactivate.mutate({ row: deactivating, reason })}
+          onConfirm={(reason) =>
+            deactivate.mutate(
+              { row: deactivating, reason },
+              {
+                // Someone else changed it: close and offer Reload above the table, since
+                // retrying with the old version can never succeed.
+                onError: (error) => {
+                  if (error instanceof ApiError && error.code === 'STALE_VERSION') {
+                    setDeactivating(null);
+                    setRowError(error);
+                  }
+                },
+              },
+            )
+          }
           onClose={() => setDeactivating(null)}
         />
       )}

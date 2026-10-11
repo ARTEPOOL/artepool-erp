@@ -8,7 +8,7 @@ import {
   type CompanyResponse,
   type SaveCompanyRequest,
 } from '@artepool/shared/contracts';
-import { useSave } from '../../../api/hooks';
+import { useApi, useSave } from '../../../api/hooks';
 import { Button, iconClass, Note, SelectField, Switch, TextField, useToast } from '../../../ui';
 import { errorField } from '../../auth/context';
 import { MD_KEYS } from '../../masterdata/refs';
@@ -39,6 +39,7 @@ export function LegalDetailsCard({
   const { t: md } = useTranslation('masterdata');
   const toast = useToast();
   const queryClient = useQueryClient();
+  const api = useApi();
   // `base` is the saved record the form started from; its version is what a save sends back.
   const [base, setBase] = useState(company);
   const [form, setForm] = useState<CompanyForm>(() => toForm(company));
@@ -92,22 +93,28 @@ export function LegalDetailsCard({
   const reload = async () => {
     setReloading(true);
     try {
-      await queryClient.invalidateQueries({ queryKey: MD_KEYS.company });
-      const fresh = queryClient.getQueryData<CompanyResponse>(MD_KEYS.company)?.company ?? null;
+      // Read the record itself: a failed read must not bring back the old cached version.
+      const answer = await api.get<CompanyResponse>('/api/v1/company');
+      queryClient.setQueryData(MD_KEYS.company, answer);
+      const fresh = answer.company;
       setBase(fresh);
       setSeen(fresh);
       setForm(toForm(fresh));
       setProblems({});
       setError(null);
+    } catch (caught) {
+      setError(caught);
     } finally {
       setReloading(false);
     }
   };
 
   const serverField = errorField(error);
+  // A refusal about a field on this form shows under it; anything else shows below the form.
+  const isFormField = (field: string): field is CompanyField => field in form;
   const problemOf = (field: CompanyField): string | undefined => {
     const code = problems[field] ?? (serverField?.field === field ? serverField.code : undefined);
-    return code ? md(`fields.${code}`) : undefined;
+    return code ? md(`fields.${code}`, { defaultValue: md('fields.invalid') }) : undefined;
   };
   const text = (field: CompanyField & keyof typeof LIMITS, options: { ltr?: boolean } = {}) => (
     <TextField
@@ -173,7 +180,7 @@ export function LegalDetailsCard({
           />
         </div>
         <SaveProblem
-          error={serverField && !isStale(error) ? null : error}
+          error={serverField && isFormField(serverField.field) && !isStale(error) ? null : error}
           onReload={() => void reload()}
           reloading={reloading}
         />

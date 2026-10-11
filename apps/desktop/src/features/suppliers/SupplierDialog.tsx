@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { normalizePhone, normalizeTrn } from '@artepool/shared';
+import { normalizePhone, normalizeTrn, asciiDigits } from '@artepool/shared';
 import type {
   CreateSupplierRequest,
   Emirate,
@@ -116,7 +116,7 @@ export function SupplierDialog(props: {
     }
     const country = form.countryCode.trim().toUpperCase();
     if (!/^[A-Z]{2}$/.test(country)) found.countryCode = t('parties:suppliers.countryInvalid');
-    const termsText = form.paymentTermsDays.trim();
+    const termsText = asciiDigits(form.paymentTermsDays.trim());
     const days = /^\d{1,3}$/.test(termsText) ? Number(termsText) : -1;
     if (days < 0 || days > 365) found.paymentTermsDays = t('parties:credit.termsInvalid');
     setLocal(found);

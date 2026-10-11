@@ -201,7 +201,7 @@ export function UsersPanel() {
         <div className={styles.panel}>
           {selected ? (
             <UserCard
-              key={selected.id}
+              key={`user-${selected.id}`}
               user={selected}
               roles={roles.data?.roles ?? []}
               onTempCode={setTempCode}
@@ -213,7 +213,7 @@ export function UsersPanel() {
           )}
           {role && roles.data && (
             <RolePermissions
-              key={role.id}
+              key={`role-${role.id}`}
               role={role}
               permissions={roles.data.permissions}
               onDirtyChange={setPermissionsDirty}

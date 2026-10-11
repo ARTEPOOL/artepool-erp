@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Banknote, CreditCard, ScrollText } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { MoneyFormatError, parseFils } from '@artepool/shared';
+import { MoneyFormatError, parseFils, asciiDigits } from '@artepool/shared';
 import type {
   CreditMode,
   CustomerDetail,
@@ -109,7 +109,7 @@ export function CreditDialog(props: {
       else limitFils = fils;
       if (form.termsChoice === OTHER) {
         const text = form.termsOther.trim();
-        days = /^\d{1,3}$/.test(text) ? Number(text) : -1;
+        days = /^\d{1,3}$/.test(asciiDigits(text)) ? Number(asciiDigits(text)) : -1;
         if (days < 0 || days > 365) found.terms = t('parties:credit.termsInvalid');
       } else {
         days = Number(form.termsChoice);

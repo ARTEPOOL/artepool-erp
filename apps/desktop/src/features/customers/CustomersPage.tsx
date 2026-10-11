@@ -69,8 +69,11 @@ export function CustomersPage() {
 
   const reload = async (): Promise<CustomerDetail | null> => {
     if (!selectedId) return null;
-    await queryClient.invalidateQueries({ queryKey: MD_KEYS.customers });
-    return queryClient.getQueryData<CustomerDetail>(MD_KEYS.customer(selectedId)) ?? null;
+    // Read the record itself: a failed read must not bring back the old cached version.
+    const fresh = await api.get<CustomerDetail>(`/api/v1/customers/${selectedId}`);
+    queryClient.setQueryData(MD_KEYS.customer(selectedId), fresh);
+    void queryClient.invalidateQueries({ queryKey: MD_KEYS.customers });
+    return fresh;
   };
 
   const exportAll = async () => {

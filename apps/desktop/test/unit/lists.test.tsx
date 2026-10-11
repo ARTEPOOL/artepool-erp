@@ -13,7 +13,14 @@ import type {
   WarehouseItem,
 } from '@artepool/shared/contracts';
 import { App } from '../../src/app/App';
-import { FakeBridge, ok, sessionView, signInAnswer, userView } from '../support/fake-bridge';
+import {
+  failure,
+  FakeBridge,
+  ok,
+  sessionView,
+  signInAnswer,
+  userView,
+} from '../support/fake-bridge';
 
 const unit = (patch: Partial<UnitItem>): UnitItem => ({
   id: '1',
@@ -346,6 +353,27 @@ describe('Settings → Lists', () => {
       reason: 'انتهى المشروع',
       rowVersion: 3,
     });
+  });
+
+  it('if someone else changed it first, deactivating closes and offers Reload', async () => {
+    const bridge = signedInBridge(['warehouses.manage']);
+    bridge.on('POST', '/api/v1/warehouses/2/deactivate', failure(409, 'STALE_VERSION'));
+    await signIn(bridge);
+    await openLists();
+    fireEvent.click(screen.getByRole('tab', { name: 'المستودعات' }));
+    fireEvent.click(within(await row('SITE-1')).getByRole('button', { name: 'إيقاف SITE-1' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText(/^السبب/), {
+      target: { value: 'انتهى المشروع' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'إيقاف' }));
+    await screen.findByText(/عدّل شخص آخر هذه البيانات/);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    const reads = bridge.callsTo('GET', '/api/v1/warehouses').length;
+    fireEvent.click(screen.getByRole('button', { name: 'إعادة التحميل' }));
+    await waitFor(() =>
+      expect(bridge.callsTo('GET', '/api/v1/warehouses').length).toBeGreaterThan(reads),
+    );
   });
 
   it('a paid-out reason needs an account, chosen from accounts that receive postings', async () => {

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type KeyboardEvent } from 'react';
 import { Ban, Plus, Truck, Upload } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
+import { useApi } from '../../api/hooks';
 import type { SupplierDetail } from '@artepool/shared/contracts';
 import {
   Alert,
@@ -37,6 +38,7 @@ export function SuppliersPage() {
   const can = useCan();
   const errorText = useErrorText();
   const queryClient = useQueryClient();
+  const api = useApi();
   const [search, setSearch] = useState('');
   const q = useDebounced(search);
   const [filter, setFilter] = useState<SupplierFilter>('active');
@@ -60,8 +62,11 @@ export function SuppliersPage() {
 
   const reload = async (): Promise<SupplierDetail | null> => {
     if (!selectedId) return null;
-    await queryClient.invalidateQueries({ queryKey: MD_KEYS.suppliers });
-    return queryClient.getQueryData<SupplierDetail>(MD_KEYS.supplier(selectedId)) ?? null;
+    // Read the record itself: a failed read must not bring back the old cached version.
+    const fresh = await api.get<SupplierDetail>(`/api/v1/suppliers/${selectedId}`);
+    queryClient.setQueryData(MD_KEYS.supplier(selectedId), fresh);
+    void queryClient.invalidateQueries({ queryKey: MD_KEYS.suppliers });
+    return fresh;
   };
 
   const onRowKey = (event: KeyboardEvent, id: string) => {
