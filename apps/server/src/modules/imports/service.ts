@@ -30,6 +30,7 @@ import {
   TEXT_COLUMNS,
 } from './entities';
 import { cell, ExcelFileError, readRows, writeWorkbook, type SheetRow } from './xlsx';
+import { createAdjustment, type Auth } from '../inventory/service';
 
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 const REPORT_LIMIT = 1000;
@@ -43,6 +44,7 @@ export const IMPORT_PERMISSIONS: Readonly<Record<ImportEntity, readonly string[]
   item_prices: ['prices.manage'],
   customers: ['customers.manage'],
   suppliers: ['suppliers.manage'],
+  opening_stock: ['stock.opening'],
 };
 
 function decode(body: ImportFileRequest): Buffer {
@@ -327,7 +329,87 @@ async function checkSuppliers(
   return out.filter((r) => !c.isBad(r.row));
 }
 
-type Records = ItemRecord[] | PriceRecord[] | CustomerRecord[] | SupplierRecord[];
+interface OpeningRecord {
+  row: number;
+  itemId: bigint;
+  quantityMilli: bigint;
+  unitCost4dp: bigint | null;
+}
+
+/** Opening stock: existing stock items, a quantity in the unit's decimals, a cost or a purchase price. */
+async function checkOpening(
+  db: Kysely<DB>,
+  rows: SheetRow[],
+  c: Checker,
+): Promise<OpeningRecord[]> {
+  const items = await db
+    .selectFrom('md.items as i')
+    .innerJoin('md.units as u', 'u.id', 'i.unit_id')
+    .select([
+      'i.id',
+      'i.code',
+      'i.item_type',
+      'i.is_active',
+      'i.fallback_unit_cost_4dp',
+      'u.decimals',
+    ])
+    .execute();
+  const byCode = new Map(items.map((i) => [i.code.toUpperCase(), i]));
+  const out: OpeningRecord[] = [];
+  const codes: { row: number; value: string | null }[] = [];
+  for (const row of rows) {
+    c.basics(row);
+    const code = c.code(row);
+    const item = code ? byCode.get(code) : undefined;
+    if (code && !item) c.add(row.row, 'code', 'unknown_reference');
+    else if (item && !item.is_active) c.add(row.row, 'code', 'inactive_reference');
+    else if (item && item.item_type !== 'stock') c.add(row.row, 'code', 'not_a_stock_item');
+    const quantity = c.quantity(row, 'quantity', item?.decimals ?? null);
+    if (quantity === 0n) c.add(row.row, 'quantity', 'invalid_quantity');
+    const cost = c.price(row, 'unit_cost');
+    if (cell(row, 'unit_cost') === null && item && item.fallback_unit_cost_4dp === null) {
+      c.add(row.row, 'unit_cost', 'cost_unknown');
+    }
+    codes.push({ row: row.row, value: code });
+    if (c.isBad(row.row) || !item || quantity === null) continue;
+    out.push({ row: row.row, itemId: item.id, quantityMilli: quantity, unitCost4dp: cost });
+  }
+  c.uniqueInFile(codes, 'code');
+  return out.filter((r) => !c.isBad(r.row));
+}
+
+/** One opening adjustment for the whole file, posted with its journal entry. */
+async function saveOpening(
+  trx: Transaction<DB>,
+  auth: Auth,
+  batchId: bigint,
+  records: OpeningRecord[],
+): Promise<void> {
+  const reason = await trx
+    .selectFrom('sys.reason_codes')
+    .select('id')
+    .where('category', '=', 'other')
+    .where('code', '=', 'OPENING')
+    .executeTakeFirstOrThrow();
+  for (const part of chunks(records)) {
+    await createAdjustment(
+      trx,
+      auth,
+      {
+        kind: 'opening',
+        reasonCodeId: reason.id.toString(),
+        lines: part.map((r) => ({
+          itemId: r.itemId.toString(),
+          quantityMilli: r.quantityMilli.toString(),
+          ...(r.unitCost4dp !== null ? { unitCost4dp: r.unitCost4dp.toString() } : {}),
+        })),
+      },
+      batchId,
+    );
+  }
+}
+
+type Records = ItemRecord[] | PriceRecord[] | CustomerRecord[] | SupplierRecord[] | OpeningRecord[];
 
 async function checkFile(
   db: Kysely<DB>,
@@ -344,7 +426,9 @@ async function checkFile(
         ? await checkPrices(db, rows, checker)
         : entity === 'customers'
           ? await checkCustomers(db, rows, checker)
-          : await checkSuppliers(db, rows, checker);
+          : entity === 'opening_stock'
+            ? await checkOpening(db, rows, checker)
+            : await checkSuppliers(db, rows, checker);
   checker.issues.sort((a, b) => a.row - b.row);
   return { rows, checker, records };
 }
@@ -564,6 +648,7 @@ export async function commitImport(
   batchId: bigint,
   body: ImportFileRequest,
   canCost: boolean,
+  auth: Auth = null,
 ): Promise<ImportCommitResponse> {
   const batch = await trx
     .selectFrom('sys.import_batches')
@@ -588,6 +673,8 @@ export async function commitImport(
   if (entity === 'items') await saveItems(trx, records as ItemRecord[]);
   else if (entity === 'item_prices') await savePrices(trx, records as PriceRecord[]);
   else if (entity === 'customers') await saveCustomers(trx, records as CustomerRecord[]);
+  else if (entity === 'opening_stock')
+    await saveOpening(trx, auth, batchId, records as OpeningRecord[]);
   else await saveSuppliers(trx, records as SupplierRecord[]);
   await trx
     .updateTable('sys.import_batches')

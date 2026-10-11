@@ -67,6 +67,7 @@ export function registerImportRoutes(app: FastifyInstance): void {
           BigInt(params.batchId),
           body,
           request.auth?.permissions.has('items.cost') ?? false,
+          request.auth,
         ),
       };
     },

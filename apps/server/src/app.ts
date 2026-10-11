@@ -10,6 +10,7 @@ import { registerAuthRoutes } from './modules/auth/routes';
 import { registerCompanyRoutes } from './modules/company/routes';
 import { registerDeviceRoutes } from './modules/devices/routes';
 import { registerImportRoutes } from './modules/imports/routes';
+import { registerInventoryRoutes } from './modules/inventory/routes';
 import { registerItemRoutes } from './modules/items/routes';
 import { registerLedgerRoutes } from './modules/ledger/routes';
 import { registerListRoutes } from './modules/lists/routes';
@@ -96,6 +97,7 @@ export function buildApp(options: AppOptions, deps: AppDeps): FastifyInstance {
   registerCompanyRoutes(app);
   registerSettingsRoutes(app);
   registerLedgerRoutes(app);
+  registerInventoryRoutes(app);
   registerItemRoutes(app);
   registerPartyRoutes(app);
   registerListRoutes(app);

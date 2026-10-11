@@ -4,7 +4,13 @@
  */
 import { z } from 'zod';
 
-export const IMPORT_ENTITIES = ['items', 'item_prices', 'customers', 'suppliers'] as const;
+export const IMPORT_ENTITIES = [
+  'items',
+  'item_prices',
+  'customers',
+  'suppliers',
+  'opening_stock',
+] as const;
 export type ImportEntity = (typeof IMPORT_ENTITIES)[number];
 
 /** At most 5 MB of Excel, sent as base64 inside JSON. */
@@ -42,6 +48,8 @@ export const IMPORT_PROBLEMS = [
   'too_many_decimals',
   'trn_needs_registration',
   'cost_needs_permission',
+  'not_a_stock_item',
+  'cost_unknown',
 ] as const;
 export type ImportProblem = (typeof IMPORT_PROBLEMS)[number];
 

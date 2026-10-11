@@ -94,6 +94,12 @@ export const COLUMNS: Readonly<Record<ImportEntity, readonly ColumnSpec[]>> = {
     { key: 'payment_terms_days', ar: 'أيام السداد', en: 'Payment terms (days)' },
     { key: 'notes', ar: 'ملاحظات', en: 'Notes' },
   ],
+  // Opening stock at go-live (decision 0042): an empty cost takes the item's purchase price.
+  opening_stock: [
+    { key: 'code', ar: 'الكود', en: 'Code' },
+    { key: 'quantity', ar: 'الكمية', en: 'Quantity' },
+    { key: 'unit_cost', ar: 'تكلفة الوحدة (بدون ضريبة)', en: 'Unit cost (excl. VAT)' },
+  ],
 };
 
 /** Columns Excel must keep as text (a leading 0 or 15 digits must survive). */
@@ -105,6 +111,7 @@ const REQUIRED: Readonly<Record<ImportEntity, readonly string[]>> = {
   item_prices: ['code', 'price', 'price_includes_vat'],
   customers: ['type', 'name', 'phone'],
   suppliers: ['name'],
+  opening_stock: ['code', 'quantity'],
 };
 
 const MAX_TEXT: Readonly<Record<string, number>> = {

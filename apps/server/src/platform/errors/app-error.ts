@@ -96,6 +96,7 @@ const DUPLICATE_FIELDS: Readonly<Record<string, string>> = {
   suppliers_code_uq: 'code',
   suppliers_trn_uq: 'trn',
   technicians_code_uq: 'code',
+  label_sizes_code_uq: 'code',
   technicians_user_id_key: 'userId',
   payment_methods_code_uq: 'code',
   warehouses_code_uq: 'code',

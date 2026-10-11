@@ -18,6 +18,7 @@ import type {
   CreateItemRequest,
   ItemDetail,
   ItemListItem,
+  ItemStockFigures,
   ItemsQuery,
   ItemsResponse,
   ItemType,
@@ -45,9 +46,27 @@ async function standardLevelId(db: Kysely<DB>): Promise<bigint> {
 }
 
 /** The items list: search by name in either language (Arabic letter variants ignored), code or barcode. */
-export async function listItems(db: Kysely<DB>, query: ItemsQuery): Promise<ItemsResponse> {
+/** Per-item stock over all warehouses: sellable and defective quantities, and the sellable value. */
+const stockTotals = (db: Kysely<DB>) =>
+  db
+    .selectFrom('inv.balances')
+    .select([
+      'item_id',
+      sql<string>`sum(quantity) FILTER (WHERE stock_status = 'available')`.as('on_hand'),
+      sql<string>`sum(quantity) FILTER (WHERE stock_status = 'defective')`.as('defective'),
+      sql<string>`sum(value_4dp) FILTER (WHERE stock_status = 'available')`.as('value_4dp'),
+      sql<string>`max(avg_unit_cost_4dp) FILTER (WHERE stock_status = 'available')`.as('last_avg'),
+    ])
+    .groupBy('item_id');
+
+export async function listItems(
+  db: Kysely<DB>,
+  query: ItemsQuery,
+  showCost = false,
+): Promise<ItemsResponse> {
   let base = db
     .selectFrom('md.items as i')
+    .leftJoin(stockTotals(db).as('s'), 's.item_id', 'i.id')
     .leftJoin('md.price_levels as l', (join) => join.on('l.is_default', '=', true))
     .leftJoin('md.item_prices as p', (join) =>
       join.onRef('p.item_id', '=', 'i.id').onRef('p.price_level_id', '=', 'l.id'),
@@ -57,6 +76,12 @@ export async function listItems(db: Kysely<DB>, query: ItemsQuery): Promise<Item
     );
   if (query.status !== 'all') base = base.where('i.is_active', '=', query.status === 'active');
   if (query.itemType) base = base.where('i.item_type', '=', query.itemType);
+  if (query.toReorder) {
+    base = base
+      .where('i.item_type', '=', 'stock')
+      .where('i.reorder_level', 'is not', null)
+      .where(sql<boolean>`coalesce(s.on_hand, 0) <= i.reorder_level`);
+  }
   if (query.categoryId) {
     const root = BigInt(query.categoryId);
     base = base.where(
@@ -103,6 +128,11 @@ export async function listItems(db: Kysely<DB>, query: ItemsQuery): Promise<Item
       'p.price_4dp',
       'p.includes_vat',
       'b.barcode',
+      'i.reorder_level',
+      's.on_hand',
+      's.defective',
+      's.value_4dp',
+      's.last_avg',
     ])
     .orderBy('i.code')
     .limit(query.pageSize)
@@ -137,6 +167,7 @@ export async function listItems(db: Kysely<DB>, query: ItemsQuery): Promise<Item
       primaryBarcode: r.barcode,
       isSellable: r.is_sellable,
       isActive: r.is_active,
+      ...(r.item_type === 'stock' ? { stock: stockFigures(r, showCost) } : {}),
     })),
   };
 }
@@ -160,6 +191,32 @@ function purchaseCostOf(
     total += roundDiv(c.fallback_unit_cost_4dp * quantityFromDb(c.quantity), 1000n);
   }
   return components.length === 0 ? null : total.toString();
+}
+
+function stockFigures(
+  r: {
+    reorder_level: string | null;
+    on_hand: string | null;
+    defective: string | null;
+    value_4dp: string | null;
+    last_avg: string | null;
+  },
+  showCost: boolean,
+): ItemStockFigures {
+  const onHand = r.on_hand === null ? 0n : quantityFromDb(r.on_hand);
+  const reorder = r.reorder_level === null ? null : quantityFromDb(r.reorder_level);
+  // The average over all warehouses; with nothing on hand, the last known average.
+  const avg =
+    onHand > 0n && r.value_4dp !== null
+      ? roundDiv(BigInt(r.value_4dp) * 1000n, onHand).toString()
+      : r.last_avg;
+  return {
+    onHandMilli: onHand.toString(),
+    defectiveMilli: (r.defective === null ? 0n : quantityFromDb(r.defective)).toString(),
+    reorderLevelMilli: reorder?.toString() ?? null,
+    toReorder: reorder !== null && onHand <= reorder,
+    ...(showCost ? { avgUnitCost4dp: avg } : {}),
+  };
 }
 
 export async function getItem(db: Kysely<DB>, id: bigint, showCost = false): Promise<ItemDetail> {

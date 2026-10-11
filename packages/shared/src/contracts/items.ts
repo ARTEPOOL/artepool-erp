@@ -121,11 +121,25 @@ export interface ItemListItem {
   primaryBarcode: string | null;
   isSellable: boolean;
   isActive: boolean;
+  /** Stock items only (M3): quantities for everyone; the cost with stock.view_cost only (0040). */
+  stock?: ItemStockFigures;
+}
+
+export interface ItemStockFigures {
+  /** Sellable quantity on hand, all warehouses (thousandths). */
+  onHandMilli: string;
+  defectiveMilli: string;
+  reorderLevelMilli: string | null;
+  /** At or below the reorder level. */
+  toReorder: boolean;
+  avgUnitCost4dp?: string | null;
 }
 
 export const ItemsQuery = ListQuery.extend({
   categoryId: IdText.optional(),
   itemType: z.enum(ITEM_TYPES).optional(),
+  /** Only stock items at or below their reorder level. */
+  toReorder: z.enum(['true']).optional(),
 });
 export type ItemsQuery = z.infer<typeof ItemsQuery>;
 
