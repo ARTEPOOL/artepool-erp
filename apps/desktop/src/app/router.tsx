@@ -11,6 +11,10 @@ import {
 import { AccountingPage } from '../features/accounting/AccountingPage';
 import { CustomersPage } from '../features/customers/CustomersPage';
 import { HomePage } from '../features/home/HomePage';
+import { CountPage } from '../features/inventory/CountPage';
+import { CountsPage } from '../features/inventory/CountsPage';
+import { OpeningStockPage } from '../features/inventory/OpeningStockPage';
+import { ReviewsPage } from '../features/inventory/ReviewsPage';
 import { ItemsPage } from '../features/items/ItemsPage';
 import { CompanyPanel } from '../features/settings/company/CompanyPanel';
 import { ListsPanel } from '../features/settings/lists/ListsPanel';
@@ -25,6 +29,27 @@ import { Shell } from './Shell';
 const root = createRootRoute({ component: Shell });
 const home = createRoute({ getParentRoute: () => root, path: '/', component: HomePage });
 const items = createRoute({ getParentRoute: () => root, path: 'items', component: ItemsPage });
+// Stock pages reached from Items & stock (design 07) and the dashboard alerts.
+const openingStock = createRoute({
+  getParentRoute: () => root,
+  path: 'stock/opening',
+  component: OpeningStockPage,
+});
+const counts = createRoute({
+  getParentRoute: () => root,
+  path: 'stock/counts',
+  component: CountsPage,
+});
+const count = createRoute({
+  getParentRoute: () => root,
+  path: 'stock/counts/$countId',
+  component: CountPage,
+});
+const reviews = createRoute({
+  getParentRoute: () => root,
+  path: 'stock/reviews',
+  component: ReviewsPage,
+});
 const customers = createRoute({
   getParentRoute: () => root,
   path: 'customers',
@@ -68,6 +93,10 @@ const lists = createRoute({ getParentRoute: () => settings, path: 'lists', compo
 const routeTree = root.addChildren([
   home,
   items,
+  openingStock,
+  counts,
+  count,
+  reviews,
   customers,
   suppliers,
   accounting,

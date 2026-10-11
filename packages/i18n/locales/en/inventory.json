@@ -1,0 +1,12 @@
+{
+  "title": "Stock",
+  "opening": {
+    "title": "Opening stock"
+  },
+  "counts": {
+    "title": "Stock counts"
+  },
+  "reviews": {
+    "title": "Oversell reviews"
+  }
+}

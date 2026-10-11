@@ -46,6 +46,7 @@ let cashier: Actor;
 let storekeeperId: bigint;
 let storekeeperPc: TestDevice;
 let accountantId: bigint;
+let officeId: string;
 const ids = {
   category: '',
   unit: '',
@@ -114,6 +115,7 @@ async function entryOf(adjustment: AdjustmentDetail): Promise<Record<string, [st
 beforeAll(async () => {
   server = await startTestServer();
   const office = await addDevice(server, { code: 'OFFICE-01' });
+  officeId = office.id.toString();
   const ownerId = await addOwner(server);
   owner = actor(
     office,
@@ -629,5 +631,28 @@ describe('stock figures, oversell review and the journal', () => {
     expect(balanceOf('1310')).toBe(books.rows[0]!.available);
     expect(balanceOf('1320')).toBe(books.rows[0]!.defective);
     expect((await storekeeper('GET', '/api/v1/journal')).statusCode).toBe(403);
+  });
+
+  it('a PC can use another warehouse; only an active one; only with system.devices.manage', async () => {
+    const { rows } = await sql<{
+      id: string;
+    }>`SELECT id::text FROM md.warehouses WHERE code = 'MAIN'`.execute(server.db);
+    const main = rows[0]!.id;
+    expect(
+      (await owner('PATCH', `/api/v1/devices/${officeId}`, { defaultWarehouseId: main }))
+        .statusCode,
+    ).toBe(200);
+    const list = (await owner('GET', '/api/v1/devices')).json<{
+      devices: { id: string; defaultWarehouseId: string | null }[];
+    }>();
+    expect(list.devices.find((d) => d.id === officeId)?.defaultWarehouseId).toBe(main);
+    expect(
+      (await owner('PATCH', `/api/v1/devices/${officeId}`, { defaultWarehouseId: '999999' }))
+        .statusCode,
+    ).toBe(422);
+    expect(
+      (await storekeeper('PATCH', `/api/v1/devices/${officeId}`, { defaultWarehouseId: null }))
+        .statusCode,
+    ).toBe(403);
   });
 });
