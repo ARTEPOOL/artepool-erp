@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | **Approved** (2026-10-08) with the owner's changes to pricing and VAT, recorded as decisions [0031](../decisions/0031-excel-import-all-or-nothing.md)–[0037](../decisions/0037-master-data-defaults.md) |
+| **Status** | **Done** (2026-10-11), awaiting the owner's merge of the pull request. Approved on 2026-10-08 with the owner's changes to pricing and VAT, recorded as decisions [0031](../decisions/0031-excel-import-all-or-nothing.md)–[0037](../decisions/0037-master-data-defaults.md). See [Delivered](#delivered). |
 | **Date** | 2026-10-08 |
 | **Milestone** | M2 of the [Phase 1 plan](../phase-1-plan.md) |
 | **Design reference** | [`design/screens/07-items-stock.html`](../../design/screens/07-items-stock.html), [`design/screens/14-customers.html`](../../design/screens/14-customers.html), [`design/screens/13-settings.html`](../../design/screens/13-settings.html) (Company, VAT & numbering), tokens and components in [`design/`](../../design/) |
@@ -124,3 +124,30 @@ There are still no stock movements, sales or journal entries in M2. They come in
   - Create an item "مضخة أرضية" and search for "مضخه ارضيه": it is found.
   - Import the sample Excel file containing one bad row: you see a clear row-by-row report, and nothing is imported.
   - Enter the company details, a kit and a VAT-registered customer with a TRN. Every change appears in the audit log.
+
+## Delivered
+
+| Task | Commit(s) | Result |
+|---|---|---|
+| Plan, decisions | `eae37dd`, `7e528a4` | M2 plan; decisions 0031–0037; PRD, `CLAUDE.md` and schema updated |
+| T1 | `a7aae9c` | Migration 0008: chart of accounts, 12 event links, monthly periods kept 3 months ahead |
+| T2 | `faf366b` | Migration 0009: master data, price levels, reason codes and their rules |
+| T3–T5 | `1087180` | Shared rules (TRN, phones, codes, prices); company, VAT, numbering, accounts and periods API |
+| T6–T8 | `ae9acbf` | Items, customers, suppliers, lists and Excel import API |
+| T9–T12 foundation | `7b2f76e`, `4dd8235` | Shared screen parts, side menu, routes, translation files |
+| T9 | `69f6c42` | Items screen (design 07): list, filters, F2 search, item form with kits, barcodes and the price/VAT figure, deactivate, import |
+| T10 | `b951b45`, `dcaca9f` | Customers (design 14) and Suppliers screens: TRN rule, cash/credit with a reason, walk-in locked, import, export |
+| T11 | `36d78ac`, `7077a13` | Settings → Company, VAT & numbering, and Lists |
+| T12 | `7077a13` | Accounting screen: chart tree and event links |
+| Fixes | `0a2180f`, `11e1a50` | Arabic plural forms (and a check that requires them); fixes from the code review |
+| T13 | this pull request | Playwright flows (`e2e/masterdata.spec.ts`), screenshots in [`docs/screenshots/m2`](../screenshots/m2), changelog |
+
+**Not done in M2 (moved, with the reason):**
+- **"To reorder" filter on Items** and the stock columns/tiles: they need stock quantities, which arrive with stock movements in M3.
+- **Default warehouse per PC in Settings → Devices:** only useful with more than one warehouse and with stock movements; moved to M3 with them.
+- **Playwright flows for closing/locking a month, the accountant not seeing Company, and refusing a header account as an event link:** covered by screen-component tests (`setup.test.tsx`, `accounting.test.tsx`) and server tests instead, because they change shared data the other browser flows rely on.
+
+**Open questions for the owner (not blocking):**
+- **Technician list for warehouse managers:** someone who may manage warehouses but not technicians cannot pick the technician for a van warehouse (the screen explains why). Should "manage warehouses" also allow reading the technician list?
+- **Accounts list without "view ledger":** the payment-methods and lines-of-business forms need the chart of accounts; the default roles have both permissions, so this only matters for custom roles.
+
