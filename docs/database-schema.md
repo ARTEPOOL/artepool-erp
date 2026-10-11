@@ -635,7 +635,7 @@ Lines of business ([0018](decisions/0018-chart-of-accounts-and-posting-map.md)).
 | default_business_line_id | bigint? → md.business_lines | If set, overrides the document's line of business (e.g. a cleaning service sold at the POS) |
 | reorder_level | numeric(14,3)? | `>= 0`; stock items only |
 | reorder_qty | numeric(14,3)? | `> 0` |
-| fallback_unit_cost_4dp | bigint? | `>= 0`; values an approved oversell when no average cost is known |
+| fallback_unit_cost_4dp | bigint? | `>= 0`. **The item's purchase price, without VAT** ([0038](decisions/0038-item-purchase-price-owner-only.md)): stock items and services only (a kit's cost is the sum of its components). Setting or changing it needs `items.cost` (owner-only; trigger `c_item_cost_rules`, migration 0010). It values sales and approved oversells until a weighted-average cost exists. |
 | is_sellable | boolean | `DEFAULT true` |
 | [active], [std] | | |
 
@@ -1644,15 +1644,16 @@ Migrations are written **in build order** (milestones in [`phase-1-plan.md`](pha
 | 0007 | `company_edit_owner_only` | M1 | — (data: `system.company.edit` becomes owner-only and leaves every other role, decision 0030) | — |
 | 0008 | `gl_core` | M2 | `accounts` (provisional chart), `account_mappings`, `periods` (monthly, seeded) + period guard | — |
 | 0009 | `master_data` | M2 | All 15 `md.*` tables (with seeds) and `sys.reason_codes` (with seeds); permission `customers.credit`; deactivation needs a reason; company TRN starts with 100 and the logo is PNG/JPEG; series prefix changeable until first use (decisions 0031–0037) | `auth.devices.default_warehouse_id`, `auth.approvals.reason_code_id` |
-| 0010 | `inventory` | M3 | All `inv.*` tables + `apply_movement` + stock views | — |
-| 0011 | `gl_journals` | M3 | `journal_entries`, `journal_lines` + balance trigger | — |
-| 0012 | `cash_core` | M4 | `registers`, `shifts`, `counts`, `count_lines` + shift-owner function | — |
-| 0013 | `sales` | M4 | All `sales.*` tables + allocation, advance-deduction, note and payment-allocation triggers + sales views | `inv.movements.sales_document_line_id`, `inv.adjustments.sales_document_id`, `gl.journal_entries` (sales document, payment, opening balance, shift) |
-| 0014 | `ops_outbox` | M4 | `ops.outbox` | — |
-| 0015 | `cash_events` | M5 | `cash.movements`, `cash.drawer_events` + shift summary view | `gl.journal_entries.cash_movement_id` |
-| 0016 | `ops_backup` | M6 | `ops.backup_runs`, `ops.integrity_runs` + backup role grants | — |
+| 0010 | `item_purchase_cost` | M2b | — (data/rules: purchase price may be set on services too, kits never; permission `items.cost`, owner-only; trigger requires it; decision 0038) | — |
+| 0011 | `inventory` | M3 | All `inv.*` tables + `apply_movement` + stock views | — |
+| 0012 | `gl_journals` | M3 | `journal_entries`, `journal_lines` + balance trigger | — |
+| 0013 | `cash_core` | M4 | `registers`, `shifts`, `counts`, `count_lines` + shift-owner function | — |
+| 0014 | `sales` | M4 | All `sales.*` tables + allocation, advance-deduction, note and payment-allocation triggers + sales views | `inv.movements.sales_document_line_id`, `inv.adjustments.sales_document_id`, `gl.journal_entries` (sales document, payment, opening balance, shift) |
+| 0015 | `ops_outbox` | M4 | `ops.outbox` | — |
+| 0016 | `cash_events` | M5 | `cash.movements`, `cash.drawer_events` + shift summary view | `gl.journal_entries.cash_movement_id` |
+| 0017 | `ops_backup` | M6 | `ops.backup_runs`, `ops.integrity_runs` + backup role grants | — |
 
-After 0016, a final check asserts that every business table has the audit trigger, the no-delete guard and the expected grants. The same check runs as an automated test.
+After 0017, a final check asserts that every business table has the audit trigger, the no-delete guard and the expected grants. The same check runs as an automated test.
 
 ---
 

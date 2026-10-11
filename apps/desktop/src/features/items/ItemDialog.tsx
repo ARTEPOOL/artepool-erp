@@ -42,6 +42,7 @@ import {
   type FormField,
   type ItemForm,
 } from './form';
+import { marginOf, percentText } from './margin';
 import { ItemIcon, TypeLabel } from './parts';
 import styles from './items.module.css';
 
@@ -54,6 +55,7 @@ const FORM_FIELDS: readonly FormField[] = [
   'unitId',
   'vatCategoryId',
   'price',
+  'purchaseCost4dp',
   'barcodes',
   'components',
   'reorderLevelMilli',
@@ -67,6 +69,32 @@ const RULE_FIELDS: Record<string, FormField> = {
   CODE_FIXED: 'code',
   QUANTITY_DECIMALS: 'reorderLevelMilli',
 };
+
+/** Profit per unit while typing: sale price without VAT minus the purchase price (decision 0038). */
+function ProfitLine(props: {
+  price: string;
+  includesVat: boolean;
+  cost: string;
+  rateBp: number | undefined;
+}) {
+  const { t } = useTranslation('items');
+  const sale = typedPrice(props.price);
+  const cost = typedPrice(props.cost);
+  if (sale === null || cost === null || props.rateBp === undefined) return null;
+  const net = priceBoth(sale, props.includesVat, props.rateBp).netFils;
+  const margin = marginOf(net, cost);
+  return (
+    <p className={styles.priceLine} data-testid="profit-line" aria-live="polite">
+      {t('price.profit')}: <bdi>{money(margin.profitFils)}</bdi> {t('aed')}
+      {margin.tenthsOfPercent !== null && (
+        <>
+          {' '}
+          · <bdi>{percentText(margin.tenthsOfPercent)}</bdi>
+        </>
+      )}
+    </p>
+  );
+}
 
 function FieldMessage({ children }: { children?: ReactNode }) {
   if (!children) return null;
@@ -312,6 +340,7 @@ export function ItemDialog(props: {
   const [base, setBase] = useState<ItemDetail | undefined>(props.item);
   const isNew = base === undefined;
   const canPrice = can('prices.manage');
+  const canCost = can('items.cost');
   const [form, setForm] = useState<ItemForm>(() =>
     props.item ? formFromItem(props.item) : emptyForm({ unitId: '', vatCategoryId: '' }),
   );
@@ -387,6 +416,7 @@ export function ItemDialog(props: {
       isNew,
       units: units.data ?? [],
       canPrice,
+      canCost,
       original: base,
     });
     setErrors(built.errors);
@@ -649,6 +679,29 @@ export function ItemDialog(props: {
             </div>
           </div>
           <PriceLine text={form.price} includesVat={form.includesVat} rateBp={rateBp} />
+          {canCost && form.itemType !== 'bundle' && (
+            <>
+              <div className={mdStyles.grid2}>
+                <TextField
+                  label={t('fields.purchaseCost')}
+                  value={form.purchaseCost}
+                  onChange={(purchaseCost) => set({ purchaseCost })}
+                  ltr
+                  inputMode="text"
+                  autoComplete="off"
+                  hint={t('dialog.costHint')}
+                  error={fieldText('purchaseCost4dp')}
+                />
+              </div>
+              <ProfitLine
+                price={form.price}
+                includesVat={form.includesVat}
+                cost={form.purchaseCost}
+                rateBp={rateBp}
+              />
+            </>
+          )}
+          {canCost && form.itemType === 'bundle' && <Note>{t('dialog.kitCost')}</Note>}
         </fieldset>
 
         {form.itemType === 'stock' && (

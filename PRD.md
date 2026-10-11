@@ -185,7 +185,7 @@ Phase tags: **[P1]** to **[P4]** (see section 13).
 
 ### 9.2 Master data [P1]
 - Company profile: bilingual name, TRN, address, logo, contact details.
-- Items: code (suggested by the app, fixed after creation), barcode(s), bilingual name, category, unit, cost (weighted average, 4-decimal precision), VAT category (rate configurable per item), reorder level, default line of business, active flag.
+- Items: code (suggested by the app, fixed after creation), barcode(s), bilingual name, category, unit, **purchase price** (without VAT, owner only, 4-decimal precision; the weighted-average cost takes over once purchases exist; [0038](docs/decisions/0038-item-purchase-price-owner-only.md)), VAT category (rate configurable per item), reorder level, default line of business, active flag.
 - **One sale price per item** (4-decimal precision) with a **"Price includes VAT"** switch, set on the item screen. The tables are ready for a second price level by customer type later; no screen for it in P1 ([0032](docs/decisions/0032-one-sale-price-with-vat-flag-and-customer-types.md)).
 - Item types: stock item, service/labour, **bundle** (kit made of components).
 - **Customers:**
@@ -275,7 +275,7 @@ Phase tags: **[P1]** to **[P4]** (see section 13).
 - Reorder suggestions from low-stock levels.
 
 ### 9.8 Expenses and petty cash [P2]
-- Expense entry with category, VAT (input tax) and an attachment (scanned receipt).
+- Expense entry with category, VAT (input tax) and an attachment (scanned receipt). Simple "New expense" (type, amount, date, note) posted to the ledger; built once the journals exist ([0039](docs/decisions/0039-owner-reports-dashboard.md)).
 - Petty cash custody per employee.
 
 ### 9.9 Accounting [P1 core, P2 screens]
@@ -325,6 +325,7 @@ Phase tags: **[P1]** to **[P4]** (see section 13).
 - Optional loyalty points.
 
 ### 9.15 Owner dashboard [P2]
+- **Reports dashboard, owner only** ([0039](docs/decisions/0039-owner-reports-dashboard.md)): total sales; VAT due; sales without VAT; profit (sales without VAT minus the cost of goods sold). A detailed net-profit report after expenses (rent, bills). Date range: today (default), week, month, year, or from–to.
 - Today's sales, cash position, receivables due, low stock, pending oversell reviews, overdue visits/jobs, backup health.
 
 ---
@@ -431,3 +432,4 @@ Each phase ends with automated tests passing, a security review, an accountant r
 | 1.2 | 2026-10-07 | Phase 1 plan approved. Owner confirmed: VAT only on payments received before an invoice is issued; a 1-fils difference per movement is acceptable while the books match stock exactly; reprints marked "Copy" by default (setting); other document prefixes approved as defaults. Development moves to the owner's Windows PC after M0. |
 | 1.3 | 2026-10-07 | Added the print designer (9.6a, decision 0020): customisable, versioned print templates with locked tax fields, in Phase 1. UI design reference v2 (simple style) in `design/`. |
 | 1.4 | 2026-10-08 | M2 decisions 0031–0037:<br>• Excel import all or nothing after a check<br>• one sale price per item with a "price includes VAT" switch, net/VAT/total on every invoice, required customer type (price levels ready for later)<br>• four fixed UAE VAT categories with owner-only rate changes<br>• screen placement<br>• fiscal year January–December, with the chart provisional until the accountant approves<br>• customers start as cash, and credit is a permissioned, audited change<br>• master-data rules for codes, phones, TRNs and the logo |
+| 1.5 | 2026-10-11 | Decisions 0038–0039: the item purchase price (without VAT, owner only, copied onto each sale) and the owner reports dashboard (four figures, date range, net profit after expenses). |

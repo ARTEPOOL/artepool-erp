@@ -387,6 +387,112 @@ describe('Items & stock: the item form', () => {
     expect(await detailCard('كلور سائل')).toBeTruthy();
   });
 
+  it('the owner types the purchase price (without VAT): profit is shown, and it is sent exactly', async () => {
+    const created = detail({
+      id: '12',
+      code: 'CHEM-0013',
+      nameAr: 'كلور سائل',
+      nameEn: 'Liquid chlorine',
+      categoryId: '1',
+      price: { price4dp: '125000', includesVat: true },
+      purchaseCost4dp: '50000',
+      rowVersion: 1,
+    });
+    const bridge = bridgeFor([...OWNER, 'items.cost'])
+      .on('GET', '/api/v1/items/next-code', ok({ code: 'CHEM-0013' }))
+      .on('POST', '/api/v1/items', ok(created, 201))
+      .on('GET', '/api/v1/items/12', ok(created));
+    await openItems(bridge);
+    fireEvent.click(screen.getByRole('button', { name: 'صنف جديد' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText('التصنيف'), { target: { value: '1' } });
+    await waitFor(() =>
+      expect(within(dialog).getByLabelText<HTMLInputElement>('الكود').value).toBe('CHEM-0013'),
+    );
+    fireEvent.change(within(dialog).getByLabelText('الاسم بالعربية'), {
+      target: { value: 'كلور سائل' },
+    });
+    fireEvent.change(within(dialog).getByLabelText('الاسم بالإنجليزية'), {
+      target: { value: 'Liquid chlorine' },
+    });
+    fireEvent.change(within(dialog).getByLabelText('سعر البيع'), { target: { value: '12.5' } });
+    // A wrong purchase price is refused on this PC, with nothing sent.
+    fireEvent.change(within(dialog).getByLabelText('سعر الشراء (بدون ضريبة)'), {
+      target: { value: '5,5x' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'حفظ الصنف' }));
+    expect(await within(dialog).findByText(/اكتب سعرًا صحيحًا/)).toBeTruthy();
+    expect(bridge.callsTo('POST', '/api/v1/items')).toHaveLength(0);
+    // Sells at 12.50 including 5% VAT → 11.90 without; bought at 5.00 → profit 6.90 = 58.0%.
+    fireEvent.change(within(dialog).getByLabelText('سعر الشراء (بدون ضريبة)'), {
+      target: { value: '5' },
+    });
+    expect(within(dialog).getByTestId('profit-line').textContent).toBe(
+      'الربح للوحدة: 6.90 درهم · 58.0%',
+    );
+    fireEvent.click(within(dialog).getByRole('button', { name: 'حفظ الصنف' }));
+    expect(await screen.findByText('تم الحفظ.')).toBeTruthy();
+    expect(bridge.callsTo('POST', '/api/v1/items')[0]!.body).toMatchObject({
+      price: { price4dp: '125000', includesVat: true },
+      purchaseCost4dp: '50000',
+    });
+    // The detail panel shows the cost and the profit per unit.
+    const card = await detailCard('كلور سائل');
+    expect(within(card).getByText('سعر الشراء (بدون ضريبة)').closest('div')!.textContent).toContain(
+      '5.00',
+    );
+    expect(within(card).getByText('الربح للوحدة').closest('div')!.textContent).toContain('6.90');
+  });
+
+  it('without items.cost the purchase price is nowhere: not in the form, not in the request', async () => {
+    const created = detail({
+      id: '12',
+      code: 'CHEM-0013',
+      nameAr: 'كلور سائل',
+      nameEn: 'Liquid chlorine',
+      categoryId: '1',
+      rowVersion: 1,
+    });
+    const bridge = bridgeFor(OWNER)
+      .on('GET', '/api/v1/items/next-code', ok({ code: 'CHEM-0013' }))
+      .on('POST', '/api/v1/items', ok(created, 201))
+      .on('GET', '/api/v1/items/12', ok(created));
+    await openItems(bridge);
+    expect(screen.queryByText('الربح للوحدة')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'صنف جديد' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).queryByLabelText('سعر الشراء (بدون ضريبة)')).toBeNull();
+    fireEvent.change(within(dialog).getByLabelText('التصنيف'), { target: { value: '1' } });
+    await waitFor(() =>
+      expect(within(dialog).getByLabelText<HTMLInputElement>('الكود').value).toBe('CHEM-0013'),
+    );
+    fireEvent.change(within(dialog).getByLabelText('الاسم بالعربية'), {
+      target: { value: 'كلور سائل' },
+    });
+    fireEvent.change(within(dialog).getByLabelText('الاسم بالإنجليزية'), {
+      target: { value: 'Liquid chlorine' },
+    });
+    fireEvent.change(within(dialog).getByLabelText('سعر البيع'), { target: { value: '12.5' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'حفظ الصنف' }));
+    await screen.findByText('تم الحفظ.');
+    expect('purchaseCost4dp' in (bridge.callsTo('POST', '/api/v1/items')[0]!.body as object)).toBe(
+      false,
+    );
+  });
+
+  it('a kit has no purchase price field: its cost is worked out from its components', async () => {
+    const bridge = bridgeFor([...OWNER, 'items.cost']);
+    await openItems(bridge);
+    fireEvent.click(await row('كلور حبيبات 10 كجم'));
+    await detailCard('كلور حبيبات 10 كجم');
+    fireEvent.click(screen.getByRole('button', { name: 'تعديل' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByLabelText('سعر الشراء (بدون ضريبة)')).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'طقم' }));
+    expect(within(dialog).queryByLabelText('سعر الشراء (بدون ضريبة)')).toBeNull();
+    expect(within(dialog).getByText(/تكلفة الطقم تُحسب من مكوناته/)).toBeTruthy();
+  });
+
   it('checks the form before sending: required names, a valid price, the unit decimals', async () => {
     const bridge = bridgeFor(OWNER).on('GET', '/api/v1/items/next-code', ok({ code: 'CHEM-0013' }));
     await openItems(bridge);

@@ -44,6 +44,8 @@ There is one short file per decision, numbered in order.
 | [0035](0035-fiscal-year-and-provisional-chart.md) | Fiscal year January–December; chart of accounts provisional until the accountant approves | Accepted |
 | [0036](0036-customers-start-as-cash.md) | New customers start as cash; credit is a permissioned, audited change | Accepted |
 | [0037](0037-master-data-defaults.md) | Master-data rules: item codes, phones, TRNs, logo, never deleted | Accepted |
+| [0038](0038-item-purchase-price-owner-only.md) | Item purchase price: without VAT, owner only, copied onto each sale | Accepted |
+| [0039](0039-owner-reports-dashboard.md) | Owner reports dashboard: four figures, date range, net profit after expenses | Accepted |
 
 ## Template
 
