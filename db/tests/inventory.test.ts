@@ -227,7 +227,8 @@ describe('the movement engine', () => {
     const damaged = await reasonId('stock_decrease', 'DAMAGED');
 
     const first = await adjust('opening', opening, [{ item, qty: '10', cost: '12345' }], owner);
-    expect(first).toMatchObject({ doc_number: expect.stringMatching(/^ADJ-/), total: '1235' });
+    expect(first.doc_number).toMatch(/^ADJ-/);
+    expect(first.total).toBe('1235');
     expect(await balance(item)).toEqual({
       quantity: '10.000',
       value_4dp: '123450',
