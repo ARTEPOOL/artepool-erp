@@ -87,12 +87,18 @@ interface ItemRecord {
   includesVat: boolean | null;
   barcode: string | null;
   reorderLevel: bigint | null;
+  purchaseCost4dp: bigint | null;
   isSellable: boolean;
   descriptionAr: string | null;
   descriptionEn: string | null;
 }
 
-async function checkItems(db: Kysely<DB>, rows: SheetRow[], c: Checker): Promise<ItemRecord[]> {
+async function checkItems(
+  db: Kysely<DB>,
+  rows: SheetRow[],
+  c: Checker,
+  canCost: boolean,
+): Promise<ItemRecord[]> {
   const refs = await itemReferences(db);
   const out: ItemRecord[] = [];
   const codes: { row: number; value: string | null }[] = [];
@@ -125,6 +131,11 @@ async function checkItems(db: Kysely<DB>, rows: SheetRow[], c: Checker): Promise
     if (isSellable && cell(row, 'price') === null) c.add(row.row, 'price', 'price_required');
     if (cell(row, 'price') !== null && cell(row, 'price_includes_vat') === null)
       c.add(row.row, 'price_includes_vat', 'required');
+    // Purchase price (decision 0038): without VAT; the owner only (kits are not imported).
+    const purchaseCost = c.price(row, 'purchase_price');
+    if (cell(row, 'purchase_price') !== null && !canCost) {
+      c.add(row.row, 'purchase_price', 'cost_needs_permission');
+    }
     const barcode = c.barcode(row);
     if (barcode && refs.activeBarcodes.has(barcode.toUpperCase()))
       c.add(row.row, 'barcode', 'already_exists');
@@ -150,6 +161,7 @@ async function checkItems(db: Kysely<DB>, rows: SheetRow[], c: Checker): Promise
       includesVat,
       barcode,
       reorderLevel,
+      purchaseCost4dp: purchaseCost,
       isSellable,
       descriptionAr: cell(row, 'description_ar'),
       descriptionEn: cell(row, 'description_en'),
@@ -321,12 +333,13 @@ async function checkFile(
   db: Kysely<DB>,
   entity: ImportEntity,
   file: Buffer,
+  canCost: boolean,
 ): Promise<{ rows: SheetRow[]; checker: Checker; records: Records }> {
   const rows = await rowsOf(entity, file);
   const checker = new Checker(entity);
   const records =
     entity === 'items'
-      ? await checkItems(db, rows, checker)
+      ? await checkItems(db, rows, checker, canCost)
       : entity === 'item_prices'
         ? await checkPrices(db, rows, checker)
         : entity === 'customers'
@@ -343,9 +356,10 @@ export async function checkImport(
   trx: Transaction<DB>,
   entity: ImportEntity,
   body: ImportFileRequest,
+  canCost: boolean,
 ): Promise<ImportCheckResponse> {
   const file = decode(body);
-  const { rows, checker } = await checkFile(trx, entity, file);
+  const { rows, checker } = await checkFile(trx, entity, file, canCost);
   const issues: ImportIssue[] = checker.issues.slice(0, REPORT_LIMIT);
   const status = checker.issues.length === 0 ? 'validated' : 'rejected';
   const batch = await trx
@@ -423,6 +437,7 @@ async function saveItems(trx: Transaction<DB>, records: ItemRecord[]): Promise<v
             vat_category_id: r.vatCategoryId,
             default_business_line_id: r.businessLineId,
             reorder_level: r.reorderLevel === null ? null : quantityToDb(r.reorderLevel),
+            fallback_unit_cost_4dp: r.purchaseCost4dp,
             is_sellable: r.isSellable,
           }),
         ),
@@ -548,6 +563,7 @@ export async function commitImport(
   entity: ImportEntity,
   batchId: bigint,
   body: ImportFileRequest,
+  canCost: boolean,
 ): Promise<ImportCommitResponse> {
   const batch = await trx
     .selectFrom('sys.import_batches')
@@ -563,7 +579,7 @@ export async function commitImport(
   if (!sha256(file).equals(batch.file_sha256)) {
     throw ruleError('IMPORT_FILE_CHANGED', 'The file is not the one that was checked');
   }
-  const { checker, records } = await checkFile(trx, entity, file);
+  const { checker, records } = await checkFile(trx, entity, file, canCost);
   if (checker.issues.length > 0) {
     throw ruleError('IMPORT_HAS_ERRORS', 'The file has problems now', {
       issuesTotal: checker.issues.length,

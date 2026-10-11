@@ -173,6 +173,8 @@ export function defineActivation<R>(
       id: bigint,
       active: boolean,
       rowVersion: number,
+      /** The signed-in user's rights, for answers that depend on them (items show costs). */
+      auth: { permissions: ReadonlySet<string> } | null,
     ) => Promise<R>;
   },
 ): void {
@@ -184,8 +186,8 @@ export function defineActivation<R>(
     params,
     body: DeactivateRequest,
     reason: ({ body }) => body.reason,
-    handler: async ({ trx, params: p, body }) => ({
-      body: await def.setActive(trx, BigInt(p.id), false, body.rowVersion),
+    handler: async ({ trx, request, params: p, body }) => ({
+      body: await def.setActive(trx, BigInt(p.id), false, body.rowVersion, request.auth),
     }),
   });
   defineWrite(app, {
@@ -194,8 +196,8 @@ export function defineActivation<R>(
     access: def.access,
     params,
     body: ReactivateRequest,
-    handler: async ({ trx, params: p, body }) => ({
-      body: await def.setActive(trx, BigInt(p.id), true, body.rowVersion),
+    handler: async ({ trx, request, params: p, body }) => ({
+      body: await def.setActive(trx, BigInt(p.id), true, body.rowVersion, request.auth),
     }),
   });
 }

@@ -261,6 +261,58 @@ describe('items', () => {
     ).rejects.toMatchObject(check);
   });
 
+  it('purchase prices (decision 0038): only the owner sets them; stock and services, never kits', async () => {
+    const stock = await item('COST-0001');
+    // Without items.cost nobody can set or change a cost, not even the accountant.
+    await expect(
+      run(`UPDATE md.items SET fallback_unit_cost_4dp = 62000 WHERE id = $1`, [stock], accountant),
+    ).rejects.toMatchObject(denied('COST_PERMISSION'));
+    await expect(
+      run(`UPDATE md.items SET fallback_unit_cost_4dp = 62000 WHERE id = $1`, [stock], cashier),
+    ).rejects.toMatchObject(denied('COST_PERMISSION'));
+    await run(`UPDATE md.items SET fallback_unit_cost_4dp = 62000 WHERE id = $1`, [stock], owner);
+    // Other edits by someone without the permission leave the cost alone and are allowed.
+    await run(`UPDATE md.items SET name_en = 'Renamed' WHERE id = $1`, [stock], accountant);
+    expect(
+      (
+        await api.query(`SELECT fallback_unit_cost_4dp::text AS c FROM md.items WHERE id = $1`, [
+          stock,
+        ])
+      ).rows[0],
+    ).toEqual({ c: '62000' });
+    // A service may have a cost; a kit may not (its cost comes from its components).
+    const service = await item('COST-SV01', 'service', { unit: 'VISIT', category: 'SERV' });
+    await run(
+      `UPDATE md.items SET fallback_unit_cost_4dp = 150000 WHERE id = $1`,
+      [service],
+      owner,
+    );
+    const kit = await item('COST-KIT1', 'bundle');
+    await expect(
+      run(`UPDATE md.items SET fallback_unit_cost_4dp = 1 WHERE id = $1`, [kit], owner),
+    ).rejects.toMatchObject(check);
+    await expect(
+      run(`UPDATE md.items SET fallback_unit_cost_4dp = -1 WHERE id = $1`, [stock], owner),
+    ).rejects.toMatchObject(check);
+    // A new item with a cost also needs the permission.
+    await expect(
+      run(
+        `INSERT INTO md.items (code, item_type, name_ar, name_en, category_id, unit_id, vat_category_id, fallback_unit_cost_4dp)
+         SELECT 'COST-0002', 'stock', 'صنف', 'Item', c.id, u.id, v.id, 5
+           FROM md.item_categories c, md.units u, md.vat_categories v
+          WHERE c.code = 'EQUIP' AND u.code = 'PCS' AND v.code = 'SR'`,
+        [],
+        accountant,
+      ),
+    ).rejects.toMatchObject(denied('COST_PERMISSION'));
+    // The change is audited with the old and new value.
+    const { rows } = await api.query(
+      `SELECT new_values ->> 'fallback_unit_cost_4dp' AS c FROM audit.log
+        WHERE entity_type = 'md.items' AND (new_values ->> 'fallback_unit_cost_4dp') = '62000' LIMIT 1`,
+    );
+    expect(rows).toHaveLength(1);
+  });
+
   it('use only active categories, units and lines of business, which stay active while used', async () => {
     await run(
       `INSERT INTO md.item_categories (code, name_ar, name_en) VALUES ('OLD', 'قديم', 'Old')`,

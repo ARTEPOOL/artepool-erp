@@ -154,6 +154,12 @@ export interface ComponentItem {
 }
 
 export interface ItemDetail extends ItemListItem {
+  /**
+   * Purchase price per unit without VAT, 4 decimals (decision 0038). Present only for someone with
+   * `items.cost` (the owner); null when none is set. A kit's value is the sum of its components, and
+   * null while any component has none.
+   */
+  purchaseCost4dp?: string | null;
   descriptionAr: string | null;
   descriptionEn: string | null;
   defaultBusinessLineId: string | null;
@@ -178,6 +184,11 @@ const ItemFields = z.object({
   defaultBusinessLineId: IdText.nullable().default(null),
   reorderLevelMilli: NonNegativeIntText.nullable().default(null),
   reorderQtyMilli: NonNegativeIntText.nullable().default(null),
+  /**
+   * Purchase price without VAT (decision 0038). Left out = unchanged; null = cleared. Needs
+   * `items.cost`; never for kits.
+   */
+  purchaseCost4dp: NonNegativeIntText.nullable().optional(),
   isSellable: z.boolean().default(true),
   /** The one sale price (decision 0032). Required for items that are for sale. */
   price: z

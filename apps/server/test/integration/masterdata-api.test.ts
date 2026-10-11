@@ -210,6 +210,90 @@ describe('items (design 07, decision 0032)', () => {
     ).toMatchObject({ status: 409, code: 'STALE_VERSION' });
   });
 
+  it('purchase prices (decision 0038): the owner sets and sees them; others never see them', async () => {
+    const withCost = (cost: string | null, version: number, extra = {}) => ({
+      ...pump(),
+      price: { price4dp: '1300000', includesVat: false },
+      purchaseCost4dp: cost,
+      rowVersion: version,
+      ...extra,
+    });
+    // The owner sets 62.00, without VAT; the answer shows it.
+    const set = await owner(
+      'PUT',
+      `/api/v1/items/${pumpItem.id}`,
+      withCost('620000', pumpItem.rowVersion),
+    );
+    expect(set.statusCode).toBe(200);
+    pumpItem = set.json<ItemDetail>();
+    expect(pumpItem.purchaseCost4dp).toBe('620000');
+    // Someone without items.cost is not told it, in the item or after any save.
+    const seen = (await clerk('GET', `/api/v1/items/${pumpItem.id}`)).json<ItemDetail>();
+    expect('purchaseCost4dp' in seen).toBe(false);
+    const renamed = await clerk('PUT', `/api/v1/items/${pumpItem.id}`, {
+      ...pump(),
+      price: { price4dp: '1300000', includesVat: false },
+      nameEn: 'Floor pump 1.5 HP',
+      rowVersion: pumpItem.rowVersion,
+    });
+    expect(renamed.statusCode).toBe(200);
+    expect('purchaseCost4dp' in renamed.json<ItemDetail>()).toBe(false);
+    // Saving without the field leaves the cost alone.
+    pumpItem = (await owner('GET', `/api/v1/items/${pumpItem.id}`)).json<ItemDetail>();
+    expect(pumpItem.purchaseCost4dp).toBe('620000');
+    // Trying to change it without the permission is refused by the database.
+    expect(
+      await refusal(
+        clerk('PUT', `/api/v1/items/${pumpItem.id}`, withCost('1', pumpItem.rowVersion)),
+      ),
+    ).toMatchObject({ status: 403, code: 'PERMISSION_DENIED', rule: 'COST_PERMISSION' });
+    expect(
+      await refusal(
+        accountant('PUT', `/api/v1/items/${pumpItem.id}`, withCost('1', pumpItem.rowVersion)),
+      ),
+    ).toMatchObject({ status: 403 });
+    // A cost is a whole number of 4-decimal units, never negative.
+    expect(
+      (await owner('PUT', `/api/v1/items/${pumpItem.id}`, withCost('-5', pumpItem.rowVersion)))
+        .statusCode,
+    ).toBe(422);
+    // A kit has no cost of its own: it is the sum of its components (rounded per component).
+    const visit = (
+      await owner('POST', '/api/v1/items', {
+        code: 'SERV-0002',
+        itemType: 'service',
+        nameAr: 'صيانة',
+        nameEn: 'Service call',
+        categoryId: ids.service,
+        unitId: ids.unit,
+        vatCategoryId: ids.vat,
+        price: { price4dp: '1500000', includesVat: false },
+        purchaseCost4dp: '150000',
+      })
+    ).json<ItemDetail>();
+    expect(visit.purchaseCost4dp).toBe('150000');
+    const kitBody = {
+      code: 'KIT-0002',
+      itemType: 'bundle',
+      nameAr: 'طقم',
+      nameEn: 'Kit with cost',
+      categoryId: ids.category,
+      unitId: ids.unit,
+      vatCategoryId: ids.vat,
+      price: { price4dp: '2500000', includesVat: true },
+      components: [
+        { itemId: pumpItem.id, quantityMilli: '2000' },
+        { itemId: visit.id, quantityMilli: '3000' },
+      ],
+    };
+    expect(
+      await refusal(owner('POST', '/api/v1/items', { ...kitBody, purchaseCost4dp: '5' })),
+    ).toMatchObject({ status: 422 });
+    const kit = (await owner('POST', '/api/v1/items', kitBody)).json<ItemDetail>();
+    // 2 x 62.00 + 3 x 15.00 = 169.00
+    expect(kit.purchaseCost4dp).toBe('1690000');
+  });
+
   it('kits list their components, which then keep their type', async () => {
     const visit = (
       await owner('POST', '/api/v1/items', {
