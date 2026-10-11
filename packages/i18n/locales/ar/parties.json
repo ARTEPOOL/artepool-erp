@@ -69,10 +69,12 @@
   },
   "terms": {
     "onReceipt": "عند الاستلام",
-    "one": "يوم واحد",
-    "two": "يومان",
-    "few": "{days} أيام",
-    "many": "{days} يومًا"
+    "days_zero": "{count} يوم",
+    "days_one": "يوم واحد",
+    "days_two": "يومان",
+    "days_few": "{count} أيام",
+    "days_many": "{count} يومًا",
+    "days_other": "{count} يوم"
   },
   "detail": {
     "invoiceType": "نوع الفاتورة",

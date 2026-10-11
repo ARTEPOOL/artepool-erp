@@ -61,19 +61,10 @@ export function useEmirateOptions(): SelectOption[] {
   ];
 }
 
-/**
- * Payment terms: 0 days is "On receipt". The Arabic counted noun changes with the number
- * (يوم واحد، يومان، 3–10 أيام، 11+ يومًا), so the form is chosen here rather than by i18next plurals.
- */
+/** Payment terms: 0 days is "On receipt"; otherwise the counted days in the language's plural form. */
 export function useTermsText(): (days: number) => string {
   const { t } = useTranslation('parties');
-  return (days) => {
-    if (days === 0) return t('terms.onReceipt');
-    if (days === 1) return t('terms.one');
-    if (days === 2) return t('terms.two');
-    const lastTwo = days % 100;
-    return lastTwo >= 3 && lastTwo <= 10 ? t('terms.few', { days }) : t('terms.many', { days });
-  };
+  return (days) => (days === 0 ? t('terms.onReceipt') : t('terms.days', { count: days }));
 }
 
 /** Which tax invoice a customer gets follows their VAT registration (decision 0010). */

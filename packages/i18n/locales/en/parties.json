@@ -69,10 +69,8 @@
   },
   "terms": {
     "onReceipt": "On receipt",
-    "one": "1 day",
-    "two": "2 days",
-    "few": "{days} days",
-    "many": "{days} days"
+    "days_one": "{count} day",
+    "days_other": "{count} days"
   },
   "detail": {
     "invoiceType": "Invoice type",
