@@ -243,7 +243,7 @@ pnpm --filter @artepool/desktop exec playwright install chromium
 pnpm test:e2e
 pnpm test:rust
 ```
-- `test:e2e` opens the real screens in a hidden browser against a throwaway database, in Arabic and English, light and dark. It ends with `32 passed`. Screenshots are saved in `apps\desktop\e2e-screens\`.
+- `test:e2e` opens the real screens in a hidden browser against a throwaway database, in Arabic and English, light and dark. It ends with `42 passed`. Screenshots are saved in `apps\desktop\e2e-screens\`.
 - `test:rust` checks the app's secure side (enrollment, TLS rules, the device key). Every group says `test result: ok`.
 
 ---

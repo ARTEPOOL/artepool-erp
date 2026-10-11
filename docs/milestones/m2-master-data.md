@@ -142,6 +142,8 @@ There are still no stock movements, sales or journal entries in M2. They come in
 | Fixes | `0a2180f`, `11e1a50` | Arabic plural forms (and a check that requires them); fixes from the code review |
 | T13 | this pull request | Playwright flows (`e2e/masterdata.spec.ts`), screenshots in [`docs/screenshots/m2`](../screenshots/m2), changelog |
 
+**Tests at the end of M2:** 237 unit and screen-component tests, 339 integration tests (real PostgreSQL), 42 Playwright flows (21 in Arabic/light, 21 in English/dark). The Rust tests are unchanged from M1 and run in CI.
+
 **Not done in M2 (moved, with the reason):**
 - **"To reorder" filter on Items** and the stock columns/tiles: they need stock quantities, which arrive with stock movements in M3.
 - **Default warehouse per PC in Settings → Devices:** only useful with more than one warehouse and with stock movements; moved to M3 with them.
