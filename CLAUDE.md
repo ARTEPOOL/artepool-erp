@@ -93,6 +93,13 @@ It runs client–server on the local network: PostgreSQL and the API service on 
 - **Last resort:** `pnpm owner:reset-password` on the server PC only — reason required, temporary password shown once, optional 2-step reset if the phone is lost, audited; the owner sees a notice when choosing their own password. (0029)
 - **Company details** (name, TRN, address, logo) are edited by the owner only (`system.company.edit` is owner-only); the accountant keeps viewing/verifying/exporting the audit log. (0030)
 
+**Inventory**
+- **Cost visibility:** average cost and stock values only for `stock.view_cost` (owner, accountant); storekeeper and cashier see quantities. (0040)
+- **Adjustments** above 500.00 AED (setting) need a supervisor's approval. (0041)
+- **Opening stock:** once at go-live, owner only (`stock.opening`); empty cost → the item's purchase price. (0042)
+- **Labels:** preset sizes + custom sizes (`md.label_sizes`), printed through the print dialog for now. (0043)
+- **Counts** are blind while counting; one warehouse in Phase 1. (0044)
+
 **Accounting**
 - **Defective returns** are held at cost in "Inventory – defective" until written off. (0015)
 - **Periods** are monthly and are locked after close. Nothing is ever deleted. (0016)

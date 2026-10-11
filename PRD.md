@@ -209,7 +209,8 @@ Phase tags: **[P1]** to **[P4]** (see section 13).
 - **Out-of-stock at POS:** the sale is allowed with supervisor approval. The system posts an **oversell adjustment** in the same transaction and flags it for the storekeeper to review ([0003](docs/decisions/0003-pos-oversell-with-approval.md)).
 - **Defective stock bucket** for returned broken goods, separate from sellable stock. Defective goods are **held at cost in "Inventory – defective" until written off** ([0015](docs/decisions/0015-defective-returns-held-at-cost.md)).
 - Bundles deduct their components.
-- Barcode label printing.
+- Barcode label printing: sizes 25×15 to 100×50 mm, A4 label sheets and custom sizes, through the print dialog for now ([0043](docs/decisions/0043-barcode-label-sizes.md)).
+- **Who sees stock cost and value:** owner and accountant only; storekeeper and cashier see quantities ([0040](docs/decisions/0040-stock-cost-visibility.md)). Adjustments above 500.00 AED need a supervisor's approval ([0041](docs/decisions/0041-stock-adjustment-approval-threshold.md)). Opening stock is posted once, by the owner ([0042](docs/decisions/0042-opening-stock-owner-only.md)). Full counts are blind ([0044](docs/decisions/0044-blind-stock-counts.md)).
 - Multi-warehouse ready; transfers between warehouses come in [P3].
 
 ### 9.4 Sales documents [P1]
@@ -433,3 +434,4 @@ Each phase ends with automated tests passing, a security review, an accountant r
 | 1.3 | 2026-10-07 | Added the print designer (9.6a, decision 0020): customisable, versioned print templates with locked tax fields, in Phase 1. UI design reference v2 (simple style) in `design/`. |
 | 1.4 | 2026-10-08 | M2 decisions 0031–0037:<br>• Excel import all or nothing after a check<br>• one sale price per item with a "price includes VAT" switch, net/VAT/total on every invoice, required customer type (price levels ready for later)<br>• four fixed UAE VAT categories with owner-only rate changes<br>• screen placement<br>• fiscal year January–December, with the chart provisional until the accountant approves<br>• customers start as cash, and credit is a permissioned, audited change<br>• master-data rules for codes, phones, TRNs and the logo |
 | 1.5 | 2026-10-11 | Decisions 0038–0039: the item purchase price (without VAT, owner only, copied onto each sale) and the owner reports dashboard (four figures, date range, net profit after expenses). |
+| 1.6 | 2026-10-11 | M3 decisions 0040–0044: stock cost visible to owner and accountant only; adjustment approval above 500.00 AED; opening stock by the owner only; barcode label sizes (list + custom); blind full counts and one warehouse in Phase 1. |

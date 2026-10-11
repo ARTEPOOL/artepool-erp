@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | **Awaiting the owner's approval** (questions at the end) |
+| **Status** | **Approved** (2026-10-11): all recommendations accepted, recorded as decisions [0040](../decisions/0040-stock-cost-visibility.md)–[0044](../decisions/0044-blind-stock-counts.md); more label sizes added ([0043](../decisions/0043-barcode-label-sizes.md)) |
 | **Date** | 2026-10-11 |
 | **Milestone** | M3 of the [Phase 1 plan](../phase-1-plan.md) |
 | **Design reference** | [`design/screens/07-items-stock.html`](../../design/screens/07-items-stock.html) (stock tiles and columns, "Stock adjustment" dialog, "Barcode labels" dialog), tokens and components in [`design/`](../../design/) |
@@ -43,7 +43,7 @@ Sales, the POS and cash come in M4–M5. Expenses and the owner's profit dashboa
 | T8 | **Journal viewer and periods API:** list and filter entries (date, source, account), open one entry with its lines and its source document; trial balance by account for a date range | `apps/server/src/modules/ledger/*` | Permissions (`ledger.view`); totals |
 | T9 | **Screens — Items & stock (design 07):** the stock tiles (stock value, to reorder, defective) and columns (average cost, on hand); per-item stock card (quantity and value per warehouse and status, movement history); "To reorder" filter; the **Stock adjustment** dialog; **Opening stock** (form + Excel); **Stock count** screens (list, count entry, post) | `apps/desktop/src/features/{items,inventory}/*` | Component tests + Playwright |
 | T10 | **Screens — Accounting:** journal viewer and entry detail, trial balance; oversell review list; alerts on the dashboard (to reorder, pending reviews) | `apps/desktop/src/features/{accounting,inventory,dashboard}/*` | Component tests + Playwright |
-| T11 | **Barcode labels** (design 07 dialog): label size, number of labels, price with VAT; printed through the print dialog (see question 4) | `apps/desktop/src/features/items/labels*` | Layout test, both languages |
+| T11 | **Barcode labels** (design 07 dialog): sizes 25×15, 30×20, 38×25, 40×30, 50×25, 50×30, 58×40, 100×50 mm and A4 sheets, plus custom sizes saved by the owner (`md.label_sizes`, Settings → Lists); number of labels, price with VAT; printed through the print dialog ([0043](../decisions/0043-barcode-label-sizes.md)) | `apps/desktop/src/features/items/labels*` | Layout test, both languages |
 | T12 | **Default warehouse per PC** (moved from M2): Settings → Devices, shown only with more than one warehouse | `apps/desktop/src/features/settings/devices/*` | Component test |
 | T13 | **CI and docs:** Playwright flows (Arabic/light, English/dark), screenshots, decisions, `CLAUDE.md`, PRD, schema, changelog, pull request | `e2e/*`, `docs/*` | Green CI |
 
@@ -57,7 +57,7 @@ Sales, the POS and cash come in M4–M5. Expenses and the owner's profit dashboa
   - Try to remove more than you have → refused, nothing changes.
   - Every adjustment and its journal entry appear in the audit log.
 
-## Questions for the owner
+## Questions for the owner (answered 2026-10-11: all recommendations accepted)
 
 1. **Who sees stock cost and value** (average cost column, stock value tile, values in adjustments and journal entries)? The default roles today: owner and accountant yes (`stock.view_cost`), storekeeper and cashier no. Decision 0038 made the *purchase price* owner-only, but the accountant needs inventory values for the books. **Recommendation:** owner and accountant see stock values and average cost; storekeeper and cashier see quantities only; the purchase price field stays owner-only.
 2. **Approval threshold for adjustments:** an adjustment or count difference worth more than **500.00 AED** needs a supervisor's approval (design 07 and setting today). Keep 500?
