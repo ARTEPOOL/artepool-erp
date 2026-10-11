@@ -1,0 +1,194 @@
+/* Customers and Suppliers (design 14): .vatbox, .sec, .offbar, the detail card and the dialogs. */
+.form {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.grid2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.grid3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.span2 {
+  grid-column: span 2;
+}
+
+.field {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.fieldLabel {
+  font-size: var(--text-label);
+  font-weight: 500;
+}
+
+.fieldError {
+  font-size: var(--text-caption);
+  color: var(--color-danger);
+}
+
+.sub {
+  display: block;
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+  font-weight: 400;
+}
+
+.vatbox {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  transition:
+    border-color var(--motion-fast) var(--motion-ease),
+    background var(--motion-fast) var(--motion-ease);
+}
+
+.vatOn {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+
+.vatLabel {
+  display: grid;
+  line-height: 1.4;
+  font-size: var(--text-label);
+}
+
+.vatLabel b {
+  font-weight: 600;
+}
+
+.stale {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tableNote {
+  margin-block: var(--space-3) 0;
+}
+
+.typeCell {
+  white-space: nowrap;
+}
+
+.more {
+  display: flex;
+  justify-content: center;
+  padding-block: var(--space-3) 0;
+}
+
+/* The detail panel (the design's section.card.sec) */
+.sec {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.who {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  min-inline-size: 0;
+}
+
+.who > span:last-child {
+  display: grid;
+  line-height: 1.4;
+  min-inline-size: 0;
+}
+
+.name {
+  font-size: var(--text-h3);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.offbar {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-muted);
+  font-size: var(--text-label);
+}
+
+.offbar svg {
+  inline-size: 1rem;
+  block-size: 1rem;
+  flex-shrink: 0;
+  margin-block-start: 0.2rem;
+}
+
+.section {
+  display: grid;
+  gap: var(--space-3);
+  padding-block-start: var(--space-4);
+  border-block-start: 1px solid var(--color-border);
+}
+
+.sectionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.sectionHead h3 {
+  font-size: var(--text-label);
+  font-weight: 600;
+}
+
+.notes {
+  white-space: pre-wrap;
+  font-size: var(--text-label);
+  overflow-wrap: anywhere;
+}
+
+.acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.creditRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: flex-end;
+}
+
+.creditRow > * {
+  flex: 1;
+  min-inline-size: 10rem;
+}
+
+@media (max-width: 760px) {
+  .grid2,
+  .grid3 {
+    grid-template-columns: 1fr;
+  }
+
+  .span2 {
+    grid-column: auto;
+  }
+}
