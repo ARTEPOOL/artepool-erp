@@ -195,6 +195,7 @@ describe('the owner is protected (decisions 0025, 0026)', () => {
     expect(rows.map((r) => r.code)).toEqual([
       'items.cost', // purchase prices are for the owner only (decision 0038)
       'roles.manage',
+      'stock.opening', // opening stock is posted by the owner only (decision 0042)
       'system.company.edit', // company details are printed on tax invoices (decision 0030)
       'system.devices.manage',
       'system.series.manage',

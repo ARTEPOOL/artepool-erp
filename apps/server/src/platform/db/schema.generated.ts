@@ -301,6 +301,135 @@ export interface GlPeriods {
   updated_by: bigint;
 }
 
+export interface InvAdjustmentLines {
+  adjustment_id: bigint;
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  entered_unit_cost_4dp: bigint | null;
+  id: Generated<bigint>;
+  item_id: bigint;
+  line_no: number;
+  note: string | null;
+  quantity: Numeric;
+  row_version: Generated<number>;
+  stock_status: Generated<string>;
+  target_status: string | null;
+  updated_at: Generated<Timestamp>;
+  updated_by: bigint;
+  value_4dp: bigint | null;
+  value_fils: bigint | null;
+}
+
+export interface InvAdjustments {
+  adjustment_date: string;
+  approval_id: bigint | null;
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  doc_number: string | null;
+  id: Generated<bigint>;
+  import_batch_id: bigint | null;
+  kind: string;
+  note: string | null;
+  posted_at: Timestamp | null;
+  posted_by: bigint | null;
+  reason_code_id: bigint;
+  review_note: string | null;
+  review_status: Generated<string>;
+  reviewed_at: Timestamp | null;
+  reviewed_by: bigint | null;
+  row_version: Generated<number>;
+  sales_document_id: bigint | null;
+  seq_no: bigint | null;
+  series_id: bigint;
+  status: Generated<string>;
+  total_value_fils: bigint | null;
+  updated_at: Generated<Timestamp>;
+  updated_by: bigint;
+  uuid: Generated<string>;
+  warehouse_id: bigint;
+}
+
+export interface InvBalances {
+  avg_unit_cost_4dp: bigint | null;
+  book_value_fils: Generated<bigint>;
+  item_id: bigint;
+  last_movement_id: bigint | null;
+  quantity: Generated<Numeric>;
+  stock_status: string;
+  updated_at: Generated<Timestamp>;
+  value_4dp: Generated<bigint>;
+  warehouse_id: bigint;
+}
+
+export interface InvCountLines {
+  count_id: bigint;
+  counted_at: Timestamp | null;
+  counted_by: bigint | null;
+  counted_qty: Numeric | null;
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  id: Generated<bigint>;
+  item_id: bigint;
+  movement_since_snapshot: Numeric | null;
+  note: string | null;
+  reason_code_id: bigint | null;
+  row_version: Generated<number>;
+  stock_status: Generated<string>;
+  system_qty: Numeric;
+  updated_at: Generated<Timestamp>;
+  updated_by: bigint;
+  value_fils: bigint | null;
+  variance_qty: Numeric | null;
+}
+
+export interface InvCounts {
+  approval_id: bigint | null;
+  category_id: bigint | null;
+  count_date: string | null;
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  doc_number: string | null;
+  id: Generated<bigint>;
+  note: string | null;
+  posted_at: Timestamp | null;
+  posted_by: bigint | null;
+  row_version: Generated<number>;
+  scope: string;
+  seq_no: bigint | null;
+  series_id: bigint;
+  snapshot_at: Timestamp | null;
+  status: Generated<string>;
+  total_value_fils: bigint | null;
+  updated_at: Generated<Timestamp>;
+  updated_by: bigint;
+  uuid: Generated<string>;
+  variance_abs_fils: bigint | null;
+  warehouse_id: bigint;
+}
+
+export interface InvMovements {
+  adjustment_line_id: bigint | null;
+  approval_id: bigint | null;
+  count_line_id: bigint | null;
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  id: Generated<bigint>;
+  item_id: bigint;
+  movement_date: string;
+  movement_type: string;
+  occurred_at: Generated<Timestamp>;
+  qty_after: Numeric;
+  quantity: Numeric;
+  reason_code_id: bigint | null;
+  sales_document_line_id: bigint | null;
+  stock_status: string;
+  unit_cost_4dp: bigint;
+  value_4dp: bigint;
+  value_after_4dp: bigint;
+  value_fils: bigint;
+  warehouse_id: bigint;
+}
+
 export interface MdBundleComponents {
   bundle_item_id: bigint;
   component_item_id: bigint;
@@ -441,6 +570,22 @@ export interface MdItems {
   updated_at: Generated<Timestamp>;
   updated_by: bigint;
   vat_category_id: bigint;
+}
+
+export interface MdLabelSizes {
+  code: string;
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  height_mm: number;
+  id: Generated<bigint>;
+  is_active: Generated<boolean>;
+  name_ar: string;
+  name_en: string;
+  row_version: Generated<number>;
+  sort_order: Generated<number>;
+  updated_at: Generated<Timestamp>;
+  updated_by: bigint;
+  width_mm: number;
 }
 
 export interface MdPaymentMethods {
@@ -723,6 +868,12 @@ export interface DB {
   "gl.account_mappings": GlAccountMappings;
   "gl.accounts": GlAccounts;
   "gl.periods": GlPeriods;
+  "inv.adjustment_lines": InvAdjustmentLines;
+  "inv.adjustments": InvAdjustments;
+  "inv.balances": InvBalances;
+  "inv.count_lines": InvCountLines;
+  "inv.counts": InvCounts;
+  "inv.movements": InvMovements;
   "md.bundle_components": MdBundleComponents;
   "md.business_lines": MdBusinessLines;
   "md.cash_denominations": MdCashDenominations;
@@ -731,6 +882,7 @@ export interface DB {
   "md.item_categories": MdItemCategories;
   "md.item_prices": MdItemPrices;
   "md.items": MdItems;
+  "md.label_sizes": MdLabelSizes;
   "md.payment_methods": MdPaymentMethods;
   "md.price_levels": MdPriceLevels;
   "md.suppliers": MdSuppliers;

@@ -88,7 +88,20 @@
       "LOGO_INVALID": "The logo must be a PNG or JPEG image of at most 512 KB.",
       "IMPORT_NOT_CHECKED": "Check the file before importing it.",
       "IMPORT_FILE_CHANGED": "The file changed after it was checked. Check it again.",
-      "IMPORT_HAS_ERRORS": "The file has problems. Fix them in Excel, then check it again."
+      "IMPORT_HAS_ERRORS": "The file has problems. Fix them in Excel, then check it again.",
+      "PERIOD_NOT_OPEN": "That month is closed or does not exist: nothing can be dated in it.",
+      "STOCK_INSUFFICIENT": "There is not enough stock.",
+      "STOCK_ITEM_ONLY": "Services and kits have no stock.",
+      "MOVEMENT_VALUE_REQUIRED": "An incoming movement needs its value.",
+      "ADJUSTMENT_REASON": "This reason does not fit this kind of adjustment.",
+      "ADJUSTMENT_EMPTY": "Add at least one item.",
+      "ADJUSTMENT_LINE": "The stock status does not fit this operation.",
+      "COST_UNKNOWN": "This item has no cost: type the unit cost or set the item's purchase price.",
+      "OPENING_OWNER_ONLY": "Only the owner posts opening stock.",
+      "APPROVAL_REQUIRED": "The value is above the limit: a supervisor's approval is needed.",
+      "COUNT_INCOMPLETE": "Count every item before posting.",
+      "REVIEW_STEP": "This was already reviewed or needs no review.",
+      "DOCUMENT_STEP": "This step is not possible in the document's current state."
     }
   }
 }
