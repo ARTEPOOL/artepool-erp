@@ -27,6 +27,7 @@ const listItem = (r: {
   phone: string | null;
   is_vat_registered: boolean;
   trn: string | null;
+  payment_terms_days: number;
   is_active: boolean;
 }): SupplierListItem => ({
   id: r.id.toString(),
@@ -36,6 +37,7 @@ const listItem = (r: {
   phone: r.phone,
   isVatRegistered: r.is_vat_registered,
   trn: r.trn,
+  paymentTermsDays: r.payment_terms_days,
   isActive: r.is_active,
 });
 
@@ -68,7 +70,6 @@ export async function getSupplier(db: Kysely<DB>, id: bigint): Promise<SupplierD
     city: r.city,
     emirate: r.emirate as Emirate | null,
     countryCode: r.country_code,
-    paymentTermsDays: r.payment_terms_days,
     notes: r.notes,
     rowVersion: r.row_version,
   };

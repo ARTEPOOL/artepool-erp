@@ -439,9 +439,14 @@ describe('suppliers and the lists (decision 0034)', () => {
         name: 'Gulf Pool Chemicals LLC',
         isVatRegistered: true,
         trn: '100999999999999',
+        paymentTermsDays: 45,
       })
     ).json<SupplierDetail>();
     expect(supplier.code).toMatch(/^S\d{5}$/);
+    const listed = (await owner('GET', '/api/v1/suppliers?q=Gulf Pool')).json<{
+      suppliers: SupplierDetail[];
+    }>().suppliers;
+    expect(listed.find((s) => s.id === supplier.id)?.paymentTermsDays).toBe(45);
     expect((await cashier('GET', '/api/v1/suppliers')).statusCode).toBe(403);
   });
 

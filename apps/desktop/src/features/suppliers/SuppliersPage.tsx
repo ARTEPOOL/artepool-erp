@@ -23,7 +23,7 @@ import {
   ToolBar,
 } from '../../ui';
 import { useCan, useErrorText } from '../auth/context';
-import { partiesClasses as styles, Phone, useDebounced } from '../customers/parts';
+import { partiesClasses as styles, Phone, useDebounced, useTermsText } from '../customers/parts';
 import { ImportDialog } from '../masterdata/ImportDialog';
 import { MD_KEYS } from '../masterdata/refs';
 import { useSupplier, useSupplierList, type SupplierFilter } from './api';
@@ -33,6 +33,7 @@ import { SupplierDialog } from './SupplierDialog';
 /** Suppliers, in the style of design 14 (decision 0034). Purchasing arrives in Phase 2. */
 export function SuppliersPage() {
   const { t } = useTranslation(['parties', 'masterdata']);
+  const termsText = useTermsText();
   const can = useCan();
   const errorText = useErrorText();
   const queryClient = useQueryClient();
@@ -110,7 +111,7 @@ export function SuppliersPage() {
             <tr>
               <th>{t('parties:suppliers.cols.supplier')}</th>
               <th>{t('parties:suppliers.cols.vat')}</th>
-              <th className={tbl.num}>{t('parties:suppliers.cols.code')}</th>
+              <th>{t('parties:suppliers.cols.terms')}</th>
             </tr>
           </thead>
           <tbody>
@@ -148,8 +149,11 @@ export function SuppliersPage() {
                     <span className={tbl.sub}>{t('parties:vat.notRegistered')}</span>
                   )}
                 </td>
-                <td className={tbl.num}>
-                  <bdi>{s.code}</bdi>
+                <td>
+                  <span>{termsText(s.paymentTermsDays)}</span>
+                  <span className={tbl.sub}>
+                    <bdi>{s.code}</bdi>
+                  </span>
                   {!s.isActive && (
                     <Chip icon={<Ban aria-hidden="true" />}>{t('masterdata:status.inactive')}</Chip>
                   )}

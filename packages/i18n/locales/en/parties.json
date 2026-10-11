@@ -141,7 +141,7 @@
     "cols": {
       "supplier": "Supplier",
       "vat": "VAT",
-      "code": "Code"
+      "terms": "Payment terms"
     },
     "empty": "No suppliers match.",
     "select": "Choose a supplier to see their details.",

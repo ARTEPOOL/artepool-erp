@@ -460,6 +460,7 @@ describe('Suppliers', () => {
       phone: s.phone,
       isVatRegistered: s.isVatRegistered,
       trn: s.trn,
+      paymentTermsDays: s.paymentTermsDays,
       isActive: s.isActive,
     })),
     total: list.length,
@@ -490,6 +491,7 @@ describe('Suppliers', () => {
     const gulf = await row('شركة الخليج للكيماويات');
     expect(within(gulf).getByText('TRN 100567812300003')).toBeTruthy();
     expect(within(gulf).getByText('04 234 5678')).toBeTruthy();
+    expect(within(gulf).getByText('30 يومًا')).toBeTruthy();
     const panel = await detailPanel('شركة الخليج للكيماويات');
     expect(within(panel).getByText('30 يومًا')).toBeTruthy();
 

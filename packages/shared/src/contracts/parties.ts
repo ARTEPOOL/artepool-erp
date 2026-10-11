@@ -114,6 +114,7 @@ export interface SupplierListItem {
   phone: string | null;
   isVatRegistered: boolean;
   trn: string | null;
+  paymentTermsDays: number;
   isActive: boolean;
 }
 
@@ -128,7 +129,6 @@ export interface SupplierDetail extends SupplierListItem {
   city: string | null;
   emirate: Emirate | null;
   countryCode: string;
-  paymentTermsDays: number;
   notes: string | null;
   rowVersion: number;
 }
