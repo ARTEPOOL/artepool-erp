@@ -34,6 +34,7 @@ Phase 1 has **68 tables in 9 schemas**, plus reporting views and the functions a
 | **[ins]** | `created_at timestamptz NOT NULL DEFAULT now()`, `created_by bigint NOT NULL → auth.users` (append-only tables) |
 | SYSTEM user | `auth.users` id 1 = `system` (cannot log in): seeds and scheduled jobs |
 | Foreign keys | `ON DELETE RESTRICT` everywhere |
+| Rule errors | Custom SQLSTATEs `AP001`–`AP0xx`. From M2: `AP011` = a business rule, `AP012` = a permission rule, each with a machine-readable `HINT` (e.g. `ACCOUNT_IN_USE`, `CREDIT_PERMISSION`) that the API passes on and the app translates |
 
 **Notation:** `→ x.y` means a foreign key. A type followed by `?` is nullable; every other column is `NOT NULL`.
 
@@ -91,7 +92,7 @@ Phase 1 has **68 tables in 9 schemas**, plus reporting views and the functions a
  sys.company_profile · sys.settings · sys.branches · sys.document_series (POS-, INV-, CN-, …)
 
  md.business_lines (supplies / construction / maintenance / cleaning) ─► gl.accounts (revenue, cost of sales)
- md.items ◄─ md.item_barcodes · md.bundle_components · md.item_prices ─► md.price_lists
+ md.items ◄─ md.item_barcodes · md.bundle_components · md.item_prices ─► md.price_levels
      └─ md.item_categories · md.units · md.vat_categories          md.customers (VAT registered + TRN)
 
  sales.quotations ─► sales.quotation_lines
@@ -199,7 +200,7 @@ The counter is changed only by `sys.next_number()`.
 | code | text | `UNIQUE (category, code)` |
 | name_ar, name_en | text | |
 | requires_note | boolean | `DEFAULT false` |
-| gl_account_id | bigint? → gl.accounts | Account for paid-in/paid-out reasons |
+| gl_account_id | bigint? → gl.accounts | Account for paid-in/paid-out reasons: `CHECK ((category IN ('paid_in','paid_out')) = (gl_account_id IS NOT NULL))`; active, postable, not control |
 | [active], [std] | | |
 
 There is no `line_void` category: cart removals need no reason ([0005](decisions/0005-cart-removals-logged-without-approval.md)).
@@ -585,9 +586,9 @@ Also used, together with the 6-digit code, to recover a forgotten password in th
 | Column | Type | Rules |
 |---|---|---|
 | id | bigint PK | |
-| code | text | unique: `SR` (5%), `ZR`, `EX`, `OS` |
+| code | text | unique: `SR` (5%), `ZR`, `EX`, `OS`. Exactly these four, fixed ([0033](decisions/0033-four-fixed-uae-vat-categories.md)): the API may change only the rate. |
 | name_ar, name_en | text | |
-| rate_bp | integer | `CHECK 0..10000`. Configurable ([0009](decisions/0009-vat-per-line.md)). |
+| rate_bp | integer | `CHECK 0..10000`. Changed by the owner only (`system.settings.edit`), with a reason; applies to new documents only ([0033](decisions/0033-four-fixed-uae-vat-categories.md)). |
 | einvoice_code | text | `CHECK IN ('S','Z','E','O')`; `CHECK ((einvoice_code = 'S') = (rate_bp > 0))` |
 | [active], [std] | | |
 
@@ -623,7 +624,7 @@ Lines of business ([0018](decisions/0018-chart-of-accounts-and-posting-map.md)).
 | Column | Type | Rules |
 |---|---|---|
 | id | bigint PK | |
-| code | text | unique |
+| code | text | unique. Suggested by the app; fixed after creation (trigger, [0037](decisions/0037-master-data-defaults.md)) |
 | item_type | text | `CHECK IN ('stock','service','bundle')`. Trigger: fixed after first use. |
 | name_ar, name_en | text | |
 | description_ar, description_en | text? | |
@@ -646,7 +647,7 @@ The average cost is not stored on the item. It lives in `inv.balances.avg_unit_c
 |---|---|---|
 | id | bigint PK | |
 | item_id | bigint → md.items | |
-| barcode | text | `CHECK (barcode ~ '^[0-9A-Za-z.\-]{3,64}$')`; unique `WHERE is_active` |
+| barcode | text | `CHECK (barcode ~ '^[0-9A-Za-z.\-]{3,64}$')`; unique on `upper(barcode)` `WHERE is_active`; never changes or moves to another item (deactivate and add a new one) |
 | qty_per_scan | numeric(14,3) | `DEFAULT 1`, `> 0` (pack barcodes) |
 | is_primary | boolean | One primary active barcode per item |
 | [active], [std] | | |
@@ -660,25 +661,31 @@ The average cost is not stored on the item. It lives in `inv.balances.avg_unit_c
 | quantity | numeric(14,3) | `> 0` |
 | [std] | | |
 
-### 7.8 `md.price_lists`
+### 7.8 `md.price_levels` (decision [0032](decisions/0032-one-sale-price-with-vat-flag-and-customer-types.md))
+
+One level (`STANDARD`) in P1. A second level (for example "Contractors & companies") can be added later without changing existing data; there is no screen for it in P1.
 
 | Column | Type | Rules |
 |---|---|---|
 | id | bigint PK | |
-| code | text | unique (`RETAIL`, `CONTRACTOR`) |
+| code | text | unique (`STANDARD`) |
 | name_ar, name_en | text | |
-| prices_include_vat | boolean | Retail = `true` |
-| is_default | boolean | One default |
+| is_default | boolean | Exactly one active default |
+| customer_types | text[] | `DEFAULT '{}'`; subset of `individual`, `contractor`, `company`. The default level lists none and applies to everyone; a customer type is listed on at most one active level. |
+| sort_order | integer | |
 | [active], [std] | | |
+
+**Choosing a price (M4):** the level that lists the customer's type, if the item has a price there; otherwise the default level.
 
 ### 7.9 `md.item_prices`
 
 | Column | Type | Rules |
 |---|---|---|
 | id | bigint PK | |
-| price_list_id | bigint → md.price_lists | `UNIQUE (price_list_id, item_id)` |
+| price_level_id | bigint → md.price_levels | `UNIQUE (price_level_id, item_id)` |
 | item_id | bigint → md.items | |
-| price_4dp | bigint | `>= 0`; 4-decimal unit price, inclusive or exclusive per the list |
+| price_4dp | bigint | `>= 0`; 4-decimal unit price |
+| includes_vat | boolean | "Price includes VAT" (set on the item screen). Inclusive prices are split back into net and VAT; exclusive prices have VAT added ([0009](decisions/0009-vat-per-line.md)). |
 | [std] | | History is in the audit log |
 
 ### 7.10 `md.customers`
@@ -687,24 +694,26 @@ The average cost is not stored on the item. It lives in `inv.balances.avg_unit_c
 |---|---|---|
 | id | bigint PK | |
 | code | text | unique |
-| customer_type | text | `CHECK IN ('individual','business')` |
+| customer_type | text | `CHECK IN ('individual','contractor','company')`, required ([0032](decisions/0032-one-sale-price-with-vat-flag-and-customer-types.md)). Never changes the VAT. |
 | name | text | |
 | name_alt | text? | |
-| search_key | text | Generated (code, names, phone) |
+| search_key | text | Generated (code, names, phone, TRN) |
 | is_vat_registered | boolean | `DEFAULT false`. Decides the invoice format ([0010](decisions/0010-invoice-format-by-vat-registration.md)). |
-| trn | char(15)? | `CHECK (trn ~ '^[0-9]{15}$')`; `CHECK (NOT is_vat_registered OR trn IS NOT NULL)` |
-| phone, phone_alt | text? | E.164 |
+| trn | char(15)? | `CHECK (trn ~ '^100[0-9]{12}$')`; `CHECK (NOT is_vat_registered OR trn IS NOT NULL)`; unique ([0037](decisions/0037-master-data-defaults.md)) |
+| phone, phone_alt | text? | E.164. `phone` required except for the walk-in customer; unique ([0037](decisions/0037-master-data-defaults.md)) |
 | email | text? | |
 | address_line, area, city, po_box | text? | |
 | emirate | text? | |
 | country_code | char(2) | `'AE'` |
-| price_list_id | bigint? → md.price_lists | |
-| payment_terms_days | smallint | `DEFAULT 0`, `0..365` |
-| credit_limit_fils | bigint | `DEFAULT 0` (cash only), `>= 0` |
-| is_walk_in | boolean | Exactly one "Cash customer" |
+| credit_mode | text | `CHECK IN ('cash','credit')`, `DEFAULT 'cash'` ([0036](decisions/0036-customers-start-as-cash.md)) |
+| payment_terms_days | smallint | `DEFAULT 0`, `0..365`; 0 when cash |
+| credit_limit_fils | bigint | `DEFAULT 0`; 0 when cash, `> 0` when credit |
+| is_walk_in | boolean | Exactly one "Cash customer"; it cannot be changed or deactivated and is always cash |
 | preferred_language | text? | |
 | notes | text? | |
 | [active], [std] | | |
+
+**Credit rule (database trigger):** a change to `credit_mode`, `payment_terms_days` or `credit_limit_fils` (and any customer created as credit) needs a user with `customers.credit` and a reason in the request context.
 
 ### 7.11 `md.suppliers`
 
@@ -716,7 +725,7 @@ The average cost is not stored on the item. It lives in `inv.balances.avg_unit_c
 | name_alt | text? | |
 | search_key | text | Generated |
 | is_vat_registered | boolean | |
-| trn | char(15)? | As customers |
+| trn | char(15)? | As customers (15 digits starting with 100; unique among suppliers) |
 | phone, email, address_line, city, emirate | text? | |
 | country_code | char(2) | |
 | payment_terms_days | smallint | |
@@ -760,7 +769,7 @@ The average cost is not stored on the item. It lives in `inv.balances.avg_unit_c
 | branch_id | bigint → sys.branches | |
 | warehouse_type | text | `CHECK IN ('store','van','site')` |
 | technician_id | bigint? → md.technicians | Required for `van` |
-| is_default | boolean | |
+| is_default | boolean | Exactly one per branch: choosing a new default takes the mark from the old one; the mark cannot simply be removed |
 | [active], [std] | | |
 
 ### 7.15 `md.cash_denominations`
@@ -946,8 +955,7 @@ After posting, only the `review_*` columns may change, and only `pending → rev
 | bill_to_name_alt, bill_to_trn, bill_to_address, bill_to_phone | text? | Snapshot |
 | quotation_date | date | |
 | valid_until | date | `>= quotation_date` |
-| price_list_id | bigint → md.price_lists | |
-| prices_include_vat | boolean | |
+| price_level_id | bigint → md.price_levels | Level used to price the lines ([0032](decisions/0032-one-sale-price-with-vat-flag-and-customer-types.md)) |
 | salesperson_id | bigint? → auth.users | |
 | subject | text? | |
 | terms_ar, terms_en, notes | text? | |
@@ -972,6 +980,7 @@ The money columns work exactly as in `sales.document_lines` (item lines only).
 | business_line_id | bigint → md.business_lines | |
 | quantity | numeric(14,3) | `> 0` |
 | list_price_4dp, unit_price_4dp | bigint | `>= 0` |
+| price_includes_vat | boolean | Snapshot of the item price's switch ([0032](decisions/0032-one-sale-price-with-vat-flag-and-customer-types.md)) |
 | amount_before_discount_fils | bigint | `round_fils(qty × unit_price_4dp)` |
 | line_discount_bp | integer? | If entered as % |
 | line_discount_fils, doc_discount_alloc_fils | bigint | `>= 0` |
@@ -1010,8 +1019,7 @@ The money columns work exactly as in `sales.document_lines` (item lines only).
 | issued_at | timestamptz? | |
 | due_date | date? | `>= issue_date` |
 | currency | char(3) | `'AED'` |
-| price_list_id | bigint? → md.price_lists | NULL for `advance_invoice` |
-| prices_include_vat | boolean | `CHECK (doc_type <> 'advance_invoice' OR prices_include_vat)` (amount received includes VAT) |
+| price_level_id | bigint? → md.price_levels | NULL for `advance_invoice` ([0032](decisions/0032-one-sale-price-with-vat-flag-and-customer-types.md)) |
 | salesperson_id | bigint? → auth.users | |
 | quotation_id | bigint? → sales.quotations | Agreement that invoices and payment invoices belong to |
 | original_document_id | bigint? → sales.documents | `CHECK ((doc_type IN ('credit_note','debit_note')) = (original_document_id IS NOT NULL))`; the original must be an issued `invoice` or `advance_invoice` of the same customer |
@@ -1054,7 +1062,8 @@ The money columns work exactly as in `sales.document_lines` (item lines only).
 | unit_id | bigint? → md.units | |
 | business_line_id | bigint → md.business_lines | Item default, else the document's |
 | quantity | numeric(14,3) | `> 0`; `= 1` for `advance` / `advance_deduction` |
-| list_price_4dp | bigint | Price-list price (item lines) |
+| list_price_4dp | bigint | Item price at the document's price level (item lines) |
+| price_includes_vat | boolean | Snapshot of the item price's "includes VAT" switch ([0032](decisions/0032-one-sale-price-with-vat-flag-and-customer-types.md)); always `true` on `advance` lines (the amount received includes VAT). Each line follows its own switch. |
 | unit_price_4dp | bigint | Price charged ("original price"). `CHECK (unit_price_4dp >= 0 OR line_kind = 'advance_deduction')` |
 | price_override_approval_id | bigint? → auth.approvals | When `unit_price ≠ list_price` without `sales.price_override` |
 | amount_before_discount_fils | bigint | `round_fils(qty × unit_price_4dp)` |
@@ -1341,6 +1350,7 @@ Revenue and cost of sales come from `md.business_lines`, payment accounts from `
 | [std] | | |
 
 **Status rules:**
+- Open → closed → locked, one step at a time, in month order. A month closes only after it ends; reopening a closed month needs a reason; who and when are stamped by the database.
 - `closed` and `locked` both reject every posting and every document issue ([0016](decisions/0016-monthly-period-lock.md)).
 - `locked` can never be reopened.
 
@@ -1497,6 +1507,10 @@ See the one-page [posting map](accounting/posting-map.md) (**pending accountant 
 | `gl.check_entry_balanced()` | deferred constraint trigger | Balanced, ≥ 2 lines |
 | `gl.check_period_open()` | trigger | Journal entries, document issue, stock and cash postings |
 | `sys.clock_guard()` | function | Detects the server clock going backwards |
+| `sys.require_reason_to_deactivate()` | trigger | Deactivating master data or an account needs a reason in the request context ([0037](decisions/0037-master-data-defaults.md)) |
+| `gl.account_in_use(id)` | function | Why an account is in use (event link, line of business, payment method, reason code; postings from 0011), or NULL |
+| `gl.ensure_periods(n)` | security definer | Creates the missing months up to n months ahead ([0035](decisions/0035-fiscal-year-and-provisional-chart.md)) |
+| `md.item_in_use(id)` | function | Why an item is in use (kit component or kit contents; movements and document lines later), or NULL |
 | `sys.check_setting()` | trigger | Safe whole-number ranges for every `security.*` setting (password length never below 10); `client.min_version` format |
 | `auth.user_has_permission(user, code)` | function | Active user + active role + role permission |
 | `auth.assert_single_owner()` | function | At most one active owner (advisory lock) |
@@ -1515,7 +1529,7 @@ See the one-page [posting map](accounting/posting-map.md) (**pending accountant 
 | system | `system.company.edit`, `system.settings.edit`, `system.series.manage`, `system.devices.manage`, `system.health.view`, `system.backup.restore_test`, `system.integrity.run` |
 | users | `users.view`, `users.manage`, `users.reset_credentials`, `roles.manage` |
 | audit | `audit.view`, `audit.verify`, `audit.export` |
-| master data | `items.view`, `items.manage`, `prices.manage`, `customers.view`, `customers.manage`, `suppliers.manage`, `technicians.manage`, `payment_methods.manage`, `warehouses.manage`, `data.import` |
+| master data | `items.view`, `items.manage`, `prices.manage`, `customers.view`, `customers.manage`, `customers.credit`*, `suppliers.manage`, `technicians.manage`, `payment_methods.manage`, `warehouses.manage`, `data.import` |
 | inventory | `stock.view`, `stock.view_cost`, `stock.adjust`, `stock.adjust_over_threshold`*, `stock.count`, `stock.count_post`, `stock.defective`, `stock.write_off`, `stock.oversell_review`, `labels.print` |
 | sales (A4) | `invoices.view`, `quotations.manage`, `invoices.create`, `invoices.issue`, `sales.discount_over_limit`*, `sales.price_override`*, `sales.credit_over_limit`*, `credit_notes.issue`*, `debit_notes.issue`, `payments.receive`, `payments.refund`*, `payments.reverse`*, `statements.view`, `documents.reprint` |
 | pos | `pos.sell`, `pos.oversell`*, `pos.no_sale` |
@@ -1560,15 +1574,16 @@ All series use 6 digits and continuous numbering ([0011](decisions/0011-document
 ### 15.3 Other seeds
 
 - **VAT categories:** `SR` 5%, `ZR` 0%, `EX`, `OS`.
-- **Units:** `PCS`, `BOX`, `SET`, `KG`, `L`, `M`, `M2`, `HR`, `VISIT`, `JOB`.
+- **Units:** `PCS`, `BOX`, `BAG`, `BTL`, `SET` (0 decimals), `KG`, `L` (3), `M`, `M2`, `HR` (2), `VISIT`, `JOB` (0). E-invoice codes only where certain (`H87`, `KGM`, `LTR`, `MTR`, `MTK`, `HUR`).
+- **Item categories:** `CHEM` Chemicals, `EQUIP` Equipment, `CLEAN` Cleaning, `PARTS` Spare parts, `SERV` Services.
 - **Lines of business:** supplies (4100/5100), construction (4200/5200), maintenance (4300/5300), cleaning (4400/5400).
 - **Chart of accounts and mappings:** the provisional chart from [`accounting/chart-of-accounts.md`](accounting/chart-of-accounts.md).
 - **Payment methods:** Cash (1110), Card (1150), Bank transfer (1140), Cheque (1160).
 - **AED denominations:** notes 1000–5; coins 1 AED, 50 fils, 25 fils.
 - **Branch and warehouse:** branch `HQ` (Al Ain); warehouse `MAIN`.
-- **Price lists:** `RETAIL` (VAT-inclusive, default) and `CONTRACTOR` (VAT-exclusive).
-- **Walk-in customer:** "عميل نقدي / Cash customer" (not VAT-registered).
-- **Periods:** monthly periods for the current fiscal year plus 3 months ahead.
+- **Price level:** `STANDARD` (default; no customer types) ([0032](decisions/0032-one-sale-price-with-vat-flag-and-customer-types.md)).
+- **Walk-in customer:** "عميل نقدي / Cash customer" (type individual, not VAT-registered, cash).
+- **Periods:** monthly periods from January of the current year (fiscal year January–December, [0035](decisions/0035-fiscal-year-and-provisional-chart.md)) up to 3 months ahead; the server keeps creating them 3 months ahead.
 - **Reason codes:**
   - stock: damaged, expired, found, theft/loss, data correction, oversell
   - defective: customer return – broken
@@ -1628,7 +1643,7 @@ Migrations are written **in build order** (milestones in [`phase-1-plan.md`](pha
 | 0006 | `device_trust` | M1 | `auth.device_trust` ("trust this PC", decision 0027), `trusted_device` sign-in method, `security.trusted_device_days` | — |
 | 0007 | `company_edit_owner_only` | M1 | — (data: `system.company.edit` becomes owner-only and leaves every other role, decision 0030) | — |
 | 0008 | `gl_core` | M2 | `accounts` (provisional chart), `account_mappings`, `periods` (monthly, seeded) + period guard | — |
-| 0009 | `master_data` | M2 | All 15 `md.*` tables (with seeds) and `sys.reason_codes` (with seeds) | `auth.devices.default_warehouse_id`, `auth.approvals.reason_code_id` |
+| 0009 | `master_data` | M2 | All 15 `md.*` tables (with seeds) and `sys.reason_codes` (with seeds); permission `customers.credit`; deactivation needs a reason; company TRN starts with 100 and the logo is PNG/JPEG; series prefix changeable until first use (decisions 0031–0037) | `auth.devices.default_warehouse_id`, `auth.approvals.reason_code_id` |
 | 0010 | `inventory` | M3 | All `inv.*` tables + `apply_movement` + stock views | — |
 | 0011 | `gl_journals` | M3 | `journal_entries`, `journal_lines` + balance trigger | — |
 | 0012 | `cash_core` | M4 | `registers`, `shifts`, `counts`, `count_lines` + shift-owner function | — |

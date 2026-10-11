@@ -1,0 +1,116 @@
+/* Settings → Lists and the Accounting page: tables in cards and their dialogs, in the style of
+   design 13 (.card.tbl with .card-h, .form, .note). Tokens and logical properties only. */
+.tableHead {
+  display: grid;
+  gap: var(--space-3);
+  padding-block: var(--space-3);
+}
+
+.headTools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.search {
+  min-inline-size: 14rem;
+}
+
+.tableNote {
+  margin-block: var(--space-3);
+}
+
+.rowTools {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  align-items: center;
+  justify-content: flex-end;
+}
+
+/* Tree rows: each level is indented on the start side (RTL and LTR). */
+.treeName {
+  display: grid;
+  line-height: 1.4;
+  padding-inline-start: calc(var(--depth, 0) * var(--space-5));
+}
+
+.header {
+  font-weight: 700;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.form {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.grid2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.grid3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.switches {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.staleText {
+  display: block;
+  margin-block-end: var(--space-2);
+}
+
+.linkCell {
+  display: grid;
+  gap: var(--space-2);
+  min-inline-size: 16rem;
+}
+
+.linkSave {
+  display: flex;
+  gap: var(--space-2);
+  align-items: end;
+}
+
+.linkSave > :first-child {
+  flex: 1;
+}
+
+/* A message under a native select (the shared SelectField has no error slot). */
+.fieldError {
+  font-size: var(--text-caption);
+  color: var(--color-danger);
+}
+
+.muted {
+  color: var(--color-text-secondary);
+  font-size: var(--text-caption);
+}
+
+.visuallyHidden {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (max-width: 1250px) {
+  .grid3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import {
   Building2,
   Database,
+  ListChecks,
   History,
   MonitorSmartphone,
   Palette,
@@ -13,13 +14,14 @@ import { Link, Navigate, Outlet, useRouterState } from '@tanstack/react-router';
 import { Card, cx, Tile } from '../../ui';
 import { useCan } from '../auth/context';
 import { NoAccess, PageHeader } from './parts';
-import { allowedSections, SECTIONS, type SectionId } from './sections';
+import { allowedSections, isAllowed, SECTIONS, type SectionId } from './sections';
 import styles from './settings.module.css';
 
 const ICONS: Record<SectionId, ReactNode> = {
   company: <Building2 aria-hidden="true" />,
   users: <Users aria-hidden="true" />,
   tax: <Percent aria-hidden="true" />,
+  lists: <ListChecks aria-hidden="true" />,
   devices: <MonitorSmartphone aria-hidden="true" />,
   print: <Palette aria-hidden="true" />,
   backup: <Database aria-hidden="true" />,
@@ -38,7 +40,7 @@ export function SettingsPage() {
         <Card as="nav" rise padding="compact" aria-label={t('hub.label')} className={styles.sub}>
           <div className={styles.subList}>
             {SECTIONS.map((section) => {
-              const allowed = section.permission !== undefined && can(section.permission);
+              const allowed = isAllowed(section, can);
               const label = t(`hub.${section.id}`);
               return (
                 <div key={section.id}>
@@ -55,11 +57,11 @@ export function SettingsPage() {
                     <span
                       className={styles.later}
                       aria-disabled="true"
-                      title={section.permission ? undefined : t('hub.comingLater')}
+                      title={section.permissions ? undefined : t('hub.comingLater')}
                     >
                       <Tile>{ICONS[section.id]}</Tile>
                       <span>{label}</span>
-                      {!section.permission && (
+                      {!section.permissions && (
                         <span className={styles.soon}>{t('hub.comingLater')}</span>
                       )}
                     </span>

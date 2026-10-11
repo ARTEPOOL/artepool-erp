@@ -1,0 +1,126 @@
+{
+  "title": "Items & stock",
+  "subtitle": "Main warehouse · Al Ain",
+  "newItem": "New item",
+  "aed": "AED",
+  "search": "Name, code or barcode",
+  "searchKey": "F2",
+  "import": {
+    "items": "Import items",
+    "prices": "Import prices",
+    "itemsTitle": "Import items from Excel",
+    "itemsIntro": "Download the template, fill it with the new items and their prices, then choose the file and check it before importing.",
+    "pricesTitle": "Update prices from Excel",
+    "pricesIntro": "Download the template and fill in each item's code and its new price. A new price applies to new sales only."
+  },
+  "kpi": {
+    "active": "Active items",
+    "stock": "Stock items",
+    "service": "Services",
+    "bundle": "Kits"
+  },
+  "filters": {
+    "label": "Category",
+    "all": "All",
+    "inactive": "Deactivated"
+  },
+  "types": {
+    "stock": "Stock item",
+    "service": "Service",
+    "bundle": "Kit"
+  },
+  "list": {
+    "label": "Items list",
+    "item": "Item",
+    "type": "Type",
+    "price": "Price incl. VAT",
+    "status": "Status",
+    "exclVat": "excl. VAT",
+    "noPrice": "No sale price",
+    "loading": "Loading…",
+    "noMatch": "No items match the search.",
+    "empty": "No items here yet.",
+    "shown": "Showing {shown} of {total}",
+    "more": "Show more"
+  },
+  "detail": {
+    "select": "Choose an item in the list to see its details.",
+    "inactive": "This item is deactivated: it is hidden from the POS and from search.",
+    "noBarcodes": "No barcodes."
+  },
+  "price": {
+    "oneUnit": "Price of one unit",
+    "net": "Excl. VAT",
+    "vat": "VAT",
+    "total": "Total"
+  },
+  "fields": {
+    "type": "Type",
+    "code": "Code",
+    "category": "Category",
+    "nameAr": "Name in Arabic",
+    "nameEn": "Name in English",
+    "descriptionAr": "Description in Arabic",
+    "descriptionEn": "Description in English",
+    "unit": "Unit",
+    "vatCategory": "VAT category",
+    "businessLine": "Line of business",
+    "price": "Sale price",
+    "includesVat": "Price includes VAT",
+    "forSale": "For sale",
+    "reorderLevel": "Reorder level",
+    "barcodes": "Barcodes",
+    "components": "Kit components"
+  },
+  "barcodes": {
+    "primary": "Main",
+    "perScan": "Quantity per scan",
+    "perScanShort": "Quantity per scan:",
+    "barcodeN": "Barcode {n}",
+    "perScanN": "Quantity per scan for barcode {n}",
+    "removeN": "Remove barcode {n}",
+    "add": "Add barcode",
+    "hint": "A pack barcode scans several units at once: write how many units each scan counts."
+  },
+  "components": {
+    "hint": "What one kit is made of: stock items and services, never another kit.",
+    "search": "Search for an item to add",
+    "results": "Search results",
+    "none": "No matching items.",
+    "quantityOf": "Quantity of {name}",
+    "remove": "Remove {name}"
+  },
+  "deactivate": {
+    "title": "Deactivate item",
+    "explanation": "Items are never deleted, because their movements and invoices must be kept. Deactivating hides the item from the POS and search; you can reactivate it."
+  },
+  "dialog": {
+    "newTitle": "New item",
+    "editTitle": "Edit item",
+    "save": "Save item",
+    "choose": "Choose…",
+    "noBusinessLine": "None",
+    "fixErrors": "Correct the marked fields, then save.",
+    "codeHint": "Suggested from the category; it can be changed only before the first save.",
+    "codeFixed": "The code never changes after the item is created.",
+    "addDescriptions": "Add a description",
+    "priceSection": "Price and VAT",
+    "priceHint": "Up to 4 decimals, e.g. 12.50",
+    "priceLocked": "Changing the price needs the \"Manage prices\" permission.",
+    "reorderHint": "In {unit}",
+    "typeFixedOther": "This item is in use, so its type can no longer change.",
+    "typeFixed": {
+      "kit_component": "This item is part of a kit, so its type can no longer change.",
+      "kit_contents": "This kit has components, so its type can no longer change."
+    },
+    "errors": {
+      "code": "A code uses English letters, digits and . _ - only, up to 32 characters.",
+      "price": "Write a valid price with at most 4 decimals, e.g. 12.50",
+      "priceLocked": "An item for sale needs a price, and setting it needs the \"Manage prices\" permission. Turn off \"For sale\" or ask someone who has the permission.",
+      "barcode": "A barcode is 3 to 64 English letters or digits.",
+      "perScan": "The quantity per scan must be a number above zero.",
+      "components": "Add at least one component to the kit.",
+      "quantity": "Each component's quantity must be a number above zero."
+    }
+  }
+}

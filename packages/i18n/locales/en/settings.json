@@ -6,8 +6,10 @@
     "invoices": "A4 invoices",
     "items": "Items & stock",
     "customers": "Customers",
+    "suppliers": "Suppliers",
     "shifts": "Shifts & cash",
     "reports": "Reports",
+    "accounting": "Accounting",
     "settings": "Settings",
     "comingLater": "Coming later"
   },
@@ -32,6 +34,7 @@
     "company": "Company",
     "users": "Users & permissions",
     "tax": "VAT & numbering",
+    "lists": "Lists",
     "devices": "Devices & printers",
     "print": "Print designer",
     "backup": "Backup",

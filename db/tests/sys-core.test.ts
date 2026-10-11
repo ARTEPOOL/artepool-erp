@@ -187,8 +187,31 @@ describe('gapless numbering (golden rule 5)', () => {
       ]),
     ).rejects.toMatchObject({ code: 'AP005' });
     await expect(
-      attempt(admin, `UPDATE sys.document_series SET prefix = 'XX-' WHERE id = $1`, [cn]),
+      attempt(admin, `UPDATE sys.document_series SET doc_type = 'refund' WHERE id = $1`, [cn]),
     ).rejects.toMatchObject({ code: 'AP003' });
+  });
+
+  it('lets the prefix, width and start change only until the first number is used (decision 0011)', async () => {
+    const rvs = await seriesId('RVS');
+    await inContext(api, () =>
+      api.query(
+        `UPDATE sys.document_series SET prefix = 'REV-', number_width = 5, start_number = 101
+          WHERE id = $1`,
+        [rvs],
+      ),
+    );
+    await api.query('BEGIN');
+    try {
+      await setContext(api);
+      expect(await nextNumber(api, rvs)).toEqual({ seq_no: '101', formatted: 'REV-00101' });
+      await api.query('COMMIT');
+    } catch (error) {
+      await api.query('ROLLBACK');
+      throw error;
+    }
+    await expect(
+      attempt(api, `UPDATE sys.document_series SET prefix = 'RVS-' WHERE id = $1`, [rvs]),
+    ).rejects.toMatchObject({ code: 'AP011', hint: 'SERIES_IN_USE' });
   });
 
   it('refuses inactive series and invoice series without a channel', async () => {

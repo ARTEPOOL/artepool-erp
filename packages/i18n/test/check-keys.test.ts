@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checkLocales, placeholdersOf } from '../src/check-keys';
+import { checkLocales, placeholdersOf, pluralFormsOf } from '../src/check-keys';
 import { resources } from '../src/index';
 
 describe('translation checks', () => {
@@ -26,6 +26,25 @@ describe('translation checks', () => {
   it('reports required keys that no language has', () => {
     const problems = checkLocales({ ar: { common: {} }, en: { common: {} } }, { common: ['x'] });
     expect(problems).toHaveLength(2);
+  });
+
+  it('asks every language for the plural forms its grammar needs', () => {
+    expect(pluralFormsOf('en')).toEqual(['one', 'other']);
+    expect(pluralFormsOf('ar')).toEqual(['zero', 'one', 'two', 'few', 'many', 'other']);
+    const problems = checkLocales({
+      ar: { common: { rows_one: 'صف واحد', rows_other: '{count} صف' } },
+      en: { common: { rows_one: '{count} row', rows_other: '{count} rows', rows_few: 'x' } },
+    });
+    expect(problems).toEqual(
+      expect.arrayContaining([
+        { language: 'ar', namespace: 'common', key: 'rows_few', issue: 'missing' },
+        { language: 'ar', namespace: 'common', key: 'rows_many', issue: 'missing' },
+        { language: 'ar', namespace: 'common', key: 'rows_two', issue: 'missing' },
+        { language: 'ar', namespace: 'common', key: 'rows_zero', issue: 'missing' },
+        expect.objectContaining({ language: 'en', key: 'rows_few', issue: 'plural_form' }),
+      ]),
+    );
+    expect(problems).toHaveLength(5);
   });
 
   it('passes for the real Arabic and English texts', () => {

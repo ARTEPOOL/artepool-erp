@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { Transaction } from 'kysely';
-import type { z } from 'zod';
+import { z } from 'zod';
+import { DeactivateRequest, IdText, ReactivateRequest } from '@artepool/shared/contracts';
 import { withBusinessTx } from '../db/tx';
 import type { DB } from '../db/schema.generated';
 import { AppError } from '../errors/app-error';
@@ -14,6 +15,8 @@ import {
 import type { Access } from './access';
 import { contextOf, header } from './context';
 import { IDEMPOTENCY_HEADER } from './logging';
+
+const DeactivateParams = z.object({ id: IdText });
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -100,6 +103,8 @@ export function defineWrite<P = undefined, Q = undefined, B = undefined, R = unk
     access: Extract<Access, { kind: 'session' } | { kind: 'permission' }>;
     /** Reason written to every audit entry of the transaction. */
     reason?: (input: RouteInput<P, Q, B>) => string | null;
+    /** Largest request body in bytes, when the default 1 MB is not enough (Excel imports). */
+    bodyLimit?: number;
     handler: (input: RouteInput<P, Q, B> & { trx: Transaction<DB> }) => Promise<WriteResult<R>>;
   },
 ): void {
@@ -107,6 +112,7 @@ export function defineWrite<P = undefined, Q = undefined, B = undefined, R = unk
     method: def.method,
     url: def.url,
     config: { access: def.access },
+    ...(def.bodyLimit ? { bodyLimit: def.bodyLimit } : {}),
     handler: async (request, reply) => {
       const key = header(request, IDEMPOTENCY_HEADER);
       if (!key || !UUID.test(key)) {
@@ -149,5 +155,47 @@ export function defineWrite<P = undefined, Q = undefined, B = undefined, R = unk
       }
       return reply.code(response.status).send(response.live ?? response.body);
     },
+  });
+}
+
+/**
+ * `POST <base>/:id/deactivate` (with a reason, written to the audit log) and
+ * `POST <base>/:id/reactivate` for master data: nothing is ever deleted (golden rule 2,
+ * decision 0037).
+ */
+export function defineActivation<R>(
+  app: FastifyInstance,
+  def: {
+    base: string;
+    access: Extract<Access, { kind: 'permission' }>;
+    setActive: (
+      trx: Transaction<DB>,
+      id: bigint,
+      active: boolean,
+      rowVersion: number,
+    ) => Promise<R>;
+  },
+): void {
+  const params = DeactivateParams;
+  defineWrite(app, {
+    method: 'POST',
+    url: `${def.base}/:id/deactivate`,
+    access: def.access,
+    params,
+    body: DeactivateRequest,
+    reason: ({ body }) => body.reason,
+    handler: async ({ trx, params: p, body }) => ({
+      body: await def.setActive(trx, BigInt(p.id), false, body.rowVersion),
+    }),
+  });
+  defineWrite(app, {
+    method: 'POST',
+    url: `${def.base}/:id/reactivate`,
+    access: def.access,
+    params,
+    body: ReactivateRequest,
+    handler: async ({ trx, params: p, body }) => ({
+      body: await def.setActive(trx, BigInt(p.id), true, body.rowVersion),
+    }),
   });
 }

@@ -5,3 +5,6 @@ packages:
   - db
 onlyBuiltDependencies:
   - esbuild
+overrides:
+  # exceljs pins uuid 8; it only uses v4, but 11.1.1 closes GHSA-w5hq-g745-h8pq anyway.
+  'exceljs>uuid': 11.1.1

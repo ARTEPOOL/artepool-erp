@@ -185,11 +185,21 @@ Phase tags: **[P1]** to **[P4]** (see section 13).
 
 ### 9.2 Master data [P1]
 - Company profile: bilingual name, TRN, address, logo, contact details.
-- Items: code, barcode(s), bilingual name, category, unit, cost (weighted average, 4-decimal precision), price(s) (4-decimal precision), VAT category (rate configurable per item), reorder level, default line of business, active flag.
+- Items: code (suggested by the app, fixed after creation), barcode(s), bilingual name, category, unit, cost (weighted average, 4-decimal precision), VAT category (rate configurable per item), reorder level, default line of business, active flag.
+- **One sale price per item** (4-decimal precision) with a **"Price includes VAT"** switch, set on the item screen. The tables are ready for a second price level by customer type later; no screen for it in P1 ([0032](docs/decisions/0032-one-sale-price-with-vat-flag-and-customer-types.md)).
 - Item types: stock item, service/labour, **bundle** (kit made of components).
-- Customers (VAT registration status and TRN), suppliers, technicians (no login needed), payment methods, warehouses.
+- **Customers:**
+  - **Type** (required): Individual / Contractor / Company.
+  - VAT registration status and TRN (15 digits starting with 100, unique).
+  - Phone (required, unique).
+  - **Cash or credit:** new customers start as cash with a zero credit limit. Giving credit (limit + payment terms) needs the `customers.credit` permission and a reason, and is audited ([0036](docs/decisions/0036-customers-start-as-cash.md), [0037](docs/decisions/0037-master-data-defaults.md)).
+- Suppliers, technicians (no login needed), payment methods, warehouses.
 - Lines of business: pool supplies, construction, maintenance, cleaning. Each has its own revenue account.
-- Bulk import from Excel templates.
+- Bulk import from Excel templates: **all or nothing**, after a check that reports every problem by row and column ([0031](docs/decisions/0031-excel-import-all-or-nothing.md)).
+- **Never deleted:** master data is deactivated with a reason and can be reactivated.
+- **Screen placement** ([0034](docs/decisions/0034-master-data-screen-placement.md)):
+  - side menu: Items & stock, Customers, Suppliers, Accounting
+  - Settings: Company, VAT & numbering, Lists
 
 ### 9.3 Inventory [P1]
 - Stock movements ledger: every in/out is a row. Stock on hand is derived from it and never edited directly.
@@ -270,6 +280,8 @@ Phase tags: **[P1]** to **[P4]** (see section 13).
 
 ### 9.9 Accounting [P1 core, P2 screens]
 - **[P1]** Chart of accounts (provisional, editable). Revenue is split by line of business: pool supplies, construction, maintenance, cleaning.
+  - The chart stays provisional until ARTÉPOOL's accountant approves it, and go-live waits for that approval.
+  - The fiscal year runs January–December ([0035](docs/decisions/0035-fiscal-year-and-provisional-chart.md)).
 - **[P1]** Automatic journal postings from every P1 module, following the posting map. The chart of accounts and posting map are **pending accountant review** before go-live ([0018](docs/decisions/0018-chart-of-accounts-and-posting-map.md)).
 - **[P1]** Monthly accounting periods and period lock.
 - **[P2]** Manual journal entries with approval.
@@ -320,9 +332,18 @@ Phase tags: **[P1]** to **[P4]** (see section 13).
 ## 10. UAE tax and compliance
 
 ### 10.1 VAT
-- Standard rate 5%. Zero-rated and exempt categories are configurable, and the **rate is configurable per item** (through its VAT category).
-- **VAT applies to every customer.**
-- Prices can be tax-inclusive or tax-exclusive, set per price list.
+- **Four fixed UAE VAT categories:**
+  - standard 5%
+  - zero-rated
+  - exempt
+  - out of scope
+
+  Each item has one. Only the owner can change a rate, with a reason; the change applies to new documents only and is audited ([0033](docs/decisions/0033-four-fixed-uae-vat-categories.md)).
+- **VAT applies to every customer:** individuals, contractors and companies, with no exceptions. The customer type never changes the VAT ([0032](docs/decisions/0032-one-sale-price-with-vat-flag-and-customer-types.md)).
+- **Prices can be tax-inclusive or tax-exclusive, set per item.**
+  - If the price includes VAT, the system works the net and the VAT back out of it.
+  - Otherwise it adds the VAT.
+- **Every tax invoice** (A4 or POS receipt), for every customer, shows net, VAT and total separately.
 - **VAT is calculated per line.** Invoice VAT total = sum of line VAT. VAT is shown per line and in the total ([0009](docs/decisions/0009-vat-per-line.md)).
 - Rounding: half away from zero to the fils, per line, through the shared helper. **No cash rounding.**
 - **VAT on payments received:** see 9.4 and [0013](docs/decisions/0013-advance-and-progress-payments-vat.md).
@@ -409,3 +430,4 @@ Each phase ends with automated tests passing, a security review, an accountant r
 | 1.1 | 2026-10-06 | Applied owner and accountant decisions 0001–0019: confirmed stack; separate repository; POS oversell with approval; one cashier per shift; cart removals logged without approval; one recount with approval; no code-signing for now; POS silent printing and separate A4 section; VAT per line; invoice format by VAT registration; POS-/INV- series; discounts net per line; VAT on advance/progress payments; 4-decimal unit precision and no cash rounding; defective held at cost; monthly lock; quarterly VAT export and annual archive; chart of accounts by line of business (pending review); e-invoicing via accredited provider (go-live pending). Ledger core moved into P1. |
 | 1.2 | 2026-10-07 | Phase 1 plan approved. Owner confirmed: VAT only on payments received before an invoice is issued; a 1-fils difference per movement is acceptable while the books match stock exactly; reprints marked "Copy" by default (setting); other document prefixes approved as defaults. Development moves to the owner's Windows PC after M0. |
 | 1.3 | 2026-10-07 | Added the print designer (9.6a, decision 0020): customisable, versioned print templates with locked tax fields, in Phase 1. UI design reference v2 (simple style) in `design/`. |
+| 1.4 | 2026-10-08 | M2 decisions 0031–0037:<br>• Excel import all or nothing after a check<br>• one sale price per item with a "price includes VAT" switch, net/VAT/total on every invoice, required customer type (price levels ready for later)<br>• four fixed UAE VAT categories with owner-only rate changes<br>• screen placement<br>• fiscal year January–December, with the chart provisional until the accountant approves<br>• customers start as cash, and credit is a permissioned, audited change<br>• master-data rules for codes, phones, TRNs and the logo |

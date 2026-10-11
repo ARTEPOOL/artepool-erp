@@ -21,6 +21,8 @@ export type JsonPrimitive = boolean | number | string | null;
 
 export type JsonValue = JsonArray | JsonObject | JsonPrimitive;
 
+export type Numeric = ColumnType<string, number | string, number | string>;
+
 export type Timestamp = ColumnType<Date, Date | string, Date | string>;
 
 export interface AuditAnchors {
@@ -252,6 +254,315 @@ export interface AuthUsers {
   username: string;
 }
 
+export interface GlAccountMappings {
+  account_id: bigint;
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  key: string;
+  needs_control: boolean;
+  required_type: string;
+  row_version: Generated<number>;
+  updated_at: Generated<Timestamp>;
+  updated_by: bigint;
+}
+
+export interface GlAccounts {
+  account_type: string;
+  code: string;
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  id: Generated<bigint>;
+  is_active: Generated<boolean>;
+  is_contra: Generated<boolean>;
+  is_control: Generated<boolean>;
+  is_postable: Generated<boolean>;
+  name_ar: string;
+  name_en: string;
+  parent_id: bigint | null;
+  row_version: Generated<number>;
+  updated_at: Generated<Timestamp>;
+  updated_by: bigint;
+}
+
+export interface GlPeriods {
+  closed_at: Timestamp | null;
+  closed_by: bigint | null;
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  fiscal_year: number;
+  id: Generated<bigint>;
+  locked_at: Timestamp | null;
+  locked_by: bigint | null;
+  period_end: string;
+  period_start: string;
+  row_version: Generated<number>;
+  status: Generated<string>;
+  updated_at: Generated<Timestamp>;
+  updated_by: bigint;
+}
+
+export interface MdBundleComponents {
+  bundle_item_id: bigint;
+  component_item_id: bigint;
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  quantity: Numeric;
+  row_version: Generated<number>;
+  updated_at: Generated<Timestamp>;
+  updated_by: bigint;
+}
+
+export interface MdBusinessLines {
+  code: string;
+  cogs_account_id: bigint;
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  id: Generated<bigint>;
+  is_active: Generated<boolean>;
+  name_ar: string;
+  name_en: string;
+  revenue_account_id: bigint;
+  row_version: Generated<number>;
+  sort_order: Generated<number>;
+  updated_at: Generated<Timestamp>;
+  updated_by: bigint;
+}
+
+export interface MdCashDenominations {
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  id: Generated<bigint>;
+  is_active: Generated<boolean>;
+  kind: string;
+  row_version: Generated<number>;
+  sort_order: Generated<number>;
+  updated_at: Generated<Timestamp>;
+  updated_by: bigint;
+  value_fils: bigint;
+}
+
+export interface MdCustomers {
+  address_line: string | null;
+  area: string | null;
+  city: string | null;
+  code: string;
+  country_code: Generated<string>;
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  credit_limit_fils: Generated<bigint>;
+  credit_mode: Generated<string>;
+  customer_type: string;
+  email: string | null;
+  emirate: string | null;
+  id: Generated<bigint>;
+  is_active: Generated<boolean>;
+  is_vat_registered: Generated<boolean>;
+  is_walk_in: Generated<boolean>;
+  name: string;
+  name_alt: string | null;
+  notes: string | null;
+  payment_terms_days: Generated<number>;
+  phone: string | null;
+  phone_alt: string | null;
+  po_box: string | null;
+  preferred_language: string | null;
+  row_version: Generated<number>;
+  search_key: Generated<string | null>;
+  trn: string | null;
+  updated_at: Generated<Timestamp>;
+  updated_by: bigint;
+}
+
+export interface MdItemBarcodes {
+  barcode: string;
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  id: Generated<bigint>;
+  is_active: Generated<boolean>;
+  is_primary: Generated<boolean>;
+  item_id: bigint;
+  qty_per_scan: Generated<Numeric>;
+  row_version: Generated<number>;
+  updated_at: Generated<Timestamp>;
+  updated_by: bigint;
+}
+
+export interface MdItemCategories {
+  code: string;
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  id: Generated<bigint>;
+  is_active: Generated<boolean>;
+  name_ar: string;
+  name_en: string;
+  parent_id: bigint | null;
+  row_version: Generated<number>;
+  sort_order: Generated<number>;
+  updated_at: Generated<Timestamp>;
+  updated_by: bigint;
+}
+
+export interface MdItemPrices {
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  id: Generated<bigint>;
+  includes_vat: boolean;
+  item_id: bigint;
+  price_4dp: bigint;
+  price_level_id: bigint;
+  row_version: Generated<number>;
+  updated_at: Generated<Timestamp>;
+  updated_by: bigint;
+}
+
+export interface MdItems {
+  category_id: bigint;
+  code: string;
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  default_business_line_id: bigint | null;
+  description_ar: string | null;
+  description_en: string | null;
+  fallback_unit_cost_4dp: bigint | null;
+  id: Generated<bigint>;
+  is_active: Generated<boolean>;
+  is_sellable: Generated<boolean>;
+  item_type: string;
+  name_ar: string;
+  name_en: string;
+  reorder_level: Numeric | null;
+  reorder_qty: Numeric | null;
+  row_version: Generated<number>;
+  search_key: Generated<string | null>;
+  unit_id: bigint;
+  updated_at: Generated<Timestamp>;
+  updated_by: bigint;
+  vat_category_id: bigint;
+}
+
+export interface MdPaymentMethods {
+  code: string;
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  gives_change: Generated<boolean>;
+  gl_account_id: bigint;
+  id: Generated<bigint>;
+  in_office: Generated<boolean>;
+  in_pos: Generated<boolean>;
+  is_active: Generated<boolean>;
+  kind: string;
+  name_ar: string;
+  name_en: string;
+  opens_drawer: Generated<boolean>;
+  requires_reference: Generated<boolean>;
+  row_version: Generated<number>;
+  sort_order: Generated<number>;
+  updated_at: Generated<Timestamp>;
+  updated_by: bigint;
+}
+
+export interface MdPriceLevels {
+  code: string;
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  customer_types: Generated<string[]>;
+  id: Generated<bigint>;
+  is_active: Generated<boolean>;
+  is_default: Generated<boolean>;
+  name_ar: string;
+  name_en: string;
+  row_version: Generated<number>;
+  sort_order: Generated<number>;
+  updated_at: Generated<Timestamp>;
+  updated_by: bigint;
+}
+
+export interface MdSuppliers {
+  address_line: string | null;
+  city: string | null;
+  code: string;
+  country_code: Generated<string>;
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  email: string | null;
+  emirate: string | null;
+  id: Generated<bigint>;
+  is_active: Generated<boolean>;
+  is_vat_registered: Generated<boolean>;
+  name: string;
+  name_alt: string | null;
+  notes: string | null;
+  payment_terms_days: Generated<number>;
+  phone: string | null;
+  row_version: Generated<number>;
+  search_key: Generated<string | null>;
+  trn: string | null;
+  updated_at: Generated<Timestamp>;
+  updated_by: bigint;
+}
+
+export interface MdTechnicians {
+  code: string;
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  id: Generated<bigint>;
+  is_active: Generated<boolean>;
+  name_ar: string;
+  name_en: string;
+  phone: string | null;
+  row_version: Generated<number>;
+  updated_at: Generated<Timestamp>;
+  updated_by: bigint;
+  user_id: bigint | null;
+}
+
+export interface MdUnits {
+  code: string;
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  decimals: number;
+  einvoice_code: string | null;
+  id: Generated<bigint>;
+  is_active: Generated<boolean>;
+  name_ar: string;
+  name_en: string;
+  row_version: Generated<number>;
+  updated_at: Generated<Timestamp>;
+  updated_by: bigint;
+}
+
+export interface MdVatCategories {
+  code: string;
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  einvoice_code: string;
+  id: Generated<bigint>;
+  is_active: Generated<boolean>;
+  name_ar: string;
+  name_en: string;
+  rate_bp: number;
+  row_version: Generated<number>;
+  updated_at: Generated<Timestamp>;
+  updated_by: bigint;
+}
+
+export interface MdWarehouses {
+  branch_id: bigint;
+  code: string;
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  id: Generated<bigint>;
+  is_active: Generated<boolean>;
+  is_default: Generated<boolean>;
+  name_ar: string;
+  name_en: string;
+  row_version: Generated<number>;
+  technician_id: bigint | null;
+  updated_at: Generated<Timestamp>;
+  updated_by: bigint;
+  warehouse_type: string;
+}
+
 export interface SysAlerts {
   ack_note: string | null;
   acknowledged_at: Timestamp | null;
@@ -353,6 +664,22 @@ export interface SysImportBatches {
   status: string;
 }
 
+export interface SysReasonCodes {
+  category: string;
+  code: string;
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  gl_account_id: bigint | null;
+  id: Generated<bigint>;
+  is_active: Generated<boolean>;
+  name_ar: string;
+  name_en: string;
+  requires_note: Generated<boolean>;
+  row_version: Generated<number>;
+  updated_at: Generated<Timestamp>;
+  updated_by: bigint;
+}
+
 export interface SysSchemaMigrations {
   applied_at: Generated<Timestamp>;
   applied_by: string;
@@ -390,12 +717,31 @@ export interface DB {
   "auth.sessions": AuthSessions;
   "auth.user_roles": AuthUserRoles;
   "auth.users": AuthUsers;
+  "gl.account_mappings": GlAccountMappings;
+  "gl.accounts": GlAccounts;
+  "gl.periods": GlPeriods;
+  "md.bundle_components": MdBundleComponents;
+  "md.business_lines": MdBusinessLines;
+  "md.cash_denominations": MdCashDenominations;
+  "md.customers": MdCustomers;
+  "md.item_barcodes": MdItemBarcodes;
+  "md.item_categories": MdItemCategories;
+  "md.item_prices": MdItemPrices;
+  "md.items": MdItems;
+  "md.payment_methods": MdPaymentMethods;
+  "md.price_levels": MdPriceLevels;
+  "md.suppliers": MdSuppliers;
+  "md.technicians": MdTechnicians;
+  "md.units": MdUnits;
+  "md.vat_categories": MdVatCategories;
+  "md.warehouses": MdWarehouses;
   "sys.alerts": SysAlerts;
   "sys.branches": SysBranches;
   "sys.company_profile": SysCompanyProfile;
   "sys.document_series": SysDocumentSeries;
   "sys.idempotency_keys": SysIdempotencyKeys;
   "sys.import_batches": SysImportBatches;
+  "sys.reason_codes": SysReasonCodes;
   "sys.schema_migrations": SysSchemaMigrations;
   "sys.settings": SysSettings;
 }

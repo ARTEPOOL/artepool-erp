@@ -1,0 +1,186 @@
+/* From design/screens/07-items-stock.html and 14-customers.html: .page-h, .kpis, .kpi, .layout,
+   .detail, .bar, .list, .dl, .offbar */
+.page {
+  display: grid;
+  gap: var(--space-5);
+  align-content: start;
+}
+
+.pageHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.pageHeader h1 {
+  font-size: var(--text-h1);
+  line-height: 1.35;
+  font-weight: 600;
+  text-wrap: balance;
+}
+
+.pageHeader p {
+  color: var(--color-text-secondary);
+}
+
+.tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.kpi {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.kpi > div {
+  display: grid;
+  line-height: 1.35;
+}
+
+.kpi b {
+  font-size: var(--text-h2);
+  font-weight: 700;
+}
+
+.kpiLabel {
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 21rem;
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.layoutMain {
+  min-inline-size: 0;
+}
+
+.detail {
+  display: grid;
+  gap: var(--space-4);
+  position: sticky;
+  inset-block-start: var(--space-4);
+}
+
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: center;
+  justify-content: space-between;
+  margin-block-end: var(--space-3);
+}
+
+.bar > label:first-child {
+  flex: 1;
+  min-inline-size: 14rem;
+  max-inline-size: 24rem;
+}
+
+.list {
+  padding: var(--space-2) var(--space-5);
+  overflow-x: auto;
+}
+
+.dl {
+  display: grid;
+  gap: var(--space-2);
+  font-size: var(--text-label);
+  margin: 0;
+}
+
+.dl div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.dl dt {
+  color: var(--color-text-secondary);
+}
+
+.dl dd {
+  margin: 0;
+  font-weight: 600;
+  text-align: end;
+  overflow-wrap: anywhere;
+}
+
+.infoBar {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-muted);
+  font-size: var(--text-label);
+}
+
+.infoBar svg {
+  inline-size: 1rem;
+  block-size: 1rem;
+  flex-shrink: 0;
+  margin-block-start: 0.2rem;
+}
+
+.empty {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2);
+  padding: var(--space-6) var(--space-4);
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  border-block-end: 1px solid var(--color-border);
+}
+
+.tabs button {
+  min-block-size: 2.5rem;
+  padding-inline: var(--space-4);
+  border: none;
+  border-block-end: 2px solid transparent;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--text-label);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tabs button[aria-selected='true'] {
+  color: var(--color-primary);
+  border-block-end-color: var(--color-primary);
+}
+
+@media (max-width: 1250px) {
+  .kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .detail {
+    position: static;
+  }
+}

@@ -1,7 +1,7 @@
 /** `pnpm i18n:check` — fails if any text is missing, empty or has different placeholders. */
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { ERROR_CODES } from '@artepool/shared/errors';
+import { ERROR_CODES, RULE_CODES } from '@artepool/shared/errors';
 import { checkLocales, type LocaleTree, type Messages } from './check-keys';
 
 const localesDir = join(import.meta.dirname, '..', 'locales');
@@ -15,7 +15,12 @@ for (const language of readdirSync(localesDir)) {
   }
 }
 
-const problems = checkLocales(tree, { common: ERROR_CODES.map((code) => `errors.${code}`) });
+const problems = checkLocales(tree, {
+  common: [
+    ...ERROR_CODES.map((code) => `errors.${code}`),
+    ...RULE_CODES.map((code) => `errors.rules.${code}`),
+  ],
+});
 if (problems.length === 0) {
   console.log(`i18n OK: ${Object.keys(tree).join(', ')} have the same texts and placeholders.`);
 } else {

@@ -20,6 +20,7 @@ test('the owner creates a user, then deactivates them with a reason', async ({
   await open('office');
   await signInAsOwner(page, t);
   await page.getByRole('link', { name: t('settings:nav.settings') }).click();
+  await page.getByRole('link', { name: t('settings:hub.users') }).click();
   await expect(page.getByRole('heading', { name: t('settings:users.title') })).toBeVisible();
   await snap(page, '20-settings-users');
 

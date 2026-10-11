@@ -45,6 +45,8 @@ export const ERROR_CODES = [
   'TIMEOUT',
   'MONEY_FORMAT',
   'MONEY_RULE',
+  'RULE_VIOLATION',
+  'STALE_VERSION',
   'INTERNAL',
 ] as const;
 
@@ -65,6 +67,8 @@ export const SQLSTATE_TO_ERROR_CODE: Readonly<Record<string, ErrorCode>> = {
   AP008: 'OWNER_PROTECTED',
   AP009: 'APPROVAL_INVALID',
   AP010: 'SIGN_IN_NOT_ALLOWED',
+  AP011: 'RULE_VIOLATION',
+  AP012: 'PERMISSION_DENIED',
   '22P02': 'VALIDATION_FAILED',
   '23502': 'VALIDATION_FAILED',
   '23514': 'VALIDATION_FAILED',
@@ -79,4 +83,53 @@ export const SQLSTATE_TO_ERROR_CODE: Readonly<Record<string, ErrorCode>> = {
 
 export function errorCodeForSqlState(sqlState: string | undefined): ErrorCode {
   return (sqlState && SQLSTATE_TO_ERROR_CODE[sqlState]) || 'INTERNAL';
+}
+
+/**
+ * Business rules with their own message: the database raises them as AP011 (a rule) or AP012
+ * (a permission rule) with the rule code as HINT, and the API checks some of them first. The
+ * client receives `details.rule` and translates `errors.rules.<RULE>`.
+ */
+export const RULE_CODES = [
+  'REASON_REQUIRED',
+  'CODE_FIXED',
+  'REFERENCE_INACTIVE',
+  'STILL_USED',
+  'DEFAULT_REQUIRED',
+  'QUANTITY_DECIMALS',
+  'ACCOUNT_PARENT_NOT_HEADER',
+  'ACCOUNT_PARENT_TYPE',
+  'ACCOUNT_PARENT_INACTIVE',
+  'ACCOUNT_LOOP',
+  'ACCOUNT_HAS_CHILDREN',
+  'ACCOUNT_IN_USE',
+  'MAPPING_ACCOUNT_INVALID',
+  'BUSINESS_LINE_ACCOUNT_INVALID',
+  'PAYMENT_ACCOUNT_INVALID',
+  'REASON_ACCOUNT_INVALID',
+  'PERIOD_STATUS_STEP',
+  'PERIOD_GAP',
+  'PERIOD_LOCKED',
+  'PERIOD_NOT_ENDED',
+  'PERIOD_ORDER',
+  'SERIES_IN_USE',
+  'VAT_RATE_OWNER_ONLY',
+  'ITEM_TYPE_FIXED',
+  'ITEM_IN_ACTIVE_KIT',
+  'CATEGORY_LOOP',
+  'KIT_RULE',
+  'PRICE_LEVEL_TYPE_TAKEN',
+  'PRICE_REQUIRED',
+  'WALK_IN_LOCKED',
+  'CREDIT_PERMISSION',
+  'LOGO_INVALID',
+  'IMPORT_NOT_CHECKED',
+  'IMPORT_FILE_CHANGED',
+  'IMPORT_HAS_ERRORS',
+] as const;
+
+export type RuleCode = (typeof RULE_CODES)[number];
+
+export function isRuleCode(value: unknown): value is RuleCode {
+  return typeof value === 'string' && (RULE_CODES as readonly string[]).includes(value);
 }

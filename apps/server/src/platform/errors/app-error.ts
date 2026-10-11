@@ -1,8 +1,10 @@
 import {
   errorCodeForSqlState,
+  isRuleCode,
   MoneyFormatError,
   MoneyRuleError,
   type ErrorCode,
+  type RuleCode,
 } from '@artepool/shared';
 
 const HTTP_STATUS: Record<ErrorCode, number> = {
@@ -48,6 +50,8 @@ const HTTP_STATUS: Record<ErrorCode, number> = {
   TIMEOUT: 503,
   MONEY_FORMAT: 422,
   MONEY_RULE: 422,
+  RULE_VIOLATION: 422,
+  STALE_VERSION: 409,
   INTERNAL: 500,
 };
 
@@ -68,6 +72,49 @@ export class AppError extends Error {
     super(message, options);
     this.httpStatus = HTTP_STATUS[code];
   }
+}
+
+/** A broken business rule, translated by the app as `errors.rules.<rule>`. */
+export function ruleError(rule: RuleCode, message: string, details: Record<string, unknown> = {}) {
+  return new AppError('RULE_VIOLATION', message, { rule, ...details });
+}
+
+/**
+ * Unique indexes → the form field the duplicate is about, so the screen can show the message
+ * under that field. Index names never reach the client.
+ */
+const DUPLICATE_FIELDS: Readonly<Record<string, string>> = {
+  accounts_code_uq: 'code',
+  business_lines_code_uq: 'code',
+  units_code_uq: 'code',
+  item_categories_code_uq: 'code',
+  items_code_uq: 'code',
+  item_barcodes_active_uq: 'barcodes',
+  customers_code_uq: 'code',
+  customers_phone_uq: 'phone',
+  customers_trn_uq: 'trn',
+  suppliers_code_uq: 'code',
+  suppliers_trn_uq: 'trn',
+  technicians_code_uq: 'code',
+  technicians_user_id_key: 'userId',
+  payment_methods_code_uq: 'code',
+  warehouses_code_uq: 'code',
+  reason_codes_code_uq: 'code',
+  series_prefix_uq: 'prefix',
+};
+
+/** Extra, safe details of a database error: the broken rule, or the duplicate field. */
+function databaseDetails(error: unknown, state: string): Record<string, unknown> {
+  const e = error as { hint?: unknown; detail?: unknown; constraint?: unknown };
+  if ((state === 'AP011' || state === 'AP012') && isRuleCode(e.hint)) {
+    // DETAIL carries a short machine word (e.g. why an account is in use), never data.
+    const why = typeof e.detail === 'string' && /^[a-z_]{1,40}$/.test(e.detail) ? e.detail : null;
+    return why ? { rule: e.hint, why } : { rule: e.hint };
+  }
+  if (state === '23505' && typeof e.constraint === 'string' && DUPLICATE_FIELDS[e.constraint]) {
+    return { field: DUPLICATE_FIELDS[e.constraint] };
+  }
+  return {};
 }
 
 function sqlStateOf(error: unknown): string | undefined {
@@ -92,7 +139,7 @@ export function toAppError(error: unknown): AppError {
     return new AppError(
       errorCodeForSqlState(state),
       message,
-      { sqlState: state },
+      { sqlState: state, ...databaseDetails(error, state) },
       { cause: error },
     );
   }

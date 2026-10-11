@@ -1,5 +1,19 @@
 # Changelog
 
+## M2 — Master data and chart of accounts (2026-10-11)
+
+**In plain words:** the owner can now enter everything the shop is built on: the company details printed on tax invoices, items with barcodes and one sale price (with a "Price includes VAT" switch), customers and suppliers, the short lists (units, categories, payment methods, warehouses, technicians, lines of business, reasons), the provisional chart of accounts with its event links, and the monthly accounting periods. Existing items and customers come in from Excel: checked first, then all rows or none. Nothing is ever deleted. Arabic and English, light and dark. Proven by 237 unit and screen, 339 integration and 42 browser tests.
+
+- **Database:** migration 0008 (chart of accounts, event links, monthly periods kept 3 months ahead) and 0009 (master data, price levels, reason codes). Business rules live in the database and answer with a clear rule code the screens translate.
+- **Prices and VAT (decisions 0032, 0033):** one sale price to 4 decimals per item, with "Price includes VAT"; the screens always show net, VAT and total, split or added through the shared rounding helper. Four fixed UAE VAT categories; only the owner changes a rate, with a reason, for new documents only. Ready for a second price level later, without building it now.
+- **Items (design 07):** stock items, services and kits; barcodes with one main barcode and pack quantities; the code is suggested from the category and never changes; the type is fixed once used; search ignores Arabic letter forms ("مضخه ارضيه" finds "مضخة أرضية").
+- **Customers (design 14) and suppliers:** customer type (Individual / Contractor / Company); VAT-registered customers need a TRN (15 digits starting with 100) and get a full tax invoice; phone and TRN are unique; new customers start as cash and only the owner or accountant gives credit, with a reason (decision 0036); the walk-in customer is locked; export to Excel is written to the audit log.
+- **Settings:** Company (owner only; logo PNG/JPEG up to 512 KB, checked by content), VAT & numbering (series fixed after their first number, close / reopen with a reason / lock a month for good, e-invoicing waiting for the accountant), and the new Lists section.
+- **Accounting:** the provisional chart as a tree (an account in use keeps its type and cannot be deactivated) and the event links, which accept only a suitable account. Go-live waits for the accountant's approval (decision 0035).
+- **Excel import (decision 0031):** templates with Arabic and English headers; check first with a row-by-row report; then one transaction for all rows or none; a file changed after the check must be checked again.
+- **Every save is protected against "changed by someone else"**: the screen offers to reload instead of overwriting.
+- **Fixes found on the way:** Arabic counts now use every Arabic plural form (2 → صفّين, 3–10 → صفوف, 11–99 → صفًا), and the translation check requires them; a React key clash on the Users screen (user 3 next to role 3) is gone.
+
 ## M1 — Security core and app shell (2026-10-07)
 
 **In plain words:** only enrolled PCs can talk to the server, over an encrypted connection; people sign in safely (password, cashier PIN on POS PCs, owner's phone code); and the owner manages users, PCs and the audit log in Settings — in Arabic and English, light and dark, matching the approved design. Proven by 164 unit, 260 integration, 26 Rust and 32 browser tests.

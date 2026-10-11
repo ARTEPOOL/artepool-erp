@@ -18,7 +18,7 @@ const NOT_ROW_AUDITED = [
   'sys.idempotency_keys',
 ];
 /** Link and technical tables the API may delete from (docs/database-schema.md §2). */
-const API_MAY_DELETE = ['auth.role_permissions', 'auth.user_roles'];
+const API_MAY_DELETE = ['auth.role_permissions', 'auth.user_roles', 'md.bundle_components'];
 
 let db: TestDatabase;
 let admin: pg.Client;

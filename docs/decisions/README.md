@@ -37,6 +37,13 @@ There is one short file per decision, numbered in order.
 | [0028](0028-forgot-password-with-phone-and-recovery-code.md) | Forgot password: recover it in the app with the phone code and one recovery code | Accepted |
 | [0029](0029-owner-password-reset-on-the-server-pc.md) | Emergency owner password reset on the server PC (`pnpm owner:reset-password`) | Accepted |
 | [0030](0030-company-details-owner-only.md) | Company details owner-only; the accountant keeps the audit log | Accepted |
+| [0031](0031-excel-import-all-or-nothing.md) | Excel import: all or nothing, after a full check with a row-by-row report | Accepted |
+| [0032](0032-one-sale-price-with-vat-flag-and-customer-types.md) | One sale price per item with a "price includes VAT" switch; VAT shown on every invoice; customer types; price levels ready for later | Accepted |
+| [0033](0033-four-fixed-uae-vat-categories.md) | Four fixed UAE VAT categories; only the owner changes a rate | Accepted |
+| [0034](0034-master-data-screen-placement.md) | Where the master-data screens go (Suppliers and Accounting in the side menu; Settings → Lists) | Accepted |
+| [0035](0035-fiscal-year-and-provisional-chart.md) | Fiscal year January–December; chart of accounts provisional until the accountant approves | Accepted |
+| [0036](0036-customers-start-as-cash.md) | New customers start as cash; credit is a permissioned, audited change | Accepted |
+| [0037](0037-master-data-defaults.md) | Master-data rules: item codes, phones, TRNs, logo, never deleted | Accepted |
 
 ## Template
 

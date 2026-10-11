@@ -6,3 +6,4 @@ export * from './Surface';
 export * from './Toasts';
 export * from './Menu';
 export * from './Table';
+export * from './Page';

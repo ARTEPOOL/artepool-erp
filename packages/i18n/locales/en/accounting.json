@@ -1,0 +1,129 @@
+{
+  "title": "Accounting",
+  "subtitle": "Provisional chart of accounts, pending the accountant's approval",
+  "provisional": "This chart of accounts and the account used for each event are provisional. They can still be changed until ARTÉPOOL's accountant approves them; the system goes live only after that approval. Every change is written to the audit log for the accountant to review.",
+  "loading": "Loading…",
+  "tabs": {
+    "chart": "Chart of accounts",
+    "links": "Event links"
+  },
+  "chart": {
+    "search": "Search by code or name",
+    "new": "New account",
+    "newUnder": "New account under {code}",
+    "editOne": "Edit {code}",
+    "editTitle": "Edit account {code}",
+    "deactivateOne": "Deactivate {code}",
+    "deactivateTitle": "Deactivate account",
+    "deactivateNote": "Accounts are never deleted: their history must be kept. A deactivated account receives no new postings; you can reactivate it later.",
+    "empty": "The chart of accounts is empty.",
+    "noMatch": "No account matches this search.",
+    "lockedWhy": "This account is in use ({reason}), so its type, header choice, control flag and active state cannot change. Its code, names, the header it sits under and the contra flag can still change."
+  },
+  "col": {
+    "code": "Code",
+    "name": "Account",
+    "type": "Type",
+    "flags": "Kind",
+    "inUse": "In use",
+    "status": "Status",
+    "actions": "Actions"
+  },
+  "types": {
+    "asset": "Asset",
+    "liability": "Liability",
+    "equity": "Equity",
+    "revenue": "Revenue",
+    "expense": "Expense"
+  },
+  "flags": {
+    "header": "Header",
+    "control": "Control",
+    "contra": "Contra"
+  },
+  "inUse": {
+    "event_link": "Used by an event link",
+    "business_line": "Used by a line of business",
+    "payment_method": "Used by a payment method",
+    "reason_code": "Used by a reason code",
+    "posted": "Has postings"
+  },
+  "field": {
+    "code": "Code",
+    "nameAr": "Name in Arabic",
+    "nameEn": "Name in English",
+    "type": "Type",
+    "parent": "Under header",
+    "topLevel": "Top level",
+    "isHeader": "Header account",
+    "isHeaderHint": "Groups other accounts and never receives postings itself.",
+    "isControl": "Control account",
+    "isControlHint": "Its balance is the total of a sub-ledger (e.g. all customers); only automatic postings use it.",
+    "isContra": "Contra account",
+    "isContraHint": "Reduces its group's balance (e.g. accumulated depreciation)."
+  },
+  "links": {
+    "help": "Each event below posts automatically to the account chosen here. Only suitable accounts are offered: active, receiving postings, of the type shown, and a control account only where one is needed.",
+    "readOnly": "Each event below posts automatically to the account shown. Only people allowed to manage the chart of accounts can change them.",
+    "event": "When this happens",
+    "needs": "Needs",
+    "account": "Account",
+    "accountFor": "Account for: {event}",
+    "control": "control account",
+    "notControl": "not a control account",
+    "save": "Save",
+    "saveFor": "Save the account for: {event}",
+    "saved": "Saved: {event}.",
+    "empty": "No event links.",
+    "keys": {
+      "ar_control": {
+        "title": "Customer receivables",
+        "body": "Every customer posting: invoices, payments, credit notes and refunds."
+      },
+      "ap_control": {
+        "title": "Supplier payables",
+        "body": "Every supplier posting (purchases arrive in Phase 2)."
+      },
+      "customer_advances": {
+        "title": "Customer advances",
+        "body": "The net amount of advance and progress payments, until the final invoice deducts them."
+      },
+      "vat_output": {
+        "title": "VAT payable on sales",
+        "body": "The VAT on every tax invoice, and its reversal on credit notes."
+      },
+      "vat_input": {
+        "title": "VAT recoverable on purchases",
+        "body": "The VAT paid on purchases and expenses (Phase 2)."
+      },
+      "inventory": {
+        "title": "Inventory – sellable",
+        "body": "The value of stock for sale: goods sold leave at cost; returns and counts add or remove value."
+      },
+      "inventory_defective": {
+        "title": "Inventory – defective",
+        "body": "Broken returns, held at cost until they are written off."
+      },
+      "stock_adjustments": {
+        "title": "Stock adjustments",
+        "body": "Gains and losses from stock counts, adjustments and approved overselling at the POS."
+      },
+      "write_off": {
+        "title": "Defective stock write-offs",
+        "body": "The cost of defective goods that are written off."
+      },
+      "cash_over_short": {
+        "title": "Cash over / short",
+        "body": "The difference found when a cashier's shift is closed."
+      },
+      "cash_in_safe": {
+        "title": "Cash in safe",
+        "body": "Cash dropped from the drawers into the safe, and float taken from it."
+      },
+      "opening_balance_equity": {
+        "title": "Opening balances",
+        "body": "The other side of the opening customer balances and opening stock at go-live."
+      }
+    }
+  }
+}

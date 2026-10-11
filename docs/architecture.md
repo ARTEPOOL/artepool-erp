@@ -129,7 +129,7 @@ App (POS section)                     API                                       
  │                                     │ 3. verify approvals (single-use, matching) │
  │                                     │ 4. BEGIN; set request context ────────────►│
  │                                     │ 5. idempotency key seen? → earlier result  │
- │                                     │ 6. re-price every line from price list     │
+ │                                     │ 6. re-price every line from the item price │
  │                                     │    (4-dp unit prices), discounts spread,   │
  │                                     │    VAT per line → fils via shared helper   │
  │                                     │ 7. format: full if customer VAT-registered,│
@@ -177,7 +177,7 @@ App (POS section)                     API                                       
 - **Line math, VAT inclusive:** the same, except that the result after discounts is the gross; `vat = round_fils(gross × rate / (10000 + rate))` and `net = gross − vat`.
 - **VAT per line ([0009](decisions/0009-vat-per-line.md)):** document VAT = Σ line VAT. VAT is shown per line and in the total.
 - **Document discount** is spread across lines by value (largest-remainder method, exact to the fils) **before** VAT.
-- **Lines store and print ([0012](decisions/0012-discounts-net-revenue-per-line.md)):** original price, amount before discount, discount, net, VAT and total. For VAT-inclusive price lists, the price and discount columns are labelled "incl. VAT", so every printed row adds up exactly.
+- **Lines store and print ([0012](decisions/0012-discounts-net-revenue-per-line.md)):** original price, amount before discount, discount, net, VAT and total. For items whose price includes VAT ([0032](decisions/0032-one-sale-price-with-vat-flag-and-customer-types.md)), that line's price and discount are labelled "incl. VAT", so every printed row adds up exactly.
 - **Revenue is posted net of discount.** There is no discount account; discounts are reported from the lines.
 - **Invoice format ([0010](decisions/0010-invoice-format-by-vat-registration.md)):** a VAT-registered customer gets a full tax invoice with TRN; everyone else gets a simplified tax invoice. This applies to POS and A4, and to notes.
 
