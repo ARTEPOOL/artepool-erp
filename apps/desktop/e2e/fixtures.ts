@@ -106,6 +106,11 @@ export const test = base.extend<{
       },
       [lang, theme] as const,
     );
+    // React key clashes mean a list can show the wrong rows: report them in the test output.
+    page.on('console', (message) => {
+      if (message.type() === 'error' && message.text().includes('same key'))
+        console.warn(`React key clash on ${page.url()}: ${message.text()}`);
+    });
     await use(async (pc) => {
       await page.goto(`http://localhost:${E2E.pcs[pc].port}/`);
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 30_000 });
