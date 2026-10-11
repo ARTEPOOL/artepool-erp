@@ -37,7 +37,14 @@ export function registerImportRoutes(app: FastifyInstance): void {
       for (const permission of imports.IMPORT_PERMISSIONS[params.entity]) {
         requireAlso(request.auth, permission);
       }
-      return { body: await imports.checkImport(trx, params.entity, body) };
+      return {
+        body: await imports.checkImport(
+          trx,
+          params.entity,
+          body,
+          request.auth?.permissions.has('items.cost') ?? false,
+        ),
+      };
     },
   });
   defineWrite(app, {
@@ -59,6 +66,7 @@ export function registerImportRoutes(app: FastifyInstance): void {
           params.entity,
           BigInt(params.batchId),
           body,
+          request.auth?.permissions.has('items.cost') ?? false,
         ),
       };
     },

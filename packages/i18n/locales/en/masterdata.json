@@ -47,7 +47,8 @@
     "kits_only": "Only kits have components.",
     "one_primary": "Choose one main barcode.",
     "unknown": "Not found.",
-    "invalid_number": "Write a number."
+    "invalid_number": "Write a number.",
+    "kit_cost": "A kit's cost is worked out from its components."
   },
   "emirates": {
     "abu_dhabi": "Abu Dhabi",
@@ -109,7 +110,8 @@
       "price_required": "An item for sale needs a price above zero",
       "stock_fields_for_stock_only": "Only stock items have this",
       "too_many_decimals": "More decimals than the unit allows",
-      "trn_needs_registration": "A TRN needs \"VAT-registered\" = yes"
+      "trn_needs_registration": "A TRN needs \"VAT-registered\" = yes",
+      "cost_needs_permission": "Only the owner can set a purchase price"
     }
   }
 }

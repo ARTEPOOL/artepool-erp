@@ -193,6 +193,7 @@ describe('the owner is protected (decisions 0025, 0026)', () => {
       'SELECT code FROM auth.permissions WHERE owner_only ORDER BY code',
     );
     expect(rows.map((r) => r.code)).toEqual([
+      'items.cost', // purchase prices are for the owner only (decision 0038)
       'roles.manage',
       'system.company.edit', // company details are printed on tax invoices (decision 0030)
       'system.devices.manage',

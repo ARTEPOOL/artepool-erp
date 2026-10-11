@@ -47,6 +47,8 @@ export interface ItemForm {
   isSellable: boolean;
   price: string;
   includesVat: boolean;
+  /** Purchase price without VAT, as typed (owner only; decision 0038). */
+  purchaseCost: string;
   barcodes: BarcodeRow[];
   components: ComponentRow[];
   reorderLevel: string;
@@ -62,6 +64,7 @@ export type FormField =
   | 'unitId'
   | 'vatCategoryId'
   | 'price'
+  | 'purchaseCost4dp'
   | 'barcodes'
   | 'components'
   | 'reorderLevelMilli';
@@ -97,6 +100,7 @@ export function emptyForm(defaults: { unitId: string; vatCategoryId: string }): 
     isSellable: true,
     price: '',
     includesVat: true,
+    purchaseCost: '',
     barcodes: [],
     components: [],
     reorderLevel: '',
@@ -118,6 +122,11 @@ export function formFromItem(item: ItemDetail): ItemForm {
     isSellable: item.isSellable,
     price: item.price ? formatPrice(BigInt(item.price.price4dp)) : '',
     includesVat: item.price?.includesVat ?? true,
+    // A kit's cost is worked out from its components, never typed.
+    purchaseCost:
+      item.itemType !== 'bundle' && item.purchaseCost4dp
+        ? formatPrice(BigInt(item.purchaseCost4dp))
+        : '',
     barcodes: item.barcodes.map((b) => ({
       key: rowKey(),
       barcode: b.barcode,
@@ -172,6 +181,8 @@ export function buildItem(
     isNew: boolean;
     units: UnitItem[];
     canPrice: boolean;
+    /** The owner (`items.cost`): the purchase price is part of the form and of the request. */
+    canCost: boolean;
     original?: ItemDetail;
   },
 ): { errors: FormErrors; body: ItemBody | null; code: string } {
@@ -202,6 +213,19 @@ export function buildItem(
   } else {
     price = options.original?.price ?? null;
     if (form.isSellable && !price) errors.price = 'items:dialog.errors.priceLocked';
+  }
+
+  // The purchase price, without VAT (decision 0038). Without `items.cost` it is left out of the
+  // request, so the server keeps it; a kit never has one of its own.
+  let purchaseCost4dp: ItemBody['purchaseCost4dp'];
+  if (options.canCost) {
+    if (form.itemType === 'bundle') purchaseCost4dp = null;
+    else if (!form.purchaseCost.trim()) purchaseCost4dp = null;
+    else {
+      const value = typedPrice(form.purchaseCost);
+      if (value === null) errors.purchaseCost4dp = 'items:dialog.errors.price';
+      else purchaseCost4dp = value.toString();
+    }
   }
 
   // Barcodes: empty rows are ignored; one main barcode (the first, if none is marked).
@@ -262,6 +286,7 @@ export function buildItem(
       reorderQtyMilli,
       isSellable: form.isSellable,
       price,
+      ...(purchaseCost4dp === undefined ? {} : { purchaseCost4dp }),
       barcodes,
       components,
     },

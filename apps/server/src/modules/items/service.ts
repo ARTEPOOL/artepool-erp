@@ -10,6 +10,7 @@ import {
   normalizeCode,
   quantityFromDb,
   quantityToDb,
+  roundDiv,
 } from '@artepool/shared';
 import type {
   BarcodeItem,
@@ -140,7 +141,28 @@ export async function listItems(db: Kysely<DB>, query: ItemsQuery): Promise<Item
   };
 }
 
-export async function getItem(db: Kysely<DB>, id: bigint): Promise<ItemDetail> {
+/** Only someone with `items.cost` (the owner) is told purchase prices (decision 0038). */
+export const canSeeCost = (auth: Auth): boolean => auth?.permissions.has('items.cost') ?? false;
+
+/**
+ * The cost shown for an item: its own purchase price; for a kit the sum of its components'
+ * (quantity × price, rounded once per component with the shared helper), or null while any
+ * component has none.
+ */
+function purchaseCostOf(
+  item: { item_type: string; fallback_unit_cost_4dp: bigint | null },
+  components: { fallback_unit_cost_4dp: bigint | null; quantity: string }[],
+): string | null {
+  if (item.item_type !== 'bundle') return item.fallback_unit_cost_4dp?.toString() ?? null;
+  let total = 0n;
+  for (const c of components) {
+    if (c.fallback_unit_cost_4dp === null) return null;
+    total += roundDiv(c.fallback_unit_cost_4dp * quantityFromDb(c.quantity), 1000n);
+  }
+  return components.length === 0 ? null : total.toString();
+}
+
+export async function getItem(db: Kysely<DB>, id: bigint, showCost = false): Promise<ItemDetail> {
   const item = await db
     .selectFrom('md.items')
     .selectAll()
@@ -165,12 +187,21 @@ export async function getItem(db: Kysely<DB>, id: bigint): Promise<ItemDetail> {
   const components = await db
     .selectFrom('md.bundle_components as c')
     .innerJoin('md.items as i', 'i.id', 'c.component_item_id')
-    .select(['i.id', 'i.code', 'i.name_ar', 'i.name_en', 'i.unit_id', 'c.quantity'])
+    .select([
+      'i.id',
+      'i.code',
+      'i.name_ar',
+      'i.name_en',
+      'i.unit_id',
+      'i.fallback_unit_cost_4dp',
+      'c.quantity',
+    ])
     .where('c.bundle_item_id', '=', id)
     .orderBy('i.code')
     .execute();
   const primary = barcodes.find((b) => b.is_primary);
   return {
+    ...(showCost ? { purchaseCost4dp: purchaseCostOf(item, components) } : {}),
     id: item.id.toString(),
     code: item.code,
     itemType: item.item_type as ItemType,
@@ -240,6 +271,12 @@ async function checkInput(db: Kysely<DB>, body: ItemInput): Promise<void> {
     throw fieldError('reorderLevelMilli', 'stock_only');
   }
   if (body.reorderQtyMilli === '0') throw fieldError('reorderQtyMilli', 'too_small');
+  if (
+    body.itemType === 'bundle' &&
+    body.purchaseCost4dp !== undefined &&
+    body.purchaseCost4dp !== null
+  )
+    throw fieldError('purchaseCost4dp', 'kit_cost');
   if (body.itemType === 'bundle' && body.components.length === 0) {
     throw fieldError('components', 'required');
   }
@@ -294,6 +331,14 @@ function itemValues(body: ItemInput) {
       body.reorderLevelMilli === null ? null : quantityToDb(BigInt(body.reorderLevelMilli)),
     reorder_qty: body.reorderQtyMilli === null ? null : quantityToDb(BigInt(body.reorderQtyMilli)),
     is_sellable: body.isSellable,
+    // Left out = unchanged (someone without `items.cost` never sends it); the database checks the
+    // permission whenever the value really changes.
+    ...(body.purchaseCost4dp === undefined
+      ? {}
+      : {
+          fallback_unit_cost_4dp:
+            body.purchaseCost4dp === null ? null : BigInt(body.purchaseCost4dp),
+        }),
   };
 }
 
@@ -456,7 +501,7 @@ export async function createItem(
   await savePrice(trx, auth, row.id, body.price);
   await saveBarcodes(trx, row.id, body.barcodes);
   await saveComponents(trx, row.id, body.components);
-  return getItem(trx, row.id);
+  return getItem(trx, row.id, canSeeCost(auth));
 }
 
 export async function updateItem(
@@ -477,7 +522,7 @@ export async function updateItem(
   await savePrice(trx, auth, id, body.price);
   await saveBarcodes(trx, id, body.barcodes);
   await saveComponents(trx, id, body.components);
-  return getItem(trx, id);
+  return getItem(trx, id, canSeeCost(auth));
 }
 
 export async function setItemActive(
@@ -485,6 +530,7 @@ export async function setItemActive(
   id: bigint,
   active: boolean,
   rowVersion: number,
+  auth: Auth,
 ): Promise<ItemDetail> {
   const result = await trx
     .updateTable('md.items')
@@ -493,5 +539,5 @@ export async function setItemActive(
     .where('row_version', '=', rowVersion)
     .executeTakeFirst();
   await expectUpdated(trx, 'md.items', id, result);
-  return getItem(trx, id);
+  return getItem(trx, id, canSeeCost(auth));
 }

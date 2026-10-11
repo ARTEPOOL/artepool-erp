@@ -17,7 +17,7 @@ import {
 } from '../../ui';
 import { useCan, useErrorText } from '../auth/context';
 import { DeactivateDialog } from '../masterdata/DeactivateDialog';
-import { price, rate } from '../masterdata/format';
+import { money, price, priceBoth, rate } from '../masterdata/format';
 import {
   localName,
   MD_KEYS,
@@ -28,6 +28,7 @@ import {
 } from '../masterdata/refs';
 import { itemPath, useItem } from './api';
 import { quantityText } from './form';
+import { marginOf, percentText } from './margin';
 import { ItemIcon, PriceFigures, StatusChip, TypeLabel } from './parts';
 import styles from './items.module.css';
 
@@ -126,6 +127,47 @@ export function ItemCard(props: { id: string; onEdit: (item: ItemDetail) => void
       },
       { label: t('fields.includesVat'), value: item.price.includesVat ? tm('yes') : tm('no') },
     );
+  }
+  // Purchase price and profit per unit: only the owner is sent them (decision 0038).
+  if (item.purchaseCost4dp !== undefined) {
+    const cost = item.purchaseCost4dp === null ? null : BigInt(item.purchaseCost4dp);
+    rows.push({
+      label: item.itemType === 'bundle' ? t('fields.kitCost') : t('fields.purchaseCost'),
+      value:
+        cost === null ? (
+          item.itemType === 'bundle' ? (
+            t('detail.kitCostUnknown')
+          ) : (
+            tm('none')
+          )
+        ) : (
+          <>
+            <bdi>{price(cost)}</bdi> {t('aed')}
+          </>
+        ),
+    });
+    if (cost !== null && item.price && vatCategory) {
+      const net = priceBoth(
+        BigInt(item.price.price4dp),
+        item.price.includesVat,
+        vatCategory.rateBp,
+      ).netFils;
+      const margin = marginOf(net, cost);
+      rows.push({
+        label: t('price.profit'),
+        value: (
+          <>
+            <bdi>{money(margin.profitFils)}</bdi> {t('aed')}
+            {margin.tenthsOfPercent !== null && (
+              <>
+                {' '}
+                · <bdi>{percentText(margin.tenthsOfPercent)}</bdi>
+              </>
+            )}
+          </>
+        ),
+      });
+    }
   }
   if (item.itemType === 'stock') {
     rows.push({

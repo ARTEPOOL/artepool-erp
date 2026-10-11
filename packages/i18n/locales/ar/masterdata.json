@@ -47,7 +47,8 @@
     "kits_only": "المكونات للأطقم فقط.",
     "one_primary": "اختر باركودًا رئيسيًا واحدًا.",
     "unknown": "غير موجود.",
-    "invalid_number": "اكتب رقمًا."
+    "invalid_number": "اكتب رقمًا.",
+    "kit_cost": "تكلفة الطقم تُحسب من مكوناته."
   },
   "emirates": {
     "abu_dhabi": "أبوظبي",
@@ -129,7 +130,8 @@
       "price_required": "الصنف المعروض للبيع يحتاج سعرًا أكبر من صفر",
       "stock_fields_for_stock_only": "للأصناف المخزنية فقط",
       "too_many_decimals": "أرقام عشرية أكثر مما تسمح به الوحدة",
-      "trn_needs_registration": "الرقم الضريبي يحتاج \"مسجل في الضريبة\" = نعم"
+      "trn_needs_registration": "الرقم الضريبي يحتاج \"مسجل في الضريبة\" = نعم",
+      "cost_needs_permission": "سعر الشراء يضيفه المالك فقط"
     }
   }
 }

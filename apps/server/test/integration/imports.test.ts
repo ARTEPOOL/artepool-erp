@@ -4,6 +4,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import ExcelJS from 'exceljs';
+import { sql } from 'kysely';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type {
   FilePayload,
@@ -20,6 +21,7 @@ import {
   type TestDevice,
   type TestServer,
 } from '../support/server';
+import { withBusinessTx } from '../../src/platform/db/tx';
 
 type Method = 'GET' | 'POST';
 type Actor = (method: Method, url: string, body?: unknown) => ReturnType<typeof call>;
@@ -228,6 +230,94 @@ describe('importing items (all or nothing)', () => {
       },
       { code: 'SERV-0001', price: '1500000', includes_vat: false, barcode: null, reorder: null },
     ]);
+  });
+
+  it('imports purchase prices (without VAT) for the owner; for anyone else the column is refused', async () => {
+    await withBusinessTx(server.db, { userId: 1n, requestId: randomUUID() }, async (trx) => {
+      await sql`INSERT INTO auth.roles (code, name_ar, name_en) VALUES ('import-clerk', 'كاتب استيراد', 'Import clerk')`.execute(
+        trx,
+      );
+      await sql`INSERT INTO auth.role_permissions (role_id, permission_code)
+                SELECT r.id, p FROM auth.roles r,
+                       unnest(ARRAY['data.import', 'items.view', 'items.manage', 'prices.manage']) p
+                 WHERE r.code = 'import-clerk'`.execute(trx);
+    });
+    const pc = await addDevice(server, { code: 'CLERK-PC' });
+    const clerkId = await addUser(server, { username: 'clerk.imp', roles: ['import-clerk'] });
+    const clerk = actor(
+      pc,
+      (await openSession(server, { userId: clerkId, deviceId: pc.id })).token,
+    );
+
+    const header = [...ITEM_HEADER, 'Purchase price (excl. VAT)'];
+    const file = await excel([
+      header,
+      [
+        'COST-0001',
+        'stock',
+        'قطعة',
+        'Part',
+        'PARTS',
+        'PCS',
+        'SR',
+        '20',
+        'no',
+        null,
+        null,
+        '12.3456',
+      ],
+      [
+        'COST-0002',
+        'stock',
+        'قطعة 2',
+        'Part 2',
+        'PARTS',
+        'PCS',
+        'SR',
+        '30',
+        'no',
+        null,
+        null,
+        null,
+      ],
+    ]);
+    const body = { fileName: 'cost.xlsx', dataBase64: file };
+
+    // Someone without items.cost: the column is refused, row by row, and nothing is imported.
+    const refused = (
+      await clerk('POST', '/api/v1/imports/items/check', body)
+    ).json<ImportCheckResponse>();
+    expect(refused.status).toBe('rejected');
+    expect(refused.issues).toEqual([
+      expect.objectContaining({ row: 2, problem: 'cost_needs_permission' }),
+    ]);
+
+    // The owner: 12.3456 is stored exactly, and an empty cell stays empty.
+    const checkedCost = (
+      await owner('POST', '/api/v1/imports/items/check', body)
+    ).json<ImportCheckResponse>();
+    expect(checkedCost).toMatchObject({ status: 'validated', rowsValid: 2 });
+    await owner('POST', `/api/v1/imports/items/${checkedCost.batchId}/commit`, body);
+    const { rows } = await server.admin.query(
+      `SELECT code, fallback_unit_cost_4dp::text AS cost FROM md.items WHERE code LIKE 'COST-%' ORDER BY code`,
+    );
+    expect(rows).toEqual([
+      { code: 'COST-0001', cost: '123456' },
+      { code: 'COST-0002', cost: null },
+    ]);
+    // A file without the column still imports for someone without items.cost.
+    const plain = await excel([
+      ITEM_HEADER,
+      ['COST-0003', 'stock', 'قطعة 3', 'Part 3', 'PARTS', 'PCS', 'SR', '40', 'no', null, null],
+    ]);
+    expect(
+      (
+        await clerk('POST', '/api/v1/imports/items/check', {
+          fileName: 'plain.xlsx',
+          dataBase64: plain,
+        })
+      ).json<ImportCheckResponse>().status,
+    ).toBe('validated');
   });
 
   it('never imports the same file twice', async () => {

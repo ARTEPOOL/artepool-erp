@@ -1,5 +1,14 @@
 # Changelog
 
+## M2b — Item purchase price (2026-10-11)
+
+**In plain words:** every stock item and service can now have a **purchase price**, typed on the item screen or in the Excel template. It is without VAT, and **only the owner** sees or changes it. Next to the sale price the owner sees the **profit per unit**. A kit's cost is worked out from its components. This is the data the owner's profit reports (decision 0039) will use once sales exist.
+
+- **Database:** migration 0010 (services may have a cost, kits never; the database refuses a change without the new owner-only permission `items.cost`). The planned later migrations move up by one (inventory is now 0011).
+- **Never leaks:** the cost is not in item lists, to the cashier, the storekeeper or the accountant; Excel import of the column is refused for anyone else.
+- **Decisions:** [0038](decisions/0038-item-purchase-price-owner-only.md) purchase price; [0039](decisions/0039-owner-reports-dashboard.md) the owner's reports dashboard (four figures, date range, net profit after expenses).
+- **Expenses (rent, bills):** approved, but they need the ledger's journal tables (M3), so they are built after M3, not before.
+
 ## M2 — Master data and chart of accounts (2026-10-11)
 
 **In plain words:** the owner can now enter everything the shop is built on: the company details printed on tax invoices, items with barcodes and one sale price (with a "Price includes VAT" switch), customers and suppliers, the short lists (units, categories, payment methods, warehouses, technicians, lines of business, reasons), the provisional chart of accounts with its event links, and the monthly accounting periods. Existing items and customers come in from Excel: checked first, then all rows or none. Nothing is ever deleted. Arabic and English, light and dark. Proven by 237 unit and screen, 339 integration and 42 browser tests.

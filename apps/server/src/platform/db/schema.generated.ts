@@ -423,6 +423,9 @@ export interface MdItems {
   default_business_line_id: bigint | null;
   description_ar: string | null;
   description_en: string | null;
+  /**
+   * Purchase price per unit, 4 decimals (AED x 10,000), without VAT. Owner only (items.cost). Stock items and services; a kit's cost is the sum of its components.
+   */
   fallback_unit_cost_4dp: bigint | null;
   id: Generated<bigint>;
   is_active: Generated<boolean>;

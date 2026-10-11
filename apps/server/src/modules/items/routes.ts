@@ -44,7 +44,8 @@ export function registerItemRoutes(app: FastifyInstance): void {
     url: '/api/v1/items/:id',
     access: view,
     params: Params,
-    handler: ({ params }) => items.getItem(db, BigInt(params.id)),
+    handler: ({ params, request }) =>
+      items.getItem(db, BigInt(params.id), items.canSeeCost(request.auth)),
   });
   defineWrite(app, {
     method: 'POST',

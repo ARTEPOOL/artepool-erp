@@ -41,6 +41,7 @@ export const IMPORT_PROBLEMS = [
   'stock_fields_for_stock_only',
   'too_many_decimals',
   'trn_needs_registration',
+  'cost_needs_permission',
 ] as const;
 export type ImportProblem = (typeof IMPORT_PROBLEMS)[number];
 

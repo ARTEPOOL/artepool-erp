@@ -84,6 +84,7 @@
       "PRICE_REQUIRED": "An item for sale needs a sale price above zero.",
       "WALK_IN_LOCKED": "The walk-in customer \"Cash customer\" cannot be changed or deactivated.",
       "CREDIT_PERMISSION": "Giving credit needs the \"Give customers credit\" permission.",
+      "COST_PERMISSION": "Changing a purchase price needs the \"See and change purchase prices\" permission (owner only).",
       "LOGO_INVALID": "The logo must be a PNG or JPEG image of at most 512 KB.",
       "IMPORT_NOT_CHECKED": "Check the file before importing it.",
       "IMPORT_FILE_CHANGED": "The file changed after it was checked. Check it again.",

@@ -68,6 +68,9 @@ test('an item is found again with other Arabic letter forms', async ({ page, ope
   await dialog.getByLabel(t('items:fields.nameEn'), { exact: true }).fill(`Floor pump ${n}`);
   await dialog.getByLabel(t('items:fields.price'), { exact: true }).fill('9.99');
   await expect(dialog.getByText(/9\.51/)).toBeVisible(); // 9.99 incl. 5% VAT → 9.51 + 0.48
+  // The owner also types the purchase price (without VAT): 9.51 - 5.00 = 4.51 profit, 47.4%.
+  await dialog.getByLabel(t('items:fields.purchaseCost'), { exact: true }).fill('5');
+  await expect(dialog.getByTestId('profit-line')).toContainText('4.51');
   await snap(page, '43-new-item');
   await dialog.getByRole('button', { name: t('items:dialog.save') }).click();
   await expect(dialog).toHaveCount(0);
@@ -76,6 +79,7 @@ test('an item is found again with other Arabic letter forms', async ({ page, ope
   await page.getByPlaceholder(t('items:search')).fill(`مضخه ارضيه ${n}`);
   await expect(page.getByRole('row', { name: new RegExp(n) })).toHaveCount(1);
   await page.getByRole('row', { name: new RegExp(n) }).click();
+  await expect(page.getByText(t('items:fields.purchaseCost'), { exact: true })).toBeVisible();
   await snap(page, '44-items');
 });
 

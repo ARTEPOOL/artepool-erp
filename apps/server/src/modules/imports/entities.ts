@@ -52,6 +52,7 @@ export const COLUMNS: Readonly<Record<ImportEntity, readonly ColumnSpec[]>> = {
     { key: 'vat', ar: 'فئة الضريبة', en: 'VAT category' },
     { key: 'price', ar: 'سعر البيع', en: 'Sale price' },
     { key: 'price_includes_vat', ar: 'السعر شامل الضريبة', en: 'Price includes VAT' },
+    { key: 'purchase_price', ar: 'سعر الشراء (بدون ضريبة)', en: 'Purchase price (excl. VAT)' },
     { key: 'barcode', ar: 'الباركود', en: 'Barcode' },
     { key: 'reorder_level', ar: 'حد إعادة الطلب', en: 'Reorder level' },
     { key: 'sellable', ar: 'للبيع', en: 'For sale' },

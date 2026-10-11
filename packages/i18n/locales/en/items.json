@@ -46,13 +46,15 @@
   "detail": {
     "select": "Choose an item in the list to see its details.",
     "inactive": "This item is deactivated: it is hidden from the POS and from search.",
-    "noBarcodes": "No barcodes."
+    "noBarcodes": "No barcodes.",
+    "kitCostUnknown": "Unknown: some components have no purchase price"
   },
   "price": {
     "oneUnit": "Price of one unit",
     "net": "Excl. VAT",
     "vat": "VAT",
-    "total": "Total"
+    "total": "Total",
+    "profit": "Profit per unit"
   },
   "fields": {
     "type": "Type",
@@ -70,7 +72,9 @@
     "forSale": "For sale",
     "reorderLevel": "Reorder level",
     "barcodes": "Barcodes",
-    "components": "Kit components"
+    "components": "Kit components",
+    "purchaseCost": "Purchase price (excl. VAT)",
+    "kitCost": "Kit cost (from its components)"
   },
   "barcodes": {
     "primary": "Main",
@@ -121,6 +125,8 @@
       "perScan": "The quantity per scan must be a number above zero.",
       "components": "Add at least one component to the kit.",
       "quantity": "Each component's quantity must be a number above zero."
-    }
+    },
+    "costHint": "Without VAT, up to 4 decimals, e.g. 62.50. Only the owner sees it.",
+    "kitCost": "A kit's cost is worked out from its components; it is not typed here."
   }
 }
