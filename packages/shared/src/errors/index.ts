@@ -140,6 +140,9 @@ export const RULE_CODES = [
   'COUNT_INCOMPLETE',
   'REVIEW_STEP',
   'DOCUMENT_STEP',
+  'JOURNAL_UNBALANCED',
+  'POSTING_ACCOUNT_INVALID',
+  'POSTING_CUSTOMER_REQUIRED',
 ] as const;
 
 export type RuleCode = (typeof RULE_CODES)[number];

@@ -101,7 +101,10 @@
       "APPROVAL_REQUIRED": "The value is above the limit: a supervisor's approval is needed.",
       "COUNT_INCOMPLETE": "Count every item before posting.",
       "REVIEW_STEP": "This was already reviewed or needs no review.",
-      "DOCUMENT_STEP": "This step is not possible in the document's current state."
+      "DOCUMENT_STEP": "This step is not possible in the document's current state.",
+      "JOURNAL_UNBALANCED": "The entry does not balance: debits do not equal credits.",
+      "POSTING_ACCOUNT_INVALID": "This account cannot receive postings (header or deactivated).",
+      "POSTING_CUSTOMER_REQUIRED": "A line on a control account needs its customer."
     }
   }
 }

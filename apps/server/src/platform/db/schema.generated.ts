@@ -284,6 +284,43 @@ export interface GlAccounts {
   updated_by: bigint;
 }
 
+export interface GlJournalEntries {
+  cash_movement_id: bigint | null;
+  entry_date: string;
+  entry_number: string;
+  id: Generated<bigint>;
+  inventory_adjustment_id: bigint | null;
+  inventory_count_id: bigint | null;
+  memo: string | null;
+  opening_balance_id: bigint | null;
+  payment_id: bigint | null;
+  period_id: bigint;
+  posted_at: Generated<Timestamp>;
+  posted_by: bigint;
+  reversal_of_id: bigint | null;
+  sales_document_id: bigint | null;
+  seq_no: bigint;
+  series_id: bigint;
+  shift_id: bigint | null;
+  source_type: string;
+  total_credit_fils: bigint;
+  total_debit_fils: bigint;
+  uuid: Generated<string>;
+}
+
+export interface GlJournalLines {
+  account_id: bigint;
+  business_line_id: bigint | null;
+  credit_fils: Generated<bigint>;
+  customer_id: bigint | null;
+  debit_fils: Generated<bigint>;
+  entry_id: bigint;
+  id: Generated<bigint>;
+  line_no: number;
+  memo: string | null;
+  vat_category_id: bigint | null;
+}
+
 export interface GlPeriods {
   closed_at: Timestamp | null;
   closed_by: bigint | null;
@@ -867,6 +904,8 @@ export interface DB {
   "auth.users": AuthUsers;
   "gl.account_mappings": GlAccountMappings;
   "gl.accounts": GlAccounts;
+  "gl.journal_entries": GlJournalEntries;
+  "gl.journal_lines": GlJournalLines;
   "gl.periods": GlPeriods;
   "inv.adjustment_lines": InvAdjustmentLines;
   "inv.adjustments": InvAdjustments;
