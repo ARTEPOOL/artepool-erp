@@ -1,0 +1,10 @@
+/* The Accounting page: the provisional-chart warning, the tabs and the active tab's card. */
+.stack {
+  display: grid;
+  gap: var(--space-4);
+  min-inline-size: 0;
+}
+
+.warnIcon {
+  color: var(--color-warning);
+}
