@@ -691,3 +691,66 @@ describe('opening balances (decision 0051) and quotations (0049)', () => {
     ).toBe('superseded');
   });
 });
+
+describe('the e-invoice outbox (0019) and print template versions (0020, 0050)', () => {
+  it('every issued document is queued, not required before the go-live date, and keeps its template version', async () => {
+    const cust = await customer('Outbox', { creditLimit: 10_000_000 });
+    const svc = await item('S-OUT', 'service', 1_000_000, false);
+    const issueOne = () =>
+      tx(async (c) => {
+        const doc = await draft(c, 'invoice', cust);
+        await line(c, doc, { item: svc, price: 1_000_000 });
+        await issue(c, doc, cust);
+        return doc;
+      });
+    const before = await issueOne();
+    const row = (doc: string) =>
+      one<{ status: string; v: string | null }>(
+        api,
+        `SELECT o.status, d.print_template_version_id::text AS v
+           FROM ops.outbox o JOIN sales.documents d ON d.id = o.sales_document_id
+          WHERE o.sales_document_id = $1 AND o.channel = 'einvoice'`,
+        [doc],
+      );
+    expect(await row(before)).toMatchObject({ status: 'not_required' });
+    expect((await row(before)).v).not.toBeNull();
+    await tx((c) =>
+      c.query(
+        `UPDATE sys.settings SET value = to_jsonb($1::text) WHERE key = 'einvoice.mandatory_from'`,
+        [today],
+      ),
+    );
+    expect((await row(await issueOne())).status).toBe('pending');
+    await tx((c) =>
+      c.query(`UPDATE sys.settings SET value = 'null' WHERE key = 'einvoice.mandatory_from'`),
+    );
+  });
+
+  it('only the owner saves a new template version; versions never change', async () => {
+    const template = (
+      await one<{ id: string }>(
+        api,
+        `SELECT id::text FROM sys.print_templates WHERE doc_kind = 'tax_invoice_a4'`,
+      )
+    ).id;
+    const save = (userId: bigint) =>
+      tx(
+        (c) =>
+          one<{ id: string; version_no: number }>(
+            c,
+            `INSERT INTO sys.print_template_versions (template_id, settings) VALUES ($1, '{"language":"ar"}')
+             RETURNING id::text, version_no`,
+            [template],
+          ),
+        userId,
+      );
+    await expect(save(accountant)).rejects.toMatchObject(denied('PRINT_OWNER_ONLY'));
+    const v2 = await save(owner);
+    expect(v2.version_no).toBe(2);
+    await expect(
+      tx((c) =>
+        c.query(`UPDATE sys.print_template_versions SET note = 'x' WHERE id = $1`, [v2.id]),
+      ),
+    ).rejects.toMatchObject({ code: '42501' }); // the API may not even try; the guard is behind it
+  });
+});

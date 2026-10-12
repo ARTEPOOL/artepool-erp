@@ -299,10 +299,10 @@ describe('looking after accounts', () => {
 describe('roles and permissions', () => {
   it('lists every permission with owner-only ones marked', async () => {
     const { roles, permissions } = (await owner('GET', '/api/v1/roles')).json<RolesResponse>();
-    expect(permissions).toHaveLength(68);
+    expect(permissions).toHaveLength(69);
     expect(permissions.filter((p) => p.ownerOnly).map((p) => p.code)).toContain('users.manage');
     expect(roles.find((r) => r.code === 'owner')).toMatchObject({ requires2fa: true });
-    expect(roles.find((r) => r.code === 'owner')!.permissions).toHaveLength(68);
+    expect(roles.find((r) => r.code === 'owner')!.permissions).toHaveLength(69);
   });
 
   it('creates a role by copying another, never copying owner-only permissions', async () => {

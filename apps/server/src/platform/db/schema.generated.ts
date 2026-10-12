@@ -821,6 +821,28 @@ export interface MdWarehouses {
   warehouse_type: string;
 }
 
+export interface OpsOutbox {
+  attempts: Generated<number>;
+  channel: string;
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  id: Generated<bigint>;
+  last_attempt_at: Timestamp | null;
+  last_error: string | null;
+  next_attempt_at: Timestamp | null;
+  payload: Json | null;
+  payload_format: string | null;
+  payload_sha256: Buffer | null;
+  provider_reference: string | null;
+  response: Json | null;
+  row_version: Generated<number>;
+  sales_document_id: bigint | null;
+  status: string;
+  updated_at: Generated<Timestamp>;
+  updated_by: bigint;
+  uuid: Generated<string>;
+}
+
 export interface SalesCreditAllocations {
   amount_fils: bigint;
   created_at: Generated<Timestamp>;
@@ -903,6 +925,7 @@ export interface SalesDocuments {
   pos_cart_id: string | null;
   price_level_id: bigint | null;
   print_count: Generated<number>;
+  print_template_version_id: bigint | null;
   quotation_id: bigint | null;
   reason_code_id: bigint | null;
   reason_text: string | null;
@@ -984,6 +1007,7 @@ export interface SalesPayments {
   payment_date: string;
   payment_kind: string;
   payment_method_id: bigint;
+  print_template_version_id: bigint | null;
   quotation_id: bigint | null;
   reason_code_id: bigint | null;
   received_at: Generated<Timestamp>;
@@ -1046,6 +1070,7 @@ export interface SalesQuotations {
   net_fils: Generated<bigint>;
   notes: string | null;
   price_level_id: bigint;
+  print_template_version_id: bigint | null;
   quotation_date: string;
   revised_from_id: bigint | null;
   revision: Generated<number>;
@@ -1167,6 +1192,28 @@ export interface SysImportBatches {
   status: string;
 }
 
+export interface SysPrintTemplates {
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  current_version_id: bigint | null;
+  doc_kind: string;
+  id: Generated<bigint>;
+  row_version: Generated<number>;
+  updated_at: Generated<Timestamp>;
+  updated_by: bigint;
+}
+
+export interface SysPrintTemplateVersions {
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  id: Generated<bigint>;
+  logo_sha256: Buffer | null;
+  note: string | null;
+  settings: Json;
+  template_id: bigint;
+  version_no: number;
+}
+
 export interface SysReasonCodes {
   category: string;
   code: string;
@@ -1251,6 +1298,7 @@ export interface DB {
   "md.units": MdUnits;
   "md.vat_categories": MdVatCategories;
   "md.warehouses": MdWarehouses;
+  "ops.outbox": OpsOutbox;
   "sales.credit_allocations": SalesCreditAllocations;
   "sales.document_lines": SalesDocumentLines;
   "sales.documents": SalesDocuments;
@@ -1266,6 +1314,8 @@ export interface DB {
   "sys.document_series": SysDocumentSeries;
   "sys.idempotency_keys": SysIdempotencyKeys;
   "sys.import_batches": SysImportBatches;
+  "sys.print_template_versions": SysPrintTemplateVersions;
+  "sys.print_templates": SysPrintTemplates;
   "sys.reason_codes": SysReasonCodes;
   "sys.schema_migrations": SysSchemaMigrations;
   "sys.settings": SysSettings;
