@@ -107,6 +107,7 @@ export async function addMovement(
     value4dp?: bigint;
     adjustmentLineId?: bigint;
     countLineId?: bigint;
+    salesDocumentLineId?: bigint;
   },
 ): Promise<{ value4dp: bigint; valueFils: bigint }> {
   const row = await trx
@@ -123,6 +124,7 @@ export async function addMovement(
         value_4dp: m.value4dp ?? (null as unknown as bigint),
         adjustment_line_id: m.adjustmentLineId ?? null,
         count_line_id: m.countLineId ?? null,
+        sales_document_line_id: m.salesDocumentLineId ?? null,
       } as never),
     )
     .returning(['value_4dp', 'value_fils'])

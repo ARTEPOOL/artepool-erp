@@ -878,6 +878,7 @@ export interface SalesDocumentLines {
   price_includes_vat: Generated<boolean>;
   price_override_approval_id: bigint | null;
   quantity: Numeric;
+  quotation_line_id: bigint | null;
   return_stock_status: string | null;
   technician_id: bigint | null;
   unit_id: bigint | null;
