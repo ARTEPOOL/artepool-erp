@@ -1,4 +1,151 @@
 {
   "title": "A4 invoices",
-  "subtitle": "Tax invoices, payment invoices and notes"
+  "subtitle": "Tax invoices, payment invoices and notes",
+  "list": {
+    "new": "New invoice",
+    "search": "Number or customer",
+    "type": "Type",
+    "allTypes": "All types",
+    "allStatuses": "All (without discarded)",
+    "settlement": "Payment",
+    "allSettlements": "All",
+    "notFullyPaid": "Not fully paid",
+    "label": "Invoices and notes",
+    "paidDue": "Paid / due",
+    "draftNumber": "Draft (no number yet)",
+    "due": "Due {amount}",
+    "empty": "No documents match these filters."
+  },
+  "form": {
+    "back": "Back to invoices",
+    "newTitle": "New tax invoice",
+    "newSubtitle": "A draft has no number; it gets one when it is issued.",
+    "draftTitle": "Invoice draft",
+    "discardedTitle": "Discarded draft",
+    "saved": "Draft saved.",
+    "discarded": "Draft discarded.",
+    "problems": {
+      "customer": "Choose the customer first.",
+      "lines": "Add at least one line.",
+      "lineValues": "Fix the marked lines first.",
+      "discount": "The discount must be an amount in AED, not more than the lines' total."
+    },
+    "lineErrors": {
+      "not_for_sale": "This item cannot be sold (inactive, not for sale or without a price).",
+      "unit_decimals": "This unit does not take this many decimals.",
+      "too_large": "The discount is more than the line's amount.",
+      "other": "This line is not valid."
+    },
+    "advances": {
+      "title": "Earlier payments to deduct",
+      "explain": "Payments received before this invoice already had VAT charged on them. Tick the ones this invoice should deduct; what is left of each is deducted.",
+      "deduct": "Deduct {number}",
+      "left": "Left to deduct: {amount}"
+    },
+    "dueDate": "Due date (optional)",
+    "docDiscountHint": "An amount in AED; it is spread across the lines.",
+    "cannotIssue": "You may prepare this draft; someone allowed to issue invoices must issue it.",
+    "saveFirst": "Save the draft before issuing it.",
+    "discard": "Discard draft",
+    "save": "Save draft",
+    "issue": "Issue invoice",
+    "discardTitle": "Discard this draft?",
+    "discardExplain": "The draft is kept in the records as discarded, without a number. It cannot be issued afterwards.",
+    "keep": "Cancel",
+    "discardConfirm": "Discard"
+  },
+  "issue": {
+    "title": "Issue the invoice",
+    "explain": "After issuing, the invoice gets its number and can no longer be changed. Corrections are made with a credit or debit note.",
+    "paidNow": "Paid now",
+    "unpaidHint": "Nothing paid now. A cash customer, or one above their credit limit, needs a supervisor's approval to leave it unpaid.",
+    "paying": "Paying now",
+    "leftUnpaid": "Left unpaid",
+    "noPayments": "You may not receive payments; the invoice is issued unpaid.",
+    "moreThanDue": "The payments are more than the total due.",
+    "confirm": "Issue",
+    "done": "Invoice {number} issued."
+  },
+  "pay": {
+    "part": "Payment {n}",
+    "chooseMethod": "Choose…",
+    "chequeDate": "Cheque date",
+    "chequeBank": "Bank",
+    "remove": "Remove payment {n}",
+    "add": "Add a payment",
+    "problems": {
+      "method": "Choose the payment method.",
+      "amount": "Type an amount above zero.",
+      "reference": "This method needs a reference.",
+      "chequeDate": "Type the cheque date."
+    }
+  },
+  "print": {
+    "sent": "Sent to the print dialog.",
+    "noReprint": "Reprinting needs the reprint permission."
+  },
+  "view": {
+    "type": "Type",
+    "format": "Format",
+    "supplyDate": "Supply date",
+    "original": "Original document",
+    "reason": "Reason",
+    "issuedBy": "Issued by",
+    "billTo": "Bill to",
+    "trn": "Customer TRN",
+    "phone": "Phone",
+    "address": "Address",
+    "inclVat": "incl. VAT",
+    "beforeDeductions": "Total before deductions",
+    "vatAfterDeductions": "VAT due on this invoice",
+    "settlements": "Payments and credits",
+    "noSettlements": "Nothing paid or credited yet.",
+    "settlementKinds": {
+      "payment": "Receipt",
+      "credit_note": "Credit note"
+    },
+    "receive": "Receive payment"
+  },
+  "notes": {
+    "creditButton": "Credit note",
+    "debitButton": "Debit note",
+    "creditTitle": "New credit note",
+    "debitTitle": "New debit note",
+    "creditExplain": "A credit note reduces what the customer owes for",
+    "debitExplain": "A debit note adds to what the customer owes for",
+    "reason": "Reason",
+    "chooseReason": "Choose a reason…",
+    "reasonText": "Explanation",
+    "advanceAmount": "Amount to credit (with VAT)",
+    "advanceLeft": "Up to {amount}",
+    "lines": "Lines of the original invoice",
+    "left": "Can be credited",
+    "price": "Price per unit (optional)",
+    "goesTo": "Returned goods",
+    "quantityOf": "Quantity — {name}",
+    "priceOf": "Price per unit — {name}",
+    "goesToOf": "Returned goods — {name}",
+    "back": {
+      "available": "Back to sellable stock",
+      "defective": "Back as defective",
+      "none": "No goods back"
+    },
+    "creditLinesHint": "Type a quantity on each line to credit. An empty price uses the original price and its discount; type a price to correct it. The returned goods choice applies to stock items only.",
+    "debitLinesHint": "Type a quantity on each line to charge. An empty price uses the original price.",
+    "refundNow": "Pay the money back now",
+    "keptAsCredit": "Without a refund, the amount settles the invoice if it is unpaid, or stays as the customer's credit.",
+    "issueCredit": "Issue credit note",
+    "issueDebit": "Issue debit note",
+    "done": "{number} issued.",
+    "problems": {
+      "reason": "Choose a reason.",
+      "reasonText": "Write an explanation (at least 3 characters).",
+      "amount": "Type an amount above zero, up to {amount}.",
+      "lines": "Type a quantity on at least one line.",
+      "quantity": "Type a quantity above zero.",
+      "tooMany": "At most {left}.",
+      "decimals": "This unit does not take this many decimals.",
+      "price": "Type a valid price."
+    }
+  }
 }
