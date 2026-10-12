@@ -883,9 +883,9 @@ describe('Receipts in Arabic (right to left)', () => {
       '/api/v1/sales/payments',
       receiveAnswer(RECEIPT, null),
     );
-    await signIn(bridge, 'سندات القبض', 'ar');
+    await signIn(bridge, 'إيصالات الاستلام', 'ar');
     expect(document.documentElement.dir).toBe('rtl');
-    const table = await screen.findByRole('table', { name: 'سندات القبض والرد والعكس' });
+    const table = await screen.findByRole('table', { name: 'إيصالات الاستلام والرد والعكس' });
     expect(within(row(table, 'RCT-000058')).getByText('معكوس')).toBeTruthy();
     expect(within(row(table, 'RCT-000060')).getByText('شيك')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'رد مبلغ' }));

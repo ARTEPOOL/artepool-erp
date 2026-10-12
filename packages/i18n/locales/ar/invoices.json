@@ -101,7 +101,7 @@
     "settlements": "الدفعات والإشعارات الدائنة",
     "noSettlements": "لم يُدفع أو يُخصم شيء بعد.",
     "settlementKinds": {
-      "payment": "سند قبض",
+      "payment": "إيصال استلام",
       "credit_note": "إشعار دائن"
     },
     "receive": "استلام دفعة"

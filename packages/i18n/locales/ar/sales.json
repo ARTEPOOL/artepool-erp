@@ -34,7 +34,7 @@
     "superseded": "استُبدل بنسخة أحدث"
   },
   "paymentKinds": {
-    "receipt": "سند قبض",
+    "receipt": "إيصال استلام",
     "refund": "رد مبلغ",
     "reversal": "عكس دفعة"
   },

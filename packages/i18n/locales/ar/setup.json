@@ -95,7 +95,7 @@
         "credit_note": "إشعار دائن",
         "debit_note": "إشعار مدين",
         "quotation": "عرض سعر",
-        "receipt": "سند قبض",
+        "receipt": "إيصال استلام",
         "refund": "سند رد مبلغ",
         "payment_reversal": "عكس دفعة",
         "cash_voucher": "سند حركة نقدية للدرج",
