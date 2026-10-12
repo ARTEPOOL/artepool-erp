@@ -256,7 +256,7 @@ describe('Items & stock: the list', () => {
       within(filters)
         .getAllByRole('button')
         .map((b) => b.textContent),
-    ).toEqual(['الكل', 'كيماويات', 'معدات', 'موقوفة']);
+    ).toEqual(['الكل', 'كيماويات', 'معدات', 'تحتاج طلب', 'موقوفة']);
     expect(screen.getByRole('button', { name: 'استيراد أصناف' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'استيراد أسعار' })).toBeTruthy();
   });

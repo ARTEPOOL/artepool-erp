@@ -1,0 +1,102 @@
+/* Barcode labels (design 07 "ملصقات باركود", decision 0043). A label is drawn at its real size in
+   millimetres: the sizes arrive as custom properties (--label-w, --label-h) set from the chosen
+   size. Tokens and logical properties only. */
+
+.muted {
+  color: var(--color-text-secondary);
+  font-size: var(--text-caption);
+}
+
+.previewBox {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.preview {
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-muted);
+  overflow: auto;
+}
+
+.label {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--label-h) * 0.03);
+  inline-size: var(--label-w);
+  block-size: var(--label-h);
+  padding: calc(var(--label-h) * 0.06);
+  overflow: hidden;
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px dashed var(--color-border);
+  font-size: calc(var(--label-h) * 0.12);
+  line-height: 1.15;
+  text-align: center;
+}
+
+.name {
+  max-inline-size: 100%;
+  overflow: hidden;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.bars {
+  display: block;
+  inline-size: 100%;
+  block-size: auto;
+  flex: 1 1 auto;
+  min-block-size: 0;
+}
+
+.code {
+  font-family: var(--font-mono);
+  direction: ltr;
+  letter-spacing: 0.05em;
+}
+
+.price {
+  font-weight: 700;
+}
+
+/* Print-only containers: hidden on screen. */
+.printSheet,
+.printRoll {
+  display: none;
+}
+
+@media print {
+  /* While labels are printing, everything else on the page is hidden. */
+  :global(body):has(> .printSheet) > :not(.printSheet),
+  :global(body):has(> .printRoll) > :not(.printRoll) {
+    display: none;
+  }
+
+  .printSheet {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, var(--label-w));
+    gap: 2mm;
+    align-content: start;
+  }
+
+  .printRoll {
+    display: block;
+  }
+
+  .printSheet .label,
+  .printRoll .label {
+    border: none;
+    break-inside: avoid;
+  }
+
+  .printRoll .label {
+    break-after: page;
+  }
+}
