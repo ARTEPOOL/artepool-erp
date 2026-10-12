@@ -148,6 +148,7 @@
     "adjustTool": "تسوية مخزون",
     "countTool": "جرد المخزون",
     "openingTool": "الرصيد الافتتاحي",
+    "reviewsTool": "مراجعة البيع بدون رصيد",
     "movements": "الحركات",
     "noMovements": "لا توجد حركات بعد.",
     "after": "الرصيد بعدها",

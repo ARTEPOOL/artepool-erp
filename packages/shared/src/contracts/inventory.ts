@@ -151,6 +151,12 @@ export interface AdjustmentLine {
   valueFils?: string | null;
 }
 
+/** A person's name in both languages, so screens show names without the users list. */
+export interface PersonName {
+  displayNameAr: string;
+  displayNameEn: string;
+}
+
 export interface AdjustmentItem {
   id: string;
   docNumber: string | null;
@@ -166,6 +172,10 @@ export interface AdjustmentItem {
   reviewedAt: string | null;
   postedAt: string | null;
   postedBy: string | null;
+  postedByName: PersonName | null;
+  reviewedByName: PersonName | null;
+  /** The supervisor who approved a change above the threshold (decision 0041). */
+  approvedByName: PersonName | null;
   lineCount: number;
   /** Signed book value; with stock.view_cost only. */
   totalValueFils?: string | null;
@@ -326,6 +336,7 @@ export interface JournalEntryItem {
   totalFils: string;
   postedAt: string;
   postedBy: string;
+  postedByName: PersonName;
 }
 
 export interface JournalLine {

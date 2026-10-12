@@ -179,6 +179,7 @@
     "pending": "Pending",
     "reviewed": "Reviewed",
     "postedBy": "Posted by",
+    "approvedBy": "approved by {name}",
     "reviewedBy": "Reviewed by",
     "mark": "Mark reviewed",
     "markOf": "Mark {number} reviewed",

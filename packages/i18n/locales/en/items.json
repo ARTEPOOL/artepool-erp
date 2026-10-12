@@ -148,6 +148,7 @@
     "adjustTool": "Stock adjustment",
     "countTool": "Stock count",
     "openingTool": "Opening stock",
+    "reviewsTool": "Oversell reviews",
     "movements": "Movements",
     "noMovements": "No movements yet.",
     "after": "Balance after",

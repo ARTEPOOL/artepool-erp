@@ -104,7 +104,7 @@ export function Shell() {
                 <Link
                   key={item.key}
                   to={item.to}
-                  aria-current={path.startsWith(item.to) ? 'page' : undefined}
+                  aria-current={crumbOf(path) === item.key ? 'page' : undefined}
                 >
                   {item.icon}
                   <span>{t(`nav.${item.key}`)}</span>

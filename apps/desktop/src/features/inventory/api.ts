@@ -10,10 +10,8 @@ import type {
   CountDetail,
   CountsResponse,
   ItemsResponse,
-  UsersResponse,
 } from '@artepool/shared/contracts';
 import { useApi } from '../../api/hooks';
-import { useCan } from '../auth/context';
 import { MD_KEYS } from '../masterdata/refs';
 
 export const STOCK_PATHS = {
@@ -87,16 +85,5 @@ export function useStockItemSearch(q: string) {
     queryKey: [...MD_KEYS.items, 'stock-pick', q] as QueryKey,
     queryFn: () => api.get<ItemsResponse>(`/api/v1/items?${params.toString()}`),
     enabled: q.length > 0,
-  });
-}
-
-/** Names of the people behind a document, when this person may see the users list. */
-export function useUserNames() {
-  const api = useApi();
-  const can = useCan();
-  return useQuery({
-    queryKey: ['stock', 'users'] as QueryKey,
-    queryFn: async () => (await api.get<UsersResponse>('/api/v1/users')).users,
-    enabled: can('users.view'),
   });
 }

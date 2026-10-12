@@ -17,6 +17,7 @@ function entryBase(db: Kysely<DB>) {
     .selectFrom('gl.journal_entries as e')
     .leftJoin('inv.adjustments as a', 'a.id', 'e.inventory_adjustment_id')
     .leftJoin('inv.counts as c', 'c.id', 'e.inventory_count_id')
+    .innerJoin('auth.users as u', 'u.id', 'e.posted_by')
     .select([
       'e.id',
       'e.entry_number',
@@ -26,6 +27,8 @@ function entryBase(db: Kysely<DB>) {
       'e.total_debit_fils',
       'e.posted_at',
       'e.posted_by',
+      'u.display_name_ar',
+      'u.display_name_en',
       'a.id as adjustment_id',
       'a.doc_number as adjustment_number',
       'c.id as count_id',
@@ -46,6 +49,7 @@ const entryItem = (r: EntryRow): JournalEntryItem => ({
   totalFils: r.total_debit_fils.toString(),
   postedAt: r.posted_at.toISOString(),
   postedBy: r.posted_by.toString(),
+  postedByName: { displayNameAr: r.display_name_ar, displayNameEn: r.display_name_en },
 });
 
 export async function listJournal(db: Kysely<DB>, query: JournalQuery): Promise<JournalResponse> {

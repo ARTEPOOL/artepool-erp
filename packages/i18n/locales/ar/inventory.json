@@ -191,6 +191,7 @@
     "pending": "بانتظار المراجعة",
     "reviewed": "تمت مراجعتها",
     "postedBy": "رُحّل بواسطة",
+    "approvedBy": "بموافقة {name}",
     "reviewedBy": "راجعه",
     "mark": "تمت المراجعة",
     "markOf": "تسجيل مراجعة {number}",

@@ -341,6 +341,18 @@ describe('adjustments', () => {
     );
     const ok = await adjust(storekeeper, { ...body, approvalId: approval });
     expect(ok.statusCode).toBe(201);
+    // The document names who posted it and who approved it, for everyone who can see it.
+    const names = await sql<{ id: string; ar: string; en: string }>`
+      SELECT id::text, display_name_ar AS ar, display_name_en AS en FROM auth.users
+       WHERE id IN (${storekeeperId}, ${accountantId})`.execute(server.db);
+    const nameOf = (id: unknown) => {
+      const row = names.rows.find((r) => r.id === String(id))!;
+      return { displayNameAr: row.ar, displayNameEn: row.en };
+    };
+    const posted = ok.json<AdjustmentDetail>();
+    expect(posted.postedByName).toEqual(nameOf(storekeeperId));
+    expect(posted.approvedByName).toEqual(nameOf(accountantId));
+    expect(posted.reviewedByName).toBeNull();
     // The same approval cannot be used twice.
     expect(
       (await adjust(storekeeper, { ...body, approvalId: approval })).statusCode,
@@ -612,6 +624,7 @@ describe('stock figures, oversell review and the journal', () => {
       await accountant('GET', '/api/v1/journal?source=inventory_adjustment')
     ).json<JournalResponse>();
     expect(list.total).toBeGreaterThan(5);
+    expect(list.entries[0]!.postedByName.displayNameEn.length).toBeGreaterThan(0);
     const { rows } = await sql<{ d: string }>`SELECT sys.business_date()::text AS d`.execute(
       server.db,
     );

@@ -5,7 +5,7 @@ import type {
   AdjustmentDetail,
   AdjustmentItem,
   ReviewOversellRequest,
-  UserListItem,
+  PersonName,
 } from '@artepool/shared/contracts';
 import { useSave } from '../../api/hooks';
 import { formatDate, formatDateTime } from '../../lib/format';
@@ -28,7 +28,7 @@ import {
 import { useCan, useDisplayName, useErrorText } from '../auth/context';
 import { money } from '../masterdata/format';
 import { localName, useUnits } from '../masterdata/refs';
-import { STOCK_INVALIDATE, STOCK_PATHS, useAdjustment, useAdjustments, useUserNames } from './api';
+import { STOCK_INVALIDATE, STOCK_PATHS, useAdjustment, useAdjustments } from './api';
 import { quantityShort, SaveError, useUnitOf } from './parts';
 import styles from './inventory.module.css';
 
@@ -93,7 +93,6 @@ function ReviewDialog(props: { doc: AdjustmentItem; onClose: () => void }) {
 function OversellRow(props: {
   doc: AdjustmentItem;
   tab: Tab;
-  people: Map<string, UserListItem>;
   onReview: (doc: AdjustmentItem) => void;
 }) {
   const { t, i18n } = useTranslation('inventory');
@@ -105,10 +104,7 @@ function OversellRow(props: {
   const detail = useAdjustment(props.doc.id);
   const values = can('stock.view_cost');
   const { doc } = props;
-  const person = (id: string | null) => {
-    const found = id ? props.people.get(id) : undefined;
-    return found ? nameOf(found) : '—';
-  };
+  const person = (found: PersonName | null) => (found ? nameOf(found) : '—');
   const lines = detail.data?.lines ?? [];
   return (
     <tr>
@@ -137,10 +133,17 @@ function OversellRow(props: {
           <bdi>{doc.totalValueFils ? money(BigInt(doc.totalValueFils)) : '—'}</bdi>
         </td>
       )}
-      <td>{person(doc.postedBy)}</td>
+      <td>
+        {person(doc.postedByName)}
+        {doc.approvedByName && (
+          <span className={tbl.sub}>
+            {t('reviews.approvedBy', { name: nameOf(doc.approvedByName) })}
+          </span>
+        )}
+      </td>
       {props.tab === 'reviewed' ? (
         <td>
-          {person(doc.reviewedBy)}
+          {person(doc.reviewedByName)}
           {doc.reviewedAt && (
             <span className={tbl.sub}>
               <bdi>{formatDateTime(doc.reviewedAt)}</bdi>
@@ -177,8 +180,6 @@ export function ReviewsPage() {
   const [reviewing, setReviewing] = useState<AdjustmentItem | null>(null);
   const allowed = can('stock.view');
   const list = useAdjustments('oversell', tab, allowed);
-  const users = useUserNames();
-  const people = new Map((users.data ?? []).map((u) => [u.id, u]));
   const values = can('stock.view_cost');
   const docs = list.data?.adjustments ?? [];
   const showAction = tab === 'reviewed' || can('stock.oversell_review');
@@ -222,13 +223,7 @@ export function ReviewsPage() {
                 </thead>
                 <tbody>
                   {docs.map((doc) => (
-                    <OversellRow
-                      key={doc.id}
-                      doc={doc}
-                      tab={tab}
-                      people={people}
-                      onReview={setReviewing}
-                    />
+                    <OversellRow key={doc.id} doc={doc} tab={tab} onReview={setReviewing} />
                   ))}
                   {list.isLoading && (
                     <tr className={tbl.empty}>

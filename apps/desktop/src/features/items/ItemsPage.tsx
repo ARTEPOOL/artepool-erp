@@ -13,6 +13,7 @@ import {
   Plus,
   RefreshCw,
   Search,
+  ShieldAlert,
   Wrench,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -250,6 +251,12 @@ export function ItemsPage() {
         <Button onPress={() => void navigate({ to: '/stock/opening' })}>
           <PackagePlus className={iconClass.sm} aria-hidden="true" />
           {t('stock.openingTool')}
+        </Button>
+      )}
+      {can('stock.oversell_review') && (
+        <Button onPress={() => void navigate({ to: '/stock/reviews' })}>
+          <ShieldAlert className={iconClass.sm} aria-hidden="true" />
+          {t('stock.reviewsTool')}
         </Button>
       )}
       {can('labels.print') && (

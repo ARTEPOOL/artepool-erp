@@ -19,6 +19,7 @@ import type {
   ReviewOversellRequest,
   StockStatus,
   StockSummary,
+  PersonName,
 } from '@artepool/shared/contracts';
 import { ADJUSTMENT_PERMISSION } from '@artepool/shared/contracts';
 import type { DB } from '../../platform/db/schema.generated';
@@ -294,6 +295,10 @@ function adjustmentBase(db: Db) {
         .onRef('j.inventory_adjustment_id', '=', 'a.id')
         .on('j.source_type', '=', 'inventory_adjustment'),
     )
+    .leftJoin('auth.users as pu', 'pu.id', 'a.posted_by')
+    .leftJoin('auth.users as ru', 'ru.id', 'a.reviewed_by')
+    .leftJoin('auth.approvals as ap', 'ap.id', 'a.approval_id')
+    .leftJoin('auth.users as au', 'au.id', 'ap.approved_by')
     .select([
       'a.id',
       'a.doc_number',
@@ -313,11 +318,20 @@ function adjustmentBase(db: Db) {
       'a.row_version',
       'j.id as journal_id',
       'j.entry_number',
+      'pu.display_name_ar as posted_by_ar',
+      'pu.display_name_en as posted_by_en',
+      'ru.display_name_ar as reviewed_by_ar',
+      'ru.display_name_en as reviewed_by_en',
+      'au.display_name_ar as approved_by_ar',
+      'au.display_name_en as approved_by_en',
       sql<number>`(SELECT count(*)::int FROM inv.adjustment_lines l WHERE l.adjustment_id = a.id)`.as(
         'line_count',
       ),
     ]);
 }
+
+const personName = (ar: string | null, en: string | null): PersonName | null =>
+  ar === null || en === null ? null : { displayNameAr: ar, displayNameEn: en };
 
 type AdjustmentRow = Awaited<
   ReturnType<ReturnType<typeof adjustmentBase>['executeTakeFirstOrThrow']>
@@ -339,6 +353,9 @@ function adjustmentItem(r: AdjustmentRow, showValues: boolean): AdjustmentItem {
     reviewedAt: r.reviewed_at?.toISOString() ?? null,
     postedAt: r.posted_at?.toISOString() ?? null,
     postedBy: r.posted_by?.toString() ?? null,
+    postedByName: personName(r.posted_by_ar, r.posted_by_en),
+    reviewedByName: personName(r.reviewed_by_ar, r.reviewed_by_en),
+    approvedByName: personName(r.approved_by_ar, r.approved_by_en),
     lineCount: r.line_count,
     journalEntryId: r.journal_id?.toString() ?? null,
     rowVersion: r.row_version,

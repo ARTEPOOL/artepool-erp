@@ -27,6 +27,7 @@ import {
   tableClasses,
 } from '../../ui';
 import { useApi } from '../../api/hooks';
+import { useDisplayName } from '../auth/context';
 import { localName, MD_KEYS } from '../masterdata/refs';
 import { money } from '../masterdata/format';
 import { SaveError, useAccountLabel } from '../settings/lists/parts';
@@ -216,6 +217,7 @@ function EntryDialog({ id, onClose }: { id: string; onClose: () => void }) {
   const { t, i18n } = useTranslation('accounting');
   const api = useApi();
   const nameOf = localName(i18n.language);
+  const displayName = useDisplayName();
   const entry = useQuery({
     queryKey: [...MD_KEYS.journal, 'entry', id],
     queryFn: () => api.get<JournalEntryDetail>(`/api/v1/journal/${id}`),
@@ -246,7 +248,7 @@ function EntryDialog({ id, onClose }: { id: string; onClose: () => void }) {
                   <>
                     <bdi>{formatDateTime(data.postedAt)}</bdi>
                     {' · '}
-                    {t('entry.postedBy', { user: data.postedBy })}
+                    {t('entry.postedBy', { user: displayName(data.postedByName) })}
                   </>
                 ),
               },

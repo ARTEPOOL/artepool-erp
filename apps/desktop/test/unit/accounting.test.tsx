@@ -373,6 +373,7 @@ const jv = (patch: Partial<JournalEntryItem>): JournalEntryItem => ({
   totalFils: '123450',
   postedAt: '2026-10-05T06:30:00.000Z',
   postedBy: '5',
+  postedByName: { displayNameAr: 'سالم', displayNameEn: 'Salem' },
   ...patch,
 });
 
@@ -460,7 +461,7 @@ describe('Accounting → Journal', () => {
     expect(within(within(dialog).getByTestId('line-2')).getByText('فروقات المخزون')).toBeTruthy();
     const totals = within(dialog).getByTestId('entry-totals');
     expect(within(totals).getAllByText('1,234.50')).toHaveLength(2);
-    expect(within(dialog).getByText(/بواسطة المستخدم رقم 5/)).toBeTruthy();
+    expect(within(dialog).getByText(/بواسطة سالم/)).toBeTruthy();
     expect(within(dialog).getByText('ADJ-000004')).toBeTruthy();
   });
 

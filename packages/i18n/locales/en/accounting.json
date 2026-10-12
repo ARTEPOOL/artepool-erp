@@ -164,7 +164,7 @@
     "loadingTitle": "Entry",
     "memo": "Memo",
     "posted": "Posted",
-    "postedBy": "by user no. {user}",
+    "postedBy": "by {user}",
     "lines": "Entry lines",
     "debit": "Debit",
     "credit": "Credit",

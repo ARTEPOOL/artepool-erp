@@ -164,7 +164,7 @@
     "loadingTitle": "القيد",
     "memo": "البيان",
     "posted": "رُحّل في",
-    "postedBy": "بواسطة المستخدم رقم {user}",
+    "postedBy": "بواسطة {user}",
     "lines": "بنود القيد",
     "debit": "مدين",
     "credit": "دائن",
