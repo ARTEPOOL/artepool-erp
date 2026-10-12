@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | **Approved** (2026-10-11): all recommendations accepted, recorded as decisions [0040](../decisions/0040-stock-cost-visibility.md)–[0044](../decisions/0044-blind-stock-counts.md); more label sizes added ([0043](../decisions/0043-barcode-label-sizes.md)) |
+| **Status** | **Done** (2026-10-12), awaiting the owner's merge of the pull request. See [Delivered](#delivered). Approved on 2026-10-11: all recommendations accepted, recorded as decisions [0040](../decisions/0040-stock-cost-visibility.md)–[0044](../decisions/0044-blind-stock-counts.md); more label sizes added ([0043](../decisions/0043-barcode-label-sizes.md)) |
 | **Date** | 2026-10-11 |
 | **Milestone** | M3 of the [Phase 1 plan](../phase-1-plan.md) |
 | **Design reference** | [`design/screens/07-items-stock.html`](../../design/screens/07-items-stock.html) (stock tiles and columns, "Stock adjustment" dialog, "Barcode labels" dialog), tokens and components in [`design/`](../../design/) |
@@ -65,3 +65,24 @@ Sales, the POS and cash come in M4–M5. Expenses and the owner's profit dashboa
 4. **Barcode labels — which printer?** The design offers 38 × 25 mm and 50 × 30 mm labels. **Recommendation:** for now print them through the normal print dialog (works with a label printer installed in Windows, or on A4 label sheets); silent printing to a dedicated label printer comes with the hardware list before M5.
 5. **Counting:** while counting, should the person counting see the system quantity? **Recommendation:** no ("blind count") for full counts, so the numbers are really counted; the quick single-item adjustment in design 07 keeps showing it.
 6. **One warehouse for now?** Only `MAIN` exists; transfers between warehouses are planned for Phase 3. **Recommendation:** keep it that way; everything is already stored per warehouse.
+
+## Delivered
+
+| Task | Commit(s) | Result |
+|---|---|---|
+| Plan, decisions | `0e8f3a8`, `7bb6080` | M3 plan; decisions 0040–0044; PRD, `CLAUDE.md` updated |
+| T1 | `3805096`, `ba06d08` | Migration 0011: the stock ledger, average cost, below-zero refused, counts, label sizes |
+| T2–T3 | `e1c8631` | Migration 0012: journal entries; the posting engine reads the event links, never hard-coded accounts |
+| T4–T8 | `37fbed3` | Adjustments, opening stock (+ Excel), counts, oversell review, journal and trial balance API |
+| T9–T12 foundation | `735cf7a`, `28733b3` | Stock routes, supervisor approval dialog, data hooks; default warehouse per PC API; schema description |
+| T9 | `6be8c50`, `512301e` | Items & stock: tiles, columns, stock card, adjustment dialog, barcode labels; opening stock, counts and oversell review pages |
+| T10–T12 | `1bc1005` | Journal viewer, trial balance, label sizes in Lists, PC warehouse in Devices, dashboard stock alerts |
+| Fixes | `dceadac` | Names instead of user numbers; buttons to the stock pages |
+| T13 | this pull request | Playwright flows (`e2e/inventory.spec.ts`), screenshots in [`docs/screenshots/m3`](../screenshots/m3), changelog |
+
+**Tests at the end of M3:** 292 unit and screen-component tests, 376 integration tests (real PostgreSQL), 46 Playwright flows (23 in Arabic/light, 23 in English/dark). The Rust tests are unchanged and run in CI.
+
+**Covered by server tests instead of browser flows:** a closed month refusing an adjustment, the supervisor approval above 500.00 AED, a full count with differences, and the storekeeper not seeing values. They change shared data that the other browser flows rely on.
+
+**Open questions for the owner (not blocking):**
+- **Expenses (rent, bills):** approved in decision 0039; the journal tables now exist, so they can be built next, together with the owner's reports dashboard once sales exist (M4–M5).
