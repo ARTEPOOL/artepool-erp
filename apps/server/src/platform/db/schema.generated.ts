@@ -254,6 +254,78 @@ export interface AuthUsers {
   username: string;
 }
 
+export interface CashCountLines {
+  amount_fils: bigint;
+  count_id: bigint;
+  denomination_id: bigint;
+  quantity: number;
+}
+
+export interface CashCounts {
+  approval_id: bigint | null;
+  counted_at: Generated<Timestamp>;
+  counted_by: bigint;
+  id: Generated<bigint>;
+  purpose: string;
+  shift_id: bigint;
+  supersedes_id: bigint | null;
+  total_fils: bigint;
+}
+
+export interface CashRegisters {
+  branch_id: bigint;
+  code: string;
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  deactivation_reason: string | null;
+  device_id: bigint | null;
+  drawer_status_supported: Generated<boolean>;
+  drop_threshold_fils: bigint;
+  id: Generated<bigint>;
+  invoice_series_id: bigint;
+  is_active: Generated<boolean>;
+  name_ar: string;
+  name_en: string;
+  receipt_series_id: bigint;
+  row_version: Generated<number>;
+  updated_at: Generated<Timestamp>;
+  updated_by: bigint;
+  variance_approval_threshold_fils: Generated<bigint>;
+  warehouse_id: bigint;
+}
+
+export interface CashShifts {
+  approval_id: bigint | null;
+  audit_anchor_hash: Buffer | null;
+  audit_anchor_seq: bigint | null;
+  cashier_id: bigint;
+  closed_at: Timestamp | null;
+  closed_by: bigint | null;
+  closing_count_id: bigint | null;
+  counted_cash_fils: bigint | null;
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  expected_cash_fils: bigint | null;
+  id: Generated<bigint>;
+  opened_at: Generated<Timestamp>;
+  opened_by: bigint;
+  opening_count_id: bigint | null;
+  opening_float_fils: bigint;
+  register_id: bigint;
+  row_version: Generated<number>;
+  seq_no: bigint;
+  series_id: bigint;
+  shift_number: string;
+  status: Generated<string>;
+  updated_at: Generated<Timestamp>;
+  updated_by: bigint;
+  uuid: Generated<string>;
+  variance_fils: bigint | null;
+  variance_note: string | null;
+  variance_reason_code_id: bigint | null;
+  z_snapshot: Json | null;
+}
+
 export interface GlAccountMappings {
   account_id: bigint;
   created_at: Generated<Timestamp>;
@@ -902,6 +974,10 @@ export interface DB {
   "auth.sessions": AuthSessions;
   "auth.user_roles": AuthUserRoles;
   "auth.users": AuthUsers;
+  "cash.count_lines": CashCountLines;
+  "cash.counts": CashCounts;
+  "cash.registers": CashRegisters;
+  "cash.shifts": CashShifts;
   "gl.account_mappings": GlAccountMappings;
   "gl.accounts": GlAccounts;
   "gl.journal_entries": GlJournalEntries;
