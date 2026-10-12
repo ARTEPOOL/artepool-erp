@@ -1,12 +1,198 @@
 {
   "title": "Stock",
+  "loading": "Loading…",
+  "noAccess": "You do not have permission to see this page.",
+  "actions": {
+    "close": "Close",
+    "keep": "Go back",
+    "remove": "Remove"
+  },
+  "fields": {
+    "code": "Code",
+    "item": "Item",
+    "items": "Items",
+    "unit": "Unit",
+    "quantity": "Quantity",
+    "unitCost": "Unit cost (excl. VAT)",
+    "value": "Value",
+    "date": "Date",
+    "number": "Number",
+    "lines": "Lines",
+    "status": "Status",
+    "journalEntry": "Journal entry",
+    "note": "Note",
+    "counted": "Counted",
+    "system": "System quantity",
+    "movedSince": "Moved since start",
+    "difference": "Difference",
+    "reason": "Reason"
+  },
+  "problems": {
+    "invalid": "Type a valid number.",
+    "decimals": "More decimals than this unit allows.",
+    "zero": "Type a quantity above zero.",
+    "whole": "This unit takes whole numbers only."
+  },
+  "picker": {
+    "search": "Search stock items by name, code or barcode",
+    "results": "Search results",
+    "none": "No matching stock items."
+  },
   "opening": {
-    "title": "Opening stock"
+    "title": "Opening stock",
+    "subtitle": "Stock quantities and their cost when the system starts.",
+    "explain": "Opening stock is entered once, at go-live, and only the owner posts it. An empty unit cost takes the item's purchase price. The journal entry is Inventory (debit) / Opening balance equity (credit).",
+    "ownerOnly": "Only the owner posts opening stock. You can view the posted documents.",
+    "import": "Import from Excel",
+    "importTitle": "Import opening stock",
+    "importIntro": "Download the template and fill in, per item: Code, Quantity and Unit cost (excl. VAT, optional). The file is checked first; then all rows are posted together, or none.",
+    "done": "Opening stock posted:",
+    "form": {
+      "title": "New opening stock",
+      "lines": "Opening stock lines",
+      "empty": "Search for an item, add it, then type its quantity.",
+      "quantityOf": "Quantity of {name}",
+      "costOf": "Unit cost of {name}",
+      "removeLine": "Remove {name}",
+      "purchaseHint": "Purchase price:",
+      "averageHint": "Average cost:",
+      "costUnknown": "This item has no cost: type the unit cost.",
+      "total": "Total value",
+      "partial": "The value shows once every quantity and cost is known.",
+      "noLines": "Add at least one item.",
+      "noReason": "The \"Opening stock\" reason is missing from the lists. Contact the system administrator.",
+      "fix": "Correct the marked lines and try again.",
+      "post": "Post opening stock"
+    },
+    "posted": {
+      "label": "Opening stock document",
+      "lines": "Document lines"
+    },
+    "list": {
+      "title": "Posted opening stock documents",
+      "empty": "No opening stock posted yet."
+    }
   },
   "counts": {
-    "title": "Stock counts"
+    "title": "Stock counts",
+    "subtitle": "Count the stock on the shelves and compare it with the system.",
+    "progress": "{done} / {total}",
+    "progressLabel": "Counting progress",
+    "status": {
+      "counting": "Counting",
+      "posted": "Posted",
+      "cancelled": "Cancelled"
+    },
+    "scope": {
+      "full": "All items",
+      "category": "Category",
+      "selected": "Selected items"
+    },
+    "scopeLong": {
+      "full": "Count of all stock items",
+      "category": "Count of one category",
+      "selected": "Count of selected items"
+    },
+    "list": {
+      "label": "Stock counts",
+      "counting": "Counting…",
+      "scope": "Scope",
+      "created": "Started",
+      "progress": "Counted",
+      "difference": "Value of differences",
+      "empty": "No counts yet. Start a new count."
+    },
+    "new": {
+      "button": "New count",
+      "title": "Start a new count",
+      "explain": "System quantities are frozen when the count starts, and the people counting do not see them. Only one count can be open at a time.",
+      "scope": "Count scope",
+      "category": "Category",
+      "choose": "Choose…",
+      "chooseCategory": "Choose the category.",
+      "chooseItems": "Add at least one item.",
+      "chosen": "Selected items",
+      "remove": "Remove {name}",
+      "note": "Note (optional)",
+      "duplicate": "A count is already open. Finish or cancel it before starting a new one.",
+      "start": "Start count"
+    },
+    "count": {
+      "title": "Count",
+      "back": "All counts",
+      "entry": "Enter counted quantities",
+      "blind": "Type what you really count on the shelf. The system quantity is not shown while counting.",
+      "onlyOpen": "Not counted yet only",
+      "changed_one": "{count} unsaved change",
+      "changed_other": "{count} unsaved changes",
+      "lines": "Count items",
+      "countedOf": "Counted quantity of {name}",
+      "defective": "Defective",
+      "allCounted": "Every item is counted.",
+      "fix": "Correct the marked quantities, then save.",
+      "save": "Save",
+      "saved": "Quantities saved.",
+      "step": "Step",
+      "stepCount": "Counting",
+      "stepReview": "Review and post"
+    },
+    "review": {
+      "title": "Review the differences",
+      "explain": "Difference = counted − (system quantity at the start + movements since). Every difference needs a reason.",
+      "summary_one": "{count} difference",
+      "summary_other": "{count} differences",
+      "lines": "Count differences",
+      "notCounted": "Not counted",
+      "noDifference": "No difference",
+      "chooseReason": "Choose a reason…",
+      "reasonOf": "Reason for {name}",
+      "noteOf": "Note for {name}",
+      "noteOptional": "Note (optional)",
+      "noteRequired": "Note (required for this reason)",
+      "reasonMissing": "Choose a reason for this difference.",
+      "noteMissing": "This reason needs a note.",
+      "total": "Net value of differences",
+      "incomplete_one": "{count} item is not counted yet. Count it before posting.",
+      "incomplete_other": "{count} items are not counted yet. Count them before posting.",
+      "needReasons": "Choose a reason for every difference before posting.",
+      "approval": "The differences are above the allowed limit: a supervisor's approval is needed.",
+      "approvalExplain": "The value of this count's differences is above the allowed limit. A supervisor approves with their PIN on this PC.",
+      "post": "Post count",
+      "posted": "Count posted.",
+      "cancel": "Cancel count",
+      "cancelTitle": "Cancel the count",
+      "cancelExplain": "The count is cancelled and no stock changes. It stays on record as \"Cancelled\".",
+      "cancelConfirm": "Yes, cancel it",
+      "cancelled": "Count cancelled."
+    },
+    "closed": {
+      "title": "Count result",
+      "lines": "Count items",
+      "posted": "Count posted as"
+    }
   },
   "reviews": {
-    "title": "Oversell reviews"
+    "title": "Oversell reviews",
+    "subtitle": "Sales beyond the stock on hand, approved by a supervisor, waiting for the storekeeper.",
+    "explain": "When a sale needs more than the stock on hand, a supervisor approves it at the POS and a stock adjustment is posted automatically. Check the shelf, then record what you found. If the real stock differs, correct it with a count or an adjustment.",
+    "tabs": "Review status",
+    "pending": "Pending",
+    "reviewed": "Reviewed",
+    "postedBy": "Posted by",
+    "reviewedBy": "Reviewed by",
+    "mark": "Mark reviewed",
+    "markOf": "Mark {number} reviewed",
+    "emptyPending": "No oversells waiting for review.",
+    "emptyPendingHint": "Every sale beyond the stock on hand, approved by a supervisor at the POS, appears here.",
+    "emptyReviewed": "No oversell reviewed yet.",
+    "dialog": {
+      "title": "Mark reviewed",
+      "explain": "Write what you found on the shelf. The note is kept on the document and in the audit log.",
+      "note": "Review note (required)",
+      "noteHint": "e.g. found the quantity in the back store",
+      "noteTooShort": "Write a note of at least 3 characters.",
+      "confirm": "Mark reviewed",
+      "done": "Review recorded."
+    }
   }
 }
