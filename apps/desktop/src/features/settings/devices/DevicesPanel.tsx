@@ -19,6 +19,7 @@ import type {
   DeviceListItem,
   DevicesResponse,
   EnrollmentCodeResponse,
+  WarehouseItem,
 } from '@artepool/shared/contracts';
 import { formatDate, formatDateTime, formatTime } from '../../../lib/format';
 import {
@@ -38,9 +39,12 @@ import {
   useToast,
 } from '../../../ui';
 import { useCan, useDisplayName, useErrorText } from '../../auth/context';
+import { localName } from '../../masterdata/refs';
 import { KEYS, useApi, useSave } from '../api';
+import { useWarehouses } from '../lists/queries';
 import { CardHead, NoAccess, PanelHeader, settingsClasses as styles } from '../parts';
 import { ReasonDialog } from '../users/dialogs';
+import deviceStyles from './devices.module.css';
 
 const KIND_ICON: Record<DeviceKind, ReactNode> = {
   pos: <ShoppingCart aria-hidden="true" />,
@@ -81,6 +85,7 @@ export function DevicesPanel() {
   const [editing, setEditing] = useState<DeviceListItem | null>(null);
   const [untrusting, setUntrusting] = useState<DeviceListItem | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [warehouseError, setWarehouseError] = useState<string | null>(null);
   const newCode = useSave(
     (client, _: null, key) =>
       client.post<EnrollmentCodeResponse>(
@@ -99,6 +104,12 @@ export function DevicesPanel() {
     },
   );
   const countdown = useCountdown(shownCode?.code ? shownCode.expiresAt : null);
+  // The warehouse per PC only matters with more than one active warehouse; without the right
+  // to read the warehouses the field stays hidden (the server checks the save again).
+  const warehouses = useWarehouses(can('system.devices.manage') && can('warehouses.manage'));
+  const activeWarehouses = (warehouses.data ?? []).filter((w) => w.isActive);
+  const showWarehouse = activeWarehouses.length > 1;
+  const columns = showWarehouse ? 5 : 4;
 
   if (!can('system.devices.manage')) return <NoAccess />;
   const list = devices.data?.devices ?? [];
@@ -117,6 +128,7 @@ export function DevicesPanel() {
               <tr>
                 <th>{t('devices.colDevice')}</th>
                 <th>{t('devices.colStatus')}</th>
+                {showWarehouse && <th>{t('devices.colWarehouse')}</th>}
                 <th className={tableClasses.num}>{t('devices.colKey')}</th>
                 <th />
               </tr>
@@ -173,6 +185,20 @@ export function DevicesPanel() {
                         </span>
                       )}
                     </td>
+                    {showWarehouse && (
+                      <td>
+                        {revoked ? (
+                          '—'
+                        ) : (
+                          <WarehouseSelect
+                            key={`${device.id}-${device.defaultWarehouseId ?? ''}`}
+                            device={device}
+                            warehouses={warehouses.data ?? []}
+                            onError={setWarehouseError}
+                          />
+                        )}
+                      </td>
+                    )}
                     <td className={tableClasses.num}>
                       {revoked ? '—' : <bdi>{formatDate(device.keyExpiresAt)}</bdi>}
                     </td>
@@ -210,12 +236,14 @@ export function DevicesPanel() {
               })}
               {devices.isLoading && (
                 <tr className={tableClasses.empty}>
-                  <td colSpan={4}>{t('common.loading')}</td>
+                  <td colSpan={columns}>{t('common.loading')}</td>
                 </tr>
               )}
             </tbody>
           </table>
+          {warehouseError && <Alert>{warehouseError}</Alert>}
           <Note className={styles.tableNote}>{t('devices.neverAgain')}</Note>
+          {showWarehouse && <Note className={styles.tableNote}>{t('devices.warehouseNote')}</Note>}
         </Card>
         <Card rise index={2}>
           <CardHead title={t('devices.enrollTitle')} />
@@ -263,6 +291,63 @@ export function DevicesPanel() {
       {editing && <EditDeviceDialog device={editing} onClose={() => setEditing(null)} />}
       {untrusting && <EndTrustDialog device={untrusting} onClose={() => setUntrusting(null)} />}
     </>
+  );
+}
+
+/**
+ * The warehouse this PC's documents use by default (M3-T12). Empty = the company's default
+ * warehouse, so moving the default in Lists moves these PCs too.
+ */
+function WarehouseSelect(props: {
+  device: DeviceListItem;
+  warehouses: WarehouseItem[];
+  onError: (text: string | null) => void;
+}) {
+  const { t, i18n } = useTranslation('settings');
+  const toast = useToast();
+  const errorText = useErrorText();
+  const nameOf = localName(i18n.language);
+  const { device } = props;
+  const save = useSave(
+    (api, body: { defaultWarehouseId: string | null }, key) =>
+      api.patch(`/api/v1/devices/${device.id}`, body, { idempotencyKey: key }),
+    {
+      invalidate: [KEYS.devices],
+      onSuccess: () => toast(t('devices.warehouseSaved', { code: device.code })),
+    },
+  );
+  const current = device.defaultWarehouseId ?? '';
+  // Shows the choice at once; the list is read again after the save, or goes back on an error.
+  const [value, setValue] = useState(current);
+  const choices = props.warehouses.filter((w) => w.isActive || w.id === current);
+  return (
+    <select
+      className={deviceStyles.warehouseSelect}
+      aria-label={t('devices.warehouseFor', { code: device.code })}
+      value={value}
+      disabled={save.isPending}
+      onChange={(event) => {
+        const chosen = event.target.value;
+        props.onError(null);
+        setValue(chosen);
+        save.mutate(
+          { defaultWarehouseId: chosen || null },
+          {
+            onError: (caught) => {
+              setValue(current);
+              props.onError(errorText(caught));
+            },
+          },
+        );
+      }}
+    >
+      <option value="">{t('devices.defaultWarehouse')}</option>
+      {choices.map((w) => (
+        <option key={w.id} value={w.id}>
+          {`${w.code} · ${nameOf(w)}`}
+        </option>
+      ))}
+    </select>
   );
 }
 

@@ -21,7 +21,14 @@
   "home": {
     "welcome": "Welcome, {name}",
     "next": "The dashboard arrives with sales. For now, the owner can manage users, PCs and the audit log in Settings.",
-    "openSettings": "Open Settings"
+    "openSettings": "Open Settings",
+    "stock": {
+      "title": "Stock alerts",
+      "toReorder": "Items to reorder",
+      "defective": "Items with defective stock",
+      "reviews": "Oversells waiting for review",
+      "open": "Open"
+    }
   },
   "noAccess": {
     "title": "No access",
@@ -206,7 +213,12 @@
     "endTrust": "End trust",
     "endTrustTitle": "End trust on this PC?",
     "endTrustBody": "The code from the phone will be asked again on {device} for: {names}.",
-    "trustEnded": "Trust ended: the phone code is needed again on this PC"
+    "trustEnded": "Trust ended: the phone code is needed again on this PC",
+    "colWarehouse": "Warehouse",
+    "warehouseFor": "Warehouse of {code}",
+    "defaultWarehouse": "Default warehouse",
+    "warehouseSaved": "Warehouse of {code} saved.",
+    "warehouseNote": "The warehouse each PC sells and issues stock from. “Default warehouse” follows the default warehouse in Lists."
   },
   "audit": {
     "title": "Audit log",

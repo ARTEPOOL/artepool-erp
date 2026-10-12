@@ -8,3 +8,94 @@
 .warnIcon {
   color: var(--color-warning);
 }
+
+/* Journal and trial balance: the filter row above the table (design 12's report filters). */
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: end;
+  padding-block: var(--space-3);
+}
+
+.filters > * {
+  min-inline-size: 11rem;
+}
+
+.field {
+  display: grid;
+  gap: var(--space-2);
+  min-inline-size: 0;
+}
+
+.label {
+  font-size: var(--text-label);
+  font-weight: 600;
+}
+
+.dateInput {
+  min-block-size: var(--control-md);
+  padding-inline: var(--space-3);
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--text-label);
+  direction: ltr;
+  text-align: start;
+}
+
+.dateInput:hover {
+  border-color: var(--color-primary);
+}
+
+.dateInput:focus-visible {
+  outline: 3px solid var(--color-primary-soft);
+  border-color: var(--color-primary);
+}
+
+.rangeError {
+  flex-basis: 100%;
+}
+
+.pager {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: center;
+  justify-content: space-between;
+  padding-block: var(--space-3);
+}
+
+.pagerButtons {
+  display: inline-flex;
+  gap: var(--space-2);
+}
+
+.muted {
+  color: var(--color-text-secondary);
+  font-size: var(--text-caption);
+}
+
+.entry {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.scroll {
+  overflow-x: auto;
+}
+
+.totals td {
+  font-weight: 700;
+  border-block-start: 2px solid var(--color-border);
+  padding: var(--space-3) var(--space-2);
+}
+
+.totalsLabel {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}

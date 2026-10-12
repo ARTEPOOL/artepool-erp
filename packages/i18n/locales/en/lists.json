@@ -182,5 +182,19 @@
     "requiresNote": "Note required",
     "requiresNoteLong": "The person must also write a note when choosing this reason",
     "note": "Only reasons for money paid in or out of the drawer post to an account."
+  },
+  "labelSizes": {
+    "tab": "Label sizes",
+    "title": "Barcode label sizes",
+    "new": "New size",
+    "edit": "Edit size",
+    "empty": "No sizes here.",
+    "size": "Size",
+    "sizeValue": "{width} × {height} mm",
+    "width": "Width (mm)",
+    "height": "Height (mm)",
+    "mmRule": "A whole number from {min} to {max} mm.",
+    "mmHint": "From {min} to {max} mm.",
+    "note": "These sizes are offered when printing barcode labels, through the print dialog. Only the owner adds, changes or deactivates a size; a size is never deleted."
   }
 }
