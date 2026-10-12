@@ -56,8 +56,8 @@ describe('settings', () => {
       'security.max_failed_logins': 5,
       'security.trusted_device_days': 30,
     });
-    // 22 from 0004 + 6 security settings from 0005 + 1 from 0006
-    expect(rows).toHaveLength(29);
+    // 22 from 0004 + 6 security settings from 0005 + 1 from 0006 + 1 from 0015
+    expect(rows).toHaveLength(30);
   });
 
   it('values can be edited (audited, versioned); keys cannot be added by the app', async () => {

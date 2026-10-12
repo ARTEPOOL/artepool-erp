@@ -103,7 +103,7 @@ describe('roles and permissions', () => {
     const { rows } = await api.query<{ code: string; approvable: boolean }>(
       'SELECT code, approvable FROM auth.permissions ORDER BY code',
     );
-    expect(rows).toHaveLength(67); // 64 + customers.credit (0036) + items.cost (0038) + stock.opening (0042)
+    expect(rows).toHaveLength(68); // 64 + customers.credit (0036) + items.cost (0038) + stock.opening (0042) + customers.opening (0051)
     expect(rows.filter((r) => r.approvable).map((r) => r.code)).toEqual([
       'cash.paid_out',
       'cash.variance_accept',
@@ -131,7 +131,7 @@ describe('roles and permissions', () => {
          FROM auth.roles r JOIN auth.role_permissions rp ON rp.role_id = r.id GROUP BY r.code`,
     );
     const perms = Object.fromEntries(rows.map((r) => [r.role, r.perms]));
-    expect(perms.owner).toHaveLength(67);
+    expect(perms.owner).toHaveLength(68);
     expect(perms.cashier).toEqual([
       'cash.drop',
       'cash.paid_in',

@@ -20,7 +20,14 @@ const NOT_ROW_AUDITED = [
   'inv.balances',
 ];
 /** Link and technical tables the API may delete from (docs/database-schema.md §2). */
-const API_MAY_DELETE = ['auth.role_permissions', 'auth.user_roles', 'md.bundle_components'];
+const API_MAY_DELETE = [
+  'auth.role_permissions',
+  'auth.user_roles',
+  'md.bundle_components',
+  // Lines of a draft only (sys.guard_draft_lines refuses once the document is sent or issued).
+  'sales.document_lines',
+  'sales.quotation_lines',
+];
 
 let db: TestDatabase;
 let admin: pg.Client;

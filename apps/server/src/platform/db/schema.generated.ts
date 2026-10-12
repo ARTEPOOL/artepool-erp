@@ -710,6 +710,7 @@ export interface MdPaymentMethods {
   kind: string;
   name_ar: string;
   name_en: string;
+  office_gl_account_id: bigint | null;
   opens_drawer: Generated<boolean>;
   requires_reference: Generated<boolean>;
   row_version: Generated<number>;
@@ -818,6 +819,251 @@ export interface MdWarehouses {
   updated_at: Generated<Timestamp>;
   updated_by: bigint;
   warehouse_type: string;
+}
+
+export interface SalesCreditAllocations {
+  amount_fils: bigint;
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  credit_note_id: bigint;
+  id: Generated<bigint>;
+  invoice_id: bigint | null;
+  opening_balance_id: bigint | null;
+}
+
+export interface SalesDocumentLines {
+  advance_document_id: bigint | null;
+  amount_before_discount_fils: Generated<bigint>;
+  business_line_id: bigint;
+  cost_fils: Generated<bigint>;
+  description_ar: string;
+  description_en: string;
+  discount_excl_vat_fils: Generated<bigint>;
+  doc_discount_alloc_fils: Generated<bigint>;
+  document_id: bigint;
+  gross_fils: bigint;
+  id: Generated<bigint>;
+  item_id: bigint | null;
+  item_type: string | null;
+  line_discount_bp: number | null;
+  line_discount_fils: Generated<bigint>;
+  line_kind: Generated<string>;
+  line_no: number;
+  list_price_4dp: Generated<bigint>;
+  net_fils: bigint;
+  note: string | null;
+  original_line_id: bigint | null;
+  price_includes_vat: Generated<boolean>;
+  price_override_approval_id: bigint | null;
+  quantity: Numeric;
+  return_stock_status: string | null;
+  technician_id: bigint | null;
+  unit_id: bigint | null;
+  unit_price_4dp: bigint;
+  vat_category_code: Generated<string>;
+  vat_category_id: bigint;
+  vat_fils: bigint;
+  vat_rate_bp: Generated<number>;
+}
+
+export interface SalesDocuments {
+  advance_used_net_fils: Generated<bigint>;
+  advance_used_vat_fils: Generated<bigint>;
+  approval_id: bigint | null;
+  bill_to_address: string | null;
+  bill_to_name: string;
+  bill_to_name_alt: string | null;
+  bill_to_phone: string | null;
+  bill_to_trn: string | null;
+  branch_id: bigint;
+  business_line_id: bigint;
+  channel: string;
+  content_hash: Buffer | null;
+  cost_fils: Generated<bigint>;
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  credit_approval_id: bigint | null;
+  currency: Generated<string>;
+  customer_id: bigint;
+  device_id: bigint;
+  discount_total_fils: Generated<bigint>;
+  doc_discount_fils: Generated<bigint>;
+  doc_number: string | null;
+  doc_type: string;
+  due_date: string | null;
+  id: Generated<bigint>;
+  internal_note: string | null;
+  invoice_format: Generated<string>;
+  issue_date: string | null;
+  issued_at: Timestamp | null;
+  issued_by: bigint | null;
+  net_fils: Generated<bigint>;
+  notes: string | null;
+  original_document_id: bigint | null;
+  pos_cart_id: string | null;
+  price_level_id: bigint | null;
+  print_count: Generated<number>;
+  quotation_id: bigint | null;
+  reason_code_id: bigint | null;
+  reason_text: string | null;
+  register_id: bigint | null;
+  row_version: Generated<number>;
+  salesperson_id: bigint | null;
+  seller_snapshot: Json | null;
+  seq_no: bigint | null;
+  series_id: bigint;
+  settled_fils: Generated<bigint>;
+  settlement_status: Generated<string>;
+  shift_id: bigint | null;
+  status: Generated<string>;
+  supply_date: string | null;
+  total_fils: Generated<bigint>;
+  updated_at: Generated<Timestamp>;
+  updated_by: bigint;
+  uuid: Generated<string>;
+  vat_fils: Generated<bigint>;
+  warehouse_id: bigint;
+}
+
+export interface SalesHeldCarts {
+  cart: Json;
+  cart_id: string;
+  closed_at: Timestamp | null;
+  closed_by: bigint | null;
+  customer_id: bigint | null;
+  device_id: bigint;
+  held_at: Generated<Timestamp>;
+  id: Generated<bigint>;
+  label: string | null;
+  register_id: bigint | null;
+  status: Generated<string>;
+  user_id: bigint;
+}
+
+export interface SalesOpeningBalances {
+  amount_fils: bigint;
+  balance_date: string;
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  customer_id: bigint;
+  direction: string;
+  due_date: string | null;
+  id: Generated<bigint>;
+  import_batch_id: bigint | null;
+  reference: string | null;
+  settled_fils: Generated<bigint>;
+}
+
+export interface SalesPaymentAllocations {
+  amount_fils: bigint;
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  document_id: bigint | null;
+  id: Generated<bigint>;
+  opening_balance_id: bigint | null;
+  payment_id: bigint;
+}
+
+export interface SalesPayments {
+  allocated_fils: Generated<bigint>;
+  amount_fils: bigint;
+  approval_id: bigint | null;
+  change_fils: bigint | null;
+  channel: string;
+  cheque_bank: string | null;
+  cheque_date: string | null;
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  customer_id: bigint;
+  device_id: bigint;
+  direction: string;
+  doc_number: string;
+  id: Generated<bigint>;
+  method_kind: string;
+  notes: string | null;
+  payment_date: string;
+  payment_kind: string;
+  payment_method_id: bigint;
+  quotation_id: bigint | null;
+  reason_code_id: bigint | null;
+  received_at: Generated<Timestamp>;
+  reference: string | null;
+  register_id: bigint | null;
+  reversal_of_id: bigint | null;
+  seq_no: bigint;
+  series_id: bigint;
+  shift_id: bigint | null;
+  status: Generated<string>;
+  tendered_fils: bigint | null;
+  uuid: Generated<string>;
+}
+
+export interface SalesQuotationLines {
+  amount_before_discount_fils: bigint;
+  business_line_id: bigint;
+  description_ar: string;
+  description_en: string;
+  discount_excl_vat_fils: Generated<bigint>;
+  doc_discount_alloc_fils: Generated<bigint>;
+  gross_fils: bigint;
+  id: Generated<bigint>;
+  is_optional: Generated<boolean>;
+  item_id: bigint;
+  line_discount_bp: number | null;
+  line_discount_fils: Generated<bigint>;
+  line_no: number;
+  list_price_4dp: bigint;
+  net_fils: bigint;
+  note: string | null;
+  price_includes_vat: boolean;
+  quantity: Numeric;
+  quotation_id: bigint;
+  unit_id: bigint;
+  unit_price_4dp: bigint;
+  vat_category_id: bigint;
+  vat_fils: bigint;
+  vat_rate_bp: number;
+}
+
+export interface SalesQuotations {
+  approval_id: bigint | null;
+  bill_to_address: string | null;
+  bill_to_name: string;
+  bill_to_name_alt: string | null;
+  bill_to_phone: string | null;
+  bill_to_trn: string | null;
+  branch_id: bigint;
+  business_line_id: bigint;
+  converted_document_id: bigint | null;
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  customer_id: bigint;
+  decided_at: Timestamp | null;
+  discount_total_fils: Generated<bigint>;
+  doc_discount_fils: Generated<bigint>;
+  doc_number: string;
+  id: Generated<bigint>;
+  net_fils: Generated<bigint>;
+  notes: string | null;
+  price_level_id: bigint;
+  quotation_date: string;
+  revised_from_id: bigint | null;
+  revision: Generated<number>;
+  row_version: Generated<number>;
+  salesperson_id: bigint | null;
+  sent_at: Timestamp | null;
+  seq_no: bigint;
+  series_id: bigint;
+  status: Generated<string>;
+  subject: string | null;
+  terms_ar: string | null;
+  terms_en: string | null;
+  total_fils: Generated<bigint>;
+  updated_at: Generated<Timestamp>;
+  updated_by: bigint;
+  uuid: Generated<string>;
+  valid_until: string;
+  vat_fils: Generated<bigint>;
 }
 
 export interface SysAlerts {
@@ -1005,6 +1251,15 @@ export interface DB {
   "md.units": MdUnits;
   "md.vat_categories": MdVatCategories;
   "md.warehouses": MdWarehouses;
+  "sales.credit_allocations": SalesCreditAllocations;
+  "sales.document_lines": SalesDocumentLines;
+  "sales.documents": SalesDocuments;
+  "sales.held_carts": SalesHeldCarts;
+  "sales.opening_balances": SalesOpeningBalances;
+  "sales.payment_allocations": SalesPaymentAllocations;
+  "sales.payments": SalesPayments;
+  "sales.quotation_lines": SalesQuotationLines;
+  "sales.quotations": SalesQuotations;
   "sys.alerts": SysAlerts;
   "sys.branches": SysBranches;
   "sys.company_profile": SysCompanyProfile;

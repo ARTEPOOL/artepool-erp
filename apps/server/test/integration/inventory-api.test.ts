@@ -590,8 +590,14 @@ describe('stock figures, oversell review and the journal', () => {
         const doc = (
           await sql<{
             id: bigint;
-          }>`INSERT INTO inv.adjustments (kind, warehouse_id, adjustment_date, reason_code_id, approval_id, sales_document_id)
-            SELECT 'oversell', w.id, sys.business_date(), r.id, ${approval}, 1 FROM md.warehouses w, sys.reason_codes r
+          }>`WITH sale AS (INSERT INTO sales.documents (doc_type, channel, branch_id, business_line_id, warehouse_id, device_id,
+                                     customer_id, bill_to_name)
+         SELECT 'invoice', 'office', (SELECT id FROM sys.branches ORDER BY id LIMIT 1),
+                (SELECT id FROM md.business_lines ORDER BY id LIMIT 1), w.id, sys.ctx_device_id(), c.id, c.name
+           FROM md.warehouses w, md.customers c WHERE w.code = 'MAIN' AND c.is_walk_in RETURNING id)
+             INSERT INTO inv.adjustments (kind, warehouse_id, adjustment_date, reason_code_id, approval_id, sales_document_id)
+            SELECT 'oversell', w.id, sys.business_date(), r.id, ${approval}, (SELECT id FROM sale)
+              FROM md.warehouses w, sys.reason_codes r
              WHERE w.code = 'MAIN' AND r.category = 'oversell' RETURNING id`.execute(trx)
         ).rows[0]!.id;
         const line = (
