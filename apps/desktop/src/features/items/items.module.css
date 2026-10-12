@@ -401,13 +401,150 @@
   flex: 1;
 }
 
+/* --- stock (M3): the tile button, the on-hand cell, the stock card, the adjustment ------- */
+.kpiButton {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  cursor: pointer;
+}
+
+.kpiButton:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.onHand {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+}
+
+.defectiveLine {
+  color: var(--color-danger);
+  font-size: var(--text-caption);
+}
+
+/* Sellable / defective (design's .pair). */
+.pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.pair div {
+  display: grid;
+  gap: 2px;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-muted);
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+}
+
+.pair b {
+  font-size: var(--text-h1);
+  line-height: 1.2;
+  color: var(--color-text);
+}
+
+.pair div.ok {
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+
+.pair div.ok b {
+  color: var(--color-success);
+}
+
+/* Movements (design's .mv): the sign is always written, colour only adds to it. */
+.movements {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-label);
+}
+
+.movements li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-block: var(--space-2);
+  border-block-end: 1px solid var(--color-border);
+}
+
+.movements li:last-child {
+  border-block-end: none;
+}
+
+.movements li > span:first-child {
+  display: grid;
+  gap: 2px;
+  min-inline-size: 0;
+}
+
+.moveQty {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+  white-space: nowrap;
+}
+
+.in {
+  color: var(--color-success);
+  font-weight: 700;
+}
+
+.out {
+  color: var(--color-danger);
+  font-weight: 700;
+}
+
+/* System / counted / difference (design's .diffbox). */
+.diffbox {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+  text-align: center;
+}
+
+.diffbox div {
+  display: grid;
+  gap: 2px;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-muted);
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+}
+
+.diffbox b {
+  font-size: var(--text-h3);
+  color: var(--color-text);
+}
+
+.diffbox .neg b {
+  color: var(--color-danger);
+}
+
+.diffbox .pos b {
+  color: var(--color-success);
+}
+
 @media (max-width: 700px) {
   .barcodeRow,
   .componentRow {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
 
-  .figures {
+  .figures,
+  .diffbox {
     grid-template-columns: 1fr;
   }
 }

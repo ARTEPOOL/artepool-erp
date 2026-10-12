@@ -17,12 +17,17 @@
     "active": "Active items",
     "stock": "Stock items",
     "service": "Services",
-    "bundle": "Kits"
+    "bundle": "Kits",
+    "value": "Stock value",
+    "toReorder": "To reorder",
+    "showToReorder": "Show the items to reorder",
+    "defective": "Items with defective stock"
   },
   "filters": {
     "label": "Category",
     "all": "All",
-    "inactive": "Deactivated"
+    "inactive": "Deactivated",
+    "toReorder": "To reorder"
   },
   "types": {
     "stock": "Stock item",
@@ -41,7 +46,10 @@
     "noMatch": "No items match the search.",
     "empty": "No items here yet.",
     "shown": "Showing {shown} of {total}",
-    "more": "Show more"
+    "more": "Show more",
+    "avgCost": "Avg. cost",
+    "onHand": "On hand",
+    "toReorder": "To reorder"
   },
   "detail": {
     "select": "Choose an item in the list to see its details.",
@@ -128,5 +136,88 @@
     },
     "costHint": "Without VAT, up to 4 decimals, e.g. 62.50. Only the owner sees it.",
     "kitCost": "A kit's cost is worked out from its components; it is not typed here."
+  },
+  "stock": {
+    "title": "Stock",
+    "sellable": "Sellable",
+    "defective": "Defective",
+    "avgCost": "Average cost",
+    "value": "Sellable stock value",
+    "defectiveValue": "Defective stock value",
+    "adjust": "Adjust",
+    "adjustTool": "Stock adjustment",
+    "countTool": "Stock count",
+    "openingTool": "Opening stock",
+    "movements": "Movements",
+    "noMovements": "No movements yet.",
+    "after": "Balance after",
+    "calculated": "Stock is calculated from movements and never edited by hand.",
+    "showAll": "Show all ({total})"
+  },
+  "movement": {
+    "opening": "Opening stock",
+    "sale": "Sale",
+    "sale_return": "Sale return",
+    "adjustment_in": "Adjustment in",
+    "adjustment_out": "Adjustment out",
+    "oversell_in": "Oversell adjustment",
+    "status_out": "Status change (out)",
+    "status_in": "Status change (in)",
+    "write_off": "Defective write-off",
+    "count_gain": "Count gain",
+    "count_loss": "Count loss"
+  },
+  "adjust": {
+    "title": "Stock adjustment",
+    "operation": "Operation",
+    "ops": {
+      "counted": "Counted quantity",
+      "increase": "Add",
+      "decrease": "Remove",
+      "status_change": "Move to defective",
+      "write_off": "Write off defective"
+    },
+    "counted": "Quantity actually counted",
+    "quantityIn": "Quantity to add",
+    "quantityOut": "Quantity to remove",
+    "quantityDefective": "Quantity to move to defective",
+    "quantityWriteOff": "Defective quantity to write off",
+    "inSystem": "In the system",
+    "countedShort": "Counted",
+    "difference": "Difference",
+    "onHand": "On hand:",
+    "defective": "Defective:",
+    "reason": "Reason",
+    "typeFirst": "Type the quantity first",
+    "note": "Note",
+    "noteRequired": "Note (required for this reason)",
+    "unitCost": "Unit cost (excl. VAT)",
+    "unitCostHint": "Leave it empty to use the average cost.",
+    "explain": "The stock is never edited directly: a numbered adjustment is recorded and the stock is calculated from it.",
+    "cancel": "Cancel",
+    "save": "Record adjustment",
+    "done": "Adjustment {number} recorded.",
+    "approvalExplain": "This adjustment is worth more than the limit and needs a supervisor's approval.",
+    "errors": {
+      "quantity": "Write a valid quantity above zero.",
+      "noDifference": "The counted quantity equals the system quantity: there is nothing to adjust.",
+      "noteRequired": "This reason needs a note."
+    }
+  },
+  "labels": {
+    "button": "Barcode labels",
+    "title": "Barcode labels",
+    "count": "Number of labels",
+    "size": "Size (mm)",
+    "sheet": "Print on A4 label sheets",
+    "showPrice": "Show the price incl. VAT",
+    "noSizes": "No label sizes are active. Add them in Settings → Lists.",
+    "cannotEncode": "This barcode cannot be drawn.",
+    "preview": "Preview at real size",
+    "print": "Print",
+    "barcodeOf": "Barcode {code}",
+    "errors": {
+      "count": "Write a number from 1 to {max}."
+    }
   }
 }
