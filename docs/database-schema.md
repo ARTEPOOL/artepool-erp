@@ -1666,11 +1666,12 @@ Migrations are written **in build order** (milestones in [`phase-1-plan.md`](pha
 | 0013 | `inventory_hardening` | M3 | — (rules: a movement only for an open document and its own line; the approval threshold uses the movements' value; opening stock once per item; `inv.lock_balances` for counts; found in the M3 code review) | — |
 | 0014 | `cash_core` | M4 | `registers`, `shifts`, `counts`, `count_lines` + shift-owner function | — |
 | 0015 | `sales` | M4 | All `sales.*` tables + allocation, advance-deduction, note and payment-allocation triggers + sales views | `inv.movements.sales_document_line_id`, `inv.adjustments.sales_document_id`, `gl.journal_entries` (sales document, payment, opening balance, shift) |
-| 0016 | `ops_outbox` | M4 | `ops.outbox` | — |
-| 0017 | `cash_events` | M5 | `cash.movements`, `cash.drawer_events` + shift summary view | `gl.journal_entries.cash_movement_id` |
-| 0018 | `ops_backup` | M6 | `ops.backup_runs`, `ops.integrity_runs` + backup role grants | — |
+| 0016 | `outbox_print` | M4 | `ops.outbox`, `sys.print_templates`, `sys.print_template_versions` (default A4 designs, decision 0050) | `print_template_version_id` on documents, quotations and payments |
+| 0017 | `sales_fixes` | M4 | — (a converted line keeps the quotation price; prices and discounts checked when a quotation is sent; advance lines on a credit note of a payment invoice; `sales.credit_over_limit` bypasses the credit check) | `sales.document_lines.quotation_line_id` |
+| 0018 | `cash_events` | M5 | `cash.movements`, `cash.drawer_events` + shift summary view | `gl.journal_entries.cash_movement_id` |
+| 0019 | `ops_backup` | M6 | `ops.backup_runs`, `ops.integrity_runs` + backup role grants | — |
 
-After 0018, a final check asserts that every business table has the audit trigger, the no-delete guard and the expected grants. The same check runs as an automated test.
+After 0019, a final check asserts that every business table has the audit trigger, the no-delete guard and the expected grants. The same check runs as an automated test.
 
 ---
 
