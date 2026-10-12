@@ -5,8 +5,12 @@ import { Button, Card, iconClass } from '../../ui';
 import { useAuthState, useCan, useDisplayName } from '../auth/context';
 import { canSeeSettings } from '../settings/sections';
 import { PageHeader, settingsClasses } from '../settings/parts';
+import { StockAlerts } from './StockAlerts';
 
-/** Until the dashboard (design 02) arrives with sales: a welcome and the way to Settings. */
+/**
+ * Until the dashboard (design 02) arrives with sales: a welcome, the stock alerts, and the way to
+ * Settings.
+ */
 export function HomePage() {
   const { t } = useTranslation('settings');
   const { user } = useAuthState();
@@ -16,6 +20,7 @@ export function HomePage() {
   return (
     <>
       <PageHeader title={t('home.welcome', { name: user ? nameOf(user) : '' })} />
+      <StockAlerts />
       <Card rise index={1} className={settingsClasses.ucard}>
         <p>{t('home.next')}</p>
         {canSeeSettings(can) && (

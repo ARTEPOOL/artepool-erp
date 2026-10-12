@@ -6,12 +6,17 @@ import { useCan } from '../auth/context';
 import { useAccounts } from '../masterdata/refs';
 import { SaveError } from '../settings/lists/parts';
 import { ChartTab } from './ChartTab';
+import { JournalTab } from './JournalTab';
 import { LinksTab } from './LinksTab';
+import { TrialBalanceTab } from './TrialBalanceTab';
 import styles from './accounting.module.css';
 
-type TabId = 'chart' | 'links';
+type TabId = 'chart' | 'links' | 'journal' | 'trial';
 
-/** Accounting: chart of accounts and event links (decisions 0018, 0034, 0035). */
+/**
+ * Accounting: chart of accounts, event links, the journal and the trial balance (decisions 0016,
+ * 0018, 0034, 0035). The whole page needs `ledger.view`; the server checks it on every call.
+ */
 export function AccountingPage() {
   const { t } = useTranslation('accounting');
   const can = useCan();
@@ -41,12 +46,21 @@ export function AccountingPage() {
           tabs={[
             { value: 'chart', label: t('tabs.chart') },
             { value: 'links', label: t('tabs.links') },
+            { value: 'journal', label: t('tabs.journal') },
+            { value: 'trial', label: t('tabs.trial') },
           ]}
         />
-        {accounts.isError && <SaveError error={accounts.error} />}
-        {accounts.isLoading && <EmptyState>{t('loading')}</EmptyState>}
-        {accounts.data &&
-          (tab === 'chart' ? <ChartTab data={accounts.data} /> : <LinksTab data={accounts.data} />)}
+        {tab === 'trial' ? (
+          <TrialBalanceTab />
+        ) : (
+          <>
+            {accounts.isError && <SaveError error={accounts.error} />}
+            {accounts.isLoading && <EmptyState>{t('loading')}</EmptyState>}
+            {accounts.data && tab === 'chart' && <ChartTab data={accounts.data} />}
+            {accounts.data && tab === 'links' && <LinksTab data={accounts.data} />}
+            {accounts.data && tab === 'journal' && <JournalTab data={accounts.data} />}
+          </>
+        )}
       </div>
     </>
   );
