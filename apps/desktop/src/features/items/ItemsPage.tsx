@@ -68,14 +68,17 @@ const ALL = 'all';
 const TO_REORDER = 'toReorder';
 const INACTIVE = 'inactive';
 
-/** Waits until the person stops typing before searching (about a quarter of a second). */
-function useDebounced(value: string, ms = 250): string {
+/**
+ * Waits until the person stops typing before searching (about a quarter of a second). `now()`
+ * searches at once: a barcode scanner ends every scan with Enter.
+ */
+function useDebounced(value: string, ms = 250): [string, () => void] {
   const [debounced, setDebounced] = useState(value);
   useEffect(() => {
     const timer = setTimeout(() => setDebounced(value), ms);
     return () => clearTimeout(timer);
   }, [value, ms]);
-  return debounced;
+  return [debounced, () => setDebounced(value)];
 }
 
 /** The list's price cell: with VAT in bold, without VAT under it (decision 0032). */
@@ -136,7 +139,7 @@ export function ItemsPage() {
   const navigate = useNavigate();
   const searchRef = useRef<HTMLInputElement>(null);
   const [search, setSearch] = useState('');
-  const q = useDebounced(search.trim());
+  const [q, searchNow] = useDebounced(search.trim());
   const [segment, setSegment] = useState<string>(ALL);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dialog, setDialog] = useState<Dialog | null>(null);
@@ -211,6 +214,15 @@ export function ItemsPage() {
 
   // A new search starts on its own first result (once the search has actually run).
   useEffect(() => setSelectedId(null), [q]);
+
+  // A scanned barcode or a full code opens that item's card straight away, and the search text
+  // is selected so the next scan simply replaces it.
+  const exactId = pages[0]?.exactMatchId ?? null;
+  useEffect(() => {
+    if (exactId === null) return;
+    setSelectedId(exactId);
+    if (document.activeElement === searchRef.current) searchRef.current?.select();
+  }, [exactId, q]);
   const changeSegment = (value: string) => {
     setSegment(value);
     setSelectedId(null);
@@ -302,6 +314,12 @@ export function ItemsPage() {
             placeholder={t('search')}
             value={search}
             onChange={(event) => setSearch(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                searchNow();
+              }
+            }}
           />
           <kbd className={styles.kbd}>{t('searchKey')}</kbd>
         </label>

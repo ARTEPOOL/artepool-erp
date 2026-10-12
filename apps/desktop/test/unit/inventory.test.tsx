@@ -119,6 +119,7 @@ function bridgeFor(permissions: string[], path: string) {
         items,
         total: items.length,
         counts: { active: 2, stock: 2, service: 0, bundle: 0 },
+        exactMatchId: null,
       });
     })
     .on('GET', '/api/v1/stock/adjustments', ok({ adjustments: [], total: 0 }));

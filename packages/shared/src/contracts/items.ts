@@ -148,6 +148,8 @@ export interface ItemsResponse {
   total: number;
   /** Active items by type, for the summary tiles. */
   counts: { active: number; stock: number; service: number; bundle: number };
+  /** The item whose barcode or code equals the search exactly (it is also listed first). */
+  exactMatchId: string | null;
 }
 
 export interface BarcodeItem {

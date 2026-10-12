@@ -303,6 +303,7 @@ function bridgeFor(permissions: string[]) {
         items: [listed(CHLORINE, { ...figures, toReorder: toReorder === 'true' })],
         total: 1,
         counts: { active: 41, stock: 30, service: 8, bundle: 3 },
+        exactMatchId: null,
       };
       return ok(answer);
     })

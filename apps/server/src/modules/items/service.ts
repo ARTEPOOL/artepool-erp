@@ -113,6 +113,28 @@ export async function listItems(
   const total = await base
     .select((eb) => eb.fn.countAll<bigint>().as('n'))
     .executeTakeFirstOrThrow();
+  // A scanned barcode or a full code names one item exactly: it opens straight away.
+  const exact = query.q
+    ? await base
+        .select('i.id')
+        .where((eb) =>
+          eb.or([
+            eb(sql<string>`upper(i.code)`, '=', query.q!.toUpperCase()),
+            eb(
+              'i.id',
+              'in',
+              eb
+                .selectFrom('md.item_barcodes')
+                .select('item_id')
+                .where('is_active', '=', true)
+                .where(sql<string>`upper(barcode)`, '=', query.q!.toUpperCase()),
+            ),
+          ]),
+        )
+        .orderBy('i.code')
+        .executeTakeFirst()
+    : undefined;
+  const exactId = exact?.id ?? null;
   const rows = await base
     .select([
       'i.id',
@@ -134,6 +156,7 @@ export async function listItems(
       's.value_4dp',
       's.last_avg',
     ])
+    .$if(exactId !== null, (qb) => qb.orderBy(sql`i.id = ${exactId}`, 'desc'))
     .orderBy('i.code')
     .limit(query.pageSize)
     .offset((query.page - 1) * query.pageSize)
@@ -151,6 +174,7 @@ export async function listItems(
   return {
     total: Number(total.n),
     counts,
+    exactMatchId: exactId?.toString() ?? null,
     items: rows.map((r): ItemListItem => ({
       id: r.id.toString(),
       code: r.code,
