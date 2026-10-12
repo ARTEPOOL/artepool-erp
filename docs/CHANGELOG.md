@@ -1,5 +1,25 @@
 # Changelog
 
+## M4 — Invoices (A4), Quotations and Receipts (2026-10-12)
+
+**In plain words:** the office can now do all its customer paperwork. **Quotations** are written, sent, revised and turned into an invoice with the agreed prices. **Tax invoices** (`INV-`) are simplified or full by themselves, from the customer's VAT registration; VAT is worked out per line; a draft has no number until it is issued, and an issued invoice never changes. **Receipts** settle the oldest invoices first; money that settles nothing becomes an advance with its own payment tax invoice, and the **final invoice deducts** those payments and their VAT (the 100,000 + VAT example of decision 0013 gives exactly 31,500 due). **Credit and debit notes**, a **bounced cheque** reversal, **opening balances** and the **statement of account** are in. Everything prints on A4 in Arabic and English through the print dialog. Proven by 344 unit and screen, 412 integration and 48 browser tests.
+
+- **Three sections in the side menu (decision 0045):** Invoices (A4), Quotations and Receipts, each shown to the people allowed to use it.
+- **Database:** migrations 0014 (registers, shifts and counts for the POS in M5), 0015 (quotations, tax documents, payments, allocations, opening balances), 0016 (e-invoice outbox and versioned print templates), 0017 and 0018 (fixes, below). The planned later migrations move up by two (cash events are now 0019).
+- **Invoices (decisions 0009–0013, 0046):** the shared line editor shows net, VAT and total as you type, with the same arithmetic as the server; a discount above your limit, a changed price, or an unpaid amount above the customer's credit each needs its own supervisor approval; payments can be taken at issue (several methods); earlier payments are ticked to be deducted.
+- **Quotations (decision 0049):** valid 15 days unless changed; optional lines are shown but not counted; prices are fixed when sent; a new revision keeps the agreed prices; converting keeps them too.
+- **Receipts (decisions 0047, 0048, 0052):** oldest first, chosen invoices, or advance only (with the quotation it is for); a live preview shows what is paid and the VAT inside an advance; a cheque needs its number, date and bank; "Receive payment" opens from an invoice or a customer with the customer already chosen.
+- **Notes (decision 0015):** a credit note returns goods to sellable or defective stock at their old cost, or corrects a price; it can pay the money back now; a credit note on a payment invoice reverses it when work is cancelled; debit notes add to what is owed.
+- **Customers:** the account card shows what the customer owes, cash or credit, unused advances, the statement of account (printable) and, for the owner, the opening balance (once, decision 0051).
+- **Printing (decisions 0008, 0050):** server-made PDFs with the seller details frozen at issue; reprints are counted, marked "Copy" and need the reprint permission.
+- **Fixes from the code review:**
+  - a draft made from a quotation keeps the agreed prices and discount when saved again;
+  - a supervisor's approval of a changed price no longer also allows a discount above the limit;
+  - credit and debit notes follow the original invoice line, even if the item's price changed since;
+  - a final invoice fully paid by its advances counts as paid and never blocks a later receipt;
+  - statements need the statement permission and reprints the reprint permission, on the server too.
+- **Not yet:** the Excel import of opening balances, a separate refund screen (refunds go through a credit note), and the print designer screen (M4b).
+
 ## M3 — Inventory and the posting engine (2026-10-12)
 
 **In plain words:** stock is now real. The owner enters the **opening stock** once (by hand or from Excel), people **add, remove, move to defective and write off** stock with a reason, and **counts** compare the shelves with the system without showing the counter the expected number. Every stock change is a numbered document that also writes its **journal entry** in the same moment, so the books always equal the stock value to the fils. The accountant sees the **journal** and the **trial balance**. Barcode labels print in many sizes. Proven by 292 unit and screen, 379 integration and 46 browser tests.

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | **Approved** (2026-10-12): all recommendations accepted, with Quotations and Receipts as their own sections; recorded as decisions [0045](../decisions/0045-sales-sections-in-the-side-menu.md)–[0052](../decisions/0052-payment-allocation-oldest-first.md) |
+| **Status** | **Done** (2026-10-12), awaiting the owner's merge of the pull request. See [Delivered](#delivered). Approved on 2026-10-12: all recommendations accepted, with Quotations and Receipts as their own sections; recorded as decisions [0045](../decisions/0045-sales-sections-in-the-side-menu.md)–[0052](../decisions/0052-payment-allocation-oldest-first.md) |
 | **Date** | 2026-10-12 |
 | **Milestone** | M4 of the [Phase 1 plan](../phase-1-plan.md) |
 | **Design reference** | [`design/screens/05-a4-invoices.html`](../../design/screens/05-a4-invoices.html) (the section), [`06-invoice-form.html`](../../design/screens/06-invoice-form.html) (the form), [`09-a4-tax-invoice.html`](../../design/screens/09-a4-tax-invoice.html) (the printed invoice), [`04-payment.html`](../../design/screens/04-payment.html) (receiving a payment) |
@@ -69,3 +69,27 @@ The POS screen, shifts and the cash drawer come in **M5**.
 6. **Print designer (decision 0020):** **recommendation:** M4 prints with a clean default design that matches design 09, and stores the template version on each document (so later reprints match); the **designer screen** (logo position, colour, language, texts) comes right after as **M4b**, so M4 stays a manageable size.
 7. **Customer opening balances:** entered once at go-live, **owner only**, by hand or Excel (same rule as opening stock, decision 0042)?
 8. **Payment allocation:** when a customer pays without choosing invoices, **recommendation:** settle the oldest open invoices first, and treat any remainder as an advance (with its payment tax invoice).
+
+## Delivered
+
+| Task | Commit(s) | Result |
+|---|---|---|
+| Plan, decisions | `b4203ec`, `8fb66cd` | M4 plan; decisions 0045–0052; PRD, `CLAUDE.md` updated |
+| T1 | `baafc6f` | Migration 0014: registers, shifts (one cashier per drawer), counts (used by the POS in M5) |
+| T2 | `6d85cc9` | Migration 0015: quotations, tax documents, payments, allocations, opening balances; the database enforces numbering at issue, full ⇔ TRN, immutability, deductions, full allocation |
+| T3 | `1c7e55f` | Migration 0016: e-invoice outbox (nothing sent yet) and versioned print templates |
+| T4–T8 | `0038b41`, `d3efd7b` | Sales contracts, posting rows, the sales API; migration 0017 (quotation prices kept on conversion, notes on payment invoices, credit-limit permission) |
+| T9 | `e875660`, `7de169c` | A4 PDFs in Arabic and English (tax invoices, notes, quotations, receipts, statements); reprints marked "Copy" |
+| T10–T12 foundation | `ddfb6cb` | Side menu entries, routes, the line editor shared by invoices and quotations, the customer picker |
+| T10 | `6867546`, `6748c6e` | Invoices (A4): list, draft, issue with payments and approvals, earlier payments deducted, credit and debit notes, print |
+| T11 | `3ae03cb` | Quotations: list, editor, send / accept / reject / revise / convert, print |
+| T12 | `4dcbdfb`, `2a7a6b0`, `190e622` | Receipts: receive (oldest first, chosen invoices, advance only), reverse, print; statement and opening balance in Customers; "Receive payment" from an invoice or a customer |
+| Fixes | `bd73eb3` | Code review fixes (migration 0018): converted drafts keep agreed prices and discount; one approval per thing (price ≠ discount); notes follow the original line; a fully prepaid invoice is settled; reprints checked on the server |
+| T13 | `8424e4b`, this pull request | Playwright flow of the 0013 example (`e2e/sales.spec.ts`), screenshots in [`docs/screenshots/m4`](../screenshots/m4), changelog |
+
+**Not in M4 (follow-ups):**
+- Customer opening balances are entered by hand; the Excel import of opening balances is not built yet.
+- Refunds are made with a credit note ("pay the money back now"); there is no separate refund screen.
+- Notes on individual lines can be set through the API only (the line editor has no note field).
+- The print designer screen is M4b (decision 0050).
+
