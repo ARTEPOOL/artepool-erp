@@ -295,7 +295,9 @@ describe('Items & stock: the list', () => {
     const bridge = bridgeFor(OWNER);
     await openItems(bridge);
     await detailCard('كلور حبيبات 10 كجم'); // the first item is shown at first
-    const search = screen.getByRole('searchbox', { name: 'الاسم أو الكود أو الباركود' });
+    const search = screen.getByRole<HTMLInputElement>('searchbox', {
+      name: 'الاسم أو الكود أو الباركود',
+    });
     search.focus();
     fireEvent.change(search, { target: { value: 'EQUIP-0003' } });
     fireEvent.keyDown(search, { key: 'Enter' });
