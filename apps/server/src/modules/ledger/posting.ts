@@ -24,9 +24,13 @@ export type LinkKey =
   | 'cash_in_safe'
   | 'opening_balance_equity';
 
-/** One side of the entry: a signed amount (positive = debit, negative = credit). */
+/**
+ * One side of the entry: a signed amount (positive = debit, negative = credit). The account is
+ * an event link, or an account the event's own master data names (a line of business's revenue
+ * and cost of sales, a payment method's account) — still data, never a hard-coded code.
+ */
 export interface PostingAmount {
-  link: LinkKey;
+  link: LinkKey | { accountId: bigint };
   fils: bigint;
   customerId?: bigint;
   businessLineId?: bigint;
@@ -35,7 +39,11 @@ export interface PostingAmount {
 }
 
 export type PostingSource =
-  { type: 'inventory_adjustment'; id: bigint } | { type: 'inventory_count'; id: bigint };
+  | { type: 'inventory_adjustment'; id: bigint }
+  | { type: 'inventory_count'; id: bigint }
+  | { type: 'sales_document'; id: bigint }
+  | { type: 'payment'; id: bigint }
+  | { type: 'opening_balance'; id: bigint };
 
 export interface PostedEntry {
   id: bigint;
@@ -45,7 +53,13 @@ export interface PostedEntry {
 const SOURCE_COLUMN = {
   inventory_adjustment: 'inventory_adjustment_id',
   inventory_count: 'inventory_count_id',
+  sales_document: 'sales_document_id',
+  payment: 'payment_id',
+  opening_balance: 'opening_balance_id',
 } as const;
+
+const linkName = (link: PostingAmount['link']): string =>
+  typeof link === 'string' ? link : `#${link.accountId}`;
 
 /**
  * Posts one entry. Amounts on the same link and dimensions are added together, zero amounts are
@@ -58,7 +72,7 @@ export async function postEntry(
 ): Promise<PostedEntry | null> {
   const merged = new Map<string, PostingAmount>();
   for (const a of entry.amounts) {
-    const key = [a.link, a.customerId, a.businessLineId, a.vatCategoryId].join('|');
+    const key = [linkName(a.link), a.customerId, a.businessLineId, a.vatCategoryId].join('|');
     const current = merged.get(key);
     merged.set(key, current ? { ...current, fils: current.fils + a.fils } : { ...a });
   }
@@ -69,12 +83,18 @@ export async function postEntry(
   }
   if (lines.length === 0) return null;
 
-  const links = await trx
-    .selectFrom('gl.account_mappings')
-    .select(['key', 'account_id'])
-    .where('key', 'in', [...new Set(lines.map((l) => l.link))])
-    .execute();
-  const accountOf = new Map(links.map((l) => [l.key, l.account_id]));
+  const keys = [...new Set(lines.flatMap((l) => (typeof l.link === 'string' ? [l.link] : [])))];
+  const links =
+    keys.length === 0
+      ? []
+      : await trx
+          .selectFrom('gl.account_mappings')
+          .select(['key', 'account_id'])
+          .where('key', 'in', keys)
+          .execute();
+  const mapped = new Map(links.map((l) => [l.key, l.account_id]));
+  const accountOf = (link: PostingAmount['link']) =>
+    typeof link === 'string' ? mapped.get(link) : link.accountId;
   const debit = lines.reduce((sum, a) => (a.fils > 0n ? sum + a.fils : sum), 0n);
 
   const header = await trx
@@ -96,9 +116,9 @@ export async function postEntry(
     .insertInto('gl.journal_lines')
     .values(
       lines.map((a, i) => {
-        const accountId = accountOf.get(a.link);
+        const accountId = accountOf(a.link);
         if (accountId === undefined)
-          throw new AppError('INTERNAL', `Event link ${a.link} is missing`);
+          throw new AppError('INTERNAL', `Event link ${linkName(a.link)} is missing`);
         return stamped('gl.journal_lines', {
           entry_id: header.id,
           line_no: i + 1,
