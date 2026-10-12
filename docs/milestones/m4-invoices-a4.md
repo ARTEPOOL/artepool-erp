@@ -1,8 +1,8 @@
-# M4 — Invoices (A4) section: task plan
+# M4 — Invoices (A4), Quotations and Receipts: task plan
 
 | | |
 |---|---|
-| **Status** | **Awaiting the owner's approval** (questions below) |
+| **Status** | **Approved** (2026-10-12): all recommendations accepted, with Quotations and Receipts as their own sections; recorded as decisions [0045](../decisions/0045-sales-sections-in-the-side-menu.md)–[0052](../decisions/0052-payment-allocation-oldest-first.md) |
 | **Date** | 2026-10-12 |
 | **Milestone** | M4 of the [Phase 1 plan](../phase-1-plan.md) |
 | **Design reference** | [`design/screens/05-a4-invoices.html`](../../design/screens/05-a4-invoices.html) (the section), [`06-invoice-form.html`](../../design/screens/06-invoice-form.html) (the form), [`09-a4-tax-invoice.html`](../../design/screens/09-a4-tax-invoice.html) (the printed invoice), [`04-payment.html`](../../design/screens/04-payment.html) (receiving a payment) |
@@ -14,7 +14,8 @@ After M4, the office can do all its paperwork for customers:
 
 - **Quotations:** a price offer with lines, discounts and VAT; revisions after it is sent; converted to an invoice in one click.
 - **Tax invoices (`INV-`):** simplified or full, chosen by the customer's VAT registration (decision 0010); VAT per line (0009); discounts per line and on the total, spread across the lines (0012). A draft has no number; the number is given at issue (0011). An issued invoice never changes.
-- **Receiving payments:** cash, card, transfer, cheque or a custom method, several methods for one invoice, partial payments. A payment that settles an issued invoice creates no VAT; any part that does not becomes an **advance/progress payment tax invoice** (`INV-`) with its VAT (0013).
+- **Three sections in the side menu (decision 0045):** Invoices (A4), Quotations, and Receipts.
+- **Receiving payments (the Receipts section):** cash, card, transfer, cheque or a custom method, several methods for one invoice, partial payments. A payment that settles an issued invoice creates no VAT; any part that does not becomes an **advance/progress payment tax invoice** (`INV-`) with its VAT (0013).
 - **The final invoice deducts** earlier payments and their VAT, so VAT is counted once (the 100,000 + VAT example in 0013 reproduces exactly).
 - **Credit notes (`CN-`)** for returns (goods back to sellable or defective stock, decision 0015) and price corrections, credit notes against advances (work cancelled), **debit notes (`DN-`)**, **refunds (`RFD-`)** and **reversals (`RVS-`)** for a bounced cheque.
 - **Customer opening balances** at go-live (by hand or Excel, owner only) and the **statement of account** for any dates.
@@ -42,9 +43,9 @@ The POS screen, shifts and the cash drawer come in **M5**.
 | T7 | **Notes API:** credit notes (return to sellable or defective at the cost the goods left with; price correction; against an advance), debit notes; automatic application to an unpaid invoice; refund or keep the credit | `apps/server/src/modules/sales/notes*` | Rows 7, 8, 9; never more than the original |
 | T8 | **Opening balances and statement:** customer opening balances (owner only, by hand or Excel, row 20); statement of account for a date range with the running balance | `apps/server/src/modules/sales/statement*`, `imports/*` | Statement balance = Σ documents − Σ payments; receivable control = Σ customer balances |
 | T9 | **A4 PDFs:** bilingual templates (tax invoice full/simplified, payment invoice, final invoice with deductions, credit/debit note, quotation, receipt, statement) rendered by pinned headless Chromium on the server; reprint count and "Copy" | `apps/server/src/modules/printing/*`, `apps/server/print-templates/*` | Snapshot tests of the HTML in both languages; the PDF opens; locked tax fields always present |
-| T10 | **Screens — Invoices (A4) section (design 05):** the list (invoices, payment invoices, notes, quotations) with filters and status; open a document; print / reprint | `apps/desktop/src/features/sales/*` | Component tests + Playwright |
-| T11 | **Screens — the form (design 06):** customer search, item search and barcode, lines with discount, totals with VAT, save draft, issue (with the approval dialog when needed); quotation form and convert | `apps/desktop/src/features/sales/form*` | Component tests (amounts exact, both languages) |
-| T12 | **Screens — payments and notes (design 04):** receive payment (methods, allocation, the advance invoice that results), credit note from an invoice, refund, reverse; customer statement and opening balances | `apps/desktop/src/features/sales/{payments,notes,statement}*` | Component tests + Playwright |
+| T10 | **Screens — Invoices (A4) section (design 05, decision 0045):** the list (invoices, payment invoices, credit and debit notes) with filters and status; the form (design 06): customer search, item search and barcode, lines with discount, totals with VAT, save draft, issue (with the approval dialog when needed); open, print, reprint; credit note from an invoice | `apps/desktop/src/features/invoices/*` | Component tests (amounts exact, both languages) + Playwright |
+| T11 | **Screens — Quotations section (own side-menu entry, 0045):** list with status and revisions; form (same line editor as invoices); send, accept, reject, new revision, convert to an invoice; print | `apps/desktop/src/features/quotations/*` | Component tests + Playwright |
+| T12 | **Screens — Receipts section (own side-menu entry, 0045; design 04):** list of receipts, refunds and reversals; receive payment (methods, allocation to invoices, the payment invoice that results), print the receipt; refund; reverse a bounced cheque; customer statement and opening balances (from Customers) | `apps/desktop/src/features/receipts/*`, `features/customers/*` | Component tests + Playwright |
 | T13 | **CI and docs:** Playwright flows (the 0013 worked example by hand: quotation 100,000 + VAT → receive 31,500 → receive 42,000 → final invoice with 31,500 due), screenshots, decisions, `CLAUDE.md`, PRD, schema, changelog, pull request | `e2e/*`, `docs/*` | Green CI |
 
 ## Done when
