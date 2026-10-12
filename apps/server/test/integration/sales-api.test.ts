@@ -483,10 +483,11 @@ describe('the advance and progress payments example (decision 0013)', () => {
     expect(printed.html).not.toContain('COPY');
     if (process.env.ARTEPOOL_PRINT_PREVIEW)
       writeFileSync(process.env.ARTEPOOL_PRINT_PREVIEW, printed.html);
-    const file = await accountant('GET', `/api/v1/sales/documents/${final.id}/pdf`);
-    expect(file.statusCode).toBe(200);
-    expect(file.headers['content-type']).toBe('application/pdf');
-    expect(file.rawPayload.subarray(0, 5).toString()).toBe('%PDF-');
+    const file = await ok<{ fileName: string; mime: string; dataBase64: string }>(
+      accountant('GET', `/api/v1/sales/documents/${final.id}/pdf`),
+    );
+    expect(file).toMatchObject({ fileName: `${final.docNumber}.pdf`, mime: 'application/pdf' });
+    expect(Buffer.from(file.dataBase64, 'base64').subarray(0, 5).toString()).toBe('%PDF-');
     // Printed once, then again: the second is a copy (decision 0008).
     await ok(accountant('POST', `/api/v1/sales/documents/${final.id}/printed`, {}));
     await ok(accountant('POST', `/api/v1/sales/documents/${final.id}/printed`, {}));
