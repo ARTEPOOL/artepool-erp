@@ -29,12 +29,79 @@ import { createNote, creditWholeAdvance } from './notes';
 import * as payments from './payments';
 import * as quotations from './quotations';
 import * as statements from './statement';
+import { closeRenderer, renderPdf } from '../printing/render';
+import { documentHtml, quotationHtml, receiptHtml, statementHtml } from '../printing/service';
 
 const Params = z.object({ id: IdText });
 const allow = (permission: string) => ({ kind: 'permission', permission }) as const;
 
 export function registerSalesRoutes(app: FastifyInstance): void {
   const db = app.deps.db;
+  app.addHook('onClose', closeRenderer);
+
+  // ---------------------------------------------------------------- A4 PDFs (print dialog, 0008)
+  const pdf = (name: string, body: Buffer) => ({
+    type: 'application/pdf',
+    disposition: `inline; filename="${name.replace(/[^A-Za-z0-9_.-]/g, '_')}.pdf"`,
+    body,
+  });
+  defineRoute(app, {
+    method: 'GET',
+    url: '/api/v1/sales/documents/:id/pdf',
+    access: allow('invoices.view'),
+    params: Params,
+    handler: async ({ params, reply }) => {
+      const doc = await documentHtml(db, BigInt(params.id));
+      const out = pdf(doc.number ?? 'draft', await renderPdf(doc.html));
+      return reply
+        .header('content-type', out.type)
+        .header('content-disposition', out.disposition)
+        .send(out.body);
+    },
+  });
+  defineRoute(app, {
+    method: 'GET',
+    url: '/api/v1/sales/quotations/:id/pdf',
+    access: allow('quotations.manage'),
+    params: Params,
+    handler: async ({ params, reply }) => {
+      const q = await quotationHtml(db, BigInt(params.id));
+      const out = pdf(q.number, await renderPdf(q.html));
+      return reply
+        .header('content-type', out.type)
+        .header('content-disposition', out.disposition)
+        .send(out.body);
+    },
+  });
+  defineRoute(app, {
+    method: 'GET',
+    url: '/api/v1/sales/payments/:id/pdf',
+    access: allow('invoices.view'),
+    params: Params,
+    handler: async ({ params, reply }) => {
+      const r = await receiptHtml(db, BigInt(params.id));
+      const out = pdf(r.number, await renderPdf(r.html));
+      return reply
+        .header('content-type', out.type)
+        .header('content-disposition', out.disposition)
+        .send(out.body);
+    },
+  });
+  defineRoute(app, {
+    method: 'GET',
+    url: '/api/v1/customers/:id/statement/pdf',
+    access: allow('customers.view'),
+    params: Params,
+    query: StatementQuery,
+    handler: async ({ params, query, reply }) => {
+      const html = await statementHtml(db, BigInt(params.id), query.from, query.to);
+      const out = pdf(`statement-${params.id}`, await renderPdf(html));
+      return reply
+        .header('content-type', out.type)
+        .header('content-disposition', out.disposition)
+        .send(out.body);
+    },
+  });
 
   // ---------------------------------------------------------------- Invoices (A4) and notes
   defineRoute(app, {

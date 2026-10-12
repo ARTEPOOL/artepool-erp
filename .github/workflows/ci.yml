@@ -62,6 +62,8 @@ jobs:
         run: pnpm db:status
       - name: Generated database types are up to date
         run: pnpm db:codegen:check
+      - name: Chromium for the A4 PDF renderer
+        run: pnpm --filter @artepool/server exec playwright-core install --with-deps chromium-headless-shell
       - name: Integration tests (database rules, concurrency, server)
         run: pnpm test:integration
       - name: Audit chain check

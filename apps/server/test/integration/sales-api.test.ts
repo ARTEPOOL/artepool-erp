@@ -24,6 +24,8 @@ import type {
   TrialBalanceResponse,
 } from '@artepool/shared/contracts';
 import { withBusinessTx } from '../../src/platform/db/tx';
+import { documentHtml } from '../../src/modules/printing/service';
+import { writeFileSync } from 'node:fs';
 import {
   addDevice,
   addOwner,
@@ -170,6 +172,9 @@ async function approval(permission: string) {
       ).rows[0]!.id,
   );
 }
+
+// The PDF renderer uses the pinned browser; locally the one the screen tests use.
+process.env.ARTEPOOL_CHROMIUM ??= process.env.ARTEPOOL_E2E_CHROMIUM;
 
 beforeAll(async () => {
   server = await startTestServer();
@@ -468,6 +473,24 @@ describe('the advance and progress payments example (decision 0013)', () => {
       server.db,
     );
     expect(rows[0]!.v).toBe('500000');
+    // The printed final invoice: both languages, the seller's TRN, the deductions; a PDF that opens.
+    const printed = await documentHtml(server.db, BigInt(final.id));
+    expect(printed.html).toContain('Tax Invoice');
+    expect(printed.html).toContain('فاتورة ضريبية');
+    expect(printed.html).toContain('100123456789012');
+    expect(printed.html).toContain('Less: earlier payments');
+    expect(printed.html).toContain('31,500.00');
+    expect(printed.html).not.toContain('COPY');
+    if (process.env.ARTEPOOL_PRINT_PREVIEW)
+      writeFileSync(process.env.ARTEPOOL_PRINT_PREVIEW, printed.html);
+    const file = await accountant('GET', `/api/v1/sales/documents/${final.id}/pdf`);
+    expect(file.statusCode).toBe(200);
+    expect(file.headers['content-type']).toBe('application/pdf');
+    expect(file.rawPayload.subarray(0, 5).toString()).toBe('%PDF-');
+    // Printed once, then again: the second is a copy (decision 0008).
+    await ok(accountant('POST', `/api/v1/sales/documents/${final.id}/printed`, {}));
+    await ok(accountant('POST', `/api/v1/sales/documents/${final.id}/printed`, {}));
+    expect((await documentHtml(server.db, BigInt(final.id))).html).toContain('COPY');
     const balance = await ok<CustomerBalance>(owner('GET', `/api/v1/customers/${cust}/balance`));
     expect(balance).toMatchObject({ balanceFils: '3150000', advancesFils: '0' });
   });
