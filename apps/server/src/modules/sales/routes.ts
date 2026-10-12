@@ -80,7 +80,7 @@ export function registerSalesRoutes(app: FastifyInstance): void {
   defineRoute(app, {
     method: 'GET',
     url: '/api/v1/customers/:id/statement/pdf',
-    access: allow('customers.view'),
+    access: allow('statements.view'),
     params: Params,
     query: StatementQuery,
     handler: async ({ params, query }) => {
@@ -341,7 +341,7 @@ export function registerSalesRoutes(app: FastifyInstance): void {
   defineRoute(app, {
     method: 'GET',
     url: '/api/v1/customers/:id/statement',
-    access: allow('customers.view'),
+    access: allow('statements.view'),
     params: Params,
     query: StatementQuery,
     handler: ({ params, query }) => statements.statement(db, BigInt(params.id), query),

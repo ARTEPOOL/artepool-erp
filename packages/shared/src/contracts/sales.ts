@@ -358,6 +358,7 @@ export type ReversePaymentRequest = z.infer<typeof ReversePaymentRequest>;
 export const PaymentsQuery = z.object({
   q: z.string().trim().max(100).optional(),
   kind: z.enum(['receipt', 'refund', 'reversal']).optional(),
+  methodKind: z.enum(['cash', 'card', 'bank_transfer', 'cheque', 'other']).optional(),
   customerId: IdText.optional(),
   from: DateText.optional(),
   to: DateText.optional(),

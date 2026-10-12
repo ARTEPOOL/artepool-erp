@@ -73,7 +73,11 @@ interface Problems {
 /** The standard VAT rate (SR, 5%) the server uses for an advance unless told otherwise. */
 const DEFAULT_RATE_BP = 500;
 
-export function ReceiveForm() {
+export function ReceiveForm({
+  initialCustomer = null,
+}: {
+  initialCustomer?: ChosenCustomer | null;
+}) {
   const { t, i18n } = useTranslation('receipts');
   const name = localName(i18n.language);
   const can = useCan();
@@ -85,7 +89,7 @@ export function ReceiveForm() {
   const methods = useSalesPaymentMethods();
   const vat = useVat();
 
-  const [customer, setCustomer] = useState<ChosenCustomer | null>(null);
+  const [customer, setCustomer] = useState<ChosenCustomer | null>(initialCustomer);
   const [date, setDate] = useState(() => dubaiDay());
   const [methodId, setMethodId] = useState('');
   const [amount, setAmount] = useState('');

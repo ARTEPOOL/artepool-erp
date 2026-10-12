@@ -63,6 +63,11 @@ const receipts = createRoute({
 const receipt = createRoute({
   getParentRoute: () => root,
   path: 'receipts/$paymentId',
+  // `new?customerId=…` opens the form with the customer chosen (from an invoice or a customer).
+  validateSearch: (search: Record<string, unknown>): { customerId?: string } =>
+    typeof search.customerId === 'string' && /^[1-9][0-9]*$/.test(search.customerId)
+      ? { customerId: search.customerId }
+      : {},
   component: ReceiptPage,
 });
 const items = createRoute({ getParentRoute: () => root, path: 'items', component: ItemsPage });

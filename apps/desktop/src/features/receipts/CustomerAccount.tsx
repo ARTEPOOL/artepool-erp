@@ -3,8 +3,9 @@
  * credit, unused advances, the statement of account and, for the owner, the opening balance.
  */
 import { useState } from 'react';
-import { FileSpreadsheet, Landmark } from 'lucide-react';
+import { FileSpreadsheet, HandCoins, Landmark } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from '@tanstack/react-router';
 import type { CustomerDetail } from '@artepool/shared/contracts';
 import { Button, Card, CardHeader, DefinitionList, iconClass } from '../../ui';
 import { useCan } from '../auth/context';
@@ -22,8 +23,10 @@ export function CustomerAccount({ customer }: { customer: CustomerDetail }) {
   const b = balance.data;
   const statements = can('statements.view');
   const opening = can('customers.opening');
+  const receive = can('payments.receive') && customer.isActive;
+  const navigate = useNavigate();
 
-  if (!b && !statements && !opening) return null;
+  if (!b && !statements && !opening && !receive) return null;
   const owed = b ? BigInt(b.balanceFils) : 0n;
   return (
     <Card rise index={3}>
@@ -55,8 +58,22 @@ export function CustomerAccount({ customer }: { customer: CustomerDetail }) {
           />
         )}
         {balance.isError && <p className={styles.muted}>{t('account.unavailable')}</p>}
-        {(statements || opening) && (
+        {(statements || opening || receive) && (
           <div className={styles.accountActions}>
+            {receive && (
+              <Button
+                onPress={() =>
+                  void navigate({
+                    to: '/receipts/$paymentId',
+                    params: { paymentId: 'new' },
+                    search: { customerId: customer.id },
+                  })
+                }
+              >
+                <HandCoins className={iconClass.sm} aria-hidden="true" />
+                {t('receive.button')}
+              </Button>
+            )}
             {statements && (
               <Button onPress={() => setDialog('statement')}>
                 <FileSpreadsheet className={iconClass.sm} aria-hidden="true" />

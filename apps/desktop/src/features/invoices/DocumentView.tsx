@@ -367,7 +367,11 @@ export function DocumentView({ doc }: { doc: DocumentDetail }) {
             {canReceive && (
               <Button
                 onPress={() =>
-                  void navigate({ to: '/receipts/$paymentId', params: { paymentId: 'new' } })
+                  void navigate({
+                    to: '/receipts/$paymentId',
+                    params: { paymentId: 'new' },
+                    search: { customerId: doc.customerId },
+                  })
                 }
               >
                 <Wallet className={iconClass.sm} aria-hidden="true" />

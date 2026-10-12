@@ -55,12 +55,14 @@ export function ReceiptsPage() {
   const [search, setSearch] = useState('');
   const q = useDebounced(search);
   const payments = usePayments(
-    { kind: kind === 'all' ? undefined : kind, q: q || undefined },
+    {
+      kind: kind === 'all' ? undefined : kind,
+      methodKind: (method || undefined) as PaymentsQuery['methodKind'],
+      q: q || undefined,
+    },
     allowed,
   );
-  const all: PaymentItem[] = payments.data?.payments ?? [];
-  // The server filters by kind and search; the method is filtered on the rows shown.
-  const list = method ? all.filter((p) => p.methodKind === method) : all;
+  const list: PaymentItem[] = payments.data?.payments ?? [];
 
   const open = (id: string) =>
     void navigate({ to: '/receipts/$paymentId', params: { paymentId: id } });
@@ -174,9 +176,9 @@ export function ReceiptsPage() {
                 {t('list.empty')}
               </EmptyState>
             )}
-            {payments.isSuccess && payments.data.total > all.length && (
+            {payments.isSuccess && payments.data.total > list.length && (
               <p className={styles.muted}>
-                {t('list.shown', { shown: all.length, total: payments.data.total })}
+                {t('list.shown', { shown: list.length, total: payments.data.total })}
               </p>
             )}
           </Card>

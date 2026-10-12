@@ -432,15 +432,16 @@ describe('Receipts list', () => {
     expect(within(row(table, 'RVS-000003')).getByText('Reversal')).toBeTruthy();
     expect(within(row(table, 'RCT-000058')).getByText('125.50')).toBeTruthy();
 
-    // The kind and the search go to the server; the method is filtered on the rows shown.
+    // The kind, the method and the search all go to the server.
     fireEvent.click(screen.getByRole('button', { name: 'Reversal' }));
     await waitFor(() =>
       expect(bridge.calls.some((c) => c.path.includes('kind=reversal'))).toBe(true),
     );
     fireEvent.click(screen.getByRole('button', { name: 'All' }));
     fireEvent.change(screen.getByLabelText('Payment method'), { target: { value: 'cheque' } });
-    await waitFor(() => expect(within(table).queryByText('RCT-000058')).toBeNull());
-    expect(within(table).getByText('RCT-000060')).toBeTruthy();
+    await waitFor(() =>
+      expect(bridge.calls.some((c) => c.path.includes('methodKind=cheque'))).toBe(true),
+    );
     fireEvent.change(screen.getByRole('searchbox', { name: 'Number, reference or customer' }), {
       target: { value: 'CHQ-104455' },
     });
@@ -551,6 +552,18 @@ describe('Receive payment', () => {
         { documentId: '41', amountFils: '30000' },
       ],
     });
+  });
+
+  it('opens with the customer chosen when the link names one (from an invoice or a customer)', async () => {
+    const bridge = bridgeFor(ACCOUNTANT, '/receipts/new?customerId=12');
+    await signIn(bridge, 'Receive payment');
+    // No search needed: the hotel is already chosen and its open debts are listed.
+    const table = await debtsTable();
+    expect(await within(table).findByText('INV-000012')).toBeTruthy();
+    expect(
+      screen.queryByRole('searchbox', { name: 'Search customers by name, phone or TRN' }),
+    ).toBeNull();
+    expect(bridge.callsTo('GET', '/api/v1/customers/12').length).toBeGreaterThan(0);
   });
 
   it('advance only, on an accepted quotation: VAT inside the amount, asAdvance and the quotation', async () => {

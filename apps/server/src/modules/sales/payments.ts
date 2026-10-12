@@ -434,6 +434,7 @@ const paymentItem = (r: PaymentRow): PaymentItem => ({
 export async function listPayments(db: Db, query: PaymentsQuery): Promise<PaymentsResponse> {
   let q = paymentBase(db);
   if (query.kind) q = q.where('p.payment_kind', '=', query.kind);
+  if (query.methodKind) q = q.where('p.method_kind', '=', query.methodKind);
   if (query.customerId) q = q.where('p.customer_id', '=', BigInt(query.customerId));
   if (query.from) q = q.where('p.payment_date', '>=', query.from);
   if (query.to) q = q.where('p.payment_date', '<=', query.to);

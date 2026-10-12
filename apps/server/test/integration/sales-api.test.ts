@@ -20,6 +20,7 @@ import type {
   PaymentDetail,
   QuotationDetail,
   ReceivePaymentResponse,
+  PaymentsResponse,
   StatementResponse,
   TrialBalanceResponse,
 } from '@artepool/shared/contracts';
@@ -691,5 +692,31 @@ describe('opening balances and the statement (decision 0051)', () => {
     expect((await storekeeper('GET', '/api/v1/sales/documents')).statusCode).toBe(403);
     expect((await storekeeper('GET', '/api/v1/sales/quotations')).statusCode).toBe(403);
     expect((await cashier('POST', '/api/v1/customers/opening-balances', {})).statusCode).toBe(403);
+    // The cashier sees customers but not their statement of account (statements.view).
+    expect(
+      (await cashier('GET', '/api/v1/customers/1/statement?from=2026-01-01&to=2026-01-31'))
+        .statusCode,
+    ).toBe(403);
+    expect(
+      (await cashier('GET', '/api/v1/customers/1/statement/pdf?from=2026-01-01&to=2026-01-31'))
+        .statusCode,
+    ).toBe(403);
+  });
+
+  it('receipts can be listed by payment method', async () => {
+    const all = await ok<PaymentsResponse>(
+      accountant('GET', '/api/v1/sales/payments?pageSize=200'),
+    );
+    const cashOnly = await ok<PaymentsResponse>(
+      accountant('GET', '/api/v1/sales/payments?methodKind=cash&pageSize=200'),
+    );
+    expect(cashOnly.payments.every((p) => p.methodKind === 'cash')).toBe(true);
+    expect(cashOnly.payments.length).toBe(
+      all.payments.filter((p) => p.methodKind === 'cash').length,
+    );
+    const cheques = await ok<PaymentsResponse>(
+      accountant('GET', '/api/v1/sales/payments?methodKind=cheque&pageSize=200'),
+    );
+    expect(cheques.payments.every((p) => p.methodKind === 'cheque')).toBe(true);
   });
 });

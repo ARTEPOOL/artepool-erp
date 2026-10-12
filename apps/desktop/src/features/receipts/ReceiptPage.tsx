@@ -6,7 +6,7 @@
 import { useState } from 'react';
 import { ArrowLeft, FileText, Lock, Printer, RotateCcw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate, useParams } from '@tanstack/react-router';
+import { Link, useNavigate, useParams, useSearch } from '@tanstack/react-router';
 import type { PaymentDetail } from '@artepool/shared/contracts';
 import { useApi } from '../../api/hooks';
 import { formatDate } from '../../lib/format';
@@ -30,6 +30,8 @@ import { money } from '../masterdata/format';
 import { fetchPdf, SALES_PATHS, usePayment } from '../sales/api';
 import { printPdf } from '../sales/print';
 import { PaymentKindChip, ReversedChip, useKindText, useMethodName } from './parts';
+import { useCustomer } from '../customers/api';
+import { chosenFrom } from '../sales/CustomerPicker';
 import { ReceiveForm } from './ReceiveForm';
 import { ReverseDialog } from './ReverseDialog';
 import salesStyles from '../sales/sales.module.css';
@@ -251,5 +253,25 @@ export function ReceiptPage() {
       </div>
     );
   }
-  return isNew ? <ReceiveForm /> : <SavedReceipt key={paymentId} id={paymentId} />;
+  return isNew ? <NewReceipt /> : <SavedReceipt key={paymentId} id={paymentId} />;
+}
+
+/** A new receipt, with the customer already chosen when the link names one. */
+function NewReceipt() {
+  const { t } = useTranslation('receipts');
+  const { customerId } = useSearch({ from: '/receipts/$paymentId' });
+  const customer = useCustomer(customerId ?? null);
+  if (customerId && customer.isPending) {
+    return (
+      <div className={pageClasses.page}>
+        <PageHeader title={t('title')} tools={<BackLink />} />
+        <p>{t('sales:loading')}</p>
+      </div>
+    );
+  }
+  return (
+    <ReceiveForm
+      initialCustomer={customer.data && customer.data.isActive ? chosenFrom(customer.data) : null}
+    />
+  );
 }
