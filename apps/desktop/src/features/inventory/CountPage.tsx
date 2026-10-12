@@ -479,7 +479,7 @@ function ReviewView({ count }: { count: CountDetail }) {
         <ApprovalDialog
           permission="stock.adjust_over_threshold"
           explanation={t('counts.review.approvalExplain')}
-          context={{ countId: count.id }}
+          context={{ action: 'stock_count', countId: count.id }}
           onClose={() => setApproving(false)}
           onApproved={(approvalId) => {
             setApproving(false);

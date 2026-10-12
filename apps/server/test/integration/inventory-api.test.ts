@@ -327,18 +327,38 @@ describe('adjustments', () => {
       status: 403,
       rule: 'APPROVAL_REQUIRED',
     });
-    const approval = await withBusinessTx(
-      server.db,
-      { userId: storekeeperId, deviceId: storekeeperPc.id, requestId: randomUUID() },
-      async (trx) =>
-        (
-          await sql<{
-            id: string;
-          }>`INSERT INTO auth.approvals (permission_code, approved_by, reason_text)
-                                    VALUES ('stock.adjust_over_threshold', ${accountantId}, 'Found a full box')
-                                    RETURNING id::text`.execute(trx)
-        ).rows[0]!.id,
-    );
+    // The supervisor approves one exact change (kind, items, quantities).
+    const approve = (context: Record<string, unknown>) =>
+      withBusinessTx(
+        server.db,
+        { userId: storekeeperId, deviceId: storekeeperPc.id, requestId: randomUUID() },
+        async (trx) =>
+          (
+            await sql<{
+              id: string;
+            }>`INSERT INTO auth.approvals (permission_code, approved_by, reason_text, context)
+                VALUES ('stock.adjust_over_threshold', ${accountantId}, 'Found a full box',
+                        ${JSON.stringify(context)}::jsonb)
+                RETURNING id::text`.execute(trx)
+          ).rows[0]!.id,
+      );
+    const approvedFor = (quantityMilli: string) => ({
+      action: 'stock_adjustment',
+      kind: 'increase',
+      lines: [{ itemId: it3.id, quantityMilli }],
+    });
+    // An approval for 6 cannot be used for 60.
+    const small = await approve(approvedFor('6000'));
+    expect(
+      await refusal(
+        adjust(storekeeper, {
+          ...body,
+          lines: [{ itemId: it3.id, quantityMilli: '60000' }],
+          approvalId: small,
+        }),
+      ),
+    ).toMatchObject({ status: 403, code: 'APPROVAL_INVALID' });
+    const approval = await approve(approvedFor('6000'));
     const ok = await adjust(storekeeper, { ...body, approvalId: approval });
     expect(ok.statusCode).toBe(201);
     // The document names who posted it and who approved it, for everyone who can see it.

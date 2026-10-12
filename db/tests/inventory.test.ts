@@ -99,7 +99,13 @@ async function adjust(
   reason: string,
   lines: Line[],
   userId: bigint,
-  options: { date?: string; approval?: string | null; client?: pg.Client } = {},
+  options: {
+    date?: string;
+    approval?: string | null;
+    client?: pg.Client;
+    /** A wrong total sent with the posting: the database must use its own. */
+    claimedTotal?: string;
+  } = {},
 ): Promise<{ id: string; doc_number: string; total: string }> {
   return tx(
     async (c) => {
@@ -178,7 +184,7 @@ async function adjust(
         c,
         `UPDATE inv.adjustments SET status = 'posted', total_value_fils = $2 WHERE id = $1
          RETURNING id, doc_number, total_value_fils::text AS total`,
-        [doc.id, total],
+        [doc.id, options.claimedTotal ?? total],
       );
     },
     userId,
@@ -394,6 +400,78 @@ describe('adjustments (ADJ-)', () => {
     ).rejects.toMatchObject(denied('OPENING_OWNER_ONLY'));
   });
 
+  it('opening stock is posted once per item (decision 0042); later changes are adjustments', async () => {
+    const item = await stockItem('INV-0109');
+    const other = await stockItem('INV-0110');
+    const opening = await reasonId('other', 'OPENING');
+    await adjust('opening', opening, [{ item, qty: '1', cost: '100' }], owner);
+    await expect(
+      adjust(
+        'opening',
+        opening,
+        [
+          { item: other, qty: '1', cost: '100' },
+          { item, qty: '1', cost: '100' },
+        ],
+        owner,
+      ),
+    ).rejects.toMatchObject(rule('OPENING_ALREADY_POSTED'));
+    // An item forgotten at go-live still gets its opening stock.
+    await adjust('opening', opening, [{ item: other, qty: '1', cost: '100' }], owner);
+  });
+
+  it('the approval threshold uses the value of the movements, never the total sent', async () => {
+    const item = await stockItem('INV-0111');
+    const found = await reasonId('stock_increase', 'FOUND');
+    await expect(
+      adjust('increase', found, [{ item, qty: '6', cost: '1000000' }], storekeeper, {
+        claimedTotal: '0',
+      }),
+    ).rejects.toMatchObject(denied('APPROVAL_REQUIRED'));
+    const small = await adjust(
+      'increase',
+      found,
+      [{ item, qty: '1', cost: '1000000' }],
+      storekeeper,
+      {
+        claimedTotal: '5',
+      },
+    );
+    expect(small.total).toBe('10000');
+  });
+
+  it('stock never moves for a posted document or another item than its line', async () => {
+    const item = await stockItem('INV-0112');
+    const other = await stockItem('INV-0113');
+    const posted = await adjust(
+      'opening',
+      await reasonId('other', 'OPENING'),
+      [{ item, qty: '2', cost: '100' }],
+      owner,
+    );
+    const line = (
+      await one<{ id: string }>(
+        api,
+        `SELECT id FROM inv.adjustment_lines WHERE adjustment_id = $1`,
+        [posted.id],
+      )
+    ).id;
+    const move = (itemId: string) =>
+      tx(
+        (c) =>
+          c.query(
+            `INSERT INTO inv.movements (movement_type, movement_date, item_id, warehouse_id, stock_status,
+                                        quantity, value_4dp, adjustment_line_id)
+             VALUES ('opening', $1, $2, $3, 'available', 1, 100, $4)`,
+            [today, itemId, warehouse, line],
+          ),
+        owner,
+      );
+    await expect(move(item)).rejects.toMatchObject(rule('DOCUMENT_STEP'));
+    await expect(move(other)).rejects.toMatchObject(rule('DOCUMENT_STEP'));
+    expect((await balance(item)).quantity).toBe('2.000');
+  });
+
   it('above the threshold (500.00 AED) need an approval (decision 0041)', async () => {
     const item = await stockItem('INV-0103');
     const found = await reasonId('stock_increase', 'FOUND');
@@ -446,7 +524,12 @@ describe('adjustments (ADJ-)', () => {
         storekeeper,
       ),
     ).rejects.toBeTruthy();
-    const b = await adjust('opening', opening, [{ item, qty: '1', cost: '100' }], owner);
+    const b = await adjust(
+      'increase',
+      await reasonId('stock_increase', 'FOUND'),
+      [{ item, qty: '1', cost: '100' }],
+      storekeeper,
+    );
     const n = (doc: string) => Number(doc.replace(/\D/g, ''));
     expect(n(b.doc_number)).toBe(n(a.doc_number) + 1);
     await expect(
@@ -637,7 +720,14 @@ describe('counts (CNT-, decision 0044)', () => {
     ).rejects.toMatchObject({ code: 'AP006' });
   });
 
-  it('a difference worth more than the threshold needs an approval', async () => {
+  it('a difference worth more than the threshold needs an approval, whatever value is sent', async () => {
+    const item = await stockItem('INV-0310');
+    await adjust(
+      'opening',
+      await reasonId('other', 'OPENING'),
+      [{ item, qty: '10', cost: '1000000' }],
+      owner,
+    ); // 10 × 100.00
     const count = await tx(
       (c) =>
         one<{ id: string }>(
@@ -647,21 +737,54 @@ describe('counts (CNT-, decision 0044)', () => {
         ),
       storekeeper,
     );
+    const line = await tx(
+      (c) =>
+        one<{ id: string }>(
+          c,
+          `INSERT INTO inv.count_lines (count_id, item_id, stock_status, system_qty)
+           VALUES ($1, $2, 'available', 10) RETURNING id`,
+          [count.id, item],
+        ),
+      storekeeper,
+    );
+    await tx(
+      (c) => c.query(`UPDATE inv.count_lines SET counted_qty = 4 WHERE id = $1`, [line.id]),
+      storekeeper,
+    );
+    // 6 missing × 100.00 = 600.00, but the posting claims there is no difference at all.
     await expect(
-      tx(
-        (c) =>
-          c.query(
-            `UPDATE inv.counts SET status = 'posted', count_date = $2, total_value_fils = -60000,
-                    variance_abs_fils = 60000 WHERE id = $1`,
-            [count.id, today],
-          ),
-        storekeeper,
-      ),
+      tx(async (c) => {
+        await c.query(
+          `INSERT INTO inv.movements (movement_type, movement_date, item_id, warehouse_id, stock_status,
+                                      quantity, count_line_id)
+           VALUES ('count_loss', $1, $2, $3, 'available', -6, $4)`,
+          [today, item, warehouse, line.id],
+        );
+        return c.query(
+          `UPDATE inv.counts SET status = 'posted', count_date = $2, total_value_fils = 0,
+                  variance_abs_fils = 0 WHERE id = $1`,
+          [count.id, today],
+        );
+      }, storekeeper),
     ).rejects.toMatchObject(denied('APPROVAL_REQUIRED'));
     await tx(
       (c) => c.query(`UPDATE inv.counts SET status = 'cancelled' WHERE id = $1`, [count.id]),
       storekeeper,
     );
+    // A cancelled count moves no stock.
+    await expect(
+      tx(
+        (c) =>
+          c.query(
+            `INSERT INTO inv.movements (movement_type, movement_date, item_id, warehouse_id, stock_status,
+                                        quantity, count_line_id)
+             VALUES ('count_loss', $1, $2, $3, 'available', -6, $4)`,
+            [today, item, warehouse, line.id],
+          ),
+        storekeeper,
+      ),
+    ).rejects.toMatchObject(rule('DOCUMENT_STEP'));
+    expect((await balance(item)).quantity).toBe('10.000');
   });
 });
 

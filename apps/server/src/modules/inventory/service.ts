@@ -173,12 +173,13 @@ export async function createAdjustment(
     .returning('id')
     .executeTakeFirstOrThrow();
   if (body.approvalId) {
-    await consumeApproval(
+    const approved = await consumeApproval(
       trx,
       BigInt(body.approvalId),
       'stock.adjust_over_threshold',
       `inv.adjustments:${doc.id}`,
     );
+    assertApprovalFits(approved, body);
   }
 
   const movements: { stockStatus: string; valueFils: bigint }[] = [];
@@ -281,6 +282,31 @@ export async function createAdjustment(
     amounts: stockPosting(body.kind, movements),
   });
   return getAdjustment(trx, auth, doc.id);
+}
+
+/**
+ * An approval is for one exact change (decision 0041): the supervisor approved this kind, these
+ * items and these quantities. Anything else is refused, so an approval cannot be reused for a
+ * bigger or different change.
+ */
+function assertApprovalFits(context: Record<string, unknown>, body: CreateAdjustmentRequest) {
+  const key = (lines: unknown) =>
+    Array.isArray(lines)
+      ? lines
+          .map(
+            (l: { itemId?: unknown; quantityMilli?: unknown }) =>
+              `${String(l.itemId)}:${String(l.quantityMilli)}`,
+          )
+          .sort()
+          .join(',')
+      : null;
+  if (
+    context.action !== 'stock_adjustment' ||
+    context.kind !== body.kind ||
+    key(context.lines) !== key(body.lines)
+  ) {
+    throw new AppError('APPROVAL_INVALID', 'The approval was given for a different change');
+  }
 }
 
 // ---------------------------------------------------------------------------------------------

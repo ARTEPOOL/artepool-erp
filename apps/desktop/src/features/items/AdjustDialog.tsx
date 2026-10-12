@@ -267,8 +267,11 @@ export function AdjustDialog(props: {
           }
           context={{
             action: 'stock_adjustment',
-            itemId: props.item.id,
             kind: awaitingApproval.kind,
+            lines: awaitingApproval.lines.map((l) => ({
+              itemId: l.itemId,
+              quantityMilli: l.quantityMilli,
+            })),
           }}
           onApproved={(approvalId) => {
             const body = { ...awaitingApproval, approvalId };

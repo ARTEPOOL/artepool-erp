@@ -303,20 +303,31 @@ export async function postCount(
         .execute()
     ).map((r) => r.id.toString()),
   );
-  const moved = await movedSince(trx, id);
   const lines = await trx
     .selectFrom('inv.count_lines')
     .select(['id', 'item_id', 'stock_status', 'system_qty', 'counted_qty'])
     .where('count_id', '=', id)
     .execute();
+  // The expected quantity is the current balance, read under its lock: a sale committing at the
+  // same moment is then neither counted twice nor missed. "Moved since" is kept for the record.
+  const current = new Map<string, bigint>();
+  for (const status of new Set(lines.map((l) => l.stock_status))) {
+    const locked = await sql<{ item_id: string; quantity: string }>`
+      SELECT item_id::text, quantity::text FROM inv.lock_balances(${count.warehouse_id}, ${status},
+        ${lines.filter((l) => l.stock_status === status).map((l) => l.item_id.toString())}::bigint[])`.execute(
+      trx,
+    );
+    for (const b of locked.rows) current.set(`${status}:${b.item_id}`, quantityFromDb(b.quantity));
+  }
 
   const movements: { stockStatus: string; valueFils: bigint }[] = [];
   let net = 0n;
   let absolute = 0n;
   for (const l of lines) {
     if (l.counted_qty === null) throw ruleError('COUNT_INCOMPLETE', 'Not every line is counted');
-    const since = moved.get(l.id.toString()) ?? 0n;
-    const variance = quantityFromDb(l.counted_qty) - (quantityFromDb(l.system_qty) + since);
+    const expected = current.get(`${l.stock_status}:${l.item_id.toString()}`) ?? 0n;
+    const since = expected - quantityFromDb(l.system_qty);
+    const variance = quantityFromDb(l.counted_qty) - expected;
     const reason = reasons.get(l.id.toString());
     if (variance !== 0n && (!reason || !allowed.has(reason.reasonCodeId))) {
       throw new AppError('VALIDATION_FAILED', 'A difference needs a reason', {
@@ -364,12 +375,16 @@ export async function postCount(
       .execute();
   }
   if (body.approvalId) {
-    await consumeApproval(
+    const approved = await consumeApproval(
       trx,
       BigInt(body.approvalId),
       'stock.adjust_over_threshold',
       `inv.counts:${id}`,
     );
+    // The approval is for this count only (decision 0041).
+    if (approved.action !== 'stock_count' || approved.countId !== id.toString()) {
+      throw new AppError('APPROVAL_INVALID', 'The approval was given for a different count');
+    }
   }
   await trx
     .updateTable('inv.counts')

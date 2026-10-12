@@ -1663,13 +1663,14 @@ Migrations are written **in build order** (milestones in [`phase-1-plan.md`](pha
 | 0010 | `item_purchase_cost` | M2b | — (data/rules: purchase price may be set on services too, kits never; permission `items.cost`, owner-only; trigger requires it; decision 0038) | — |
 | 0011 | `inventory` | M3 | All `inv.*` tables + `apply_movement`; `md.label_sizes`; `gl.assert_period_open`; stock reason codes; permission `stock.opening` (owner-only); decisions 0003, 0015, 0040–0044 | — |
 | 0012 | `gl_journals` | M3 | `journal_entries`, `journal_lines` + balance check at commit, no double posting, open month only; `gl.account_in_use` returns `posted` | — |
-| 0013 | `cash_core` | M4 | `registers`, `shifts`, `counts`, `count_lines` + shift-owner function | — |
-| 0014 | `sales` | M4 | All `sales.*` tables + allocation, advance-deduction, note and payment-allocation triggers + sales views | `inv.movements.sales_document_line_id`, `inv.adjustments.sales_document_id`, `gl.journal_entries` (sales document, payment, opening balance, shift) |
-| 0015 | `ops_outbox` | M4 | `ops.outbox` | — |
-| 0016 | `cash_events` | M5 | `cash.movements`, `cash.drawer_events` + shift summary view | `gl.journal_entries.cash_movement_id` |
-| 0017 | `ops_backup` | M6 | `ops.backup_runs`, `ops.integrity_runs` + backup role grants | — |
+| 0013 | `inventory_hardening` | M3 | — (rules: a movement only for an open document and its own line; the approval threshold uses the movements' value; opening stock once per item; `inv.lock_balances` for counts; found in the M3 code review) | — |
+| 0014 | `cash_core` | M4 | `registers`, `shifts`, `counts`, `count_lines` + shift-owner function | — |
+| 0015 | `sales` | M4 | All `sales.*` tables + allocation, advance-deduction, note and payment-allocation triggers + sales views | `inv.movements.sales_document_line_id`, `inv.adjustments.sales_document_id`, `gl.journal_entries` (sales document, payment, opening balance, shift) |
+| 0016 | `ops_outbox` | M4 | `ops.outbox` | — |
+| 0017 | `cash_events` | M5 | `cash.movements`, `cash.drawer_events` + shift summary view | `gl.journal_entries.cash_movement_id` |
+| 0018 | `ops_backup` | M6 | `ops.backup_runs`, `ops.integrity_runs` + backup role grants | — |
 
-After 0017, a final check asserts that every business table has the audit trigger, the no-delete guard and the expected grants. The same check runs as an automated test.
+After 0018, a final check asserts that every business table has the audit trigger, the no-delete guard and the expected grants. The same check runs as an automated test.
 
 ---
 

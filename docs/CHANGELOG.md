@@ -4,7 +4,7 @@
 
 **In plain words:** stock is now real. The owner enters the **opening stock** once (by hand or from Excel), people **add, remove, move to defective and write off** stock with a reason, and **counts** compare the shelves with the system without showing the counter the expected number. Every stock change is a numbered document that also writes its **journal entry** in the same moment, so the books always equal the stock value to the fils. The accountant sees the **journal** and the **trial balance**. Barcode labels print in many sizes. Proven by 292 unit and screen, 376 integration and 46 browser tests.
 
-- **Database:** migration 0011 (the stock ledger: movements, balances written only by the database, adjustments, counts, label sizes) and 0012 (journal entries `JV-`, gapless, balanced or refused, never posted twice, only in an open month).
+- **Database:** migration 0011 (the stock ledger: movements, balances written only by the database, adjustments, counts, label sizes), 0012 (journal entries `JV-`, gapless, balanced or refused, never posted twice, only in an open month) and 0013 (fixes from the code review, below). The planned later migrations move up by one (cash is now 0014).
 - **Average cost (method A, decision 0038):** 4 decimals; the last unit takes exactly what is left, so 10 × 1.2345 → remove 3 → remove 7 ends at exactly 0.00. Stock below zero is refused; 20 people taking the last 5 units at the same moment → exactly 5 succeed.
 - **Who sees what (decisions 0040–0042):** cost and values only for the owner and the accountant; above 500.00 AED a supervisor approves with their PIN; opening stock is the owner's alone.
 - **Counts (decision 0044):** blind while counting; the reviewer sees system quantity, movements during the count and the difference, gives a reason per difference, and posts one document and one journal entry.
@@ -13,6 +13,13 @@
 - **Barcode labels (decision 0043):** 8 preset sizes and A4 sheets, plus custom sizes in Settings → Lists; printed through the print dialog.
 - **Also:** the default warehouse per PC in Settings → Devices (shown with more than one warehouse); dashboard alerts for items to reorder and oversells waiting for review; names instead of user numbers on journal entries and adjustments.
 - **Oversells:** the review page is ready; the POS creates them in M5.
+- **Fixes from the code review:**
+  - a count compares with the locked current stock, so a sale at the same moment is never counted twice or missed;
+  - a supervisor's approval is for one exact change and cannot be reused for a bigger one;
+  - the 500.00 limit is checked on the value the database calculates, not on a number sent to it;
+  - stock never moves for a document that is already posted or cancelled;
+  - opening stock is posted once per item;
+  - barcode labels print black on white even when the screen is in dark mode.
 
 ## M2b — Item purchase price (2026-10-11)
 

@@ -94,6 +94,10 @@
   .printRoll .label {
     border: none;
     break-inside: avoid;
+    /* Black on white paper, whatever the screen theme: a light bar in dark mode cannot be scanned. */
+    color-scheme: light;
+    background: Canvas;
+    color: CanvasText;
   }
 
   .printRoll .label {
