@@ -178,6 +178,7 @@ const itemsAnswer = (items: ItemDetail[]): ItemsResponse => ({
   items: items.map(listed),
   total: items.length,
   counts: { active: 41, stock: 30, service: 8, bundle: 3 },
+  exactMatchId: null,
 });
 
 function bridgeFor(permissions: string[], language: 'ar' | 'en' = 'ar') {
@@ -203,6 +204,8 @@ function bridgeFor(permissions: string[], language: 'ar' | 'en' = 'ar') {
     .on('GET', '/api/v1/business-lines', ok({ businessLines: LINES }))
     .on('GET', '/api/v1/items', (request: BridgeRequest) => {
       const q = new URLSearchParams(request.path.split('?')[1]).get('q');
+      // A scanned code: the server names the exact item (it would also list it first).
+      if (q === 'EQUIP-0003') return ok({ ...itemsAnswer([CHLORINE, PUMP]), exactMatchId: '11' });
       if (q) return ok(itemsAnswer([CHLORINE, PUMP].filter((i) => i.nameAr.includes(q))));
       return ok(itemsAnswer([CHLORINE, PUMP]));
     })
@@ -256,7 +259,7 @@ describe('Items & stock: the list', () => {
       within(filters)
         .getAllByRole('button')
         .map((b) => b.textContent),
-    ).toEqual(['الكل', 'كيماويات', 'معدات', 'موقوفة']);
+    ).toEqual(['الكل', 'كيماويات', 'معدات', 'تحتاج طلب', 'موقوفة']);
     expect(screen.getByRole('button', { name: 'استيراد أصناف' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'استيراد أسعار' })).toBeTruthy();
   });
@@ -286,6 +289,30 @@ describe('Items & stock: the list', () => {
     await waitFor(() =>
       expect(bridge.callsTo('GET', '/api/v1/items').at(-1)?.path).toContain('status=inactive'),
     );
+  });
+
+  it('a scanned barcode or full code searches on Enter and opens that item straight away', async () => {
+    const bridge = bridgeFor(OWNER);
+    await openItems(bridge);
+    await detailCard('كلور حبيبات 10 كجم'); // the first item is shown at first
+    const search = screen.getByRole<HTMLInputElement>('searchbox', {
+      name: 'الاسم أو الكود أو الباركود',
+    });
+    search.focus();
+    fireEvent.change(search, { target: { value: 'EQUIP-0003' } });
+    fireEvent.keyDown(search, { key: 'Enter' });
+    // Enter does not wait for typing to stop (a quarter of a second).
+    await waitFor(
+      () => expect(bridge.callsTo('GET', '/api/v1/items').at(-1)?.path).toContain('q=EQUIP-0003'),
+      { timeout: 150 },
+    );
+    // The exact item opens, even though another item is listed before it here.
+    await detailCard('مضخة أرضية');
+    // The text is selected, so the next scan replaces it.
+    await waitFor(() => {
+      expect(search.selectionStart).toBe(0);
+      expect(search.selectionEnd).toBe('EQUIP-0003'.length);
+    });
   });
 
   it('shows each price with and without VAT (an exclusive price gets 5% added)', async () => {

@@ -11,3 +11,4 @@ export * from './items';
 export * from './ledger';
 export * from './lists';
 export * from './parties';
+export * from './inventory';

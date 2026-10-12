@@ -111,7 +111,21 @@
       "stock_fields_for_stock_only": "Only stock items have this",
       "too_many_decimals": "More decimals than the unit allows",
       "trn_needs_registration": "A TRN needs \"VAT-registered\" = yes",
-      "cost_needs_permission": "Only the owner can set a purchase price"
+      "cost_needs_permission": "Only the owner can set a purchase price",
+      "not_a_stock_item": "This item is not a stock item",
+      "cost_unknown": "No cost: type the unit cost or set the item's purchase price"
     }
+  },
+  "approval": {
+    "title": "Supervisor approval",
+    "explain": "This needs a supervisor's approval. The supervisor types their PIN on this PC.",
+    "approver": "Supervisor",
+    "choose": "Choose…",
+    "pin": "Supervisor's PIN",
+    "reason": "Reason",
+    "reasonHint": "Why is this needed?",
+    "noApprovers": "No supervisor has this permission and a working PIN.",
+    "approve": "Approve",
+    "wrongPin": "The PIN is wrong."
   }
 }

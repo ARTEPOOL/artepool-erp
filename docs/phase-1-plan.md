@@ -273,11 +273,12 @@ The detail is in [`database-schema.md` §16](database-schema.md#16-migration-ord
 | 0010 | item purchase price (owner only) | M2b |
 | 0011 | inventory | M3 |
 | 0012 | journal entries and lines | M3 |
-| 0013 | cash registers, shifts, counts | M4 |
-| 0014 | sales documents, payments, allocations | M4 |
-| 0015 | e-invoice outbox | M4 |
-| 0016 | cash movements, drawer events | M5 |
-| 0017 | backup and integrity records | M6 |
+| 0013 | inventory hardening (review fixes) | M3 |
+| 0014 | cash registers, shifts, counts | M4 |
+| 0015 | sales documents, payments, allocations | M4 |
+| 0016 | e-invoice outbox | M4 |
+| 0017 | cash movements, drawer events | M5 |
+| 0018 | backup and integrity records | M6 |
 
 ---
 
@@ -361,7 +362,7 @@ A milestone is done only when its tests pass in CI.
 ### M3 — Inventory and the posting engine
 
 **Delivers:**
-- Migrations 0011–0012.
+- Migrations 0011–0013.
 - The movement engine: costing in the database, the negative-stock block, 4-dp average cost.
 - Opening stock, adjustments, move to defective, write-off, stock counts.
 - The oversell adjustment type with review status and the storekeeper review screen.
@@ -385,7 +386,7 @@ A milestone is done only when its tests pass in CI.
 ### M4 — Invoices (A4) section
 
 **Delivers:**
-- Migrations 0013–0015.
+- Migrations 0014–0016.
 - Quotations (with revisions) → invoices (`INV-`).
 - Simplified or full format chosen automatically from the customer's VAT registration.
 - Per-line price, discount, net and VAT; the document discount spread across lines.
@@ -415,7 +416,7 @@ A milestone is done only when its tests pass in CI.
 ### M5 — POS and cash
 
 **Delivers:**
-- Migration 0016.
+- Migration 0017.
 - The POS screen: keyboard and scanner, split tender, hold/resume.
 - **Silent thermal receipts** (simplified or full), the drawer kick only on cash.
 - Cart-removal events logged without approval.
@@ -450,7 +451,7 @@ A milestone is done only when its tests pass in CI.
 ### M6 — Operations
 
 **Delivers:**
-- Migration 0017.
+- Migration 0018.
 - The backup agent: WAL archive, hourly dump, nightly base backup, `age`-encrypted daily off-site upload, external-drive reminders.
 - The restore test into `artepool_restore_test`, the nightly integrity checks and the system-health screen.
 - The server installer (PostgreSQL configuration, roles, CA and certificates, firewall, services) and the client installer (CA trust, offline WebView2).

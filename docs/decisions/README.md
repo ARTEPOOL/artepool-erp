@@ -46,6 +46,11 @@ There is one short file per decision, numbered in order.
 | [0037](0037-master-data-defaults.md) | Master-data rules: item codes, phones, TRNs, logo, never deleted | Accepted |
 | [0038](0038-item-purchase-price-owner-only.md) | Item purchase price: without VAT, owner only, copied onto each sale | Accepted |
 | [0039](0039-owner-reports-dashboard.md) | Owner reports dashboard: four figures, date range, net profit after expenses | Accepted |
+| [0040](0040-stock-cost-visibility.md) | Stock cost and value: owner and accountant only | Accepted |
+| [0041](0041-stock-adjustment-approval-threshold.md) | Adjustments above 500.00 AED need a supervisor's approval | Accepted |
+| [0042](0042-opening-stock-owner-only.md) | Opening stock: once at go-live, posted by the owner only | Accepted |
+| [0043](0043-barcode-label-sizes.md) | Barcode labels: list of sizes, custom sizes, print dialog | Accepted |
+| [0044](0044-blind-stock-counts.md) | Blind full counts; one warehouse in Phase 1 | Accepted |
 
 ## Template
 

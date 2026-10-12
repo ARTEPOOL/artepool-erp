@@ -5,7 +5,9 @@
   "loading": "Loading…",
   "tabs": {
     "chart": "Chart of accounts",
-    "links": "Event links"
+    "links": "Event links",
+    "journal": "Journal",
+    "trial": "Trial balance"
   },
   "chart": {
     "search": "Search by code or name",
@@ -125,5 +127,57 @@
         "body": "The other side of the opening customer balances and opening stock at go-live."
       }
     }
+  },
+  "period": {
+    "from": "From",
+    "to": "To",
+    "invalid": "Choose a start and an end date; the start cannot be after the end."
+  },
+  "journal": {
+    "source": "Source",
+    "allSources": "All sources",
+    "account": "Account",
+    "allAccounts": "All accounts",
+    "number": "Entry no.",
+    "date": "Date",
+    "total": "Amount",
+    "openOne": "Open entry {number}",
+    "empty": "No entries match in this period.",
+    "count": "Entries: {total}",
+    "page": "Page {page} of {pages}",
+    "previous": "Previous",
+    "next": "Next"
+  },
+  "sources": {
+    "sales_document": "Sales document",
+    "payment": "Payment",
+    "opening_balance": "Opening balances",
+    "cash_movement": "Cash movement",
+    "shift_close": "Shift close",
+    "inventory_adjustment": "Opening stock and adjustments",
+    "inventory_count": "Stock count",
+    "reversal": "Reversing entry",
+    "manual": "Manual entry"
+  },
+  "entry": {
+    "title": "Entry {number}",
+    "loadingTitle": "Entry",
+    "memo": "Memo",
+    "posted": "Posted",
+    "postedBy": "by {user}",
+    "lines": "Entry lines",
+    "debit": "Debit",
+    "credit": "Credit",
+    "totals": "Total",
+    "close": "Close"
+  },
+  "trial": {
+    "balance": "Balance",
+    "dr": "Dr",
+    "cr": "Cr",
+    "empty": "No account moved in this period.",
+    "totals": "Total",
+    "balanced": "Balanced",
+    "unbalanced": "Not balanced"
   }
 }

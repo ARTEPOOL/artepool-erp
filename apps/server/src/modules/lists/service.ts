@@ -20,6 +20,9 @@ import type {
   UpdateWarehouseRequest,
   WarehouseItem,
   WarehouseType,
+  CreateLabelSizeRequest,
+  LabelSizeItem,
+  UpdateLabelSizeRequest,
 } from '@artepool/shared/contracts';
 import type { DB } from '../../platform/db/schema.generated';
 import { stamped } from '../../platform/db/stamped';
@@ -365,4 +368,76 @@ export async function setReasonCodeActive(
     .executeTakeFirst();
   await expectUpdated(trx, 'sys.reason_codes', reasonId, result);
   return found(await listReasonCodes(trx), reasonId, 'reason');
+}
+
+// ---------------------------------------------------------------------------------------------
+// Barcode label sizes (decision 0043)
+// ---------------------------------------------------------------------------------------------
+
+export async function listLabelSizes(db: Kysely<DB>): Promise<LabelSizeItem[]> {
+  const rows = await db
+    .selectFrom('md.label_sizes')
+    .selectAll()
+    .orderBy('sort_order')
+    .orderBy('code')
+    .execute();
+  return rows.map((r) => ({
+    id: r.id.toString(),
+    code: r.code,
+    nameAr: r.name_ar,
+    nameEn: r.name_en,
+    widthMm: r.width_mm,
+    heightMm: r.height_mm,
+    sortOrder: r.sort_order,
+    isActive: r.is_active,
+    rowVersion: r.row_version,
+  }));
+}
+
+const labelSizeValues = (body: UpdateLabelSizeRequest | CreateLabelSizeRequest) => ({
+  name_ar: body.nameAr,
+  name_en: body.nameEn,
+  width_mm: body.widthMm,
+  height_mm: body.heightMm,
+  sort_order: body.sortOrder,
+});
+
+export async function createLabelSize(trx: Transaction<DB>, body: CreateLabelSizeRequest) {
+  const row = await trx
+    .insertInto('md.label_sizes')
+    .values(stamped('md.label_sizes', { code: body.code.toUpperCase(), ...labelSizeValues(body) }))
+    .returning('id')
+    .executeTakeFirstOrThrow();
+  return found(await listLabelSizes(trx), row.id, 'label size');
+}
+
+export async function updateLabelSize(
+  trx: Transaction<DB>,
+  sizeId: bigint,
+  body: UpdateLabelSizeRequest,
+) {
+  const result = await trx
+    .updateTable('md.label_sizes')
+    .set(labelSizeValues(body))
+    .where('id', '=', sizeId)
+    .where('row_version', '=', body.rowVersion)
+    .executeTakeFirst();
+  await expectUpdated(trx, 'md.label_sizes', sizeId, result);
+  return found(await listLabelSizes(trx), sizeId, 'label size');
+}
+
+export async function setLabelSizeActive(
+  trx: Transaction<DB>,
+  sizeId: bigint,
+  active: boolean,
+  rowVersion: number,
+) {
+  const result = await trx
+    .updateTable('md.label_sizes')
+    .set({ is_active: active })
+    .where('id', '=', sizeId)
+    .where('row_version', '=', rowVersion)
+    .executeTakeFirst();
+  await expectUpdated(trx, 'md.label_sizes', sizeId, result);
+  return found(await listLabelSizes(trx), sizeId, 'label size');
 }

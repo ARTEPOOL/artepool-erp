@@ -6,15 +6,18 @@ import {
   CreateBusinessLineRequest,
   DeactivateRequest,
   IdText,
+  JournalQuery,
   PeriodStepRequest,
   ReactivateRequest,
   ReopenPeriodRequest,
   UpdateAccountLinkRequest,
   UpdateAccountRequest,
   UpdateBusinessLineRequest,
+  TrialBalanceQuery,
 } from '@artepool/shared/contracts';
 import { defineRoute, defineWrite } from '../../platform/http/route';
 import * as accounts from './accounts';
+import * as journal from './journal';
 import * as periods from './periods';
 
 const Params = z.object({ id: IdText });
@@ -24,6 +27,29 @@ const managePeriods = { kind: 'permission', permission: 'periods.manage' } as co
 
 export function registerLedgerRoutes(app: FastifyInstance): void {
   const db = app.deps.db;
+
+  // Journal viewer and trial balance (read-only)
+  defineRoute(app, {
+    method: 'GET',
+    url: '/api/v1/journal',
+    access: view,
+    query: JournalQuery,
+    handler: ({ query }) => journal.listJournal(db, query),
+  });
+  defineRoute(app, {
+    method: 'GET',
+    url: '/api/v1/journal/:id',
+    access: view,
+    params: Params,
+    handler: ({ params }) => journal.getJournalEntry(db, BigInt(params.id)),
+  });
+  defineRoute(app, {
+    method: 'GET',
+    url: '/api/v1/trial-balance',
+    access: view,
+    query: TrialBalanceQuery,
+    handler: ({ query }) => journal.trialBalance(db, query),
+  });
 
   // Chart of accounts and event links
   defineRoute(app, {

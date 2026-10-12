@@ -8,6 +8,9 @@ import type {
   BusinessLineItem,
   CategoryItem,
   CompanyResponse,
+  LabelSizeItem,
+  ReasonCodeItem,
+  StockSummary,
   UnitItem,
   VatResponse,
 } from '@artepool/shared/contracts';
@@ -34,6 +37,15 @@ export const MD_KEYS = {
   paymentMethods: ['md', 'payment-methods'] as QueryKey,
   warehouses: ['md', 'warehouses'] as QueryKey,
   reasonCodes: ['md', 'reason-codes'] as QueryKey,
+  labelSizes: ['md', 'label-sizes'] as QueryKey,
+  // Stock (M3): every stock save refreshes all of these.
+  stock: ['stock'] as QueryKey,
+  stockSummary: ['stock', 'summary'] as QueryKey,
+  itemStock: (id: string) => ['stock', 'item', id] as QueryKey,
+  adjustments: ['stock', 'adjustments'] as QueryKey,
+  counts: ['stock', 'counts'] as QueryKey,
+  count: (id: string) => ['stock', 'counts', id] as QueryKey,
+  journal: ['stock', 'journal'] as QueryKey,
 };
 
 export function useVat() {
@@ -95,3 +107,34 @@ export const localName =
   (language: string) =>
   (thing: { nameAr: string; nameEn: string }): string =>
     language === 'en' ? thing.nameEn : thing.nameAr;
+
+/** Reasons for stock documents, cash and notes (everyone signed in may read them). */
+export function useReasonCodes() {
+  const api = useApi();
+  return useQuery({
+    queryKey: MD_KEYS.reasonCodes,
+    queryFn: async () =>
+      (await api.get<{ reasonCodes: ReasonCodeItem[] }>('/api/v1/reason-codes')).reasonCodes,
+  });
+}
+
+/** Barcode label sizes (decision 0043). */
+export function useLabelSizes() {
+  const api = useApi();
+  return useQuery({
+    queryKey: MD_KEYS.labelSizes,
+    queryFn: async () =>
+      (await api.get<{ labelSizes: LabelSizeItem[] }>('/api/v1/label-sizes')).labelSizes,
+  });
+}
+
+/** The stock tiles: value (owner and accountant only), to reorder, defective, pending reviews. */
+export function useStockSummary() {
+  const api = useApi();
+  const can = useCan();
+  return useQuery({
+    queryKey: MD_KEYS.stockSummary,
+    queryFn: () => api.get<StockSummary>('/api/v1/stock/summary'),
+    enabled: can('items.view'),
+  });
+}

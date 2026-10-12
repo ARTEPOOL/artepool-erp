@@ -63,6 +63,7 @@ const NAV: NavItem[] = [
 /** The menu entry a page belongs to (shown at the top of the page). */
 function crumbOf(path: string): string {
   if (path.startsWith('/settings')) return 'settings';
+  if (path.startsWith('/stock')) return 'items';
   const found = NAV.find((item) => 'to' in item && path.startsWith(item.to));
   return found?.key ?? 'dashboard';
 }
@@ -103,7 +104,7 @@ export function Shell() {
                 <Link
                   key={item.key}
                   to={item.to}
-                  aria-current={path.startsWith(item.to) ? 'page' : undefined}
+                  aria-current={crumbOf(path) === item.key ? 'page' : undefined}
                 >
                   {item.icon}
                   <span>{t(`nav.${item.key}`)}</span>

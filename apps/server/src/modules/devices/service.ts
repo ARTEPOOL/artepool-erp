@@ -319,6 +319,7 @@ export async function listDevices(
         'd.key_expires_at',
         'd.revoked_at',
         'd.revoke_reason',
+        'd.default_warehouse_id',
         'a.last_seen_at',
         'a.last_ip',
         'a.app_version',
@@ -360,6 +361,7 @@ export async function listDevices(
     revokedAt: r.revoked_at?.toISOString() ?? null,
     revokeReason: r.revoke_reason,
     isCurrent: r.id === request.device!.id,
+    defaultWarehouseId: r.default_warehouse_id?.toString() ?? null,
     trustedFor: trusts
       .filter((t) => t.device_id === r.id)
       .map((t) => ({
@@ -395,13 +397,35 @@ export async function endDeviceTrust(trx: Transaction<DB>, id: bigint): Promise<
 export async function updateDevice(
   trx: Transaction<DB>,
   id: bigint,
-  changes: { name?: string | undefined; kind?: DeviceKind | undefined },
+  changes: {
+    name?: string | undefined;
+    kind?: DeviceKind | undefined;
+    defaultWarehouseId?: string | null | undefined;
+  },
 ): Promise<void> {
+  if (changes.defaultWarehouseId) {
+    const warehouse = await trx
+      .selectFrom('md.warehouses')
+      .select('is_active')
+      .where('id', '=', BigInt(changes.defaultWarehouseId))
+      .executeTakeFirst();
+    if (!warehouse?.is_active)
+      throw new AppError('VALIDATION_FAILED', 'No such warehouse', {
+        part: 'body',
+        issues: [{ path: ['defaultWarehouseId'], code: 'unknown' }],
+      });
+  }
   const updated = await trx
     .updateTable('auth.devices')
     .set({
       ...(changes.name !== undefined ? { name: changes.name } : {}),
       ...(changes.kind !== undefined ? { device_kind: changes.kind } : {}),
+      ...(changes.defaultWarehouseId !== undefined
+        ? {
+            default_warehouse_id:
+              changes.defaultWarehouseId === null ? null : BigInt(changes.defaultWarehouseId),
+          }
+        : {}),
     })
     .where('id', '=', id)
     .executeTakeFirst();

@@ -146,6 +146,32 @@ describe('items (design 07, decision 0032)', () => {
     }
   });
 
+  it('a scanned barcode or a full code names its item and lists it first', async () => {
+    // Another item whose name holds the same digits, and whose code sorts first.
+    const lookalike = (
+      await owner('POST', '/api/v1/items', {
+        ...pump(),
+        code: 'EQUIP-0000',
+        nameEn: 'Seal kit for 6291234567890',
+        barcodes: [],
+        reorderLevelMilli: null,
+      })
+    ).json<ItemDetail>();
+    for (const q of ['6291234567890', 'equip-0001']) {
+      const list = (
+        await storekeeper('GET', `/api/v1/items?q=${encodeURIComponent(q)}`)
+      ).json<ItemsResponse>();
+      expect(list.exactMatchId).toBe(pumpItem.id);
+      expect(list.items[0]!.id).toBe(pumpItem.id);
+    }
+    const loose = (await storekeeper('GET', '/api/v1/items?q=seal')).json<ItemsResponse>();
+    expect(loose.exactMatchId).toBeNull();
+    await owner('POST', `/api/v1/items/${lookalike.id}/deactivate`, {
+      reason: 'Test item',
+      rowVersion: lookalike.rowVersion,
+    });
+  });
+
   it('need a price above zero when for sale, and the unit’s decimals', async () => {
     expect(
       await refusal(

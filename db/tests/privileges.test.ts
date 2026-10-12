@@ -16,6 +16,8 @@ const NOT_ROW_AUDITED = [
   'auth.device_activity',
   'auth.sessions',
   'sys.idempotency_keys',
+  // Derived: written only by the movement trigger, checked against the movements (schema §8.2).
+  'inv.balances',
 ];
 /** Link and technical tables the API may delete from (docs/database-schema.md §2). */
 const API_MAY_DELETE = ['auth.role_permissions', 'auth.user_roles', 'md.bundle_components'];

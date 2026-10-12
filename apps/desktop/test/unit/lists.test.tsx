@@ -1,12 +1,13 @@
 /**
  * T11: Settings → Lists (decision 0034) against a scripted server: tabs follow permissions, a new
- * unit, the VAT rate (owner only, with a reason; decision 0033), the default warehouse, and the
- * account a paid-out reason needs.
+ * unit, the VAT rate (owner only, with a reason; decision 0033), the default warehouse, the
+ * account a paid-out reason needs, and the barcode label sizes (owner only; decision 0043).
  */
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type {
   AccountItem,
+  LabelSizeItem,
   ReasonCodeItem,
   UnitItem,
   VatCategoryItem,
@@ -155,6 +156,32 @@ const reason = (patch: Partial<ReasonCodeItem>): ReasonCodeItem => ({
   ...patch,
 });
 
+const labelSize = (patch: Partial<LabelSizeItem>): LabelSizeItem => ({
+  id: '1',
+  code: 'L38X25',
+  nameAr: 'ملصق صغير',
+  nameEn: 'Small label',
+  widthMm: 38,
+  heightMm: 25,
+  sortOrder: 10,
+  isActive: true,
+  rowVersion: 2,
+  ...patch,
+});
+
+const LABEL_SIZES = [
+  labelSize({}),
+  labelSize({
+    id: '2',
+    code: 'L50X30',
+    nameAr: 'ملصق متوسط',
+    nameEn: 'Medium label',
+    widthMm: 50,
+    heightMm: 30,
+    sortOrder: 20,
+  }),
+];
+
 function signedInBridge(permissions: string[]) {
   return new FakeBridge()
     .on('POST', '/api/v1/auth/sign-in', ok(signInAnswer({}, { displayNameAr: 'محمد ياسر' })))
@@ -174,7 +201,8 @@ function signedInBridge(permissions: string[]) {
     .on('GET', '/api/v1/warehouses', ok({ warehouses: WAREHOUSES }))
     .on('GET', '/api/v1/technicians', ok({ technicians: [] }))
     .on('GET', '/api/v1/accounts', ok(ACCOUNTS))
-    .on('GET', '/api/v1/reason-codes', ok({ reasonCodes: [reason({})] }));
+    .on('GET', '/api/v1/reason-codes', ok({ reasonCodes: [reason({})] }))
+    .on('GET', '/api/v1/label-sizes', ok({ labelSizes: LABEL_SIZES }));
 }
 
 async function signIn(bridge: FakeBridge) {
@@ -211,13 +239,19 @@ describe('Settings → Lists', () => {
   it('shows only the tabs the person may use, and the VAT categories to everyone', async () => {
     await signIn(signedInBridge(['warehouses.manage']));
     await openLists();
-    expect(tabNames()).toEqual(['فئات الضريبة', 'المستودعات']);
+    expect(tabNames()).toEqual(['فئات الضريبة', 'المستودعات', 'مقاسات الملصقات']);
   });
 
   it('shows the item lists and reason codes to an owner without the other permissions', async () => {
     await signIn(signedInBridge(['items.manage', 'system.settings.edit']));
     await openLists();
-    expect(tabNames()).toEqual(['الوحدات', 'فئات الأصناف', 'فئات الضريبة', 'رموز الأسباب']);
+    expect(tabNames()).toEqual([
+      'الوحدات',
+      'فئات الأصناف',
+      'فئات الضريبة',
+      'رموز الأسباب',
+      'مقاسات الملصقات',
+    ]);
   });
 
   it('creates a unit with exactly the fields typed', async () => {
@@ -442,6 +476,101 @@ describe('Settings → Lists', () => {
     fireEvent.change(within(dialog).getByLabelText(/^الاسم بالإنجليزية/), {
       target: { value: 'Piece' },
     });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'حفظ' }));
+    expect(await within(dialog).findByText('مستخدم في سجل آخر.')).toBeTruthy();
+  });
+});
+
+describe('Settings → Lists → Label sizes (decision 0043)', () => {
+  it('shows the sizes to everyone who opens Lists, without the edit buttons', async () => {
+    await signIn(signedInBridge(['warehouses.manage']));
+    await openLists();
+    fireEvent.click(screen.getByRole('tab', { name: 'مقاسات الملصقات' }));
+    const small = await row('L38X25');
+    expect(within(small).getByText('38 × 25 مم')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'مقاس جديد' })).toBeNull();
+    expect(within(small).queryByRole('button', { name: 'تعديل L38X25' })).toBeNull();
+    expect(within(small).queryByRole('button', { name: 'إيقاف L38X25' })).toBeNull();
+  });
+
+  it('the owner creates a size: whole millimetres within the limits, exactly the fields typed', async () => {
+    const bridge = signedInBridge(['system.settings.edit']);
+    bridge.on('POST', '/api/v1/label-sizes', ok(labelSize({ id: '3', code: 'L58X40' }), 201));
+    await signIn(bridge);
+    await openLists();
+    fireEvent.click(screen.getByRole('tab', { name: 'مقاسات الملصقات' }));
+    expect(await row('L50X30')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'مقاس جديد' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText(/^الكود/), { target: { value: 'l58x40' } });
+    fireEvent.change(within(dialog).getByLabelText(/^الاسم بالعربية/), {
+      target: { value: 'ملصق كبير' },
+    });
+    fireEvent.change(within(dialog).getByLabelText(/^الاسم بالإنجليزية/), {
+      target: { value: 'Large label' },
+    });
+    fireEvent.change(within(dialog).getByLabelText(/^العرض/), { target: { value: '5' } });
+    fireEvent.change(within(dialog).getByLabelText(/^الارتفاع/), { target: { value: '40' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'حفظ' }));
+    expect(await within(dialog).findByText('رقم صحيح من 10 إلى 210 مم.')).toBeTruthy();
+    expect(bridge.callsTo('POST', '/api/v1/label-sizes')).toHaveLength(0);
+
+    // Arabic digits are accepted and sent as plain numbers.
+    fireEvent.change(within(dialog).getByLabelText(/^العرض/), { target: { value: '٥٨' } });
+    fireEvent.change(within(dialog).getByLabelText(/^الترتيب/), { target: { value: '30' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'حفظ' }));
+    await waitFor(() => expect(bridge.callsTo('POST', '/api/v1/label-sizes')).toHaveLength(1));
+    expect(bridge.callsTo('POST', '/api/v1/label-sizes')[0]!.body).toEqual({
+      code: 'L58X40',
+      nameAr: 'ملصق كبير',
+      nameEn: 'Large label',
+      widthMm: 58,
+      heightMm: 40,
+      sortOrder: 30,
+    });
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  });
+
+  it('editing keeps the code fixed and sends the row version', async () => {
+    const bridge = signedInBridge(['system.settings.edit']);
+    bridge.on('PATCH', '/api/v1/label-sizes/1', ok(labelSize({ heightMm: 30 })));
+    await signIn(bridge);
+    await openLists();
+    fireEvent.click(screen.getByRole('tab', { name: 'مقاسات الملصقات' }));
+    fireEvent.click(within(await row('L38X25')).getByRole('button', { name: 'تعديل L38X25' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByLabelText(/^الكود/)).toHaveProperty('disabled', true);
+    fireEvent.change(within(dialog).getByLabelText(/^الارتفاع/), { target: { value: '30' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'حفظ' }));
+    await waitFor(() => expect(bridge.callsTo('PATCH', '/api/v1/label-sizes/1')).toHaveLength(1));
+    expect(bridge.callsTo('PATCH', '/api/v1/label-sizes/1')[0]!.body).toEqual({
+      nameAr: 'ملصق صغير',
+      nameEn: 'Small label',
+      widthMm: 38,
+      heightMm: 30,
+      sortOrder: 10,
+      rowVersion: 2,
+    });
+  });
+
+  it('a duplicate code is shown under the code field', async () => {
+    const bridge = signedInBridge(['system.settings.edit']);
+    bridge.on('POST', '/api/v1/label-sizes', failure(409, 'DUPLICATE', { field: 'code' }));
+    await signIn(bridge);
+    await openLists();
+    fireEvent.click(screen.getByRole('tab', { name: 'مقاسات الملصقات' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'مقاس جديد' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText(/^الكود/), { target: { value: 'L38X25' } });
+    fireEvent.change(within(dialog).getByLabelText(/^الاسم بالعربية/), {
+      target: { value: 'مكرر' },
+    });
+    fireEvent.change(within(dialog).getByLabelText(/^الاسم بالإنجليزية/), {
+      target: { value: 'Duplicate' },
+    });
+    fireEvent.change(within(dialog).getByLabelText(/^العرض/), { target: { value: '38' } });
+    fireEvent.change(within(dialog).getByLabelText(/^الارتفاع/), { target: { value: '25' } });
     fireEvent.click(within(dialog).getByRole('button', { name: 'حفظ' }));
     expect(await within(dialog).findByText('مستخدم في سجل آخر.')).toBeTruthy();
   });

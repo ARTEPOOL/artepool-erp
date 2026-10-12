@@ -5,6 +5,7 @@ import { useCan } from '../../auth/context';
 import { NoAccess, PanelHeader } from '../parts';
 import { BusinessLinesTab, PaymentMethodsTab, ReasonCodesTab } from './AccountListTabs';
 import { CategoriesTab, TechniciansTab, UnitsTab } from './ItemListTabs';
+import { LabelSizesTab } from './LabelSizesTab';
 import { VatTab } from './VatTab';
 import { WarehousesTab } from './WarehousesTab';
 
@@ -16,7 +17,8 @@ type TabId =
   | 'warehouses'
   | 'technicians'
   | 'businessLines'
-  | 'reasons';
+  | 'reasons'
+  | 'labelSizes';
 
 /** Each tab and the permission that opens it (the server checks again on every call). */
 const TABS: { id: TabId; permission: string | null; component: ComponentType }[] = [
@@ -29,6 +31,8 @@ const TABS: { id: TabId; permission: string | null; component: ComponentType }[]
   { id: 'technicians', permission: 'technicians.manage', component: TechniciansTab },
   { id: 'businessLines', permission: 'accounts.manage', component: BusinessLinesTab },
   { id: 'reasons', permission: 'system.settings.edit', component: ReasonCodesTab },
+  // Everyone sees the label sizes; only the owner adds or changes one (0043).
+  { id: 'labelSizes', permission: null, component: LabelSizesTab },
 ];
 
 /** Settings → Lists (design 13 style; decision 0034). */
@@ -37,8 +41,8 @@ export function ListsPanel() {
   const can = useCan();
   const tabs = TABS.filter((tab) => tab.permission === null || can(tab.permission));
   const [chosen, setChosen] = useState<TabId | null>(null);
-  // Only the VAT categories left: this person has no list to manage here.
-  if (tabs.length === 1) return <NoAccess />;
+  // Only the lists everyone may read: this person has no list to manage here.
+  if (tabs.every((tab) => tab.permission === null)) return <NoAccess />;
   const current = tabs.find((tab) => tab.id === chosen) ?? tabs[0]!;
   const Current = current.component;
   return (

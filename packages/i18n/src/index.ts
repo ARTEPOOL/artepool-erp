@@ -1,6 +1,7 @@
 import arAccounting from '../locales/ar/accounting.json';
 import arAuth from '../locales/ar/auth.json';
 import arCommon from '../locales/ar/common.json';
+import arInventory from '../locales/ar/inventory.json';
 import arItems from '../locales/ar/items.json';
 import arLists from '../locales/ar/lists.json';
 import arMasterdata from '../locales/ar/masterdata.json';
@@ -11,6 +12,7 @@ import arShell from '../locales/ar/shell.json';
 import enAccounting from '../locales/en/accounting.json';
 import enAuth from '../locales/en/auth.json';
 import enCommon from '../locales/en/common.json';
+import enInventory from '../locales/en/inventory.json';
 import enItems from '../locales/en/items.json';
 import enLists from '../locales/en/lists.json';
 import enMasterdata from '../locales/en/masterdata.json';
@@ -37,6 +39,7 @@ export const resources = {
     accounting: arAccounting,
     setup: arSetup,
     lists: arLists,
+    inventory: arInventory,
   },
   en: {
     common: enCommon,
@@ -49,6 +52,7 @@ export const resources = {
     accounting: enAccounting,
     setup: enSetup,
     lists: enLists,
+    inventory: enInventory,
   },
 } as const;
 

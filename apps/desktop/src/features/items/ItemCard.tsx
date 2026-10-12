@@ -30,10 +30,16 @@ import { itemPath, useItem } from './api';
 import { quantityText } from './form';
 import { marginOf, percentText } from './margin';
 import { ItemIcon, PriceFigures, StatusChip, TypeLabel } from './parts';
+import { StockCard } from './StockCard';
 import styles from './items.module.css';
 
-/** The selected item (design 07 detail panel, without the stock parts that arrive in M3). */
-export function ItemCard(props: { id: string; onEdit: (item: ItemDetail) => void }) {
+/** The selected item (design 07 detail panel), with its stock card for stock items. */
+export function ItemCard(props: {
+  id: string;
+  onEdit: (item: ItemDetail) => void;
+  onAdjust: (item: ItemDetail, figures: { onHandMilli: string; defectiveMilli: string }) => void;
+  onLabels: (item: ItemDetail) => void;
+}) {
   const { t, i18n } = useTranslation('items');
   const tm = useTranslation('masterdata').t;
   const can = useCan();
@@ -169,7 +175,9 @@ export function ItemCard(props: { id: string; onEdit: (item: ItemDetail) => void
       });
     }
   }
-  if (item.itemType === 'stock') {
+  // With `stock.view` the reorder level is part of the stock card instead.
+  const showStock = item.itemType === 'stock' && can('stock.view');
+  if (item.itemType === 'stock' && !showStock) {
     rows.push({
       label: t('fields.reorderLevel'),
       value:
@@ -268,7 +276,15 @@ export function ItemCard(props: { id: string; onEdit: (item: ItemDetail) => void
         </div>
       </Card>
 
-      <Card rise index={8}>
+      {showStock && (
+        <StockCard
+          item={item}
+          onAdjust={(figures) => props.onAdjust(item, figures)}
+          onLabels={() => props.onLabels(item)}
+        />
+      )}
+
+      <Card rise index={9}>
         <section aria-label={t('fields.barcodes')} className={styles.section}>
           <h3>{t('fields.barcodes')}</h3>
           {item.barcodes.length === 0 ? (

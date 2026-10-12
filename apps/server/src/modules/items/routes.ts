@@ -28,7 +28,8 @@ export function registerItemRoutes(app: FastifyInstance): void {
     url: '/api/v1/items',
     access: view,
     query: ItemsQuery,
-    handler: ({ query }) => items.listItems(db, query),
+    handler: ({ query, request }) =>
+      items.listItems(db, query, request.auth?.permissions.has('stock.view_cost') ?? false),
   });
   defineRoute(app, {
     method: 'GET',

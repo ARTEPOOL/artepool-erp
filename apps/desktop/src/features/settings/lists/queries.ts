@@ -29,12 +29,14 @@ export function usePaymentMethods() {
   });
 }
 
-export function useWarehouses() {
+/** The warehouses (the server needs `warehouses.manage`; pass false to not ask without it). */
+export function useWarehouses(enabled = true) {
   const api = useApi();
   return useQuery({
     queryKey: MD_KEYS.warehouses,
     queryFn: async () =>
       (await api.get<{ warehouses: WarehouseItem[] }>('/api/v1/warehouses')).warehouses,
+    enabled,
   });
 }
 

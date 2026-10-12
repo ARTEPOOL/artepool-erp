@@ -3,12 +3,14 @@ import { z } from 'zod';
 import {
   CreatePaymentMethodRequest,
   CreateReasonCodeRequest,
+  CreateLabelSizeRequest,
   CreateTechnicianRequest,
   CreateWarehouseRequest,
   IdText,
   ReactivateRequest,
   UpdatePaymentMethodRequest,
   UpdateReasonCodeRequest,
+  UpdateLabelSizeRequest,
   UpdateTechnicianRequest,
   UpdateWarehouseRequest,
 } from '@artepool/shared/contracts';
@@ -19,6 +21,40 @@ const Params = z.object({ id: IdText });
 
 export function registerListRoutes(app: FastifyInstance): void {
   const db = app.deps.db;
+
+  // Barcode label sizes (decision 0043): everyone signed in reads them; the owner manages them
+  const labelSizes = { kind: 'permission', permission: 'system.settings.edit' } as const;
+  defineRoute(app, {
+    method: 'GET',
+    url: '/api/v1/label-sizes',
+    access: { kind: 'session' },
+    handler: async () => ({ labelSizes: await lists.listLabelSizes(db) }),
+  });
+  defineWrite(app, {
+    method: 'POST',
+    url: '/api/v1/label-sizes',
+    access: labelSizes,
+    body: CreateLabelSizeRequest,
+    handler: async ({ trx, body }) => ({
+      status: 201,
+      body: await lists.createLabelSize(trx, body),
+    }),
+  });
+  defineWrite(app, {
+    method: 'PATCH',
+    url: '/api/v1/label-sizes/:id',
+    access: labelSizes,
+    params: Params,
+    body: UpdateLabelSizeRequest,
+    handler: async ({ trx, params, body }) => ({
+      body: await lists.updateLabelSize(trx, BigInt(params.id), body),
+    }),
+  });
+  defineActivation(app, {
+    base: '/api/v1/label-sizes',
+    access: labelSizes,
+    setActive: lists.setLabelSizeActive,
+  });
 
   // Technicians
   const technicians = { kind: 'permission', permission: 'technicians.manage' } as const;

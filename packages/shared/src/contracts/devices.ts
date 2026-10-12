@@ -16,6 +16,8 @@ export interface DeviceListItem {
   revokeReason: string | null;
   /** The PC making this request (cannot be revoked from itself). */
   isCurrent: boolean;
+  /** The warehouse this PC uses; null = the default warehouse. */
+  defaultWarehouseId: string | null;
   /** People who may sign in here without the phone code, until when (decision 0027). */
   trustedFor: TrustedPerson[];
 }
@@ -47,9 +49,22 @@ export interface EnrollmentCodeResponse {
 }
 
 export const UpdateDeviceRequest = z
-  .object({ name: z.string().trim().min(1).max(100), kind: z.enum(DEVICE_KINDS) })
+  .object({
+    name: z.string().trim().min(1).max(100),
+    kind: z.enum(DEVICE_KINDS),
+    /** The warehouse this PC sells and counts from (null = the default warehouse). */
+    defaultWarehouseId: z
+      .string()
+      .regex(/^[1-9][0-9]{0,18}$/)
+      .nullable(),
+  })
   .partial()
-  .refine((v) => v.name !== undefined || v.kind !== undefined, { message: 'nothing to change' });
+  .refine(
+    (v) => v.name !== undefined || v.kind !== undefined || v.defaultWarehouseId !== undefined,
+    {
+      message: 'nothing to change',
+    },
+  );
 export type UpdateDeviceRequest = z.infer<typeof UpdateDeviceRequest>;
 
 /** Revoking a PC is final and always needs a reason (decision 0026). */

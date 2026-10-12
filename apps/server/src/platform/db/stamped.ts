@@ -11,3 +11,15 @@ export type NewRow<TB extends keyof DB> = Omit<InsertObject<DB, TB>, StampColumn
 export function stamped<TB extends keyof DB>(_table: TB, values: NewRow<TB>): InsertObject<DB, TB> {
   return values as InsertObject<DB, TB>;
 }
+
+/**
+ * Types a new row whose other required columns are always filled by the table's own trigger
+ * (document numbers, the accounting period, who posted). The API has no privilege on those
+ * columns, so they are never sent.
+ */
+export function filledByDatabase<TB extends keyof DB>(
+  _table: TB,
+  values: Partial<NewRow<TB>>,
+): InsertObject<DB, TB> {
+  return values as InsertObject<DB, TB>;
+}

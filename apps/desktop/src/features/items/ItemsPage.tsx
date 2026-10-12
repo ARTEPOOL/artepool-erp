@@ -1,11 +1,29 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import { Boxes, FileSpreadsheet, Layers, Package, Plus, Search, Wrench } from 'lucide-react';
+import {
+  AlertTriangle,
+  Banknote,
+  Barcode,
+  Boxes,
+  ClipboardCheck,
+  FileSpreadsheet,
+  Layers,
+  Package,
+  PackagePlus,
+  PackageX,
+  Plus,
+  RefreshCw,
+  Search,
+  ShieldAlert,
+  Wrench,
+} from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from '@tanstack/react-router';
 import type { ItemDetail, ItemListItem } from '@artepool/shared/contracts';
 import {
   Alert,
   Button,
   Card,
+  Chip,
   cx,
   EmptyState,
   iconClass,
@@ -20,30 +38,47 @@ import {
 } from '../../ui';
 import { useCan, useErrorText } from '../auth/context';
 import { ImportDialog } from '../masterdata/ImportDialog';
-import { localName, MD_KEYS, useCategories, useVat } from '../masterdata/refs';
-import { money, priceBoth } from '../masterdata/format';
-import { useItemList, type ItemsFilter } from './api';
+import {
+  localName,
+  MD_KEYS,
+  useCategories,
+  useStockSummary,
+  useUnits,
+  useVat,
+} from '../masterdata/refs';
+import { money, price, priceBoth } from '../masterdata/format';
+import { AdjustDialog, type AdjustTarget } from './AdjustDialog';
+import { useItem, useItemList, type ItemsFilter } from './api';
+import { quantityText } from './form';
 import { ItemCard } from './ItemCard';
 import { ItemDialog } from './ItemDialog';
+import { LabelsDialog } from './labels/LabelsDialog';
 import { ItemIcon, StatusChip, TypeLabel } from './parts';
+import { canAdjustAny } from './stock';
 import styles from './items.module.css';
 
 type Dialog =
   | { kind: 'new' }
   | { kind: 'edit'; item: ItemDetail }
-  | { kind: 'import'; entity: 'items' | 'item_prices' };
+  | { kind: 'import'; entity: 'items' | 'item_prices' }
+  | { kind: 'adjust'; item: AdjustTarget }
+  | { kind: 'labels'; item: ItemDetail };
 
 const ALL = 'all';
+const TO_REORDER = 'toReorder';
 const INACTIVE = 'inactive';
 
-/** Waits until the person stops typing before searching (about a quarter of a second). */
-function useDebounced(value: string, ms = 250): string {
+/**
+ * Waits until the person stops typing before searching (about a quarter of a second). `now()`
+ * searches at once: a barcode scanner ends every scan with Enter.
+ */
+function useDebounced(value: string, ms = 250): [string, () => void] {
   const [debounced, setDebounced] = useState(value);
   useEffect(() => {
     const timer = setTimeout(() => setDebounced(value), ms);
     return () => clearTimeout(timer);
   }, [value, ms]);
-  return debounced;
+  return [debounced, () => setDebounced(value)];
 }
 
 /** The list's price cell: with VAT in bold, without VAT under it (decision 0032). */
@@ -64,7 +99,34 @@ function PriceCell({ item, rateBp }: { item: ItemListItem; rateBp: number | unde
   );
 }
 
-/** Design 07: Items & stock. The stock parts (value, on hand, cost, movements) arrive in M3. */
+/** The list's on-hand cell: quantity with its unit, defective under it, and "to reorder". */
+function OnHandCell({ item, unitName }: { item: ItemListItem; unitName: string }) {
+  const { t } = useTranslation('items');
+  if (!item.stock) return <span className={tbl.sub}>—</span>;
+  const defective = BigInt(item.stock.defectiveMilli);
+  return (
+    <div className={styles.onHand}>
+      <span>
+        <b>
+          <bdi>{quantityText(item.stock.onHandMilli)}</bdi>
+        </b>{' '}
+        <span className={tbl.sub}>{unitName}</span>
+      </span>
+      {defective > 0n && (
+        <span className={styles.defectiveLine}>
+          {t('stock.defective')} <bdi>{quantityText(item.stock.defectiveMilli)}</bdi>
+        </span>
+      )}
+      {item.stock.toReorder && item.isActive && (
+        <Chip tone="warn" icon={<AlertTriangle aria-hidden="true" />}>
+          {t('list.toReorder')}
+        </Chip>
+      )}
+    </div>
+  );
+}
+
+/** Design 07: Items & stock, with the stock tiles, columns, adjustments and labels (M3). */
 export function ItemsPage() {
   const { t, i18n } = useTranslation('items');
   const can = useCan();
@@ -72,9 +134,12 @@ export function ItemsPage() {
   const name = localName(i18n.language);
   const categories = useCategories();
   const vat = useVat();
+  const units = useUnits();
+  const summary = useStockSummary();
+  const navigate = useNavigate();
   const searchRef = useRef<HTMLInputElement>(null);
   const [search, setSearch] = useState('');
-  const q = useDebounced(search.trim());
+  const [q, searchNow] = useDebounced(search.trim());
   const [segment, setSegment] = useState<string>(ALL);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dialog, setDialog] = useState<Dialog | null>(null);
@@ -82,13 +147,41 @@ export function ItemsPage() {
   const filter: ItemsFilter = {
     q,
     status: segment === INACTIVE ? 'inactive' : 'active',
-    categoryId: segment !== ALL && segment !== INACTIVE ? segment : null,
+    categoryId: segment !== ALL && segment !== INACTIVE && segment !== TO_REORDER ? segment : null,
+    ...(segment === TO_REORDER ? { toReorder: true } : {}),
   };
   const list = useItemList(filter);
   const pages = list.data?.pages ?? [];
   const items = pages.flatMap((p) => p.items);
   const total = pages[0]?.total ?? 0;
   const counts = pages[0]?.counts;
+
+  const selected = useItem(selectedId).data;
+  const canCost = can('stock.view_cost');
+  const unitName = (id: string) => {
+    const unit = units.data?.find((u) => u.id === id);
+    return unit ? name(unit) : '';
+  };
+
+  /** The adjustment dialog for one item, with its stock as the list (or stock card) shows it. */
+  const openAdjust = (
+    item: ItemDetail,
+    figures?: { onHandMilli: string; defectiveMilli: string },
+  ) => {
+    const listedStock = items.find((i) => i.id === item.id)?.stock;
+    setDialog({
+      kind: 'adjust',
+      item: {
+        id: item.id,
+        code: item.code,
+        nameAr: item.nameAr,
+        nameEn: item.nameEn,
+        unitId: item.unitId,
+        onHandMilli: figures?.onHandMilli ?? listedStock?.onHandMilli ?? '0',
+        defectiveMilli: figures?.defectiveMilli ?? listedStock?.defectiveMilli ?? '0',
+      },
+    });
+  };
 
   const rates = useMemo(
     () => new Map((vat.data?.categories ?? []).map((c) => [c.id, c.rateBp])),
@@ -121,6 +214,15 @@ export function ItemsPage() {
 
   // A new search starts on its own first result (once the search has actually run).
   useEffect(() => setSelectedId(null), [q]);
+
+  // A scanned barcode or a full code opens that item's card straight away, and the search text
+  // is selected so the next scan simply replaces it.
+  const exactId = pages[0]?.exactMatchId ?? null;
+  useEffect(() => {
+    if (exactId === null) return;
+    setSelectedId(exactId);
+    if (document.activeElement === searchRef.current) searchRef.current?.select();
+  }, [exactId, q]);
   const changeSegment = (value: string) => {
     setSegment(value);
     setSelectedId(null);
@@ -141,8 +243,43 @@ export function ItemsPage() {
   };
 
   const canImport = can('data.import');
+  const canAdjustSelected =
+    selected !== undefined && selected.itemType === 'stock' && selected.isActive;
   const tools = (
     <>
+      {canAdjustAny(can) && (
+        <Button isDisabled={!canAdjustSelected} onPress={() => selected && openAdjust(selected)}>
+          <RefreshCw className={iconClass.sm} aria-hidden="true" />
+          {t('stock.adjustTool')}
+        </Button>
+      )}
+      {can('stock.count') && (
+        <Button onPress={() => void navigate({ to: '/stock/counts' })}>
+          <ClipboardCheck className={iconClass.sm} aria-hidden="true" />
+          {t('stock.countTool')}
+        </Button>
+      )}
+      {can('stock.opening') && (
+        <Button onPress={() => void navigate({ to: '/stock/opening' })}>
+          <PackagePlus className={iconClass.sm} aria-hidden="true" />
+          {t('stock.openingTool')}
+        </Button>
+      )}
+      {can('stock.oversell_review') && (
+        <Button onPress={() => void navigate({ to: '/stock/reviews' })}>
+          <ShieldAlert className={iconClass.sm} aria-hidden="true" />
+          {t('stock.reviewsTool')}
+        </Button>
+      )}
+      {can('labels.print') && (
+        <Button
+          isDisabled={!selected}
+          onPress={() => selected && setDialog({ kind: 'labels', item: selected })}
+        >
+          <Barcode className={iconClass.sm} aria-hidden="true" />
+          {t('labels.button')}
+        </Button>
+      )}
       {canImport && can('items.manage') && can('prices.manage') && (
         <Button onPress={() => setDialog({ kind: 'import', entity: 'items' })}>
           <FileSpreadsheet className={iconClass.sm} aria-hidden="true" />
@@ -177,6 +314,12 @@ export function ItemsPage() {
             placeholder={t('search')}
             value={search}
             onChange={(event) => setSearch(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                searchNow();
+              }
+            }}
           />
           <kbd className={styles.kbd}>{t('searchKey')}</kbd>
         </label>
@@ -187,6 +330,7 @@ export function ItemsPage() {
           options={[
             { value: ALL, label: t('filters.all') },
             ...topCategories.map((c) => ({ value: c.id, label: name(c) })),
+            { value: TO_REORDER, label: t('filters.toReorder') },
             { value: INACTIVE, label: t('filters.inactive') },
           ]}
         />
@@ -202,6 +346,8 @@ export function ItemsPage() {
               <th>{t('list.item')}</th>
               <th>{t('list.type')}</th>
               <th className={tbl.num}>{t('list.price')}</th>
+              {canCost && <th className={tbl.num}>{t('list.avgCost')}</th>}
+              <th className={tbl.num}>{t('list.onHand')}</th>
               <th>{t('list.status')}</th>
             </tr>
           </thead>
@@ -234,6 +380,18 @@ export function ItemsPage() {
                 <td className={tbl.num}>
                   <PriceCell item={item} rateBp={rates.get(item.vatCategoryId)} />
                 </td>
+                {canCost && (
+                  <td className={tbl.num}>
+                    {item.stock?.avgUnitCost4dp ? (
+                      <bdi>{price(BigInt(item.stock.avgUnitCost4dp))}</bdi>
+                    ) : (
+                      <span className={tbl.sub}>—</span>
+                    )}
+                  </td>
+                )}
+                <td className={tbl.num}>
+                  <OnHandCell item={item} unitName={unitName(item.unitId)} />
+                </td>
                 <td>
                   <StatusChip active={item.isActive} />
                 </td>
@@ -241,7 +399,7 @@ export function ItemsPage() {
             ))}
             {list.isLoading && (
               <tr className={tbl.empty}>
-                <td colSpan={4}>{t('list.loading')}</td>
+                <td colSpan={canCost ? 6 : 5}>{t('list.loading')}</td>
               </tr>
             )}
           </tbody>
@@ -296,6 +454,49 @@ export function ItemsPage() {
           label={t('kpi.bundle')}
           value={<bdi>{counts?.bundle ?? '—'}</bdi>}
         />
+        {canCost && (
+          <Kpi
+            index={5}
+            icon={<Banknote aria-hidden="true" />}
+            label={t('kpi.value')}
+            value={
+              summary.data?.valueFils === undefined ? (
+                '—'
+              ) : (
+                <>
+                  <bdi>{money(BigInt(summary.data.valueFils))}</bdi> <small>{t('aed')}</small>
+                </>
+              )
+            }
+          />
+        )}
+        <Kpi
+          index={6}
+          tone="warn"
+          icon={<AlertTriangle aria-hidden="true" />}
+          label={t('kpi.toReorder')}
+          value={
+            summary.data ? (
+              <button
+                type="button"
+                className={styles.kpiButton}
+                aria-label={t('kpi.showToReorder')}
+                onClick={() => changeSegment(TO_REORDER)}
+              >
+                <bdi>{summary.data.toReorder}</bdi>
+              </button>
+            ) : (
+              '—'
+            )
+          }
+        />
+        <Kpi
+          index={7}
+          tone="danger"
+          icon={<PackageX aria-hidden="true" />}
+          label={t('kpi.defective')}
+          value={<bdi>{summary.data?.defectiveItems ?? '—'}</bdi>}
+        />
       </Kpis>
       <SplitView
         list={listPart}
@@ -305,6 +506,8 @@ export function ItemsPage() {
               key={selectedId}
               id={selectedId}
               onEdit={(item) => setDialog({ kind: 'edit', item })}
+              onAdjust={openAdjust}
+              onLabels={(item) => setDialog({ kind: 'labels', item })}
             />
           ) : (
             <Card rise index={7}>
@@ -321,6 +524,16 @@ export function ItemsPage() {
             setDialog(null);
             setSelectedId(saved.id);
           }}
+        />
+      )}
+      {dialog?.kind === 'adjust' && (
+        <AdjustDialog item={dialog.item} onClose={() => setDialog(null)} />
+      )}
+      {dialog?.kind === 'labels' && (
+        <LabelsDialog
+          item={dialog.item}
+          rateBp={rates.get(dialog.item.vatCategoryId)}
+          onClose={() => setDialog(null)}
         />
       )}
       {dialog?.kind === 'import' && (
