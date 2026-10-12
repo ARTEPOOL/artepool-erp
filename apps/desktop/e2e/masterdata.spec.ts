@@ -106,6 +106,8 @@ test('a customer needs a valid TRN, then gets credit with a reason', async ({ pa
   await expect(dialog).toHaveCount(0);
 
   await page.getByPlaceholder(t('parties:customers.search')).fill(name);
+  // Wait for the search to finish: a new search starts again from its first customer.
+  await expect(page.locator('tbody tr')).toHaveCount(1);
   await page.getByRole('row', { name: new RegExp(n) }).click();
   await page.getByRole('button', { name: t('parties:customers.changeCredit') }).click();
   const credit = page.getByRole('dialog');

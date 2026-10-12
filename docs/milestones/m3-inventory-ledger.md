@@ -77,10 +77,10 @@ Sales, the POS and cash come in M4–M5. Expenses and the owner's profit dashboa
 | T9–T12 foundation | `735cf7a`, `28733b3` | Stock routes, supervisor approval dialog, data hooks; default warehouse per PC API; schema description |
 | T9 | `6be8c50`, `512301e` | Items & stock: tiles, columns, stock card, adjustment dialog, barcode labels; opening stock, counts and oversell review pages |
 | T10–T12 | `1bc1005` | Journal viewer, trial balance, label sizes in Lists, PC warehouse in Devices, dashboard stock alerts |
-| Fixes | `dceadac` | Names instead of user numbers; buttons to the stock pages |
+| Fixes | `dceadac`, `725c2b0` | Names instead of user numbers; buttons to the stock pages; code review fixes (migration 0013: counts against the locked current stock, approvals bound to the exact change, threshold from the movements, no movement on a closed document, opening once per item; labels print black on white) |
 | T13 | this pull request | Playwright flows (`e2e/inventory.spec.ts`), screenshots in [`docs/screenshots/m3`](../screenshots/m3), changelog |
 
-**Tests at the end of M3:** 292 unit and screen-component tests, 376 integration tests (real PostgreSQL), 46 Playwright flows (23 in Arabic/light, 23 in English/dark). The Rust tests are unchanged and run in CI.
+**Tests at the end of M3:** 292 unit and screen-component tests, 379 integration tests (real PostgreSQL), 46 Playwright flows (23 in Arabic/light, 23 in English/dark). The Rust tests are unchanged and run in CI.
 
 **Covered by server tests instead of browser flows:** a closed month refusing an adjustment, the supervisor approval above 500.00 AED, a full count with differences, and the storekeeper not seeing values. They change shared data that the other browser flows rely on.
 
