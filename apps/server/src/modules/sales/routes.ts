@@ -5,7 +5,7 @@
  */
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import type { FilePayload } from '@artepool/shared/contracts';
+import type { FilePayload, SalesPaymentMethod } from '@artepool/shared/contracts';
 import {
   CreateNoteRequest,
   DiscardRequest,
@@ -259,6 +259,39 @@ export function registerSalesRoutes(app: FastifyInstance): void {
   });
 
   // ---------------------------------------------------------------- Receipts
+  defineRoute(app, {
+    method: 'GET',
+    url: '/api/v1/sales/payment-methods',
+    access: allow('invoices.view'),
+    handler: async () => ({
+      paymentMethods: (
+        await db
+          .selectFrom('md.payment_methods')
+          .select([
+            'id',
+            'code',
+            'name_ar',
+            'name_en',
+            'kind',
+            'requires_reference',
+            'gives_change',
+          ])
+          .where('is_active', '=', true)
+          .where('in_office', '=', true)
+          .orderBy('sort_order')
+          .orderBy('id')
+          .execute()
+      ).map((m): SalesPaymentMethod => ({
+        id: m.id.toString(),
+        code: m.code,
+        nameAr: m.name_ar,
+        nameEn: m.name_en,
+        kind: m.kind as SalesPaymentMethod['kind'],
+        requiresReference: m.requires_reference,
+        givesChange: m.gives_change,
+      })),
+    }),
+  });
   defineRoute(app, {
     method: 'GET',
     url: '/api/v1/sales/payments',

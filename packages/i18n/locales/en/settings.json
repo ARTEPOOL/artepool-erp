@@ -4,6 +4,8 @@
     "dashboard": "Dashboard",
     "pos": "Point of sale",
     "invoices": "A4 invoices",
+    "quotations": "Quotations",
+    "receipts": "Receipts",
     "items": "Items & stock",
     "customers": "Customers",
     "suppliers": "Suppliers",

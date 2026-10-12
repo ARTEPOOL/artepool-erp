@@ -2,12 +2,14 @@ import type { ReactNode } from 'react';
 import {
   BookOpen,
   CheckCircle2,
+  FileSignature,
   FileText,
   LayoutGrid,
   LineChart,
   Lock,
   LogOut,
   Package,
+  ReceiptText,
   Settings,
   ShoppingCart,
   Truck,
@@ -27,7 +29,14 @@ type NavItem =
   | {
       key: string;
       icon: ReactNode;
-      to: '/items' | '/customers' | '/suppliers' | '/accounting';
+      to:
+        | '/invoices'
+        | '/quotations'
+        | '/receipts'
+        | '/items'
+        | '/customers'
+        | '/suppliers'
+        | '/accounting';
       permission: string;
     }
   /** Arrives in a later milestone: shown, greyed, so the layout matches the design. */
@@ -36,7 +45,25 @@ type NavItem =
 /** The side menu (design 02; decision 0034): every entry needs its permission. */
 const NAV: NavItem[] = [
   { key: 'pos', icon: <ShoppingCart aria-hidden="true" />, later: true },
-  { key: 'invoices', icon: <FileText aria-hidden="true" />, later: true },
+  // Sales (decision 0045): each section has its own entry.
+  {
+    key: 'invoices',
+    icon: <FileText aria-hidden="true" />,
+    to: '/invoices',
+    permission: 'invoices.view',
+  },
+  {
+    key: 'quotations',
+    icon: <FileSignature aria-hidden="true" />,
+    to: '/quotations',
+    permission: 'quotations.manage',
+  },
+  {
+    key: 'receipts',
+    icon: <ReceiptText aria-hidden="true" />,
+    to: '/receipts',
+    permission: 'invoices.view',
+  },
   { key: 'items', icon: <Package aria-hidden="true" />, to: '/items', permission: 'items.view' },
   {
     key: 'customers',

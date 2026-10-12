@@ -1,0 +1,129 @@
+{
+  "docTypes": {
+    "invoice": "Tax invoice",
+    "advance_invoice": "Payment invoice",
+    "credit_note": "Credit note",
+    "debit_note": "Debit note"
+  },
+  "formats": {
+    "full": "Full tax invoice",
+    "simplified": "Simplified tax invoice"
+  },
+  "formatHint": {
+    "full": "The customer is VAT-registered: a full tax invoice with their TRN.",
+    "simplified": "The customer is not VAT-registered: a simplified tax invoice."
+  },
+  "statuses": {
+    "draft": "Draft",
+    "issued": "Issued",
+    "discarded": "Discarded"
+  },
+  "settlement": {
+    "open": "Unpaid",
+    "partial": "Partly paid",
+    "settled": "Paid"
+  },
+  "quotationStatuses": {
+    "draft": "Draft",
+    "sent": "Sent",
+    "accepted": "Accepted",
+    "rejected": "Rejected",
+    "expired": "Expired",
+    "converted": "Converted to invoice",
+    "cancelled": "Cancelled",
+    "superseded": "Replaced by a newer revision"
+  },
+  "paymentKinds": {
+    "receipt": "Receipt",
+    "refund": "Refund",
+    "reversal": "Reversal"
+  },
+  "methodKinds": {
+    "cash": "Cash",
+    "card": "Card",
+    "bank_transfer": "Bank transfer",
+    "cheque": "Cheque",
+    "other": "Other"
+  },
+  "fields": {
+    "customer": "Customer",
+    "number": "Number",
+    "date": "Date",
+    "issueDate": "Issue date",
+    "dueDate": "Due date",
+    "status": "Status",
+    "total": "Total",
+    "paid": "Paid",
+    "due": "Due",
+    "notes": "Notes",
+    "businessLine": "Line of business",
+    "reference": "Reference",
+    "method": "Payment method",
+    "amount": "Amount"
+  },
+  "lines": {
+    "title": "Lines",
+    "item": "Item",
+    "description": "Description",
+    "quantity": "Quantity",
+    "unitPrice": "Unit price",
+    "listPrice": "List price: {price}",
+    "discount": "Discount",
+    "discountPercent": "Discount %",
+    "net": "Amount before VAT",
+    "vatRate": "VAT rate",
+    "vat": "VAT",
+    "lineTotal": "Total",
+    "optional": "Optional",
+    "remove": "Remove {name}",
+    "empty": "Search for an item and add it.",
+    "search": "Search items by name, code or barcode",
+    "results": "Search results",
+    "none": "No matching items.",
+    "priceChanged": "The price differs from the item's: it needs the permission or a supervisor's approval.",
+    "deduction": "Earlier payment deducted",
+    "unitDecimals": "This unit does not take this many decimals.",
+    "discountMode": "Switch between percent and amount",
+    "aed": "AED"
+  },
+  "totals": {
+    "docDiscount": "Discount on the total",
+    "subtotal": "Subtotal before discount",
+    "discount": "Discounts",
+    "net": "Taxable amount",
+    "vat": "VAT",
+    "total": "Total",
+    "deductions": "Less: earlier payments",
+    "due": "Total due",
+    "preview": "Amounts are a preview until saved; the server works them out."
+  },
+  "customerPicker": {
+    "search": "Search customers by name, phone or TRN",
+    "results": "Customers",
+    "none": "No matching customers.",
+    "change": "Change customer",
+    "cash": "Cash (no credit)",
+    "credit": "Credit up to {limit}",
+    "balance": "Current balance: {amount}",
+    "trn": "TRN: {trn}"
+  },
+  "print": {
+    "print": "Print",
+    "reprint": "Reprint",
+    "preparing": "Preparing the file…",
+    "copyNote": "The second and later prints are marked \"Copy\".",
+    "pdf": "PDF"
+  },
+  "approval": {
+    "discountTitle": "Discount approval",
+    "discountExplain": "The discount is above your limit. A supervisor must approve it.",
+    "priceTitle": "Price change approval",
+    "priceExplain": "A line's price differs from the item's. A supervisor must approve it.",
+    "creditTitle": "Credit sale approval",
+    "creditExplain": "The unpaid amount is above the customer's credit. A supervisor must approve it.",
+    "noteTitle": "Credit note approval",
+    "noteExplain": "Issuing a credit note needs the permission or a supervisor's approval."
+  },
+  "noAccess": "You do not have permission to see this page.",
+  "loading": "Loading…"
+}

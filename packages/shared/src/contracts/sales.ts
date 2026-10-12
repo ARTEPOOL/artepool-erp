@@ -337,6 +337,17 @@ export const ReceivePaymentRequest = z.object({
 });
 export type ReceivePaymentRequest = z.infer<typeof ReceivePaymentRequest>;
 
+/** An active payment method the office can use (any user who may see sales). */
+export interface SalesPaymentMethod {
+  id: string;
+  code: string;
+  nameAr: string;
+  nameEn: string;
+  kind: 'cash' | 'card' | 'bank_transfer' | 'cheque' | 'other';
+  requiresReference: boolean;
+  givesChange: boolean;
+}
+
 export const ReversePaymentRequest = z.object({
   reasonCodeId: IdText,
   approvalId: IdText.optional(),
