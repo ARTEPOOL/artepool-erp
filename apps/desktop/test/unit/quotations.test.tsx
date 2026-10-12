@@ -470,7 +470,8 @@ describe('Sending, revising and converting', () => {
     const actions = bridge.callsTo('POST', '/api/v1/sales/quotations/51/action');
     expect(actions.map((c) => c.body)).toEqual([
       { action: 'send', rowVersion: 2 },
-      { action: 'send', rowVersion: 2, approvalId: '555' },
+      // A changed price has its own approval (a discount approval is a separate one).
+      { action: 'send', rowVersion: 2, priceApprovalId: '555' },
     ]);
     // Now read-only, with the sent actions.
     expect(await screen.findByRole('button', { name: 'New revision' })).toBeTruthy();
@@ -543,9 +544,10 @@ describe('Sending, revising and converting', () => {
       businessLineId: '1',
       subject: 'Pool chemicals',
       termsEn: 'Payment on delivery.',
+      // The agreed prices travel with the revision, even if an item's price changed since.
       lines: [
-        { itemId: '10', quantityMilli: '2000' },
-        { itemId: '20', quantityMilli: '1000', isOptional: true },
+        { itemId: '10', quantityMilli: '2000', unitPrice4dp: '1000000' },
+        { itemId: '20', quantityMilli: '1000', isOptional: true, unitPrice4dp: '25000000' },
       ],
     });
     const history = screen.getByRole('list', { name: 'Revisions' });

@@ -117,8 +117,11 @@ export function revisionRequest(
   q: QuotationDetail,
   unitDecimalsOf: (unitId: string) => number,
 ): SaveQuotationRequest | null {
-  const lines = toRequest(editorLinesOf(q), unitDecimalsOf);
-  if (lines === null || lines.length === 0) return null;
+  const saved = q.lines.filter((l) => l.lineKind === 'item');
+  const read = toRequest(editorLinesOf(q), unitDecimalsOf);
+  if (read === null || read.length === 0) return null;
+  // The agreed prices stay, even if an item's price changed since the quotation was sent.
+  const lines = read.map((l, i) => ({ ...l, unitPrice4dp: saved[i]!.unitPrice4dp }));
   return {
     customerId: q.customerId,
     businessLineId: q.businessLineId,

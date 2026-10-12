@@ -47,6 +47,8 @@ interface LineDraft {
   quantity: string;
   price: string;
   back: Back;
+  /** The person picked where the goods go (otherwise a price correction means none). */
+  backChosen?: boolean;
 }
 
 type LineProblem = 'quantity' | 'tooMany' | 'decimals' | 'price';
@@ -261,7 +263,15 @@ export function NoteDialog(props: {
                             aria-label={t('notes.priceOf', { name: label })}
                             placeholder={price(BigInt(l.unitPrice4dp))}
                             value={d.price}
-                            onChange={(e) => setLine(l.id, { price: e.target.value })}
+                            onChange={(e) =>
+                              // A price correction returns no goods unless the person says so.
+                              setLine(l.id, {
+                                price: e.target.value,
+                                ...(!d.backChosen && e.target.value.trim() !== ''
+                                  ? { back: 'none' as const }
+                                  : {}),
+                              })
+                            }
                           />
                           {lp === 'price' && (
                             <span className={salesStyles.fieldError}>
@@ -274,7 +284,9 @@ export function NoteDialog(props: {
                             <select
                               aria-label={t('notes.goesToOf', { name: label })}
                               value={d.back}
-                              onChange={(e) => setLine(l.id, { back: e.target.value as Back })}
+                              onChange={(e) =>
+                                setLine(l.id, { back: e.target.value as Back, backChosen: true })
+                              }
                             >
                               <option value="available">{t('notes.back.available')}</option>
                               <option value="defective">{t('notes.back.defective')}</option>

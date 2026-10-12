@@ -151,6 +151,8 @@ async function openDebts(db: Db, customerId: bigint) {
     .where('status', '=', 'issued')
     .where('doc_type', 'in', ['invoice', 'debit_note'])
     .where('settlement_status', '<>', 'settled')
+    // A final invoice fully covered by earlier payments has nothing left to pay.
+    .where(sql<boolean>`total_fils > settled_fils`)
     .orderBy('issue_date')
     .orderBy('id')
     .execute();

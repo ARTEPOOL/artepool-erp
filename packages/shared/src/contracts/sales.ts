@@ -36,6 +36,8 @@ export const SalesLineInput = z.object({
   businessLineId: IdText.optional(),
   isOptional: z.boolean().optional(),
   note: OptionalText(1000),
+  /** Invoices made from a quotation: the quotation line, whose agreed price it keeps (0049). */
+  quotationLineId: IdText.optional(),
 });
 export type SalesLineInput = z.infer<typeof SalesLineInput>;
 
@@ -55,6 +57,8 @@ export interface SalesLine {
   priceIncludesVat: boolean;
   amountBeforeDiscountFils: string;
   lineDiscountFils: string;
+  /** The discount as typed in percent (basis points), when it was a percentage. */
+  lineDiscountBp?: number | null;
   docDiscountAllocFils: string;
   discountExclVatFils: string;
   netFils: string;
@@ -63,6 +67,8 @@ export interface SalesLine {
   vatFils: string;
   grossFils: string;
   isOptional?: boolean;
+  /** Invoice lines converted from a quotation (decision 0049). */
+  quotationLineId?: string | null;
   /** Deductions: the payment invoice deducted (decision 0013). */
   advanceDocumentId?: string | null;
   advanceDocumentNumber?: string | null;
@@ -199,8 +205,10 @@ export type PaymentPart = z.infer<typeof PaymentPart>;
 
 export const IssueRequest = z.object({
   rowVersion: RowVersion,
-  /** A supervisor's approval for a discount above the limit or a changed price. */
+  /** A supervisor's approval for a discount above the limit. */
   approvalId: IdText.optional(),
+  /** A supervisor's approval for prices different from the items' (a separate approval). */
+  priceApprovalId: IdText.optional(),
   /** A supervisor's approval for an unpaid amount above the customer's credit (0046). */
   creditApprovalId: IdText.optional(),
   /** Paid at issue, in the same transaction. */

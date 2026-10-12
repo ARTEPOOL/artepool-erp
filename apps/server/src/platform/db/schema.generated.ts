@@ -1070,6 +1070,7 @@ export interface SalesQuotations {
   id: Generated<bigint>;
   net_fils: Generated<bigint>;
   notes: string | null;
+  price_approval_id: bigint | null;
   price_level_id: bigint;
   print_template_version_id: bigint | null;
   quotation_date: string;

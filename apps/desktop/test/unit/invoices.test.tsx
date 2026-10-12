@@ -645,6 +645,45 @@ describe('Invoices (A4): issuing', () => {
     expect(issues[1]!.body).toEqual({ rowVersion: 3, approvalId: '555' });
   });
 
+  it('a changed price and a discount: two separate approvals, each sent as its own id', async () => {
+    const bridge = bridgeFor(OFFICE, '/invoices/300')
+      .on('GET', '/api/v1/sales/documents/300', ok(DRAFT))
+      .on(
+        'POST',
+        '/api/v1/sales/documents/300/issue',
+        failure(403, 'RULE_VIOLATION', { rule: 'PRICE_OVERRIDE' }),
+        failure(403, 'RULE_VIOLATION', { rule: 'DISCOUNT_OVER_LIMIT' }),
+        ok(ISSUED_300),
+      )
+      .on(
+        'POST',
+        '/api/v1/approvals',
+        ok({ approvalId: '601', expiresAt: '2026-10-12T09:00:00Z' }),
+        ok({ approvalId: '602', expiresAt: '2026-10-12T09:00:00Z' }),
+      );
+    await signIn(bridge, 'Invoice draft');
+    fireEvent.click(await screen.findByRole('button', { name: 'Issue invoice' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Issue the invoice' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Issue' }));
+
+    expect(await screen.findByRole('dialog', { name: 'Price change approval' })).toBeTruthy();
+    await approve('Agreed with the owner');
+    expect(await screen.findByRole('dialog', { name: 'Discount approval' })).toBeTruthy();
+    await approve('Long-standing customer');
+    await screen.findByRole('heading', { name: 'INV-000300', level: 1 });
+
+    const asked = bridge.callsTo('POST', '/api/v1/approvals').map((c) => c.body);
+    expect(asked).toMatchObject([
+      { permission: 'sales.price_override' },
+      { permission: 'sales.discount_over_limit' },
+    ]);
+    expect(bridge.callsTo('POST', '/api/v1/sales/documents/300/issue').map((c) => c.body)).toEqual([
+      { rowVersion: 3 },
+      { rowVersion: 3, priceApprovalId: '601' },
+      { rowVersion: 3, approvalId: '602', priceApprovalId: '601' },
+    ]);
+  });
+
   it('unpaid for a cash customer: the credit approval is sent as creditApprovalId', async () => {
     const bridge = bridgeFor(OFFICE, '/invoices/300')
       .on('GET', '/api/v1/sales/documents/300', ok(DRAFT))

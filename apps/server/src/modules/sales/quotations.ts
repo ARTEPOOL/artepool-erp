@@ -167,24 +167,38 @@ const NEXT_STATUS: Record<QuotationActionRequest['action'], QuotationStatus> = {
 export async function quotationAction(
   trx: Transaction<DB>,
   id: bigint,
-  body: QuotationActionRequest & { approvalId?: string },
+  body: QuotationActionRequest & { approvalId?: string; priceApprovalId?: string },
 ) {
-  const approvalId =
-    body.action === 'send'
-      ? await useApproval(
-          trx,
-          body.approvalId,
-          ['sales.discount_over_limit', 'sales.price_override'],
-          `sales.quotations:${id}`,
-        )
-      : null;
+  // Sending fixes the prices: a discount above the limit and changed prices each need their own
+  // approval (or the permission).
+  const sending = body.action === 'send';
+  const approvalId = sending
+    ? await useApproval(
+        trx,
+        body.approvalId,
+        ['sales.discount_over_limit'],
+        `sales.quotations:${id}`,
+      )
+    : null;
+  const priceApprovalId = sending
+    ? await useApproval(
+        trx,
+        body.priceApprovalId,
+        ['sales.price_override'],
+        `sales.quotations:${id}:price`,
+      )
+    : null;
   await expectUpdated(
     trx,
     'sales.quotations',
     id,
     await trx
       .updateTable('sales.quotations')
-      .set({ status: NEXT_STATUS[body.action], ...(approvalId ? { approval_id: approvalId } : {}) })
+      .set({
+        status: NEXT_STATUS[body.action],
+        ...(approvalId ? { approval_id: approvalId } : {}),
+        ...(priceApprovalId ? { price_approval_id: priceApprovalId } : {}),
+      })
       .where('id', '=', id)
       .where('row_version', '=', body.rowVersion)
       .executeTakeFirst(),
@@ -231,6 +245,8 @@ export async function convertQuotation(
         ...(await billTo(trx, q.customer_id)),
         quotation_id: q.id,
         notes: q.notes,
+        // The whole-document discount comes too; its shares are already on the lines.
+        doc_discount_fils: q.doc_discount_fils,
       }),
     )
     .returning('id')
@@ -425,6 +441,7 @@ export async function getQuotation(db: Db, id: bigint): Promise<QuotationDetail>
       priceIncludesVat: l.price_includes_vat,
       amountBeforeDiscountFils: l.amount_before_discount_fils.toString(),
       lineDiscountFils: l.line_discount_fils.toString(),
+      lineDiscountBp: l.line_discount_bp,
       docDiscountAllocFils: l.doc_discount_alloc_fils.toString(),
       discountExclVatFils: l.discount_excl_vat_fils.toString(),
       netFils: l.net_fils.toString(),

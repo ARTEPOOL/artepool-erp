@@ -407,11 +407,12 @@ describe('credit (decision 0046)', () => {
         await line(c, doc, { item: svc, price: 1_000_000 });
         return doc;
       });
+    // (The cashier issues: the owner holds sales.credit_over_limit and needs no approval.)
     await expect(
       tx(async (c) => {
         const doc = await make(c);
         await issue(c, doc, cust);
-      }),
+      }, cashier),
     ).rejects.toMatchObject(denied('CREDIT_LIMIT'));
     // Paid in full in the same transaction: fine.
     await tx(async (c) => {

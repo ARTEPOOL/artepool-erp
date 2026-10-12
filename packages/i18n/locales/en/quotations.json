@@ -73,7 +73,8 @@
     "convert": "Convert to invoice",
     "expire": "Mark as expired",
     "cancel": "Cancel quotation",
-    "printDraft": "Print draft"
+    "printDraft": "Print draft",
+    "cannotRevise": "The lines cannot be read yet. Wait a moment, or check that each line still fits its unit."
   },
   "confirm": {
     "back": "Go back",

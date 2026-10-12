@@ -310,7 +310,17 @@ export function DraftEditor({ doc }: { doc: DocumentDetail | null }) {
             </div>
           </div>
           {problem && <InfoBar>{problem}</InfoBar>}
-          {showSaveError && <SaveError error={save.error} />}
+          {showSaveError && (
+            <SaveError
+              error={save.error}
+              onReload={
+                doc
+                  ? () =>
+                      void queryClient.invalidateQueries({ queryKey: SALES_KEYS.document(doc.id) })
+                  : undefined
+              }
+            />
+          )}
           {doc && !dirty && !can('invoices.issue') && <InfoBar>{t('form.cannotIssue')}</InfoBar>}
           {doc && dirty && <p className={salesStyles.muted}>{t('form.saveFirst')}</p>}
           <div className={salesStyles.actions}>

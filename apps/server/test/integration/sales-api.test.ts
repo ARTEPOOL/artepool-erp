@@ -720,3 +720,204 @@ describe('opening balances and the statement (decision 0051)', () => {
     expect(cheques.payments.every((p) => p.methodKind === 'cheque')).toBe(true);
   });
 });
+
+describe('fixes from the M4 screens review', () => {
+  it('a draft converted from a quotation keeps its agreed prices and discount when saved again', async () => {
+    const cust = await customer('Quoted villa', { credit: '100000000' });
+    const svc = await item('SVC-Q1', 'service', '10000000'); // 1,000.00 + VAT
+    const q = await ok<QuotationDetail>(
+      accountant('POST', '/api/v1/sales/quotations', {
+        customerId: cust,
+        docDiscountFils: '5000',
+        lines: [{ itemId: svc.id, quantityMilli: '1000', unitPrice4dp: '9000000' }], // 900.00
+      }),
+      201,
+    );
+    const sent = await ok<QuotationDetail>(
+      accountant('POST', `/api/v1/sales/quotations/${q.id}/action`, {
+        action: 'send',
+        rowVersion: q.rowVersion,
+      }),
+    );
+    const converted = await ok<DocumentDetail>(
+      accountant('POST', `/api/v1/sales/quotations/${q.id}/convert`, {
+        rowVersion: sent.rowVersion,
+      }),
+      201,
+    );
+    expect(converted).toMatchObject({ docDiscountFils: '5000', totalFils: sent.totalFils });
+    const line = converted.lines[0]!;
+    expect(line.quotationLineId).toBe(q.lines[0]!.id);
+    // Saved again as the screen sends it: the line names its quotation line, no price typed.
+    const saved = await ok<DocumentDetail>(
+      accountant('PUT', `/api/v1/sales/invoices/${converted.id}`, {
+        customerId: cust,
+        docDiscountFils: '5000',
+        dueDate: '2026-12-31',
+        lines: [{ itemId: svc.id, quantityMilli: '1000', quotationLineId: line.quotationLineId }],
+        rowVersion: converted.rowVersion,
+      }),
+    );
+    expect(saved.lines[0]).toMatchObject({ unitPrice4dp: '9000000', listPrice4dp: '9000000' });
+    expect(saved.totalFils).toBe(sent.totalFils); // (900.00 − 50.00) + 5% = 892.50
+    expect(saved.totalFils).toBe('89250');
+    // A line of another quotation is refused.
+    const other = await ok<QuotationDetail>(
+      accountant('POST', '/api/v1/sales/quotations', {
+        customerId: cust,
+        lines: [{ itemId: svc.id, quantityMilli: '1000' }],
+      }),
+      201,
+    );
+    expect(
+      await refusal(
+        accountant('PUT', `/api/v1/sales/invoices/${converted.id}`, {
+          customerId: cust,
+          lines: [{ itemId: svc.id, quantityMilli: '1000', quotationLineId: other.lines[0]!.id }],
+          rowVersion: saved.rowVersion,
+        }),
+      ),
+    ).toMatchObject({ status: 422 });
+  });
+
+  it('a price approval does not waive the discount limit: each needs its own approval', async () => {
+    const cust = await customer('Two approvals', { credit: '10000000' });
+    const svc = await item('SVC-A2', 'service', '1000000'); // 100.00 + VAT
+    const doc = await draft(clerk, {
+      customerId: cust,
+      lines: [
+        { itemId: svc.id, quantityMilli: '1000', unitPrice4dp: '900000', lineDiscountBp: 2000 },
+      ],
+    });
+    expect(
+      await refusal(issue(clerk, doc, { approvalId: await approval('sales.price_override') })),
+    ).toMatchObject({ rule: 'DISCOUNT_OVER_LIMIT' });
+    expect(
+      await refusal(
+        issue(clerk, doc, { priceApprovalId: await approval('sales.discount_over_limit') }),
+      ),
+    ).toMatchObject({ code: 'APPROVAL_INVALID' });
+    const issued = await ok<DocumentDetail>(
+      issue(clerk, doc, {
+        priceApprovalId: await approval('sales.price_override'),
+        approvalId: await approval('sales.discount_over_limit'),
+      }),
+    );
+    expect(issued.status).toBe('issued');
+    // The same on a quotation when it is sent.
+    const q = await ok<QuotationDetail>(
+      accountant('POST', '/api/v1/sales/quotations', {
+        customerId: cust,
+        lines: [
+          { itemId: svc.id, quantityMilli: '1000', unitPrice4dp: '900000', lineDiscountBp: 2000 },
+        ],
+      }),
+      201,
+    );
+    // (The clerk role has no quotations.manage: check the database rule directly as the clerk.)
+    const sendAsClerk = (approvalId: string | null, priceApprovalId: string | null) =>
+      withBusinessTx(
+        server.db,
+        { userId: clerkId, deviceId: clerkPc.id, requestId: randomUUID() },
+        async (trx) =>
+          sql`UPDATE sales.quotations SET status = 'sent', approval_id = ${approvalId}::bigint,
+                     price_approval_id = ${priceApprovalId}::bigint WHERE id = ${BigInt(q.id)}`.execute(
+            trx,
+          ),
+      );
+    await expect(sendAsClerk(null, await approval('sales.price_override'))).rejects.toMatchObject({
+      details: { rule: 'DISCOUNT_OVER_LIMIT' },
+    });
+    await expect(sendAsClerk(await approval('sales.price_override'), null)).rejects.toMatchObject({
+      message: 'This approval is for something else',
+    });
+  });
+
+  it('a final invoice fully covered by an advance is settled and never blocks a later receipt', async () => {
+    const cust = await customer('Prepaid');
+    const svc = await item('SVC-P1', 'service', '1000000'); // 100.00 + VAT
+    const paid = await ok<ReceivePaymentResponse>(
+      accountant('POST', '/api/v1/sales/payments', {
+        customerId: cust,
+        part: cash('10500'),
+        asAdvance: true,
+      }),
+      201,
+    );
+    const final = await ok<DocumentDetail>(
+      issue(
+        accountant,
+        await draft(accountant, {
+          customerId: cust,
+          lines: [{ itemId: svc.id, quantityMilli: '1000' }],
+          deductions: [{ advanceDocumentId: paid.advanceInvoice!.id }],
+        }),
+      ),
+    );
+    expect(final).toMatchObject({ totalFils: '0', settlementStatus: 'settled' });
+    // An automatic receipt afterwards: nothing to settle, so all of it is an advance.
+    const later = await ok<ReceivePaymentResponse>(
+      accountant('POST', '/api/v1/sales/payments', { customerId: cust, part: cash('2100') }),
+      201,
+    );
+    expect(later.advanceInvoice).toMatchObject({ totalFils: '2100' });
+  });
+
+  it('a reprint needs documents.reprint on the server too', async () => {
+    const cust = await customer('Reprints', { credit: '10000000' });
+    const svc = await item('SVC-R1', 'service', '1000000');
+    const doc = await ok<DocumentDetail>(
+      issue(
+        clerk,
+        await draft(clerk, {
+          customerId: cust,
+          lines: [{ itemId: svc.id, quantityMilli: '1000' }],
+        }),
+      ),
+    );
+    await ok(clerk('GET', `/api/v1/sales/documents/${doc.id}/pdf`));
+    await ok(clerk('POST', `/api/v1/sales/documents/${doc.id}/printed`, {}));
+    expect(await refusal(clerk('GET', `/api/v1/sales/documents/${doc.id}/pdf`))).toMatchObject({
+      status: 403,
+      code: 'PERMISSION_DENIED',
+    });
+    expect(
+      await refusal(clerk('POST', `/api/v1/sales/documents/${doc.id}/printed`, {})),
+    ).toMatchObject({ status: 403 });
+    await ok(accountant('POST', `/api/v1/sales/documents/${doc.id}/printed`, {}));
+  });
+
+  it('a credit note follows the original line even after the item price changes', async () => {
+    const cust = await customer('Price moved', { credit: '10000000' });
+    const svc = await item('SVC-N1', 'service', '1000000'); // 100.00 + VAT
+    const inv = await ok<DocumentDetail>(
+      issue(
+        accountant,
+        await draft(accountant, {
+          customerId: cust,
+          lines: [{ itemId: svc.id, quantityMilli: '1000' }],
+        }),
+      ),
+    );
+    // The price changes to 126.00 including VAT.
+    await withBusinessTx(
+      server.db,
+      { userId: accountantId, deviceId: clerkPc.id, requestId: randomUUID() },
+      async (trx) =>
+        sql`UPDATE md.item_prices SET price_4dp = 1260000, includes_vat = true
+             WHERE item_id = ${BigInt(svc.id)}`.execute(trx),
+    );
+    const note = await ok<DocumentDetail>(
+      accountant('POST', '/api/v1/sales/notes', {
+        kind: 'credit_note',
+        originalDocumentId: inv.id,
+        reasonCodeId: ids.cnReturn,
+        reasonText: 'Service not done',
+        lines: [{ originalLineId: inv.lines[0]!.id, quantityMilli: '1000' }],
+      }),
+      201,
+    );
+    expect(note).toMatchObject({ netFils: '10000', vatFils: '500', totalFils: '10500' });
+    expect(note.lines[0]).toMatchObject({ listPrice4dp: '1000000', priceIncludesVat: false });
+  });
+});

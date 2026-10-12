@@ -35,6 +35,8 @@ export interface EditorLine {
   discountMode: 'percent' | 'amount';
   discount: string;
   optional: boolean;
+  /** An invoice line converted from a quotation: it keeps the agreed price (decision 0049). */
+  quotationLineId?: string;
 }
 
 export type LineProblem = 'quantity' | 'decimals' | 'price' | 'discount';
@@ -77,9 +79,18 @@ export function lineFromSaved(l: SalesLine, names: { nameAr: string; nameEn: str
     quantity: trimZeros(formatQuantity(qty)),
     unitPrice:
       l.unitPrice4dp === l.listPrice4dp ? '' : trimZeros(format4dp(BigInt(l.unitPrice4dp))),
-    discountMode: 'amount',
-    discount: BigInt(l.lineDiscountFils) === 0n ? '' : formatFils(BigInt(l.lineDiscountFils)),
+    // A percentage stays a percentage (12.5% is 1250 basis points), so it follows the quantity.
+    ...(l.lineDiscountBp != null && l.lineDiscountBp > 0
+      ? {
+          discountMode: 'percent' as const,
+          discount: trimZeros(formatFils(BigInt(l.lineDiscountBp))),
+        }
+      : {
+          discountMode: 'amount' as const,
+          discount: BigInt(l.lineDiscountFils) === 0n ? '' : formatFils(BigInt(l.lineDiscountFils)),
+        }),
     optional: l.isOptional ?? false,
+    ...(l.quotationLineId ? { quotationLineId: l.quotationLineId } : {}),
   };
 }
 
@@ -224,6 +235,7 @@ export function toRequest(
           ? { lineDiscountFils: r.value.lineDiscountFils.toString() }
           : {}),
       ...(l.optional ? { isOptional: true } : {}),
+      ...(l.quotationLineId ? { quotationLineId: l.quotationLineId } : {}),
     });
   }
   return out;

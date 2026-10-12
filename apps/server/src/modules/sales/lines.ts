@@ -39,7 +39,9 @@ export const milliToDb = (milli: bigint): string => {
 export async function prepareLines(
   db: Db,
   input: {
-    lines: (SalesLineInput & { quotationLineId?: bigint })[];
+    lines: SalesLineInput[];
+    /** Sales documents made from a quotation: its lines keep their agreed prices (0049). */
+    quotationId?: bigint | null;
     docDiscountFils: bigint;
     businessLineId: bigint;
     priceLevelId: bigint | null;
@@ -72,6 +74,22 @@ export async function prepareLines(
     .where('i.id', 'in', ids.length > 0 ? ids : [0n])
     .execute();
   const byId = new Map(items.map((i) => [i.id.toString(), i]));
+  // Lines of the document's quotation: an untouched price stays the agreed one, not today's.
+  const quotationLineIds = input.lines.flatMap((l) =>
+    l.quotationLineId ? [BigInt(l.quotationLineId)] : [],
+  );
+  const agreed = new Map(
+    quotationLineIds.length > 0 && input.quotationId
+      ? (
+          await db
+            .selectFrom('sales.quotation_lines')
+            .select(['id', 'unit_price_4dp'])
+            .where('quotation_id', '=', input.quotationId)
+            .where('id', 'in', quotationLineIds)
+            .execute()
+        ).map((q) => [q.id.toString(), q.unit_price_4dp])
+      : [],
+  );
 
   const rows = input.lines.map((l, index) => {
     const item = byId.get(l.itemId);
@@ -83,8 +101,15 @@ export async function prepareLines(
     if (quantity % 10n ** BigInt(3 - Math.min(3, item.decimals)) !== 0n) {
       throw fieldError(`lines.${index}.quantityMilli`, 'unit_decimals');
     }
+    if (l.quotationLineId && !agreed.has(l.quotationLineId)) {
+      throw fieldError(`lines.${index}.quotationLineId`, 'invalid');
+    }
     const unitPrice =
-      l.unitPrice4dp !== undefined ? BigInt(l.unitPrice4dp) : (item.price_4dp ?? 0n);
+      l.unitPrice4dp !== undefined
+        ? BigInt(l.unitPrice4dp)
+        : l.quotationLineId
+          ? agreed.get(l.quotationLineId)!
+          : (item.price_4dp ?? 0n);
     const amount = lineAmountFils(quantity, unitPrice);
     const lineDiscount =
       l.lineDiscountBp !== undefined
@@ -107,7 +132,7 @@ export async function prepareLines(
       doc_discount_alloc_fils: 0n,
       is_optional: l.isOptional ?? false,
       note: l.note ?? null,
-      quotation_line_id: l.quotationLineId ?? null,
+      quotation_line_id: l.quotationLineId ? BigInt(l.quotationLineId) : null,
       weight: l.isOptional ? 0n : amount - lineDiscount,
     };
   });

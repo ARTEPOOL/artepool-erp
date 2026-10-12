@@ -47,10 +47,18 @@ const ASKING_FOR_RULE: Record<string, Asking> = {
   CREDIT_LIMIT: 'credit',
 };
 
+/** Each approval is for one thing: a discount, changed prices, or the credit (decision 0046). */
 interface Approvals {
   approvalId?: string;
+  priceApprovalId?: string;
   creditApprovalId?: string;
 }
+
+const GIVEN: Record<Asking, keyof Approvals> = {
+  discount: 'approvalId',
+  price: 'priceApprovalId',
+  credit: 'creditApprovalId',
+};
 
 export function IssueDialog(props: {
   doc: DocumentDetail;
@@ -89,14 +97,14 @@ export function IssueDialog(props: {
         rowVersion: doc.rowVersion,
         ...(paid.length > 0 ? { payments: paid } : {}),
         ...(given.approvalId ? { approvalId: given.approvalId } : {}),
+        ...(given.priceApprovalId ? { priceApprovalId: given.priceApprovalId } : {}),
         ...(given.creditApprovalId ? { creditApprovalId: given.creditApprovalId } : {}),
       },
       {
         onError: (error) => {
           const wanted = ASKING_FOR_RULE[ruleOf(error) ?? ''];
           // Ask only for an approval not already given for this issue.
-          if (wanted === 'credit' && !given.creditApprovalId) setAsking('credit');
-          else if (wanted && wanted !== 'credit' && !given.approvalId) setAsking(wanted);
+          if (wanted && !given[GIVEN[wanted]]) setAsking(wanted);
         },
       },
     );
@@ -165,7 +173,13 @@ export function IssueDialog(props: {
           )}
           {problem && <Alert>{problem}</Alert>}
           {issue.error !== null && (!refusedForApproval || asking === null) && (
-            <SaveError error={issue.error} />
+            <SaveError
+              error={issue.error}
+              onReload={() => {
+                props.onClose();
+                void queryClient.invalidateQueries({ queryKey: SALES_KEYS.document(doc.id) });
+              }}
+            />
           )}
           <DialogFooter>
             <Button onPress={props.onClose}>{t('form.keep')}</Button>
@@ -189,16 +203,13 @@ export function IssueDialog(props: {
             action: 'issue_invoice',
             documentId: doc.id,
             entity:
-              asking === 'credit'
-                ? `sales.documents:${doc.id}:credit`
-                : `sales.documents:${doc.id}`,
+              asking === 'discount'
+                ? `sales.documents:${doc.id}`
+                : `sales.documents:${doc.id}:${asking}`,
           }}
           onClose={() => setAsking(null)}
           onApproved={(approvalId) => {
-            const next: Approvals =
-              asking === 'credit'
-                ? { ...approvals, creditApprovalId: approvalId }
-                : { ...approvals, approvalId };
+            const next: Approvals = { ...approvals, [GIVEN[asking]]: approvalId };
             setAsking(null);
             setApprovals(next);
             send(payments, next);

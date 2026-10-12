@@ -41,6 +41,20 @@ export function registerSalesRoutes(app: FastifyInstance): void {
   app.addHook('onClose', closeRenderer);
 
   // ---------------------------------------------------------------- A4 PDFs (print dialog, 0008)
+  /** An issued document printed before is a reprint: it needs documents.reprint (decision 0008). */
+  const requireReprint = async (
+    q: typeof db,
+    auth: { permissions: ReadonlySet<string> } | null,
+    id: bigint,
+  ) => {
+    const d = await q
+      .selectFrom('sales.documents')
+      .select(['status', 'print_count'])
+      .where('id', '=', id)
+      .executeTakeFirst();
+    if (d?.status === 'issued' && d.print_count > 0) requireAlso(auth, 'documents.reprint');
+  };
+
   // PDFs travel as JSON (base64), like every other file, through the PC's secure bridge.
   const pdf = (name: string, body: Buffer): FilePayload => ({
     fileName: `${name.replace(/[^A-Za-z0-9_.-]/g, '_')}.pdf`,
@@ -52,7 +66,8 @@ export function registerSalesRoutes(app: FastifyInstance): void {
     url: '/api/v1/sales/documents/:id/pdf',
     access: allow('invoices.view'),
     params: Params,
-    handler: async ({ params }) => {
+    handler: async ({ params, request }) => {
+      await requireReprint(db, request.auth, BigInt(params.id));
       const doc = await documentHtml(db, BigInt(params.id));
       return pdf(doc.number ?? 'draft', await renderPdf(doc.html));
     },
@@ -176,9 +191,10 @@ export function registerSalesRoutes(app: FastifyInstance): void {
     access: allow('invoices.view'),
     params: Params,
     body: z.object({}),
-    handler: async ({ trx, params }) => ({
-      body: { printCount: await documents.countPrint(trx, BigInt(params.id)) },
-    }),
+    handler: async ({ trx, params, request }) => {
+      await requireReprint(trx, request.auth, BigInt(params.id));
+      return { body: { printCount: await documents.countPrint(trx, BigInt(params.id)) } };
+    },
   });
 
   // ---------------------------------------------------------------- Quotations
@@ -239,7 +255,10 @@ export function registerSalesRoutes(app: FastifyInstance): void {
     url: '/api/v1/sales/quotations/:id/action',
     access: quote,
     params: Params,
-    body: QuotationActionRequest.extend({ approvalId: IdText.optional() }),
+    body: QuotationActionRequest.extend({
+      approvalId: IdText.optional(),
+      priceApprovalId: IdText.optional(),
+    }),
     handler: async ({ trx, params, body }) => {
       await quotations.quotationAction(trx, BigInt(params.id), body);
       return { body: await quotations.getQuotation(trx, BigInt(params.id)) };

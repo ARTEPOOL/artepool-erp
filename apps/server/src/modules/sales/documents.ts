@@ -208,6 +208,7 @@ export async function saveInvoiceDraft(
     doc_discount_fils: BigInt(body.docDiscountFils ?? '0'),
   };
   let documentId: bigint;
+  let quotationId: bigint | null = body.quotationId ? BigInt(body.quotationId) : null;
   if (id === null) {
     const row = await trx
       .insertInto('sales.documents')
@@ -228,10 +229,11 @@ export async function saveInvoiceDraft(
   } else {
     const current = await trx
       .selectFrom('sales.documents')
-      .select(['status', 'doc_type'])
+      .select(['status', 'doc_type', 'quotation_id'])
       .where('id', '=', id)
       .executeTakeFirst();
     if (!current) throw new AppError('NOT_FOUND', 'No such document');
+    quotationId = current.quotation_id;
     if (current.status !== 'draft' || current.doc_type !== 'invoice') {
       throw ruleError('DOCUMENT_STEP', 'Only a draft invoice changes');
     }
@@ -255,6 +257,7 @@ export async function saveInvoiceDraft(
     docDiscountFils: header.doc_discount_fils,
     businessLineId,
     priceLevelId: null,
+    quotationId,
   });
   await insertItemLines(trx, documentId, rows);
   await insertDeductions(
@@ -457,7 +460,12 @@ export async function postDocument(trx: Transaction<DB>, documentId: bigint) {
 export async function issueDraft(
   trx: Transaction<DB>,
   id: bigint,
-  opts: { rowVersion?: number; approvalId?: string; creditApprovalId?: string } = {},
+  opts: {
+    rowVersion?: number;
+    approvalId?: string;
+    priceApprovalId?: string;
+    creditApprovalId?: string;
+  } = {},
 ): Promise<string> {
   const d = await trx
     .selectFrom('sales.documents')
@@ -475,8 +483,24 @@ export async function issueDraft(
     APPROVABLE_ON_DOCUMENT,
     `sales.documents:${id}`,
   );
-  if (approvalId !== null) {
+  const priceApprovalId = await useApproval(
+    trx,
+    opts.priceApprovalId,
+    ['sales.price_override'],
+    `sales.documents:${id}:price`,
+  );
+  if (priceApprovalId !== null) {
     // A price approval covers the lines whose price differs from the item's (decision 0012).
+    await trx
+      .updateTable('sales.document_lines')
+      .set({ price_override_approval_id: priceApprovalId })
+      .where('document_id', '=', id)
+      .where('line_kind', '=', 'item')
+      .where(sql<boolean>`unit_price_4dp <> list_price_4dp`)
+      .execute();
+  }
+  if (approvalId !== null) {
+    // (Older screens sent a price approval here: it still covers the prices, never the discount.)
     await trx
       .updateTable('sales.document_lines')
       .set({ price_override_approval_id: approvalId })
@@ -679,6 +703,7 @@ export async function documentLines(db: Db, documentId: bigint): Promise<SalesLi
     priceIncludesVat: l.price_includes_vat,
     amountBeforeDiscountFils: l.amount_before_discount_fils.toString(),
     lineDiscountFils: l.line_discount_fils.toString(),
+    lineDiscountBp: l.line_discount_bp,
     docDiscountAllocFils: l.doc_discount_alloc_fils.toString(),
     discountExclVatFils: l.discount_excl_vat_fils.toString(),
     netFils: l.net_fils.toString(),
@@ -688,6 +713,7 @@ export async function documentLines(db: Db, documentId: bigint): Promise<SalesLi
     grossFils: l.gross_fils.toString(),
     advanceDocumentId: l.advance_document_id?.toString() ?? null,
     advanceDocumentNumber: l.advance_number,
+    quotationLineId: l.quotation_line_id?.toString() ?? null,
     originalLineId: l.original_line_id?.toString() ?? null,
     returnStockStatus: l.return_stock_status as StockStatus | null,
     creditedMilli: quantityFromDb(l.credited).toString(),

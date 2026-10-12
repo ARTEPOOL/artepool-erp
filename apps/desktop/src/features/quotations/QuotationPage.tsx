@@ -555,7 +555,7 @@ function QuotationActions(props: { quotation: QuotationDetail; dirty: boolean })
   const [printError, setPrintError] = useState<unknown>(null);
 
   const act = useSave(
-    (a, body: QuotationActionRequest & { approvalId?: string }, key) =>
+    (a, body: QuotationActionRequest & { approvalId?: string; priceApprovalId?: string }, key) =>
       a.post<QuotationDetail>(SALES_PATHS.quotationAction(q.id), body, { idempotencyKey: key }),
     {
       invalidate: SALES_INVALIDATE,
@@ -612,13 +612,17 @@ function QuotationActions(props: { quotation: QuotationDetail; dirty: boolean })
           ? [...(canConvert ? (['convert'] as const) : []), 'cancel']
           : [];
 
-  const sendAction = (action: Action, approvalId?: string) => {
+  // A discount above the limit and changed prices each need their own approval.
+  const [given, setGiven] = useState<{ approvalId?: string; priceApprovalId?: string }>({});
+  const sendAction = (action: Action, approvals: typeof given = {}) => {
     act.mutate(
-      { action, rowVersion: q.rowVersion, ...(approvalId ? { approvalId } : {}) },
+      { action, rowVersion: q.rowVersion, ...(action === 'send' ? approvals : {}) },
       {
         onError: (error) => {
           const needed = action === 'send' ? APPROVAL_FOR_RULE[ruleOf(error) ?? ''] : undefined;
-          if (needed) {
+          const already =
+            needed === 'sales.price_override' ? approvals.priceApprovalId : approvals.approvalId;
+          if (needed && !already) {
             setStep(null);
             setApproval(needed);
           }
@@ -627,15 +631,18 @@ function QuotationActions(props: { quotation: QuotationDetail; dirty: boolean })
     );
   };
 
+  // The revision needs the units to read the lines; until then (or if a line no longer fits its
+  // unit) the confirm button waits and says why.
+  const revisionBody =
+    step === 'revise' && refs.ready ? revisionRequest(q, refs.unitDecimalsOf) : null;
   const confirm = () => {
     if (step === null) return;
     if (step === 'revise') {
-      const body = revisionRequest(q, refs.unitDecimalsOf);
-      if (body) revise.mutate(body);
+      if (revisionBody) revise.mutate(revisionBody);
       return;
     }
     if (step === 'convert') return convert.mutate({ rowVersion: q.rowVersion });
-    sendAction(step);
+    sendAction(step, given);
   };
 
   const print = async () => {
@@ -700,12 +707,16 @@ function QuotationActions(props: { quotation: QuotationDetail; dirty: boolean })
           <div className={salesStyles.form}>
             <p>{t(`confirm.${step}.text`, { number: quotationNumber(q), next: q.revision + 1 })}</p>
             {step === 'convert' && <InfoBar>{t('actions.convertNote')}</InfoBar>}
+            {step === 'revise' && revisionBody === null && (
+              <p className={salesStyles.muted}>{t('actions.cannotRevise')}</p>
+            )}
             {stepError !== null && <SaveError error={stepError} onReload={reload} />}
             <DialogFooter>
               <Button onPress={() => setStep(null)}>{t('confirm.back')}</Button>
               <Button
                 variant={step === 'cancel' || step === 'reject' ? 'danger' : 'primary'}
                 busy={busy}
+                isDisabled={step === 'revise' && revisionBody === null}
                 onPress={confirm}
               >
                 {t(`confirm.${step}.confirm`)}
@@ -731,8 +742,13 @@ function QuotationActions(props: { quotation: QuotationDetail; dirty: boolean })
           context={{ action: 'quotation_send', quotationId: q.id }}
           onClose={() => setApproval(null)}
           onApproved={(approvalId) => {
+            const next =
+              approval === 'sales.price_override'
+                ? { ...given, priceApprovalId: approvalId }
+                : { ...given, approvalId };
             setApproval(null);
-            sendAction('send', approvalId);
+            setGiven(next);
+            sendAction('send', next);
           }}
         />
       )}
