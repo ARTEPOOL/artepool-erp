@@ -1,4 +1,142 @@
 {
   "title": "Receipts",
-  "subtitle": "Payments received, refunds and bounced cheques"
+  "subtitle": "Payments received, refunds and bounced cheques",
+  "back": "Back to receipts",
+  "status": {
+    "reversed": "Reversed"
+  },
+  "list": {
+    "label": "Receipts, refunds and reversals",
+    "search": "Number, reference or customer",
+    "kind": "Kind",
+    "kindCol": "Kind",
+    "all": "All",
+    "method": "Payment method",
+    "allMethods": "All methods",
+    "empty": "No receipts found.",
+    "shown": "Showing the latest {shown} of {total}. Search to find older ones."
+  },
+  "receive": {
+    "button": "Receive payment",
+    "title": "Receive payment",
+    "subtitle": "Money received from a customer in the office",
+    "payment": "Payment",
+    "amount": "Amount received (AED)",
+    "chequeNumber": "Cheque number",
+    "chequeDate": "Cheque date",
+    "chequeBank": "Bank",
+    "chequeNote": "A cheque counts as paid on the day it is received. If it bounces, reverse the receipt.",
+    "allocation": "What it pays",
+    "modes": {
+      "auto": "Oldest first",
+      "manual": "Choose invoices",
+      "advance": "Advance only"
+    },
+    "modeHint": {
+      "auto": "The amount pays the oldest unpaid invoices first. Anything left becomes an advance.",
+      "manual": "Type how much goes to each invoice. Anything left becomes an advance.",
+      "advance": "The whole amount is an advance, for example a payment on a quotation before the work."
+    },
+    "chooseCustomer": "Choose the customer first.",
+    "openDebts": "Unpaid invoices",
+    "type": "Type",
+    "applied": "Paid now",
+    "applyTo": "Amount for {number}",
+    "nothingOwed": "The customer owes nothing: the whole amount becomes an advance.",
+    "quotation": "Quotation the advance is for (optional)",
+    "noQuotation": "No quotation",
+    "preview": {
+      "amount": "Amount received",
+      "settles": "Pays invoices",
+      "advance": "Advance",
+      "advanceVat": "VAT included in the advance"
+    },
+    "advanceExplain": "The advance gets its own payment tax invoice (INV-) with VAT included. The final invoice deducts it later.",
+    "submit": "Receive {amount} AED",
+    "done": "Payment received: {number}.",
+    "doneAdvance": "Payment received: {number}. Payment invoice issued: {invoice}."
+  },
+  "problems": {
+    "required": "Required.",
+    "invalid": "Enter an amount such as 150 or 150.50.",
+    "zero": "The amount must be more than zero.",
+    "customer": "Choose the customer.",
+    "method": "Choose the payment method.",
+    "more_than_due": "More than what is due.",
+    "over": "The amounts chosen add up to more than the payment.",
+    "shares": "Correct the amounts marked in red."
+  },
+  "detail": {
+    "kind": "Kind",
+    "receivedBy": "Received by",
+    "advanceInvoice": "Payment invoice issued for the advance:",
+    "reverses": "This reversal undoes an earlier payment.",
+    "original": "Made against an earlier payment.",
+    "openOriginal": "Open the original",
+    "allocations": "What it paid",
+    "document": "Document",
+    "noAllocations": "Nothing was allocated.",
+    "subtitle": {
+      "receipt": "Payment receipt",
+      "refund": "Refund to the customer",
+      "reversal": "Reversal of a payment"
+    }
+  },
+  "reverse": {
+    "button": "Reverse (bounced cheque)",
+    "title": "Reverse the payment",
+    "explain": "A reversal (RVS-) undoes this payment. The invoices it paid become unpaid again. A payment invoice it created is cancelled with a credit note. This cannot be undone.",
+    "reason": "Reason",
+    "chooseReason": "Choose…",
+    "reasonMissing": "Choose a reason.",
+    "note": "Note (optional)",
+    "noteRequired": "Note (required for this reason)",
+    "noteMissing": "Write a note for this reason.",
+    "deducted": "This payment cannot be reversed: a final invoice has already deducted the payment invoice it created. Ask the accountant.",
+    "cancel": "Cancel",
+    "confirm": "Reverse the payment",
+    "done": "Payment reversed: {number}."
+  },
+  "openingBalance": {
+    "short": "Opening balance",
+    "button": "Opening balance",
+    "title": "Customer opening balance",
+    "explain": "What this customer owed, or was owed, on the go-live day. It can be entered only once.",
+    "direction": "Direction",
+    "directions": {
+      "receivable": "The customer owes us",
+      "payable": "We owe the customer"
+    },
+    "date": "Balance date",
+    "settled": "Paid so far",
+    "onceOnly": "The opening balance is already entered and cannot be changed. Later corrections are made with credit or debit notes.",
+    "saved": "Opening balance saved.",
+    "duplicate": "This customer already has an opening balance.",
+    "close": "Close",
+    "save": "Save opening balance"
+  },
+  "statement": {
+    "button": "Statement of account",
+    "title": "Statement of account",
+    "from": "From",
+    "to": "To",
+    "badDates": "The start date must be on or before the end date.",
+    "document": "Document",
+    "debit": "Debit",
+    "credit": "Credit",
+    "balance": "Balance",
+    "opening": "Balance brought forward",
+    "closing": "Closing balance",
+    "empty": "Nothing moved in these dates.",
+    "sign": "A positive balance is what the customer owes; a negative balance is what we owe them.",
+    "close": "Close"
+  },
+  "account": {
+    "title": "Account",
+    "balance": "Owes us",
+    "weOwe": "We owe them",
+    "credit": "Payment terms",
+    "advances": "Unused advances",
+    "unavailable": "The balance could not be loaded."
+  }
 }
