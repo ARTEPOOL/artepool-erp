@@ -54,7 +54,10 @@ export function ReceiptsPage() {
   const [method, setMethod] = useState('');
   const [search, setSearch] = useState('');
   const q = useDebounced(search);
-  const payments = usePayments({ kind: kind === 'all' ? undefined : kind, q: q || undefined }, allowed);
+  const payments = usePayments(
+    { kind: kind === 'all' ? undefined : kind, q: q || undefined },
+    allowed,
+  );
   const all: PaymentItem[] = payments.data?.payments ?? [];
   // The server filters by kind and search; the method is filtered on the rows shown.
   const list = method ? all.filter((p) => p.methodKind === method) : all;

@@ -100,18 +100,14 @@ export function ReceiveForm() {
 
   const open = useOpenDebts(customer?.id ?? null);
   const canQuotations = can('quotations.manage') && customer !== null;
-  const accepted = useQuotations(
-    { customerId: customer?.id, status: 'accepted' },
-    canQuotations,
-  );
+  const accepted = useQuotations({ customerId: customer?.id, status: 'accepted' }, canQuotations);
   const sent = useQuotations({ customerId: customer?.id, status: 'sent' }, canQuotations);
   const quotations = [...(accepted.data?.quotations ?? []), ...(sent.data?.quotations ?? [])];
 
   const activeMethods: SalesPaymentMethod[] = methods.data ?? [];
   const method = activeMethods.find((m) => m.id === methodId) ?? activeMethods[0];
   const isCheque = method?.kind === 'cheque';
-  const rateBp =
-    vat.data?.categories.find((c) => c.code === 'SR')?.rateBp ?? DEFAULT_RATE_BP;
+  const rateBp = vat.data?.categories.find((c) => c.code === 'SR')?.rateBp ?? DEFAULT_RATE_BP;
 
   const read = readFils(amount);
   const amountFils = read.ok ? read.value : 0n;
@@ -270,9 +266,10 @@ export function ReceiveForm() {
               />
               {isCheque && (
                 <>
-                  <label className={styles.dateField}>
-                    <span>{t('receive.chequeDate')}</span>
+                  <div className={styles.dateField}>
+                    <label htmlFor="receive-cheque-date">{t('receive.chequeDate')}</label>
                     <input
+                      id="receive-cheque-date"
                       type="date"
                       dir="ltr"
                       value={chequeDate}
@@ -282,7 +279,7 @@ export function ReceiveForm() {
                     {shown('chequeDate') && (
                       <span className={salesStyles.fieldError}>{t('problems.required')}</span>
                     )}
-                  </label>
+                  </div>
                   <TextField
                     label={t('receive.chequeBank')}
                     value={chequeBank}
@@ -342,7 +339,10 @@ export function ReceiveForm() {
                         const problem = manual.problems[d.key];
                         const share = shareOf(d.key);
                         return (
-                          <tr key={d.key} className={cx(mode === 'manual' && problem && styles.badRow)}>
+                          <tr
+                            key={d.key}
+                            className={cx(mode === 'manual' && problem && styles.badRow)}
+                          >
                             <td className={styles.numberCell}>
                               <bdi>{label}</bdi>
                             </td>
@@ -358,7 +358,10 @@ export function ReceiveForm() {
                               {mode === 'manual' ? (
                                 <>
                                   <input
-                                    className={cx(salesStyles.cellInput, problem && salesStyles.bad)}
+                                    className={cx(
+                                      salesStyles.cellInput,
+                                      problem && salesStyles.bad,
+                                    )}
                                     dir="ltr"
                                     inputMode="decimal"
                                     autoComplete="off"
@@ -397,21 +400,23 @@ export function ReceiveForm() {
               </>
             ) : null}
 
-            {customer !== null && (spread.advanceFils > 0n || mode === 'advance') && canQuotations && (
-              <SelectField
-                id="receive-quotation"
-                label={t('receive.quotation')}
-                value={quotationId}
-                onChange={setQuotationId}
-                options={[
-                  { value: '', label: t('receive.noQuotation') },
-                  ...quotations.map((q) => ({
-                    value: q.id,
-                    label: `${q.docNumber} · ${t(`sales:quotationStatuses.${q.status}`)} · ${money(BigInt(q.totalFils))}`,
-                  })),
-                ]}
-              />
-            )}
+            {customer !== null &&
+              (spread.advanceFils > 0n || mode === 'advance') &&
+              canQuotations && (
+                <SelectField
+                  id="receive-quotation"
+                  label={t('receive.quotation')}
+                  value={quotationId}
+                  onChange={setQuotationId}
+                  options={[
+                    { value: '', label: t('receive.noQuotation') },
+                    ...quotations.map((q) => ({
+                      value: q.id,
+                      label: `${q.docNumber} · ${t(`sales:quotationStatuses.${q.status}`)} · ${money(BigInt(q.totalFils))}`,
+                    })),
+                  ]}
+                />
+              )}
 
             <dl className={salesStyles.totals} data-testid="receive-preview">
               <div>

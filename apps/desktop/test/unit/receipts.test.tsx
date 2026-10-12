@@ -96,7 +96,13 @@ const reason = (patch: Partial<ReasonCodeItem>): ReasonCodeItem => ({
 
 const REASONS: ReasonCodeItem[] = [
   reason({}),
-  reason({ id: '92', code: 'ENTRY_ERROR', nameAr: 'خطأ في التسجيل', nameEn: 'Entry error', requiresNote: true }),
+  reason({
+    id: '92',
+    code: 'ENTRY_ERROR',
+    nameAr: 'خطأ في التسجيل',
+    nameEn: 'Entry error',
+    requiresNote: true,
+  }),
   reason({ id: '70', category: 'stock_count', code: 'LOSS', nameAr: 'فقد', nameEn: 'Loss' }),
 ];
 
@@ -451,7 +457,11 @@ describe('Receive payment', () => {
   it('automatic: previews oldest first and the advance with its VAT, and sends no allocations', async () => {
     const created = payment({ paymentMethodId: '1', methodKind: 'cash', reference: null });
     const bridge = bridgeFor(ACCOUNTANT, '/receipts')
-      .on('POST', '/api/v1/sales/payments', receiveAnswer(created, { id: '45', docNumber: 'INV-000013' }))
+      .on(
+        'POST',
+        '/api/v1/sales/payments',
+        receiveAnswer(created, { id: '45', docNumber: 'INV-000013' }),
+      )
       .on('GET', '/api/v1/sales/payments/60', ok(created));
     await signIn(bridge, 'Receipts');
     fireEvent.click(screen.getByRole('button', { name: 'Receive payment' }));
@@ -470,8 +480,10 @@ describe('Receive payment', () => {
     expect(within(row(table, 'INV-000010')).getByText('1,000.00')).toBeTruthy();
 
     fireEvent.change(screen.getByLabelText(/Amount received/), { target: { value: '4000' } });
-    expect(within(row(table, 'OB-1')).getAllByText('500.00')).toHaveLength(2);
+    // Total, due and paid now.
+    expect(within(row(table, 'OB-1')).getAllByText('500.00')).toHaveLength(3);
     expect(within(row(table, 'INV-000012')).getAllByText('2,100.00')).toHaveLength(3);
+    expect(within(row(table, 'INV-000010')).getAllByText('1,000.00')).toHaveLength(2);
     const preview = previewOf();
     expect(within(preview).getByText('4,000.00')).toBeTruthy();
     expect(within(preview).getByText('3,600.00')).toBeTruthy();
@@ -499,7 +511,11 @@ describe('Receive payment', () => {
   it('manual: sends the chosen amounts (opening balance and an invoice); refuses more than the payment', async () => {
     const created = payment({ paymentMethodId: '2', methodKind: 'bank_transfer' });
     const bridge = bridgeFor(ACCOUNTANT, '/receipts/new')
-      .on('POST', '/api/v1/sales/payments', receiveAnswer(created, { id: '45', docNumber: 'INV-000013' }))
+      .on(
+        'POST',
+        '/api/v1/sales/payments',
+        receiveAnswer(created, { id: '45', docNumber: 'INV-000013' }),
+      )
       .on('GET', '/api/v1/sales/payments/60', ok(created));
     await signIn(bridge, 'Receive payment');
     await chooseHotel();
@@ -512,7 +528,9 @@ describe('Receive payment', () => {
     fireEvent.change(screen.getByLabelText('Amount for INV-000012'), { target: { value: '600' } });
     fireEvent.change(screen.getByLabelText('Amount for OB-1'), { target: { value: '100' } });
     fireEvent.click(screen.getByRole('button', { name: 'Receive 500.00 AED' }));
-    expect(await screen.findByText('The amounts chosen add up to more than the payment.')).toBeTruthy();
+    expect(
+      await screen.findByText('The amounts chosen add up to more than the payment.'),
+    ).toBeTruthy();
     // A transfer needs its reference.
     expect(screen.getByText('Required.')).toBeTruthy();
     expect(bridge.callsTo('POST', '/api/v1/sales/payments')).toHaveLength(0);
@@ -538,7 +556,11 @@ describe('Receive payment', () => {
   it('advance only, on an accepted quotation: VAT inside the amount, asAdvance and the quotation', async () => {
     const created = payment({ amountFils: '3150000', allocations: [], advanceDocumentId: '46' });
     const bridge = bridgeFor(ACCOUNTANT, '/receipts/new')
-      .on('POST', '/api/v1/sales/payments', receiveAnswer(created, { id: '46', docNumber: 'INV-000014' }))
+      .on(
+        'POST',
+        '/api/v1/sales/payments',
+        receiveAnswer(created, { id: '46', docNumber: 'INV-000014' }),
+      )
       .on('GET', '/api/v1/sales/payments/60', ok(created));
     await signIn(bridge, 'Receive payment');
     await chooseHotel();
@@ -611,7 +633,9 @@ describe('Receive payment', () => {
     fireEvent.change(screen.getByLabelText(/Amount received/), { target: { value: '10' } });
     fireEvent.click(screen.getByRole('button', { name: 'Receive 10.00 AED' }));
     expect(
-      await screen.findByText('The amount is more than what remains on the document or of the payment.'),
+      await screen.findByText(
+        'The amount is more than what remains on the document or of the payment.',
+      ),
     ).toBeTruthy();
   });
 });
@@ -661,11 +685,13 @@ describe('A receipt', () => {
     const dialog = await screen.findByRole('dialog');
     const select = within(dialog).getByLabelText('Reason');
     // Only the reversal reasons are offered.
-    expect(within(select).getAllByRole('option').map((o) => o.textContent)).toEqual([
-      'Choose…',
-      'Bounced cheque',
-      'Entry error',
-    ]);
+    await waitFor(() =>
+      expect(
+        within(select)
+          .getAllByRole('option')
+          .map((o) => o.textContent),
+      ).toEqual(['Choose…', 'Bounced cheque', 'Entry error']),
+    );
     fireEvent.click(within(dialog).getByRole('button', { name: 'Reverse the payment' }));
     expect(await within(dialog).findByText('Choose a reason.')).toBeTruthy();
     // "Entry error" needs a note.
@@ -699,6 +725,7 @@ describe('A receipt', () => {
     await signIn(bridge, 'RCT-000060');
     fireEvent.click(screen.getByRole('button', { name: 'Reverse (bounced cheque)' }));
     const dialog = await screen.findByRole('dialog');
+    await within(dialog).findByRole('option', { name: 'Bounced cheque' });
     fireEvent.change(within(dialog).getByLabelText('Reason'), { target: { value: '91' } });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Reverse the payment' }));
     expect(
@@ -779,9 +806,9 @@ describe('Customer account', () => {
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Print' }));
     await waitFor(() => expect(printed.files).toEqual([file]));
-    expect(
-      bridge.calls.some((c) => c.path === `/api/v1/customers/12/statement/pdf?${query}`),
-    ).toBe(true);
+    expect(bridge.calls.some((c) => c.path === `/api/v1/customers/12/statement/pdf?${query}`)).toBe(
+      true,
+    );
   });
 
   it('the owner enters the opening balance once: exact fils', async () => {
@@ -848,19 +875,20 @@ describe('Receipts in Arabic (right to left)', () => {
     const table = await screen.findByRole('table', { name: 'سندات القبض والرد والعكس' });
     expect(within(row(table, 'RCT-000058')).getByText('معكوس')).toBeTruthy();
     expect(within(row(table, 'RCT-000060')).getByText('شيك')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'رد' }));
+    fireEvent.click(screen.getByRole('button', { name: 'رد مبلغ' }));
     await waitFor(() =>
       expect(bridge.calls.some((c) => c.path.includes('kind=refund'))).toBe(true),
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'استلام دفعة' }));
     await screen.findByRole('heading', { name: 'استلام دفعة', level: 1 });
-    await chooseHotel('ابحث عن العملاء بالاسم أو الهاتف أو الرقم الضريبي');
+    await chooseHotel('ابحث عن عميل بالاسم أو الهاتف أو الرقم الضريبي');
     const debts = await screen.findByRole('table', { name: 'الفواتير غير المدفوعة' });
     await within(debts).findByText('INV-000012');
     fireEvent.change(screen.getByLabelText(/المبلغ المستلم/), { target: { value: '١٥٠٠' } });
-    expect(within(row(debts, 'OB-1')).getAllByText('500.00')).toHaveLength(2);
-    expect(within(row(debts, 'INV-000010')).getAllByText('1,000.00')).toHaveLength(3);
+    expect(within(row(debts, 'OB-1')).getAllByText('500.00')).toHaveLength(3);
+    expect(within(row(debts, 'INV-000010')).getAllByText('1,000.00')).toHaveLength(2);
+    expect(within(row(debts, 'INV-000012')).queryAllByText('2,100.00')).toHaveLength(2);
     fireEvent.click(screen.getByRole('button', { name: 'استلام 1,500.00 درهم' }));
     await screen.findByRole('heading', { name: 'RCT-000060', level: 1 });
     expect(bridge.callsTo('POST', '/api/v1/sales/payments')[0]!.body).toEqual({

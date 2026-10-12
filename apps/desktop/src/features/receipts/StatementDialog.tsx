@@ -47,7 +47,9 @@ export function StatementDialog(props: {
     setPrintError(null);
     try {
       const query = new URLSearchParams({ from, to }).toString();
-      await printPdf(await fetchPdf(api, `${SALES_PATHS.statementPdf(props.customer.id)}?${query}`));
+      await printPdf(
+        await fetchPdf(api, `${SALES_PATHS.statementPdf(props.customer.id)}?${query}`),
+      );
     } catch (error) {
       setPrintError(error);
     } finally {
