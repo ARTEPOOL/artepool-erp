@@ -14,6 +14,7 @@ import type {
   CashMovementItem,
   CountResult,
   CustomerDetail,
+  DocumentDetail,
   HeldCart,
   ItemDetail,
   ItemStockResponse,
@@ -707,5 +708,70 @@ describe('the shift (decisions 0004, 0006, 0056–0058)', () => {
     );
     expect(r.dropDue).toBe(true);
     expect((await ok<PosState>(cashier('GET', '/api/v1/pos/state'))).dropDue).toBe(true);
+  });
+});
+
+describe('A4 cash taken on the drawer (decision 0063)', () => {
+  it('goes into the cashier’s open shift; office cash still goes to the safe; INV shown for information', async () => {
+    // A supervisor who also sells A4 invoices, on a POS PC, with the drawer open.
+    const seller = await signedIn('cash.a4', ['accountant']);
+    const shift = await open(seller, '10000'); // 100.00
+    phone += 1;
+    const c = await ok<CustomerDetail>(
+      owner('POST', '/api/v1/customers', {
+        customerType: 'company',
+        name: 'Villa owner',
+        isVatRegistered: false,
+        phone: `050 ${phone}`,
+      }),
+      201,
+    );
+    const pump = await item('A4-PUMP', '1050000', '5000'); // 105.00 incl. VAT
+    const draft = await ok<DocumentDetail>(
+      seller('POST', '/api/v1/sales/invoices', {
+        customerId: c.id,
+        lines: [{ itemId: pump, quantityMilli: '1000' }],
+      }),
+      201,
+    );
+    const drawer = await balance('1110');
+    const safe = await balance('1120');
+    const issued = await ok<DocumentDetail>(
+      seller('POST', `/api/v1/sales/documents/${draft.id}/issue`, {
+        rowVersion: draft.rowVersion,
+        payments: [cashPart('10500')],
+      }),
+    );
+    expect(issued.docNumber).toMatch(/^INV-/);
+
+    // The cash is in the drawer: the shift, the expected cash and the drawers account.
+    const { rows } = await sql<{ channel: string; shift_id: string | null; expected: string }>`
+      SELECT p.channel, p.shift_id::text, cash.expected_cash(${shift.id}::bigint)::text AS expected
+        FROM sales.payment_allocations a JOIN sales.payments p ON p.id = a.payment_id
+       WHERE a.document_id = ${issued.id}::bigint`.execute(server.db);
+    expect(rows).toEqual([{ channel: 'pos', shift_id: shift.id, expected: '20500' }]);
+    expect((await balance('1110')) - drawer).toBe(10_500n);
+    expect((await balance('1120')) - safe).toBe(0n);
+
+    // The X report: the money under Cash, and the INV invoice on its own line.
+    const x = await ok<ShiftReport>(seller('GET', '/api/v1/shifts/current/x-report'));
+    expect(x.salesCount).toBe(0);
+    expect(x).toMatchObject({ a4InvoicesCount: 1, a4InvoicesFils: '10500' });
+    expect(x.byMethod.find((m) => m.methodId === ids.cash)?.receivedFils).toBe('10500');
+
+    // The same cash taken in the office (no drawer shift there) goes to the safe (0047).
+    const before = await balance('1120');
+    await ok(
+      accountant('POST', '/api/v1/sales/payments', {
+        customerId: c.id,
+        part: cashPart('1000'),
+        asAdvance: true,
+      }),
+      201,
+    );
+    expect((await balance('1120')) - before).toBe(1_000n);
+    expect(
+      (await ok<ShiftReport>(seller('GET', '/api/v1/shifts/current/x-report'))).expectedCashFils,
+    ).toBe('20500');
   });
 });

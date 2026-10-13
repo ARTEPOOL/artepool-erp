@@ -69,6 +69,7 @@ There is one short file per decision, numbered in order.
 | [0060](0060-pos-returns.md) | POS returns: a credit note, refunded from the open shift | Accepted |
 | [0061](0061-card-payments-no-card-data.md) | Card payments: amount and approval code only | Accepted |
 | [0062](0062-pos-receipt-and-customer.md) | POS receipt in Arabic and English; cash customer by default | Accepted |
+| [0063](0063-a4-cash-on-the-drawer.md) | A4 cash taken by the cashier goes into their drawer; INV on the shift report for information | Accepted |
 
 ## Template
 

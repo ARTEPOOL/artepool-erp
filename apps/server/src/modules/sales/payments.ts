@@ -47,6 +47,26 @@ async function methodAccount(db: Db, methodId: bigint, channel: 'office' | 'pos'
   return channel === 'office' ? (m.office_gl_account_id ?? m.gl_account_id) : m.gl_account_id;
 }
 
+/**
+ * Cash taken in the A4 sections by a cashier on their own open drawer shift goes into that
+ * drawer (decision 0063): it counts in the shift's expected cash and posts to the drawers
+ * account. Anywhere else, office cash goes to Cash in safe (0047).
+ */
+async function drawerShiftFor(trx: Transaction<DB>, methodId: bigint): Promise<bigint | null> {
+  const row = await trx
+    .selectFrom('cash.shifts as s')
+    .innerJoin('cash.registers as r', 'r.id', 's.register_id')
+    .innerJoin('md.payment_methods as m', (j) => j.on('m.id', '=', methodId))
+    .select('s.id')
+    .where('s.status', '=', 'open')
+    .where('r.device_id', '=', sql<bigint>`sys.ctx_device_id()`)
+    .where('s.cashier_id', '=', sql<bigint>`sys.ctx_user_id()`)
+    .where('m.kind', '=', 'cash')
+    .where('m.in_pos', '=', true)
+    .executeTakeFirst();
+  return row?.id ?? null;
+}
+
 export async function insertPayment(
   trx: Transaction<DB>,
   p: {
@@ -63,6 +83,11 @@ export async function insertPayment(
     notes?: string | null;
   },
 ) {
+  const drawerShift =
+    !p.pos && p.kind !== 'reversal'
+      ? await drawerShiftFor(trx, BigInt(p.part.paymentMethodId))
+      : null;
+  const pos = p.pos ?? (drawerShift ? { shiftId: drawerShift } : undefined);
   return trx
     .insertInto('sales.payments')
     .values(
@@ -76,11 +101,11 @@ export async function insertPayment(
         cheque_date: p.part.chequeDate ?? null,
         cheque_bank: p.part.chequeBank ?? null,
         payment_date: p.date,
-        channel: p.pos ? 'pos' : 'office',
-        shift_id: p.pos?.shiftId ?? null,
-        tendered_fils: p.pos?.tenderedFils ?? null,
+        channel: pos ? 'pos' : 'office',
+        shift_id: pos?.shiftId ?? null,
+        tendered_fils: pos?.tenderedFils ?? null,
         change_fils:
-          p.pos?.tenderedFils != null ? p.pos.tenderedFils - BigInt(p.part.amountFils) : null,
+          pos?.tenderedFils != null ? pos.tenderedFils - BigInt(p.part.amountFils) : null,
         device_id: sql<bigint>`sys.ctx_device_id()`,
         reason_code_id: p.reasonCodeId ?? null,
         approval_id: p.approvalId ?? null,

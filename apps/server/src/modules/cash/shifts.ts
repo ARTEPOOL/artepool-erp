@@ -471,6 +471,17 @@ export async function shiftReport(
     .execute();
   const invoices = docs.find((d) => d.doc_type === 'invoice');
   const returns = docs.find((d) => d.doc_type === 'credit_note');
+  // A4 invoices the cashier issued during the shift: shown for information only (0063).
+  const a4 = await db
+    .selectFrom('sales.documents')
+    .select([sql<string>`count(*)`.as('n'), sql<string>`coalesce(sum(total_fils), 0)`.as('total')])
+    .where('channel', '=', 'office')
+    .where('doc_type', '=', 'invoice')
+    .where('status', '=', 'issued')
+    .where('issued_by', '=', s.cashier_id)
+    .where('issued_at', '>=', s.opened_at)
+    .where('issued_at', '<=', s.closed_at ?? sql<Date>`now()`)
+    .executeTakeFirstOrThrow();
   const methods = await db
     .selectFrom('sales.payments as p')
     .innerJoin('md.payment_methods as m', 'm.id', 'p.payment_method_id')
@@ -512,6 +523,8 @@ export async function shiftReport(
     vatFils: invoices?.vat ?? '0',
     discountFils: invoices?.discount ?? '0',
     returnsFils: returns?.total ?? '0',
+    a4InvoicesCount: Number(a4.n),
+    a4InvoicesFils: a4.total,
     byMethod: methods.map((m) => ({
       methodId: m.id.toString(),
       nameAr: m.name_ar,

@@ -260,6 +260,7 @@
     "vat": "VAT",
     "discount": "Discounts",
     "returns": "Returns ({count})",
+    "a4Invoices": "A4 invoices, for information ({count})",
     "received": "Received · {method}",
     "refunded": "Refunded · {method}",
     "noSales": "No Sale openings",

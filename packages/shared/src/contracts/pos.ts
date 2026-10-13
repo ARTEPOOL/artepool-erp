@@ -317,6 +317,9 @@ export interface ShiftReport {
   vatFils: string;
   discountFils: string;
   returnsFils: string;
+  /** A4 (INV-) invoices the cashier issued during the shift, for information only (0063). */
+  a4InvoicesCount: number;
+  a4InvoicesFils: string;
   byMethod: {
     methodId: string;
     nameAr: string;

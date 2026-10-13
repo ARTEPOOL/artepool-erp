@@ -38,6 +38,7 @@
 - **Rows 4–6 and 9:** customer advances and VAT on payments received.
 - **Rows 12–13:** one adjustments account for gains and losses.
 - **Rows 14–15:** defective goods held at cost until written off.
+- **Decision 0063:** cash received on an A4 invoice (or in Receipts) by a cashier on their own open shift is debited to the drawers account (1110), not Cash in safe (1120), so it is counted with the drawer at the close.
 - **Row 18:** the drawers account (1110) returns to zero at each close: the float comes from the safe and the counted cash goes back to it. Until the variance is accepted, the difference stays in 1110.
 - **Row 19:** cash over/short.
 - **Rows 20–21:** opening balances through account 3900.

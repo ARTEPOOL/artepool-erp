@@ -41,6 +41,7 @@ export function ShiftReportView({
     [t('report.vat'), m(report.vatFils)],
     [t('report.discount'), m(report.discountFils)],
     [t('report.returns', { count: report.returnsCount }), m(report.returnsFils)],
+    [t('report.a4Invoices', { count: report.a4InvoicesCount }), m(report.a4InvoicesFils)],
     ...report.byMethod.flatMap((b) => [
       [t('report.received', { method: name(b) }), m(b.receivedFils)] as [string, string],
       ...(BigInt(b.refundedFils) > 0n

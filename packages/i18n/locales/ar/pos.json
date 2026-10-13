@@ -260,6 +260,7 @@
     "vat": "الضريبة",
     "discount": "الخصومات",
     "returns": "المرتجعات ({count})",
+    "a4Invoices": "فواتير A4 للعلم ({count})",
     "received": "المستلم · {method}",
     "refunded": "المردود · {method}",
     "noSales": "فتح الدرج بدون بيع",
