@@ -48,9 +48,9 @@ async function methodAccount(db: Db, methodId: bigint, channel: 'office' | 'pos'
 }
 
 /**
- * Cash taken in the A4 sections by a cashier on their own open drawer shift goes into that
- * drawer (decision 0063): it counts in the shift's expected cash and posts to the drawers
- * account. Anywhere else, office cash goes to Cash in safe (0047).
+ * Cash or card taken in the A4 sections by a cashier on their own open drawer shift belongs to
+ * that shift (decision 0063): cash counts in its expected cash and posts to the drawers account,
+ * card shows with the shift's card total. Anywhere else, office cash goes to Cash in safe (0047).
  */
 async function drawerShiftFor(trx: Transaction<DB>, methodId: bigint): Promise<bigint | null> {
   const row = await trx
@@ -61,7 +61,7 @@ async function drawerShiftFor(trx: Transaction<DB>, methodId: bigint): Promise<b
     .where('s.status', '=', 'open')
     .where('r.device_id', '=', sql<bigint>`sys.ctx_device_id()`)
     .where('s.cashier_id', '=', sql<bigint>`sys.ctx_user_id()`)
-    .where('m.kind', '=', 'cash')
+    .where('m.kind', 'in', ['cash', 'card'])
     .where('m.in_pos', '=', true)
     .executeTakeFirst();
   return row?.id ?? null;

@@ -759,6 +759,19 @@ describe('A4 cash taken on the drawer (decision 0063)', () => {
     expect(x).toMatchObject({ a4InvoicesCount: 1, a4InvoicesFils: '10500' });
     expect(x.byMethod.find((m) => m.methodId === ids.cash)?.receivedFils).toBe('10500');
 
+    // Card taken the same way joins the shift's card total, never its expected cash.
+    await ok(
+      seller('POST', '/api/v1/sales/payments', {
+        customerId: c.id,
+        part: { paymentMethodId: ids.card, amountFils: '2000', reference: 'APP 445566' },
+        asAdvance: true,
+      }),
+      201,
+    );
+    const x2 = await ok<ShiftReport>(seller('GET', '/api/v1/shifts/current/x-report'));
+    expect(x2.byMethod.find((m) => m.methodId === ids.card)?.receivedFils).toBe('2000');
+    expect(x2.expectedCashFils).toBe('20500');
+
     // The same cash taken in the office (no drawer shift there) goes to the safe (0047).
     const before = await balance('1120');
     await ok(
