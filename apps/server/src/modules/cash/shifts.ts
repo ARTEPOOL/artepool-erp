@@ -471,10 +471,16 @@ export async function shiftReport(
     .execute();
   const invoices = docs.find((d) => d.doc_type === 'invoice');
   const returns = docs.find((d) => d.doc_type === 'credit_note');
-  // A4 invoices the cashier issued during the shift: shown for information only (0063).
+  // A4 invoices the cashier issued during the shift: part of the shift's sales figures, never of
+  // its expected cash (0063).
   const a4 = await db
     .selectFrom('sales.documents')
-    .select([sql<string>`count(*)`.as('n'), sql<string>`coalesce(sum(total_fils), 0)`.as('total')])
+    .select([
+      sql<string>`count(*)`.as('n'),
+      sql<string>`coalesce(sum(total_fils), 0)`.as('total'),
+      sql<string>`coalesce(sum(vat_fils), 0)`.as('vat'),
+      sql<string>`coalesce(sum(discount_total_fils), 0)`.as('discount'),
+    ])
     .where('channel', '=', 'office')
     .where('doc_type', '=', 'invoice')
     .where('status', '=', 'issued')
@@ -520,11 +526,12 @@ export async function shiftReport(
     salesCount: Number(invoices?.n ?? 0),
     returnsCount: Number(returns?.n ?? 0),
     grossSalesFils: invoices?.total ?? '0',
-    vatFils: invoices?.vat ?? '0',
-    discountFils: invoices?.discount ?? '0',
+    vatFils: (BigInt(invoices?.vat ?? 0) + BigInt(a4.vat)).toString(),
+    discountFils: (BigInt(invoices?.discount ?? 0) + BigInt(a4.discount)).toString(),
     returnsFils: returns?.total ?? '0',
     a4InvoicesCount: Number(a4.n),
     a4InvoicesFils: a4.total,
+    totalSalesFils: (BigInt(invoices?.total ?? 0) + BigInt(a4.total)).toString(),
     byMethod: methods.map((m) => ({
       methodId: m.id.toString(),
       nameAr: m.name_ar,

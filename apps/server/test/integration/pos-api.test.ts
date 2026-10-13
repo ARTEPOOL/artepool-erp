@@ -756,7 +756,12 @@ describe('A4 cash taken on the drawer (decision 0063)', () => {
     // The X report: the money under Cash, and the INV invoice on its own line.
     const x = await ok<ShiftReport>(seller('GET', '/api/v1/shifts/current/x-report'));
     expect(x.salesCount).toBe(0);
-    expect(x).toMatchObject({ a4InvoicesCount: 1, a4InvoicesFils: '10500' });
+    expect(x).toMatchObject({
+      a4InvoicesCount: 1,
+      a4InvoicesFils: '10500',
+      totalSalesFils: '10500',
+      vatFils: '500',
+    });
     expect(x.byMethod.find((m) => m.methodId === ids.cash)?.receivedFils).toBe('10500');
 
     // Card taken the same way joins the shift's card total, never its expected cash.

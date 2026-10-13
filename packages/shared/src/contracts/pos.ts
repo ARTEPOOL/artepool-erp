@@ -311,15 +311,19 @@ export interface CashCountDetail {
 /** The figures of a shift: the X report (open) and the Z report (closed). */
 export interface ShiftReport {
   shift: ShiftSummary;
+  /** POS sales (POS- invoices). */
   salesCount: number;
   returnsCount: number;
   grossSalesFils: string;
+  /** VAT and discounts of all the shift's sales: POS and A4. */
   vatFils: string;
   discountFils: string;
   returnsFils: string;
-  /** A4 (INV-) invoices the cashier issued during the shift, for information only (0063). */
+  /** A4 (INV-) invoices the cashier issued during the shift; not in the expected cash (0063). */
   a4InvoicesCount: number;
   a4InvoicesFils: string;
+  /** POS sales + A4 invoices. */
+  totalSalesFils: string;
   byMethod: {
     methodId: string;
     nameAr: string;

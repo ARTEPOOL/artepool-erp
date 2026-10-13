@@ -113,7 +113,7 @@ It runs client–server on the local network: PostgreSQL and the API service on 
 - **Sections:** Invoices (A4), Quotations and Receipts each have their own side-menu entry. (0045)
 - **Cash customers:** an unpaid invoice for a cash customer (or above a credit limit) needs a supervisor's approval (`sales.credit_over_limit`). (0046)
 - **Office cash** posts to Cash in safe (1120) by default, set per payment method. (0047)
-- **A4 cash on the drawer:** cash taken in the A4 sections by a user with their own shift open on that PC goes into that drawer (shift, expected cash, drawers account), and card taken that way joins the shift's card total; the X/Z report shows INV invoices for information only. (0063)
+- **A4 cash on the drawer:** cash taken in the A4 sections by a user with their own shift open on that PC goes into that drawer (shift, expected cash, drawers account), and card taken that way joins the shift's card total; the X/Z report shows POS sales, A4 invoices and total sales (A4 never in the expected cash). (0063)
 - **Cheques** count as paid when received; a bounced cheque is reversed (`RVS-`). (0048)
 - **Quotations** are valid 15 days by default; converting keeps their prices. (0049)
 - **Printing:** M4 uses a default A4 design and stores the template version; the designer screen is M4b. (0050)

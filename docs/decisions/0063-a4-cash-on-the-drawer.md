@@ -1,4 +1,4 @@
-# 0063 — A4 cash taken by the cashier goes into their drawer; INV on the shift report for information
+# 0063 — A4 cash taken by the cashier goes into their drawer; A4 invoices in the shift's sales
 
 | | |
 |---|---|
@@ -12,7 +12,7 @@
 - The same applies to a cash refund paid out in the A4 sections from that PC: it comes out of the drawer.
 - **Card** payments taken the same way also belong to the shift, so the shift's card total matches the card terminal's settlement slip. Card never counts in the expected cash.
 - Everywhere else (an office PC, or nobody's shift open on this PC for this user), office cash still goes to Cash in safe (0047).
-- The X and Z reports show a line **"A4 invoices, for information"**: the number and total of the INV- invoices the cashier issued during the shift. It is not part of the shift's sales figures or its expected cash.
+- The X and Z reports show the shift's sales as **POS sales**, **A4 invoices** (the INV- invoices the cashier issued during the shift) and **Total sales**; VAT and discounts cover both. A4 invoices are never part of the expected cash: only the money actually received on the drawer is.
 
 ## Why
 - In the shop the cashier takes A4 invoice cash and puts it in the drawer. Posting it to the safe would make the drawer look over at the count.

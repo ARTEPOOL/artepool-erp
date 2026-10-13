@@ -432,7 +432,7 @@ Each phase ends with automated tests passing, a security review, an accountant r
 
 | Version | Date | Change |
 |---|---|---|
-| 1.9 | 2026-10-13 | Decision 0063: A4 cash taken by a cashier on their open shift goes into the drawer; INV invoices on the shift report for information. |
+| 1.9 | 2026-10-13 | Decision 0063: A4 cash taken by a cashier on their open shift goes into the drawer; A4 invoices shown in the shift's sales (POS, A4, total) but never in its expected cash. |
 | 1.0 | 2026-10-06 | Initial approved scope for Phase 1 planning |
 | 1.1 | 2026-10-06 | Applied owner and accountant decisions 0001–0019: confirmed stack; separate repository; POS oversell with approval; one cashier per shift; cart removals logged without approval; one recount with approval; no code-signing for now; POS silent printing and separate A4 section; VAT per line; invoice format by VAT registration; POS-/INV- series; discounts net per line; VAT on advance/progress payments; 4-decimal unit precision and no cash rounding; defective held at cost; monthly lock; quarterly VAT export and annual archive; chart of accounts by line of business (pending review); e-invoicing via accredited provider (go-live pending). Ledger core moved into P1. |
 | 1.2 | 2026-10-07 | Phase 1 plan approved. Owner confirmed: VAT only on payments received before an invoice is issued; a 1-fils difference per movement is acceptable while the books match stock exactly; reprints marked "Copy" by default (setting); other document prefixes approved as defaults. Development moves to the owner's Windows PC after M0. |
