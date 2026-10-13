@@ -223,6 +223,13 @@ beforeAll(async () => {
   warehouse = (await one<{ id: string }>(api, `SELECT id FROM md.warehouses WHERE code = 'MAIN'`))
     .id;
   today = (await one<{ d: string }>(api, `SELECT sys.business_date()::text AS d`)).d;
+  // The approval limit is off by default (decision 0054); these tests check it when it is on.
+  await admin.query('BEGIN');
+  await admin.query(`SELECT sys.set_context($1, p_reason => 'test: approval limit on')`, [owner]);
+  await admin.query(
+    `UPDATE sys.settings SET value = '50000'::jsonb WHERE key = 'inventory.adjustment_approval_threshold_fils'`,
+  );
+  await admin.query('COMMIT');
 });
 afterAll(() => db.drop());
 
@@ -602,13 +609,21 @@ describe('adjustments (ADJ-)', () => {
         ).id,
       storekeeper,
     );
-    // The POS (M5) creates oversells inside the sale; here the sale is a placeholder number.
+    // The POS (M5) creates oversells inside the sale; here the sale is a draft invoice.
     const doc = await tx(async (c) => {
+      const sale = await one<{ id: string }>(
+        c,
+        `INSERT INTO sales.documents (doc_type, channel, branch_id, business_line_id, warehouse_id, device_id,
+                                     customer_id, bill_to_name)
+         SELECT 'invoice', 'office', (SELECT id FROM sys.branches ORDER BY id LIMIT 1),
+                (SELECT id FROM md.business_lines ORDER BY id LIMIT 1), w.id, sys.ctx_device_id(), c.id, c.name
+           FROM md.warehouses w, md.customers c WHERE w.code = 'MAIN' AND c.is_walk_in RETURNING id`,
+      );
       const d = await one<{ id: string; review_status: string }>(
         c,
         `INSERT INTO inv.adjustments (kind, warehouse_id, adjustment_date, reason_code_id, approval_id, sales_document_id)
-         VALUES ('oversell', $1, $2, $3, $4, 1) RETURNING id, review_status`,
-        [warehouse, today, await reasonId('oversell', 'OVERSELL'), approval],
+         VALUES ('oversell', $1, $2, $3, $4, $5) RETURNING id, review_status`,
+        [warehouse, today, await reasonId('oversell', 'OVERSELL'), approval, sale.id],
       );
       const line = await one<{ id: string }>(
         c,

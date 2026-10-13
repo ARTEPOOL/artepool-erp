@@ -929,7 +929,7 @@ After posting, only the `review_*` columns may change, and only `pending → rev
 | posted_by | bigint? → auth.users | |
 | [std] | | |
 
-As built (migration 0011): a count is created straight in `counting` (the snapshot is taken then); `count_date`, `total_value_fils` (net) and `variance_abs_fils` (Σ |differences|, used for the approval threshold, decision 0041) are set at posting; **one open count per warehouse** (`counts_open_uq`). Counted quantities are hidden from the counters while counting (decision 0044, API).
+As built (migration 0011): a count is created straight in `counting` (the snapshot is taken then); `count_date`, `total_value_fils` (net) and `variance_abs_fils` (Σ |differences|, used for the approval threshold when one is set: decisions 0041, 0054) are set at posting; **one open count per warehouse** (`counts_open_uq`). Counted quantities are hidden from the counters while counting (decision 0044, API).
 
 ### 8.6 `inv.count_lines`
 
@@ -976,7 +976,8 @@ As built (migration 0011): a count is created straight in `counting` (the snapsh
 | subject | text? | |
 | terms_ar, terms_en, notes | text? | |
 | discount_total_fils, net_fils, vat_fils, total_fils | bigint | `>= 0`; `total = net + vat`; non-optional lines only |
-| approval_id | bigint? → auth.approvals | |
+| approval_id | bigint? → auth.approvals | A discount above the limit, approved when sent (`sales.discount_over_limit` only) |
+| price_approval_id | bigint? → auth.approvals | Changed prices, approved when sent (`sales.price_override` only; migration 0018) |
 | converted_document_id | bigint? → sales.documents | |
 | sent_at, decided_at | timestamptz? | |
 | [std] | | |
@@ -1041,7 +1042,7 @@ The money columns work exactly as in `sales.document_lines` (item lines only).
 | original_document_id | bigint? → sales.documents | `CHECK ((doc_type IN ('credit_note','debit_note')) = (original_document_id IS NOT NULL))`; the original must be an issued `invoice` or `advance_invoice` of the same customer |
 | reason_code_id | bigint? → sys.reason_codes | |
 | reason_text | text? | Required for notes |
-| approval_id | bigint? → auth.approvals | |
+| approval_id | bigint? → auth.approvals | A discount above the limit or a credit note; a price approval is never taken as a discount approval (migration 0018) |
 | discount_total_fils | bigint | `>= 0`; Σ line discounts (price basis) |
 | net_fils | bigint | `>= 0`; Σ line net (deductions included) |
 | vat_fils | bigint | `>= 0`; Σ line VAT (deductions included) |
@@ -1666,11 +1667,16 @@ Migrations are written **in build order** (milestones in [`phase-1-plan.md`](pha
 | 0013 | `inventory_hardening` | M3 | — (rules: a movement only for an open document and its own line; the approval threshold uses the movements' value; opening stock once per item; `inv.lock_balances` for counts; found in the M3 code review) | — |
 | 0014 | `cash_core` | M4 | `registers`, `shifts`, `counts`, `count_lines` + shift-owner function | — |
 | 0015 | `sales` | M4 | All `sales.*` tables + allocation, advance-deduction, note and payment-allocation triggers + sales views | `inv.movements.sales_document_line_id`, `inv.adjustments.sales_document_id`, `gl.journal_entries` (sales document, payment, opening balance, shift) |
-| 0016 | `ops_outbox` | M4 | `ops.outbox` | — |
-| 0017 | `cash_events` | M5 | `cash.movements`, `cash.drawer_events` + shift summary view | `gl.journal_entries.cash_movement_id` |
-| 0018 | `ops_backup` | M6 | `ops.backup_runs`, `ops.integrity_runs` + backup role grants | — |
+| 0016 | `outbox_print` | M4 | `ops.outbox`, `sys.print_templates`, `sys.print_template_versions` (default A4 designs, decision 0050) | `print_template_version_id` on documents, quotations and payments |
+| 0017 | `sales_fixes` | M4 | — (a converted line keeps the quotation price; prices and discounts checked when a quotation is sent; advance lines on a credit note of a payment invoice; `sales.credit_over_limit` bypasses the credit check) | `sales.document_lines.quotation_line_id` |
+| 0018 | `sales_review_fixes` | M4 | — (a price approval never waives the discount limit; note lines follow their original line; an issued document with nothing to pay is settled) | `sales.quotations.price_approval_id` |
+| 0019 | `new_item_quantity` | M4 | — (permission `stock.new_item_quantity` for owner, accountant, storekeeper; opening stock allowed for an item created in the same transaction, decision 0053) | — |
+| 0020 | `storekeeper_items` | M4 | — (`items.manage` for the storekeeper role, decision 0053) | — |
+| 0021 | `no_adjustment_approval` | M4 | — (the adjustment approval limit setting is emptied, decision 0054) | — |
+| 0022 | `cash_events` | M5 | `cash.movements`, `cash.drawer_events` + shift summary view | `gl.journal_entries.cash_movement_id` |
+| 0023 | `ops_backup` | M6 | `ops.backup_runs`, `ops.integrity_runs` + backup role grants | — |
 
-After 0018, a final check asserts that every business table has the audit trigger, the no-delete guard and the expected grants. The same check runs as an automated test.
+After 0023, a final check asserts that every business table has the audit trigger, the no-delete guard and the expected grants. The same check runs as an automated test.
 
 ---
 

@@ -4,6 +4,7 @@
  * (decision 0037). New customers start as cash; credit is set separately with
  * `customers.credit` and a reason, which the database enforces too (decision 0036).
  */
+import { matchesWords } from '../../platform/db/search';
 import { sql, type Kysely, type Transaction } from 'kysely';
 import { normalizePhone, normalizeTrn } from '@artepool/shared';
 import type {
@@ -65,11 +66,11 @@ export async function listCustomers(
   if (query.q) {
     const q = query.q;
     const phone = normalizePhone(q);
+    // A phone number is matched as a phone; anything else by its words, in any order.
     base = base.where((eb) =>
-      eb.or([
-        sql<boolean>`search_key LIKE '%' || sys.normalize_search(${q}) || '%'`,
-        ...(phone ? [eb('phone', '=', phone), eb('phone_alt', '=', phone)] : []),
-      ]),
+      phone
+        ? eb.or([eb('phone', '=', phone), eb('phone_alt', '=', phone)])
+        : matchesWords('search_key', q),
     );
   }
   const total = await base

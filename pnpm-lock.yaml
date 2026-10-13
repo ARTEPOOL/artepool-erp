@@ -141,6 +141,9 @@ importers:
       '@artepool/tls':
         specifier: workspace:*
         version: link:../../tools/tls
+      '@fontsource/ibm-plex-sans-arabic':
+        specifier: 5.3.0
+        version: 5.3.0
       '@node-rs/argon2':
         specifier: 2.2.2
         version: 2.2.2
@@ -162,6 +165,9 @@ importers:
       pino:
         specifier: 10.4.0
         version: 10.4.0
+      playwright-core:
+        specifier: 1.63.0
+        version: 1.63.0
       zod:
         specifier: 4.6.5
         version: 4.6.5

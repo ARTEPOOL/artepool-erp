@@ -115,7 +115,7 @@ describe('seeds', () => {
     expect(await count('md.units')).toBe(12);
     expect(await count('md.item_categories')).toBe(5);
     expect(await count('md.cash_denominations')).toBe(11);
-    expect(await count('sys.reason_codes')).toBe(28); // 21 from 0009 + 7 stock reasons from 0011
+    expect(await count('sys.reason_codes')).toBe(33); // 21 from 0009 + 7 stock reasons from 0011 + 5 sales reasons from 0015
     const { rows: lines } = await api.query<{ code: string; rev: string; cogs: string }>(
       `SELECT b.code, r.code AS rev, c.code AS cogs FROM md.business_lines b
          JOIN gl.accounts r ON r.id = b.revenue_account_id JOIN gl.accounts c ON c.id = b.cogs_account_id
@@ -447,7 +447,8 @@ describe('kits (bundles)', () => {
       [kit, chlorine],
     );
     const { rows } = await api.query(
-      `SELECT action FROM audit.log WHERE entity_type = 'md.bundle_components' AND entity_id = $1`,
+      `SELECT action FROM audit.log WHERE entity_type = 'md.bundle_components' AND entity_id = $1
+        ORDER BY id`,
       [`${kit}:${chlorine}`],
     );
     expect(rows).toEqual([{ action: 'insert' }, { action: 'delete' }]);

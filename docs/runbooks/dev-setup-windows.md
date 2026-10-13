@@ -236,6 +236,16 @@ The first time, Rust builds the app: about 5–10 minutes. Later starts take sec
 
 > The device key is kept in **Windows Credential Manager** under "ARTEPOOL ERP". The app never shows it, and the server stores only a fingerprint of it.
 
+## Step 16b: The browser that prints A4 documents (M4)
+
+The server turns invoices, quotations, receipts and statements into PDFs with a hidden browser. Install it once:
+
+```
+pnpm --filter @artepool/server exec playwright-core install chromium-headless-shell
+```
+- Without it, the server uses Microsoft Edge (on every Windows PC) to make the PDF. If neither starts, printing shows a message saying what to install; everything else works.
+- On the server PC the installer (M6) puts a fixed browser in place and sets `ARTEPOOL_CHROMIUM` to it.
+
 ## Step 17 (optional): Run the screen tests and the Rust tests
 
 ```
@@ -243,7 +253,7 @@ pnpm --filter @artepool/desktop exec playwright install chromium
 pnpm test:e2e
 pnpm test:rust
 ```
-- `test:e2e` opens the real screens in a hidden browser against a throwaway database, in Arabic and English, light and dark. It ends with `46 passed`. Screenshots are saved in `apps\desktop\e2e-screens\`.
+- `test:e2e` opens the real screens in a hidden browser against a throwaway database, in Arabic and English, light and dark. It ends with `48 passed`. Screenshots are saved in `apps\desktop\e2e-screens\`.
 - `test:rust` checks the app's secure side (enrollment, TLS rules, the device key). Every group says `test result: ok`.
 
 ---

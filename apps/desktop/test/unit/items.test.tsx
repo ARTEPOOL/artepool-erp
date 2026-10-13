@@ -414,6 +414,51 @@ describe('Items & stock: the item form', () => {
     expect(await detailCard('كلور سائل')).toBeTruthy();
   });
 
+  it("a new stock item's quantity on hand is sent with the item (decision 0053)", async () => {
+    const created = detail({ id: '13', code: 'CHEM-0013', categoryId: '1', rowVersion: 1 });
+    const bridge = bridgeFor([...OWNER, 'stock.new_item_quantity', 'stock.view_cost'])
+      .on('GET', '/api/v1/items/next-code', ok({ code: 'CHEM-0013' }))
+      .on('POST', '/api/v1/items', ok(created, 201))
+      .on('GET', '/api/v1/items/13', ok(created));
+    await openItems(bridge);
+    fireEvent.click(screen.getByRole('button', { name: 'صنف جديد' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText('التصنيف'), { target: { value: '1' } });
+    await waitFor(() =>
+      expect(within(dialog).getByLabelText<HTMLInputElement>('الكود').value).toBe('CHEM-0013'),
+    );
+    fireEvent.change(within(dialog).getByLabelText('الاسم بالعربية'), {
+      target: { value: 'كلور' },
+    });
+    fireEvent.change(within(dialog).getByLabelText('الاسم بالإنجليزية'), {
+      target: { value: 'Chlorine' },
+    });
+    fireEvent.change(within(dialog).getByLabelText('سعر البيع'), { target: { value: '12.5' } });
+    fireEvent.change(within(dialog).getByLabelText('الكمية الحالية'), {
+      target: { value: '10' },
+    });
+    // No cost field: the item's purchase price is used.
+    expect(within(dialog).queryByLabelText(/تكلفة الوحدة/)).toBeNull();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'حفظ الصنف' }));
+    expect(await screen.findByText('تم الحفظ.')).toBeTruthy();
+    expect(bridge.callsTo('POST', '/api/v1/items')[0]!.body).toMatchObject({
+      code: 'CHEM-0013',
+      openingStock: { quantityMilli: '10000' },
+    });
+  });
+
+  it('without the permission there is no quantity field', async () => {
+    const bridge = bridgeFor(OWNER.filter((p) => p !== 'stock.opening')).on(
+      'GET',
+      '/api/v1/items/next-code',
+      ok({ code: 'CHEM-0013' }),
+    );
+    await openItems(bridge);
+    fireEvent.click(screen.getByRole('button', { name: 'صنف جديد' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).queryByLabelText('الكمية الحالية')).toBeNull();
+  });
+
   it('the owner types the purchase price (without VAT): profit is shown, and it is sent exactly', async () => {
     const created = detail({
       id: '12',
@@ -602,6 +647,79 @@ describe('Items & stock: the item form', () => {
     expect(body.reorderLevelMilli).toBeNull();
     expect(body.components).toEqual([{ itemId: '10', quantityMilli: '2000' }]);
     expect(bridge.callsTo('GET', '/api/v1/items').at(-1)?.path).toContain('status=active');
+  });
+
+  it('editing shows the current quantity; a change is sent from what was shown, with approval when large', async () => {
+    const stocked = detail({
+      stock: {
+        onHandMilli: '5000',
+        defectiveMilli: '0',
+        reorderLevelMilli: null,
+        toReorder: false,
+      },
+    });
+    const bridge = bridgeFor([...OWNER, 'stock.adjust'])
+      .on('GET', '/api/v1/items/10', ok(stocked))
+      .on(
+        'PUT',
+        '/api/v1/items/10',
+        failure(403, 'RULE_VIOLATION', { rule: 'APPROVAL_REQUIRED' }),
+        ok(detail({ rowVersion: 4 })),
+      )
+      .on(
+        'GET',
+        '/api/v1/approvals/approvers',
+        ok({ approvers: [{ id: '8', displayNameAr: 'خالد سالم', displayNameEn: 'Khalid Salem' }] }),
+      )
+      .on(
+        'POST',
+        '/api/v1/approvals',
+        ok({ approvalId: '777', expiresAt: '2026-10-13T09:00:00Z' }),
+      );
+    await openItems(bridge);
+    const card = await detailCard('كلور حبيبات 10 كجم');
+    fireEvent.click(within(card).getByRole('button', { name: 'تعديل' }));
+    const dialog = await screen.findByRole('dialog');
+    const qty = within(dialog).getByLabelText<HTMLInputElement>('الكمية الحالية');
+    expect(qty.value).toBe('5');
+    fireEvent.change(qty, { target: { value: '8' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'حفظ الصنف' }));
+
+    // Above the limit: a supervisor approves, and the same change is sent again.
+    const approval = await screen.findByRole('dialog', { name: /موافقة/ });
+    await within(approval).findByRole('option', { name: 'خالد سالم' });
+    fireEvent.change(within(approval).getByLabelText('المشرف'), { target: { value: '8' } });
+    fireEvent.change(within(approval).getByLabelText(/الرمز السري للمشرف/), {
+      target: { value: '4826' },
+    });
+    fireEvent.change(within(approval).getByLabelText(/^السبب/), {
+      target: { value: 'وصلت شحنة' },
+    });
+    fireEvent.click(within(approval).getByRole('button', { name: 'موافقة' }));
+    expect(await screen.findByText('تم الحفظ.')).toBeTruthy();
+
+    expect(bridge.callsTo('POST', '/api/v1/approvals')[0]!.body).toMatchObject({
+      permission: 'stock.adjust_over_threshold',
+      context: {
+        action: 'stock_adjustment',
+        kind: 'increase',
+        lines: [{ itemId: '10', quantityMilli: '3000' }],
+      },
+    });
+    const puts = bridge
+      .callsTo('PUT', '/api/v1/items/10')
+      .map((c) => c.body as Record<string, unknown>);
+    expect(puts[0]!.stockOnHand).toEqual({
+      quantityMilli: '8000',
+      expectedMilli: '5000',
+      note: 'تصحيح الكمية من نافذة الصنف',
+    });
+    expect(puts[1]!.stockOnHand).toEqual({
+      quantityMilli: '8000',
+      expectedMilli: '5000',
+      note: 'تصحيح الكمية من نافذة الصنف',
+      approvalId: '777',
+    });
   });
 
   it('editing sends the row version; "changed by someone else" offers a reload', async () => {

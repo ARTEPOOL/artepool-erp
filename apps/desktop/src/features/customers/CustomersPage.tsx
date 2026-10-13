@@ -28,14 +28,15 @@ import { useCan, useErrorText } from '../auth/context';
 import { downloadFile } from '../masterdata/files';
 import { ImportDialog } from '../masterdata/ImportDialog';
 import { MD_KEYS } from '../masterdata/refs';
+import { CustomerAccount } from '../receipts/CustomerAccount';
 import { CUSTOMER_FILTERS, useCustomer, useCustomerList, type CustomerFilter } from './api';
 import { CreditChip, CustomerCard } from './CustomerCard';
 import { CUSTOMER_TYPE_ICONS, CustomerDialog } from './CustomerDialog';
 import { partiesClasses as styles, Phone, useDebounced, VatChip } from './parts';
 
 /**
- * Design 14: Customers. The balance, overdue, aging, statement and the Invoice / Receipt buttons
- * arrive with balances in M4 and are hidden until then (milestone M2, "Differences").
+ * Design 14: Customers. Since M4 the detail also shows the account (balance, statement of
+ * account, opening balance; features/receipts). Overdue and aging come later.
  */
 export function CustomersPage() {
   const { t } = useTranslation(['parties', 'masterdata']);
@@ -245,7 +246,12 @@ export function CustomersPage() {
         list={table}
         detail={
           detail.data && detail.data.id === selectedId ? (
-            <CustomerCard key={detail.data.id} customer={detail.data} onReload={reload} />
+            <>
+              <CustomerCard key={detail.data.id} customer={detail.data} onReload={reload} />
+              {!detail.data.isWalkIn && (
+                <CustomerAccount key={`account-${detail.data.id}`} customer={detail.data} />
+              )}
+            </>
           ) : detail.isError ? (
             <Alert>{errorText(detail.error)}</Alert>
           ) : (

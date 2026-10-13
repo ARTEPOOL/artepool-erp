@@ -95,10 +95,21 @@ It runs client–server on the local network: PostgreSQL and the API service on 
 
 **Inventory**
 - **Cost visibility:** average cost and stock values only for `stock.view_cost` (owner, accountant); storekeeper and cashier see quantities. (0040)
-- **Adjustments** above 500.00 AED (setting) need a supervisor's approval. (0041)
+- **Adjustments** need no supervisor's approval (the limit setting is empty; a value turns it back on). (0054, replaces 0041)
 - **Opening stock:** once at go-live, owner only (`stock.opening`); empty cost → the item's purchase price. (0042)
+- **Item quantity in the item window:** a new stock item's quantity is posted as its opening stock (owner, accountant, storekeeper: `stock.new_item_quantity`); editing shows the current quantity and a change becomes a "Data correction" adjustment (`stock.adjust`, approval above the limit). No cost is typed there: the purchase price is used. The storekeeper manages items. (0053)
 - **Labels:** preset sizes + custom sizes (`md.label_sizes`), printed through the print dialog for now. (0043)
 - **Counts** are blind while counting; one warehouse in Phase 1. (0044)
+
+**Sales (A4)**
+- **Sections:** Invoices (A4), Quotations and Receipts each have their own side-menu entry. (0045)
+- **Cash customers:** an unpaid invoice for a cash customer (or above a credit limit) needs a supervisor's approval (`sales.credit_over_limit`). (0046)
+- **Office cash** posts to Cash in safe (1120) by default, set per payment method. (0047)
+- **Cheques** count as paid when received; a bounced cheque is reversed (`RVS-`). (0048)
+- **Quotations** are valid 15 days by default; converting keeps their prices. (0049)
+- **Printing:** M4 uses a default A4 design and stores the template version; the designer screen is M4b. (0050)
+- **Customer opening balances:** once at go-live, owner only (`customers.opening`). (0051)
+- **Payments** without chosen invoices settle the oldest first; the rest is an advance with its own tax invoice. (0052)
 
 **Accounting**
 - **Defective returns** are held at cost in "Inventory – defective" until written off. (0015)

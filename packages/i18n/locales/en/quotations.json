@@ -1,0 +1,126 @@
+{
+  "title": "Quotations",
+  "subtitle": "Quotations and their revisions",
+  "back": "All quotations",
+  "list": {
+    "new": "New quotation",
+    "search": "Search by number, customer or subject",
+    "status": "Status",
+    "allStatuses": "All statuses",
+    "label": "Quotations",
+    "customerSubject": "Customer and subject",
+    "empty": "No quotations yet. Press \"New quotation\" to make the first one.",
+    "noMatch": "No quotations match this search."
+  },
+  "fields": {
+    "quotationDate": "Quotation date",
+    "validUntil": "Valid until",
+    "subject": "Subject",
+    "termsAr": "Terms (Arabic)",
+    "termsEn": "Terms (English)",
+    "revision": "Revision"
+  },
+  "validity": {
+    "expired": "Validity ended",
+    "soon": "Expires soon"
+  },
+  "editor": {
+    "newTitle": "New quotation",
+    "newSubtitle": "Prices are fixed when the quotation is sent.",
+    "customerTitle": "Customer",
+    "detailsTitle": "Quotation details",
+    "textsTitle": "Terms and notes",
+    "validHint": "Leave empty for the default: 15 days from the quotation date (company setting).",
+    "optionalHint": "Lines marked \"Optional\" are shown on screen but are not counted in the totals or printed.",
+    "notesHint": "Printed on the quotation.",
+    "save": "Save changes",
+    "create": "Save quotation",
+    "saved": "Quotation {number} saved.",
+    "unsaved": "You have unsaved changes.",
+    "needCustomer": "Choose the customer first.",
+    "needLines": "Add at least one line.",
+    "fixLines": "Check the lines marked in red.",
+    "badDiscount": "Type an amount, for example 25.00.",
+    "badValidUntil": "The validity cannot end before the quotation date."
+  },
+  "lineErrors": {
+    "not_for_sale": "This item cannot be sold now (inactive, not for sale or without a price).",
+    "unit_decimals": "This unit does not take this many decimals.",
+    "too_large": "The discount is larger than the line.",
+    "invalid": "Check this line."
+  },
+  "view": {
+    "title": "Quotation",
+    "paymentsReceived": "Payments received against this quotation",
+    "optionalNote": "Optional lines are shown for information; they are not in the totals.",
+    "invoice": "Invoice",
+    "openInvoice": "Open the invoice made from this quotation"
+  },
+  "revisions": {
+    "title": "Revisions",
+    "revision": "Revision {number}",
+    "current": "this one"
+  },
+  "actions": {
+    "title": "Actions",
+    "sendNote": "Sending fixes the prices. After that, changes need a new revision.",
+    "convertNote": "The invoice keeps the quotation's prices and discounts, not today's prices. Optional lines are left out.",
+    "saveFirst": "Save your changes first.",
+    "send": "Send",
+    "accept": "Customer accepted",
+    "reject": "Customer rejected",
+    "revise": "New revision",
+    "convert": "Convert to invoice",
+    "expire": "Mark as expired",
+    "cancel": "Cancel quotation",
+    "printDraft": "Print draft",
+    "cannotRevise": "The lines cannot be read yet. Wait a moment, or check that each line still fits its unit."
+  },
+  "confirm": {
+    "back": "Go back",
+    "send": {
+      "title": "Send the quotation?",
+      "text": "Quotation {number} will be marked as sent and its prices fixed. To change it later, make a new revision.",
+      "confirm": "Send"
+    },
+    "accept": {
+      "title": "Customer accepted?",
+      "text": "Quotation {number} will be marked as accepted. You can then convert it to an invoice.",
+      "confirm": "Mark as accepted"
+    },
+    "reject": {
+      "title": "Customer rejected?",
+      "text": "Quotation {number} will be marked as rejected. This cannot be undone.",
+      "confirm": "Mark as rejected"
+    },
+    "cancel": {
+      "title": "Cancel the quotation?",
+      "text": "Quotation {number} will be cancelled. It is kept in the list but cannot be used again.",
+      "confirm": "Cancel quotation"
+    },
+    "expire": {
+      "title": "Mark as expired?",
+      "text": "The validity of quotation {number} has ended. It will be marked as expired.",
+      "confirm": "Mark as expired"
+    },
+    "revise": {
+      "title": "Make a new revision?",
+      "text": "Revision {next} of {number} is made as a draft with the same lines, for you to change and send. This revision is kept and marked as replaced.",
+      "confirm": "Make revision"
+    },
+    "convert": {
+      "title": "Convert to an invoice?",
+      "text": "An invoice draft is made from quotation {number}. Check it in Invoices (A4) and issue it there.",
+      "confirm": "Convert to invoice"
+    }
+  },
+  "done": {
+    "send": "The quotation is sent.",
+    "accept": "Marked as accepted.",
+    "reject": "Marked as rejected.",
+    "cancel": "The quotation is cancelled.",
+    "expire": "Marked as expired.",
+    "revise": "Revision {number} is ready to edit.",
+    "convert": "The invoice draft is ready."
+  }
+}

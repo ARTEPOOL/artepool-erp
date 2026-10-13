@@ -16,6 +16,9 @@ import { loadEnv } from '@artepool/node-kit';
 loadEnv();
 // A database name of its own, so a test run of the API at the same time is not disturbed.
 process.env.ARTEPOOL_TEST_DB = `${process.env.ARTEPOOL_TEST_DB ?? 'artepool_test'}_e2e`;
+// A4 PDFs: the same browser the screen tests use, when one is named.
+if (process.env.ARTEPOOL_E2E_CHROMIUM)
+  process.env.ARTEPOOL_CHROMIUM ??= process.env.ARTEPOOL_E2E_CHROMIUM;
 
 const { prepareTestTemplate } = await import('@artepool/testing');
 const support = await import('@artepool/server/test-support');

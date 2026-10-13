@@ -117,6 +117,15 @@ beforeAll(async () => {
   const office = await addDevice(server, { code: 'OFFICE-01' });
   officeId = office.id.toString();
   const ownerId = await addOwner(server);
+  // The approval limit is off by default (decision 0054); these tests check it when it is on.
+  await server.admin.query('BEGIN');
+  await server.admin.query(`SELECT sys.set_context($1, p_reason => 'test: approval limit on')`, [
+    ownerId.toString(),
+  ]);
+  await server.admin.query(
+    `UPDATE sys.settings SET value = '50000'::jsonb WHERE key = 'inventory.adjustment_approval_threshold_fils'`,
+  );
+  await server.admin.query('COMMIT');
   owner = actor(
     office,
     (await openSession(server, { userId: ownerId, deviceId: office.id, method: 'password_totp' }))
@@ -590,8 +599,14 @@ describe('stock figures, oversell review and the journal', () => {
         const doc = (
           await sql<{
             id: bigint;
-          }>`INSERT INTO inv.adjustments (kind, warehouse_id, adjustment_date, reason_code_id, approval_id, sales_document_id)
-            SELECT 'oversell', w.id, sys.business_date(), r.id, ${approval}, 1 FROM md.warehouses w, sys.reason_codes r
+          }>`WITH sale AS (INSERT INTO sales.documents (doc_type, channel, branch_id, business_line_id, warehouse_id, device_id,
+                                     customer_id, bill_to_name)
+         SELECT 'invoice', 'office', (SELECT id FROM sys.branches ORDER BY id LIMIT 1),
+                (SELECT id FROM md.business_lines ORDER BY id LIMIT 1), w.id, sys.ctx_device_id(), c.id, c.name
+           FROM md.warehouses w, md.customers c WHERE w.code = 'MAIN' AND c.is_walk_in RETURNING id)
+             INSERT INTO inv.adjustments (kind, warehouse_id, adjustment_date, reason_code_id, approval_id, sales_document_id)
+            SELECT 'oversell', w.id, sys.business_date(), r.id, ${approval}, (SELECT id FROM sale)
+              FROM md.warehouses w, sys.reason_codes r
              WHERE w.code = 'MAIN' AND r.category = 'oversell' RETURNING id`.execute(trx)
         ).rows[0]!.id;
         const line = (
@@ -686,6 +701,151 @@ describe('stock figures, oversell review and the journal', () => {
     expect(
       (await storekeeper('PATCH', `/api/v1/devices/${officeId}`, { defaultWarehouseId: null }))
         .statusCode,
+    ).toBe(403);
+  });
+});
+
+describe("a new item's quantity on hand (decision 0053)", () => {
+  it('the accountant creates a stock item with its quantity: opening stock in the same step', async () => {
+    const r = await accountant('POST', '/api/v1/items', {
+      code: 'NEWQ-01',
+      itemType: 'stock',
+      nameAr: 'صنف بكمية',
+      nameEn: 'Item with quantity',
+      categoryId: ids.category,
+      unitId: ids.unit,
+      vatCategoryId: ids.vat,
+      isSellable: false,
+      // The accountant sees costs, so may type one (decision 0040): 1.25 a unit.
+      openingStock: { quantityMilli: '8000', unitCost4dp: '12500' },
+    });
+    expect(r.statusCode).toBe(201);
+    const created = r.json<ItemDetail>();
+    const stock = (
+      await owner('GET', `/api/v1/items/${created.id}/stock`)
+    ).json<ItemStockResponse>();
+    // 8 × 1.25 = 10.00.
+    expect(stock.balances[0]).toMatchObject({ quantityMilli: '8000', value4dp: '100000' });
+    // Opening stock for an item that already exists stays the owner's.
+    const existing = await item('NEWQ-02', '10000');
+    expect(
+      await refusal(
+        adjust(accountant, {
+          kind: 'opening',
+          reasonCodeId: ids.opening,
+          lines: [{ itemId: existing.id, quantityMilli: '1000' }],
+        }),
+      ),
+    ).toMatchObject({ status: 403 });
+  });
+
+  it('a refused quantity leaves no item behind (one transaction)', async () => {
+    const r = await cashier('POST', '/api/v1/items', {
+      code: 'NEWQ-03',
+      itemType: 'stock',
+      nameAr: 'صنف',
+      nameEn: 'Item',
+      categoryId: ids.category,
+      unitId: ids.unit,
+      vatCategoryId: ids.vat,
+      isSellable: false,
+      openingStock: { quantityMilli: '1000' },
+    });
+    expect(r.statusCode).toBe(403);
+    const { rows } = await server.admin.query(`SELECT 1 FROM md.items WHERE code = 'NEWQ-03'`);
+    expect(rows).toHaveLength(0);
+  });
+});
+
+describe('search by words in any order', () => {
+  it('finds an item from its words typed in another order, with other Arabic letter forms', async () => {
+    const r = await owner('POST', '/api/v1/items', {
+      code: 'SRCH-01',
+      itemType: 'stock',
+      nameAr: 'كلور شمس أقراص',
+      nameEn: 'Sun chlorine tablets',
+      categoryId: ids.category,
+      unitId: ids.unit,
+      vatCategoryId: ids.vat,
+      isSellable: false,
+    });
+    expect(r.statusCode).toBe(201);
+    for (const q of ['شمس كلور', 'اقراص شمس', 'tablets sun', 'SRCH chlorine']) {
+      const found = (await owner('GET', `/api/v1/items?q=${encodeURIComponent(q)}`)).json<{
+        items: { code: string }[];
+      }>();
+      expect(found.items.map((i) => i.code)).toContain('SRCH-01');
+    }
+    const none = (await owner('GET', `/api/v1/items?q=${encodeURIComponent('شمس صودا')}`)).json<{
+      items: { code: string }[];
+    }>();
+    expect(none.items.map((i) => i.code)).not.toContain('SRCH-01');
+    // % and _ are plain characters, not wildcards.
+    const wild = (await owner('GET', `/api/v1/items?q=${encodeURIComponent('%')}`)).json<{
+      items: unknown[];
+    }>();
+    expect(wild.items).toHaveLength(0);
+  });
+});
+
+describe('the quantity in the item window (owner decision, 2026-10-13)', () => {
+  it('the storekeeper adds an item; a changed quantity becomes a correction from what was shown', async () => {
+    const r = await storekeeper('POST', '/api/v1/items', {
+      code: 'EDQ-01',
+      itemType: 'stock',
+      nameAr: 'صنف للتعديل',
+      nameEn: 'Item to edit',
+      categoryId: ids.category,
+      unitId: ids.unit,
+      vatCategoryId: ids.vat,
+      isSellable: false,
+    });
+    expect(r.statusCode).toBe(201);
+    const made = r.json<ItemDetail>();
+    // Give it stock first (the owner, with a cost), then correct it from the item window.
+    await adjust(owner, {
+      kind: 'opening',
+      reasonCodeId: ids.opening,
+      lines: [{ itemId: made.id, quantityMilli: '4000', unitCost4dp: '10000' }],
+    });
+    const fields = {
+      itemType: 'stock',
+      nameAr: made.nameAr,
+      nameEn: made.nameEn,
+      categoryId: ids.category,
+      unitId: ids.unit,
+      vatCategoryId: ids.vat,
+      isSellable: false,
+    };
+    const fresh = (await owner('GET', `/api/v1/items/${made.id}`)).json<ItemDetail>();
+    // The stock moved since it was shown: refused.
+    expect(
+      await refusal(
+        storekeeper('PUT', `/api/v1/items/${made.id}`, {
+          ...fields,
+          rowVersion: fresh.rowVersion,
+          stockOnHand: { quantityMilli: '6000', expectedMilli: '3000', note: 'Item window' },
+        }),
+      ),
+    ).toMatchObject({ code: 'STALE_VERSION' });
+    const saved = await storekeeper('PUT', `/api/v1/items/${made.id}`, {
+      ...fields,
+      rowVersion: fresh.rowVersion,
+      stockOnHand: { quantityMilli: '6000', expectedMilli: '4000', note: 'Item window' },
+    });
+    expect(saved.statusCode).toBe(200);
+    expect(saved.json<ItemDetail>().stock).toMatchObject({ onHandMilli: '6000' });
+    const stock = (await owner('GET', `/api/v1/items/${made.id}/stock`)).json<ItemStockResponse>();
+    expect(stock.balances[0]).toMatchObject({ quantityMilli: '6000', value4dp: '60000' });
+    // The cashier cannot change items at all.
+    expect(
+      (
+        await cashier('PUT', `/api/v1/items/${made.id}`, {
+          ...fields,
+          rowVersion: saved.json<ItemDetail>().rowVersion,
+          stockOnHand: { quantityMilli: '1000', expectedMilli: '6000', note: 'x' },
+        })
+      ).statusCode,
     ).toBe(403);
   });
 });

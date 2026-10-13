@@ -228,9 +228,38 @@ const ItemFields = z.object({
     .default([]),
 });
 
-export const CreateItemRequest = ItemFields.extend({ code: Code });
+export const CreateItemRequest = ItemFields.extend({
+  code: Code,
+  /**
+   * A new stock item's quantity on hand now, posted as its opening stock in the same transaction
+   * (stock.new_item_quantity: owner, accountant, storekeeper; decision 0053). Without a cost: the
+   * item's purchase price. Only someone with stock.view_cost may type the cost.
+   */
+  openingStock: z
+    .object({
+      quantityMilli: z.string().regex(/^[1-9][0-9]{0,17}$/),
+      unitCost4dp: NonNegativeIntText.optional(),
+    })
+    .optional(),
+});
 export type CreateItemRequest = z.infer<typeof CreateItemRequest>;
-export const UpdateItemRequest = ItemFields.extend({ rowVersion: RowVersion });
+export const UpdateItemRequest = ItemFields.extend({
+  rowVersion: RowVersion,
+  /**
+   * A stock item's quantity on hand, changed in the item window (needs stock.adjust): the
+   * difference is posted as a stock adjustment (increase or decrease, "Data correction") in the
+   * same transaction. `expectedMilli` is the quantity the person saw; if the stock moved since,
+   * the change is refused. Above the threshold a supervisor's approval is needed (decision 0041).
+   */
+  stockOnHand: z
+    .object({
+      quantityMilli: NonNegativeIntText,
+      expectedMilli: NonNegativeIntText,
+      approvalId: IdText.optional(),
+      note: z.string().trim().min(1).max(1000),
+    })
+    .optional(),
+});
 export type UpdateItemRequest = z.infer<typeof UpdateItemRequest>;
 
 export const NextItemCodeQuery = z.object({ categoryId: IdText });

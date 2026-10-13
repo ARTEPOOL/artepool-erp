@@ -107,6 +107,7 @@ export async function addMovement(
     value4dp?: bigint;
     adjustmentLineId?: bigint;
     countLineId?: bigint;
+    salesDocumentLineId?: bigint;
   },
 ): Promise<{ value4dp: bigint; valueFils: bigint }> {
   const row = await trx
@@ -123,6 +124,7 @@ export async function addMovement(
         value_4dp: m.value4dp ?? (null as unknown as bigint),
         adjustment_line_id: m.adjustmentLineId ?? null,
         count_line_id: m.countLineId ?? null,
+        sales_document_line_id: m.salesDocumentLineId ?? null,
       } as never),
     )
     .returning(['value_4dp', 'value_fils'])
@@ -139,8 +141,14 @@ export async function createAdjustment(
   auth: Auth,
   body: CreateAdjustmentRequest,
   importBatchId: bigint | null = null,
+  /** A new item's quantity, entered with the item (decision 0053): owner, accountant, storekeeper. */
+  opts: { newItem?: boolean } = {},
 ): Promise<AdjustmentDetail> {
-  requireAlso(auth, ADJUSTMENT_PERMISSION[body.kind]);
+  if (opts.newItem && body.kind === 'opening' && !auth?.permissions.has('stock.opening')) {
+    requireAlso(auth, 'stock.new_item_quantity');
+  } else {
+    requireAlso(auth, ADJUSTMENT_PERMISSION[body.kind]);
+  }
   if (body.lines.some((l) => l.unitCost4dp !== undefined) && !canSeeValues(auth)) {
     // Only someone who may see costs may type one (decision 0040).
     requireAlso(auth, 'stock.view_cost');

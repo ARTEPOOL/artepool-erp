@@ -1,4 +1,5 @@
 /** Suppliers (purchasing comes in P2). TRN 15 digits starting with 100, unique (decision 0037). */
+import { matchesWords } from '../../platform/db/search';
 import { sql, type Kysely, type Transaction } from 'kysely';
 import { normalizePhone, normalizeTrn } from '@artepool/shared';
 import type {
@@ -46,7 +47,7 @@ export async function listSuppliers(db: Kysely<DB>, query: ListQuery): Promise<S
   if (query.status !== 'all') base = base.where('is_active', '=', query.status === 'active');
   if (query.q) {
     const q = query.q;
-    base = base.where(sql<boolean>`search_key LIKE '%' || sys.normalize_search(${q}) || '%'`);
+    base = base.where(matchesWords('search_key', q));
   }
   const total = await base
     .select((eb) => eb.fn.countAll<bigint>().as('n'))

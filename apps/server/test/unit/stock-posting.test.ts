@@ -3,8 +3,12 @@ import { describe, expect, it } from 'vitest';
 import { stockPosting } from '../../src/modules/ledger/stock-posting';
 
 const net = (amounts: { fils: bigint }[]) => amounts.reduce((s, a) => s + a.fils, 0n);
-const sides = (amounts: { link: string; fils: bigint }[]) =>
-  Object.fromEntries(amounts.filter((a) => a.fils !== 0n).map((a) => [a.link, a.fils]));
+const sides = (amounts: { link: string | { accountId: bigint }; fils: bigint }[]) =>
+  Object.fromEntries(
+    amounts
+      .filter((a) => a.fils !== 0n)
+      .map((a) => [typeof a.link === 'string' ? a.link : `#${a.link.accountId}`, a.fils]),
+  );
 
 describe('stock postings', () => {
   it('row 21 — opening stock: Inventory / Opening balance equity', () => {

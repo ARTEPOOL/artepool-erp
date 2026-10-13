@@ -9,6 +9,10 @@ import arParties from '../locales/ar/parties.json';
 import arSettings from '../locales/ar/settings.json';
 import arSetup from '../locales/ar/setup.json';
 import arShell from '../locales/ar/shell.json';
+import arReceipts from '../locales/ar/receipts.json';
+import arQuotations from '../locales/ar/quotations.json';
+import arInvoices from '../locales/ar/invoices.json';
+import arSales from '../locales/ar/sales.json';
 import enAccounting from '../locales/en/accounting.json';
 import enAuth from '../locales/en/auth.json';
 import enCommon from '../locales/en/common.json';
@@ -20,6 +24,10 @@ import enParties from '../locales/en/parties.json';
 import enSettings from '../locales/en/settings.json';
 import enSetup from '../locales/en/setup.json';
 import enShell from '../locales/en/shell.json';
+import enReceipts from '../locales/en/receipts.json';
+import enQuotations from '../locales/en/quotations.json';
+import enInvoices from '../locales/en/invoices.json';
+import enSales from '../locales/en/sales.json';
 
 export const LANGUAGES = ['ar', 'en'] as const;
 export type Language = (typeof LANGUAGES)[number];
@@ -40,6 +48,10 @@ export const resources = {
     setup: arSetup,
     lists: arLists,
     inventory: arInventory,
+    sales: arSales,
+    invoices: arInvoices,
+    quotations: arQuotations,
+    receipts: arReceipts,
   },
   en: {
     common: enCommon,
@@ -53,6 +65,10 @@ export const resources = {
     setup: enSetup,
     lists: enLists,
     inventory: enInventory,
+    sales: enSales,
+    invoices: enInvoices,
+    quotations: enQuotations,
+    receipts: enReceipts,
   },
 } as const;
 

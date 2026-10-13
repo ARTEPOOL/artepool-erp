@@ -47,10 +47,20 @@ There is one short file per decision, numbered in order.
 | [0038](0038-item-purchase-price-owner-only.md) | Item purchase price: without VAT, owner only, copied onto each sale | Accepted |
 | [0039](0039-owner-reports-dashboard.md) | Owner reports dashboard: four figures, date range, net profit after expenses | Accepted |
 | [0040](0040-stock-cost-visibility.md) | Stock cost and value: owner and accountant only | Accepted |
-| [0041](0041-stock-adjustment-approval-threshold.md) | Adjustments above 500.00 AED need a supervisor's approval | Accepted |
+| [0041](0041-stock-adjustment-approval-threshold.md) | Adjustments above 500.00 AED need a supervisor's approval | Replaced by 0054 |
 | [0042](0042-opening-stock-owner-only.md) | Opening stock: once at go-live, posted by the owner only | Accepted |
 | [0043](0043-barcode-label-sizes.md) | Barcode labels: list of sizes, custom sizes, print dialog | Accepted |
 | [0044](0044-blind-stock-counts.md) | Blind full counts; one warehouse in Phase 1 | Accepted |
+| [0045](0045-sales-sections-in-the-side-menu.md) | Sales screens: Invoices (A4), Quotations and Receipts are separate sections | Accepted |
+| [0046](0046-unpaid-invoice-for-cash-customers.md) | An unpaid invoice for a cash customer needs credit or a supervisor's approval | Accepted |
+| [0047](0047-office-cash-account.md) | Cash received in the office goes to Cash in safe by default | Accepted |
+| [0048](0048-cheques-paid-on-receipt.md) | A cheque counts as paid when received; a bounced cheque is reversed | Accepted |
+| [0049](0049-quotation-validity-and-prices.md) | Quotations are valid 15 days by default; their prices are kept on conversion | Accepted |
+| [0050](0050-print-designer-after-m4.md) | M4 prints with a default design; the print designer screen follows as M4b | Accepted |
+| [0051](0051-customer-opening-balances-owner-only.md) | Customer opening balances: once at go-live, owner only | Accepted |
+| [0052](0052-payment-allocation-oldest-first.md) | A payment without chosen invoices settles the oldest first; the rest is an advance | Accepted |
+| [0054](0054-no-approval-for-stock-adjustments.md) | Stock adjustments need no supervisor's approval (the limit setting is empty) | Accepted |
+| [0053](0053-new-item-quantity.md) | A new item's quantity on hand is entered with the item by the owner, accountant or storekeeper (as its opening stock) | Accepted |
 
 ## Template
 

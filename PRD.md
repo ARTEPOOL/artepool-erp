@@ -237,6 +237,7 @@ Phase tags: **[P1]** to **[P4]** (see section 13).
   - Every invoice line shows the original price, the discount amount and the net amount. The discount is stored per line, so reports show total discounts given.
   - Revenue is posted **net of discount**. There is no separate "sales discounts" account.
 - Customer **statement of account** for any date range (PDF/print).
+- **Sections ([0045](docs/decisions/0045-sales-sections-in-the-side-menu.md)):** Invoices (A4), Quotations and Receipts each have their own entry in the side menu.
 - **Invoices (A4) section:** create, print (with print dialog) and reprint A4 documents. **Any POS sale can be reprinted in A4 format**: same document, same number, counted and logged as a reprint ([0008](docs/decisions/0008-printing-pos-silent-a4-section.md)).
 - Send PDF by WhatsApp/email when online [P4].
 
@@ -435,3 +436,4 @@ Each phase ends with automated tests passing, a security review, an accountant r
 | 1.4 | 2026-10-08 | M2 decisions 0031–0037:<br>• Excel import all or nothing after a check<br>• one sale price per item with a "price includes VAT" switch, net/VAT/total on every invoice, required customer type (price levels ready for later)<br>• four fixed UAE VAT categories with owner-only rate changes<br>• screen placement<br>• fiscal year January–December, with the chart provisional until the accountant approves<br>• customers start as cash, and credit is a permissioned, audited change<br>• master-data rules for codes, phones, TRNs and the logo |
 | 1.5 | 2026-10-11 | Decisions 0038–0039: the item purchase price (without VAT, owner only, copied onto each sale) and the owner reports dashboard (four figures, date range, net profit after expenses). |
 | 1.6 | 2026-10-11 | M3 decisions 0040–0044: stock cost visible to owner and accountant only; adjustment approval above 500.00 AED; opening stock by the owner only; barcode label sizes (list + custom); blind full counts and one warehouse in Phase 1. |
+| 1.7 | 2026-10-12 | M4 decisions 0045–0052: Quotations and Receipts as their own sections; unpaid invoices for cash customers need approval; office cash to Cash in safe; cheques paid on receipt; quotations valid 15 days; print designer screen as M4b; customer opening balances by the owner only; payments settle the oldest invoices first. |

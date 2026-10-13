@@ -1,0 +1,176 @@
+/* Invoices (A4): the list filters, the document header, payment parts and the note dialog.
+   Tokens and logical properties only (RTL and LTR). */
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: flex-end;
+}
+
+.filters > div {
+  min-inline-size: 10rem;
+}
+
+.numberCell {
+  font-weight: 600;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.emptyIcon {
+  inline-size: 2rem;
+  block-size: 2rem;
+  color: var(--color-text-secondary);
+}
+
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-block-size: var(--control-md);
+  padding-inline: var(--space-3);
+  border-radius: var(--radius-md);
+  color: var(--color-primary);
+  font-size: var(--text-label);
+  text-decoration: none;
+}
+
+.backLink:hover {
+  background: var(--color-primary-soft);
+}
+
+.backLink:focus-visible {
+  outline: 3px solid var(--color-focus);
+}
+
+.flip:dir(rtl) {
+  transform: scaleX(-1);
+}
+
+.link {
+  color: var(--color-primary);
+}
+
+.columns {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+}
+
+.deductionRow td {
+  background: var(--color-surface-muted);
+  font-style: italic;
+}
+
+.negative {
+  color: var(--color-danger);
+}
+
+/* --- advances to deduct -------------------------------------------------------------------- */
+.advances {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.advances li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+/* --- payment parts (issue and refund) ------------------------------------------------------ */
+.parts {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.part {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: flex-end;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.part > div {
+  flex: 1;
+  min-inline-size: 9rem;
+}
+
+.summary {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font-size: var(--text-label);
+}
+
+.summary b {
+  font-variant-numeric: tabular-nums;
+}
+
+.bigDue {
+  font-size: var(--text-h3);
+  font-weight: 700;
+}
+
+/* --- note dialog lines --------------------------------------------------------------------- */
+.noteLines select {
+  min-block-size: var(--control-md);
+  padding-inline: var(--space-2);
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--text-label);
+}
+
+.noteLines select:focus-visible {
+  outline: 3px solid var(--color-primary-soft);
+  border-color: var(--color-primary);
+}
+
+.dateField {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.dateField label {
+  display: grid;
+  gap: var(--space-1);
+  font-size: var(--text-label);
+  font-weight: 600;
+}
+
+.dateField input {
+  min-block-size: var(--control-md);
+  padding-inline: var(--space-3);
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-weight: 400;
+}
+
+.dateField input:focus-visible {
+  outline: 3px solid var(--color-primary-soft);
+  border-color: var(--color-primary);
+}

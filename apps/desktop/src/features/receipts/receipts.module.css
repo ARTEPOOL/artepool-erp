@@ -1,0 +1,146 @@
+/* Receipts section (M4, decision 0045) and the customer's account panel. Tokens and logical
+   properties only, so the pages work in Arabic (RTL) and English (LTR). */
+
+.page {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.form {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: flex-end;
+}
+
+.fields > * {
+  flex: 1 1 12rem;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: flex-end;
+}
+
+.muted {
+  color: var(--color-text-secondary);
+  font-size: var(--text-caption);
+}
+
+.fieldError {
+  display: block;
+  font-size: var(--text-caption);
+  color: var(--color-danger);
+}
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.numberCell {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.badRow td {
+  background: var(--color-danger-soft);
+}
+
+.balanceRow td {
+  background: var(--color-surface-muted);
+  font-weight: 600;
+}
+
+.amount {
+  font-size: var(--text-h3);
+}
+
+.owes {
+  color: var(--color-danger);
+}
+
+.emptyIcon {
+  inline-size: 2rem;
+  block-size: 2rem;
+  color: var(--color-text-secondary);
+}
+
+.accountActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.dateField {
+  display: grid;
+  gap: var(--space-1);
+  font-size: var(--text-label);
+  font-weight: 600;
+}
+
+.dateField input {
+  min-block-size: var(--control-md);
+  padding-inline: var(--space-3);
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-weight: 400;
+}
+
+.dateField input:focus-visible {
+  border-color: var(--color-primary);
+  outline: 3px solid var(--color-primary-soft);
+}
+
+.dateField input[aria-invalid='true'] {
+  border-color: var(--color-danger);
+}
+
+.link {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.link:focus-visible {
+  outline: 3px solid var(--color-focus);
+}
+
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-block-size: var(--control-md);
+  padding-inline: var(--space-3);
+  border-radius: var(--radius-md);
+  color: var(--color-primary);
+  font-size: var(--text-label);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.backLink:hover {
+  background: var(--color-primary-soft);
+}
+
+.backLink:focus-visible {
+  outline: 3px solid var(--color-focus);
+}
+
+.flip:dir(rtl) {
+  transform: scaleX(-1);
+}
