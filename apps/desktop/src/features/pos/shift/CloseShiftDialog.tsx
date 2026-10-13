@@ -96,48 +96,42 @@ export function CloseShiftDialog(props: {
     <>
       <Dialog
         isOpen
+        wide
         onClose={props.onClose}
         title={recounting ? t('closeShift.recountTitle') : t('closeShift.title')}
       >
         {counting ? (
           <div className={styles.payForm}>
             <Note>{t('closeShift.blindHelp')}</Note>
-            <table className={styles.countTable}>
-              <thead>
-                <tr>
-                  <th>{t('closeShift.denomination')}</th>
-                  <th>{t('closeShift.quantity')}</th>
-                  <th>{t('closeShift.amount')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {denominations.map((d) => {
-                  const n = readCount(counts[d.id] ?? '');
-                  return (
-                    <tr key={d.id}>
-                      <td>
-                        <bdi>{money(BigInt(d.valueFils))}</bdi>{' '}
-                        <span className={styles.muted}>{t(`closeShift.${d.kind}`)}</span>
-                      </td>
-                      <td>
-                        <input
-                          className={cx(styles.qtyInput, n === null && styles.bad)}
-                          inputMode="numeric"
-                          aria-label={t('closeShift.countOf', {
-                            value: money(BigInt(d.valueFils)),
-                          })}
-                          value={counts[d.id] ?? ''}
-                          onChange={(e) => setCounts({ ...counts, [d.id]: e.target.value })}
-                        />
-                      </td>
-                      <td>
-                        <bdi>{n === null ? '—' : money(BigInt(d.valueFils) * BigInt(n))}</bdi>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <div className={styles.countGrid}>
+              {(['note', 'coin'] as const).map((kind) => (
+                <div key={kind} className={styles.countGroup}>
+                  <h3>{t(`closeShift.${kind}s`)}</h3>
+                  {denominations
+                    .filter((d) => d.kind === kind)
+                    .map((d) => {
+                      const n = readCount(counts[d.id] ?? '');
+                      return (
+                        <div key={d.id} className={styles.countRow}>
+                          <bdi className={styles.countValue}>{money(BigInt(d.valueFils))}</bdi>
+                          <input
+                            className={cx(styles.qtyInput, n === null && styles.bad)}
+                            inputMode="numeric"
+                            aria-label={t('closeShift.countOf', {
+                              value: money(BigInt(d.valueFils)),
+                            })}
+                            value={counts[d.id] ?? ''}
+                            onChange={(e) => setCounts({ ...counts, [d.id]: e.target.value })}
+                          />
+                          <bdi className={styles.countAmount}>
+                            {n === null ? '—' : money(BigInt(d.valueFils) * BigInt(n))}
+                          </bdi>
+                        </div>
+                      );
+                    })}
+                </div>
+              ))}
+            </div>
             <TextField
               label={t('closeShift.other')}
               value={other}

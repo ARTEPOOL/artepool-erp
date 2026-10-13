@@ -4,7 +4,7 @@
  * receipt and a drawer test check the wiring. Only the Windows app can reach a printer.
  */
 import { useEffect, useState } from 'react';
-import { Printer, Vault } from 'lucide-react';
+import { Printer, Landmark } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Button, Card, iconClass, Note, useToast } from '../../../ui';
 import { receiptJob } from '../../pos/receipt/escpos';
@@ -113,7 +113,7 @@ export function ReceiptPrinterCard({ index }: { index: number }) {
               isDisabled={!chosen}
               onPress={() => void kickDrawer().then((o) => report(o, t('devices.drawerSent')))}
             >
-              <Vault className={iconClass.sm} aria-hidden="true" />
+              <Landmark className={iconClass.sm} aria-hidden="true" />
               {t('devices.testDrawer')}
             </Button>
           </div>

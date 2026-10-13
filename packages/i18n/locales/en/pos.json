@@ -39,7 +39,7 @@
   "clear": "Empty cart",
   "fullInvoice": "Full tax invoice with the customer's TRN {trn}.",
   "simplifiedInvoice": "Simplified tax invoice.",
-  "emptyCart": "Scan a barcode or choose an item.",
+  "emptyCart": "Choose a product from the list to start the sale.",
   "discountShort": "discount {value}%",
   "priceChanged": "price changed",
   "less": "One less",
@@ -245,7 +245,9 @@
     "over": "The drawer is over.",
     "varianceNote": "Note about the difference",
     "recount": "Recount (supervisor)",
-    "close": "Close shift"
+    "close": "Close shift",
+    "notes": "Notes",
+    "coins": "Coins"
   },
   "report": {
     "xTitle": "X report",
@@ -302,5 +304,19 @@
     "f12": "F12",
     "esc": "Esc",
     "enter": "Enter"
-  }
+  },
+  "newSale": "New sale",
+  "newSaleHint": "Scan a barcode or choose products to add them to the invoice.",
+  "vatRate": "VAT {rate}",
+  "totalWithVat": "Total incl. VAT",
+  "walkIn": "Cash customer",
+  "chooseCustomer": "Choose the customer",
+  "addCustomer": "Add customer",
+  "changeCustomer": "Change",
+  "fullInvoiceNote": "A VAT-registered customer gets a full tax invoice with their TRN.",
+  "emptyCartTitle": "The cart is empty",
+  "scan": "Scan barcode",
+  "products": "Products",
+  "productsCount": "{count} items",
+  "lowStock": "{qty} left"
 }

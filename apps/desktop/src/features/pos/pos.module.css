@@ -1,29 +1,28 @@
 /* The point of sale and the shift screens (designs 03, 04, 08). Tokens and logical properties
    only, so the same layout works right to left and left to right. */
 
+/* The register fills the window under the top bar: the page header, then the catalog and the
+   cart side by side; each scrolls inside itself and the pay box stays at the bottom. */
 .register {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(22rem, 28rem);
   grid-template-rows: auto minmax(0, 1fr);
   gap: var(--space-4);
-  min-block-size: calc(100vh - var(--topbar-height) - var(--space-8));
+  block-size: calc(100dvh - var(--topbar-height) - 2 * var(--space-8));
+  min-block-size: 32rem;
 }
 
-.bar {
-  grid-column: 1 / -1;
+.tools {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
 }
 
-.barTitle {
-  font-size: var(--text-h2);
-  font-weight: 700;
-}
-
-.spacer {
-  flex: 1;
+.work {
+  min-block-size: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(20rem, 26rem);
+  gap: var(--space-4);
 }
 
 .linkButton {
@@ -36,6 +35,7 @@
   border-radius: var(--radius-md);
   background: var(--color-surface);
   color: var(--color-text);
+  font-size: var(--text-label);
   text-decoration: none;
   font-weight: 600;
 }
@@ -55,22 +55,36 @@
   text-align: center;
 }
 
+.hint {
+  color: var(--color-text-secondary);
+  font-size: var(--text-caption);
+  text-align: center;
+}
+
 /* --- catalog -------------------------------------------------------------------------------- */
 .catalog {
-  display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
-  gap: var(--space-3);
   min-block-size: 0;
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+  gap: var(--space-3);
+}
+
+.searchRow {
+  display: flex;
+  gap: var(--space-2);
 }
 
 .search {
+  flex: 1;
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  min-block-size: var(--control-lg);
   padding-inline: var(--space-3);
   border: 1px solid var(--color-control-border);
   border-radius: var(--radius-md);
   background: var(--color-surface);
+  color: var(--color-text-secondary);
 }
 
 .search:focus-within {
@@ -80,7 +94,7 @@
 
 .searchInput {
   flex: 1;
-  min-block-size: var(--control-lg);
+  min-inline-size: 0;
   border: 0;
   background: transparent;
   color: var(--color-text);
@@ -96,39 +110,64 @@
 }
 
 .cat {
-  min-block-size: var(--control-sm);
-  padding-inline: var(--space-3);
+  min-block-size: 2.25rem;
+  padding-inline: var(--space-4);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-pill);
   background: var(--color-surface);
-  color: var(--color-text);
+  color: var(--color-text-secondary);
   font: inherit;
+  font-size: var(--text-label);
+  font-weight: 600;
   cursor: pointer;
+  transition:
+    background var(--motion-fast) var(--motion-ease),
+    border-color var(--motion-fast) var(--motion-ease);
 }
 
-.catOn {
+.cat:hover {
   border-color: var(--color-primary);
-  background: var(--color-primary-soft);
-  color: var(--color-primary);
+}
+
+.cat[aria-pressed='true'] {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.gridHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding-block-start: var(--space-2);
+  border-block-start: 1px solid var(--color-border);
+}
+
+.gridHead h2 {
+  margin: 0;
+  font-size: var(--text-h3);
   font-weight: 600;
 }
 
 .grid {
+  min-block-size: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr));
+  grid-auto-rows: min-content;
   gap: var(--space-3);
   margin: 0;
-  padding: 0;
+  padding: 2px;
+  overflow-x: hidden;
   overflow-y: auto;
   list-style: none;
   align-content: start;
 }
 
-.itemCard {
+.prod {
   display: grid;
   gap: var(--space-1);
   inline-size: 100%;
-  min-block-size: var(--touch-target);
   padding: var(--space-3);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
@@ -137,92 +176,321 @@
   font: inherit;
   text-align: start;
   cursor: pointer;
+  transition:
+    border-color var(--motion-fast) var(--motion-ease),
+    background var(--motion-fast) var(--motion-ease);
 }
 
-.itemCard:hover,
-.itemCard:focus-visible {
+.prod:hover,
+.prod:focus-visible {
   border-color: var(--color-primary);
+  background: var(--color-primary-soft);
   outline: none;
 }
 
-.itemName {
-  font-weight: 600;
+.prodOut {
+  background: var(--color-surface-muted);
 }
 
-.itemFoot {
+.prodOut:hover {
+  border-color: var(--color-warning);
+  background: var(--color-warning-soft);
+}
+
+.prodHead {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: space-between;
   gap: var(--space-2);
+  margin-block-end: var(--space-1);
 }
 
-.stock {
+.prodName {
+  display: -webkit-box;
+  min-block-size: 2.6em;
+  overflow: hidden;
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: 1.45;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.code {
+  color: var(--color-text-secondary);
   font-size: var(--text-caption);
-  color: var(--color-success);
 }
 
-.stockOut {
-  color: var(--color-danger);
+.prodFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-block-start: var(--space-1);
+}
+
+.price {
+  font-size: var(--text-h3);
+  font-weight: 700;
+}
+
+.price small,
+.grandRow small {
+  color: var(--color-text-secondary);
+  font-size: var(--text-caption);
+  font-weight: 500;
+}
+
+.addMark {
+  display: grid;
+  place-items: center;
+  inline-size: 1.75rem;
+  block-size: 1.75rem;
+  border-radius: var(--radius-sm);
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
 }
 
 /* --- cart ----------------------------------------------------------------------------------- */
 .cart {
+  min-block-size: 0;
   display: grid;
-  align-content: start;
-  gap: var(--space-3);
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  padding: 0;
+  overflow: hidden;
 }
 
 .cartHead {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: var(--space-2);
+  padding: var(--space-4) var(--space-4) var(--space-2);
 }
 
 .cartHead h2 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   margin: 0;
   font-size: var(--text-h3);
+  font-weight: 600;
+}
+
+.count {
+  display: inline-grid;
+  place-items: center;
+  min-inline-size: 1.5rem;
+  block-size: 1.5rem;
+  padding-inline: var(--space-1);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-muted);
+  color: var(--color-text-secondary);
+  font-size: var(--text-caption);
+}
+
+.cartActions {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.customer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-inline: var(--space-4);
+  margin-block-end: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.customer:hover,
+.customer:focus-visible {
+  border-color: var(--color-primary);
+  outline: none;
+}
+
+.customerText {
+  flex: 1;
+  display: grid;
+  min-inline-size: 0;
+}
+
+.customerChange {
+  color: var(--color-primary);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.customerDialog {
+  display: grid;
+  gap: var(--space-3);
+  min-inline-size: min(28rem, 80vw);
+}
+
+.emptyCart {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: var(--space-1);
+  padding: var(--space-8) var(--space-4);
+  color: var(--color-text-secondary);
+  font-size: var(--text-label);
+  text-align: center;
+}
+
+.emptyCart b {
+  color: var(--color-text);
+  font-size: var(--text-body);
+}
+
+.emptyIcon {
+  inline-size: 2.5rem;
+  block-size: 2.5rem;
+  margin-block-end: var(--space-2);
+  color: var(--color-border);
 }
 
 .lines {
-  display: grid;
-  gap: var(--space-2);
+  min-block-size: 0;
   margin: 0;
-  padding: 0;
-  max-block-size: 40vh;
+  padding: 0 var(--space-4);
+  overflow-x: hidden;
   overflow-y: auto;
   list-style: none;
 }
 
 .line {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto auto auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: var(--space-2);
-  padding-block: var(--space-2);
+  gap: var(--space-2) var(--space-3);
+  padding-block: var(--space-3);
   border-block-end: 1px solid var(--color-border);
 }
 
 .lineName {
   display: grid;
   min-inline-size: 0;
+  line-height: 1.45;
+}
+
+.lineName b {
+  overflow-wrap: anywhere;
+  font-size: var(--text-label);
+  font-weight: 600;
+}
+
+.disc {
+  color: var(--color-success);
+}
+
+.amount {
+  font-size: var(--text-label);
+  font-weight: 700;
+  text-align: end;
+  white-space: nowrap;
 }
 
 .qty {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
+  direction: ltr;
 }
 
-.qtyValue {
-  min-inline-size: 2rem;
+.qty button {
+  display: grid;
+  place-items: center;
+  inline-size: 2rem;
+  block-size: 2rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--color-primary);
+  cursor: pointer;
+}
+
+.qty button:hover {
+  background: var(--color-primary-soft);
+}
+
+.qty b {
+  min-inline-size: 1.75rem;
   text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.lineActs {
+  display: flex;
+  justify-content: flex-end;
+  gap: 2px;
+}
+
+.iconBtn {
+  display: grid;
+  place-items: center;
+  inline-size: var(--control-sm);
+  block-size: var(--control-sm);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.iconBtn:hover {
+  background: var(--color-surface-muted);
+  color: var(--color-primary);
+}
+
+.remove,
+.remove:hover {
+  color: var(--color-danger);
+}
+
+.payBox {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border-block-start: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.sum {
+  display: flex;
+  justify-content: space-between;
+  color: var(--color-text-secondary);
+  font-size: var(--text-label);
+}
+
+.grandRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding-block: var(--space-1);
   font-weight: 600;
 }
 
-.amount {
-  min-inline-size: 5rem;
-  text-align: end;
-  font-weight: 600;
+.grandRow b {
+  font-size: var(--text-h1);
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.pay {
+  justify-content: space-between;
+  inline-size: 100%;
+  min-block-size: 3.25rem;
+  font-size: var(--text-body);
 }
 
 .totals {
@@ -237,18 +505,14 @@
   text-align: end;
 }
 
-.grand {
-  font-size: var(--text-pos-total);
+.totals .grand {
+  font-size: var(--text-h2);
   font-weight: 700;
 }
 
 .payRow {
   display: flex;
   gap: var(--space-2);
-}
-
-.pay {
-  flex: 1;
 }
 
 /* --- payment, dialogs ----------------------------------------------------------------------- */
@@ -384,8 +648,8 @@
 }
 
 .actionButtons {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
   gap: var(--space-2);
   margin-block-end: var(--space-2);
 }
@@ -418,6 +682,60 @@
 
 @media (width <= 60rem) {
   .register {
+    block-size: auto;
+  }
+
+  .work {
+    grid-template-columns: 1fr;
+  }
+
+  .cart {
+    min-block-size: 30rem;
+  }
+}
+
+/* The blind count: notes and coins side by side, one compact row per denomination. */
+.countGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.countGroup {
+  display: grid;
+  align-content: start;
+  gap: var(--space-1);
+}
+
+.countGroup h3 {
+  margin: 0 0 var(--space-1);
+  color: var(--color-text-secondary);
+  font-size: var(--text-label);
+  font-weight: 600;
+}
+
+.countRow {
+  display: grid;
+  grid-template-columns: 5.5rem 6rem minmax(5.5rem, 1fr);
+  align-items: center;
+  gap: var(--space-2);
+  padding-block: 2px;
+}
+
+.countValue {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.countAmount {
+  color: var(--color-text-secondary);
+  font-size: var(--text-label);
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (width <= 40rem) {
+  .countGrid {
     grid-template-columns: 1fr;
   }
 }

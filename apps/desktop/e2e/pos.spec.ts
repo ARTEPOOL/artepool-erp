@@ -115,6 +115,8 @@ test('sell, oversell with approval, close the shift with a recount', async ({
 
   // Close: expected 500 + 252 + 252 = 1,004.00. Count 1,000 (short 4.00), recount with approval.
   await page.getByRole('link', { name: t('pos:shift'), exact: true }).click();
+  await expect(page.getByRole('button', { name: t('pos:shiftPage.close') })).toBeVisible();
+  await snap(page, '57-pos-shift-page');
   await page.getByRole('button', { name: t('pos:shiftPage.close') }).click();
   const close = page.getByRole('dialog');
   await expect(close.getByText(t('pos:closeShift.expected'), { exact: true })).toHaveCount(0);

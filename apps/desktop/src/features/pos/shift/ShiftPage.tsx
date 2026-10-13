@@ -12,7 +12,7 @@ import {
   DoorOpen,
   FileBarChart,
   Lock,
-  Vault,
+  Landmark,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { ShiftReport } from '@artepool/shared/contracts';
@@ -81,11 +81,11 @@ export function ShiftPage() {
                   {t('movement.paid_out')}
                 </Button>
                 <Button isDisabled={!can('cash.drop')} onPress={() => setMoving('cash_drop')}>
-                  <Vault className={iconClass.sm} aria-hidden="true" />
+                  <Landmark className={iconClass.sm} aria-hidden="true" />
                   {t('movement.cash_drop')}
                 </Button>
                 <Button isDisabled={!can('cash.drop')} onPress={() => setMoving('float_top_up')}>
-                  <Vault className={iconClass.sm} aria-hidden="true" />
+                  <Landmark className={iconClass.sm} aria-hidden="true" />
                   {t('movement.float_top_up')}
                 </Button>
                 {can('pos.no_sale') && (

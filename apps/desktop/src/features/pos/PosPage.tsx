@@ -8,23 +8,44 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { Link } from '@tanstack/react-router';
 import {
   Banknote,
+  Brush,
   Clock,
+  Cog,
+  FlaskConical,
   Minus,
+  Package,
   Pause,
   Pencil,
   Plus,
+  ScanBarcode,
   Search,
+  ShoppingCart,
   Trash2,
   Undo2,
-  Vault,
+  UserRound,
+  Landmark,
+  Wrench,
+  type LucideIcon,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { formatQuantity, roundDiv } from '@artepool/shared';
-import type { HeldCart, ItemListItem, PosState } from '@artepool/shared/contracts';
+import type { CategoryItem, HeldCart, ItemListItem, PosState } from '@artepool/shared/contracts';
 import { useSave } from '../../api/hooks';
-import { Alert, Button, Card, Chip, cx, iconClass, Note, PageHeader } from '../../ui';
-import { useCan, useDisplayName, useErrorText } from '../auth/context';
-import { money } from '../masterdata/format';
+import {
+  Alert,
+  Button,
+  Card,
+  Chip,
+  cx,
+  Dialog,
+  iconClass,
+  Note,
+  PageHeader,
+  Tile,
+  type Tone,
+} from '../../ui';
+import { useDisplayName, useErrorText } from '../auth/context';
+import { money, rate } from '../masterdata/format';
 import { localName, useCategories } from '../masterdata/refs';
 import { CustomerPicker, useWalkInCustomer } from '../sales/CustomerPicker';
 import { useLineRefs, useLinesPreview } from '../sales/LineEditor';
@@ -73,7 +94,7 @@ export function PosPage() {
 
 function Register({ state }: { state: PosState }) {
   const { t, i18n } = useTranslation('pos');
-  const can = useCan();
+  const nameOf = useDisplayName();
   const cart = useCart();
   const walkIn = useWalkInCustomer();
   const refs = useLineRefs();
@@ -83,6 +104,7 @@ function Register({ state }: { state: PosState }) {
   const [editing, setEditing] = useState<string | null>(null);
   const [showHeld, setShowHeld] = useState(false);
   const [returning, setReturning] = useState(false);
+  const [choosingCustomer, setChoosingCustomer] = useState(false);
   const held = useHeldCarts();
   const errorText = useErrorText();
   const [problem, setProblem] = useState<string | null>(null);
@@ -124,151 +146,202 @@ function Register({ state }: { state: PosState }) {
   }, [canPay, cart.lines.length, hold, errorText]);
 
   const customer = cart.customer ?? walkIn;
+  const isWalkIn = !cart.customer || cart.customer.isWalkIn === true;
   const name = (l: { nameAr: string; nameEn: string }) => localName(i18n.language)(l);
   const heldCount = held.data?.length ?? 0;
+  const rates = [...new Set(cart.lines.map((l) => refs.rateOf(l.vatCategoryId)))];
+  const vatLabel =
+    rates.length === 1 && rates[0] !== undefined
+      ? t('vatRate', { rate: rate(rates[0]) })
+      : t('vat');
 
   return (
     <div className={styles.register}>
-      <div className={styles.bar}>
-        <span className={styles.barTitle}>{t('title')}</span>
-        <Chip tone="neutral" icon={<Clock aria-hidden="true" />}>
-          <bdi>{state.shift!.shiftNumber}</bdi>
-        </Chip>
-        {state.dropDue && (
-          <Chip tone="warn" icon={<Vault aria-hidden="true" />}>
-            {t('dropDue')}
-          </Chip>
-        )}
-        <span className={styles.spacer} />
-        <Button onPress={() => setShowHeld(true)} isDisabled={heldCount === 0}>
-          <Pause className={iconClass.sm} aria-hidden="true" />
-          {t('held', { count: heldCount })}
-        </Button>
-        <Button onPress={() => setReturning(true)}>
-          <Undo2 className={iconClass.sm} aria-hidden="true" />
-          {t('return')}
-        </Button>
-        <Link to="/pos/shift" className={styles.linkButton}>
-          <Banknote className={iconClass.sm} aria-hidden="true" />
-          {t('shift')}
-        </Link>
-      </div>
+      <PageHeader
+        title={t('newSale')}
+        subtitle={t('newSaleHint')}
+        tools={
+          <div className={styles.tools}>
+            <Chip tone="ok" icon={<Clock aria-hidden="true" />}>
+              {nameOf(state.shift!.cashierName)} · <bdi>{state.shift!.shiftNumber}</bdi>
+            </Chip>
+            {state.dropDue && (
+              <Chip tone="warn" icon={<Landmark aria-hidden="true" />}>
+                {t('dropDue')}
+              </Chip>
+            )}
+            <Button onPress={() => setShowHeld(true)} isDisabled={heldCount === 0}>
+              <Pause className={iconClass.sm} aria-hidden="true" />
+              {t('held', { count: heldCount })}
+            </Button>
+            <Button onPress={() => setReturning(true)}>
+              <Undo2 className={iconClass.sm} aria-hidden="true" />
+              {t('return')}
+            </Button>
+            <Link to="/pos/shift" className={styles.linkButton}>
+              <Banknote className={iconClass.sm} aria-hidden="true" />
+              {t('shift')}
+            </Link>
+          </div>
+        }
+      />
 
-      <Catalog searchRef={searchRef} onAdd={(item) => cartStore.set((c) => addItem(c, item))} />
+      <div className={styles.work}>
+        <Catalog searchRef={searchRef} onAdd={(item) => cartStore.set((c) => addItem(c, item))} />
 
-      <Card className={styles.cart} aria-label={t('cart')}>
-        <div className={styles.cartHead}>
-          <h2>{t('cart')}</h2>
-          <Chip tone="neutral">{cart.lines.length}</Chip>
-          <span className={styles.spacer} />
-          <Button
-            variant="dangerGhost"
-            isDisabled={cart.lines.length === 0}
-            onPress={() => cartStore.set((c) => clearCart(c))}
+        <Card className={styles.cart} padding="compact" aria-label={t('cart')}>
+          <div className={styles.cartHead}>
+            <h2>
+              {t('cart')} <span className={styles.count}>{cart.lines.length}</span>
+            </h2>
+            <span className={styles.cartActions}>
+              <Button
+                variant="ghost"
+                isDisabled={cart.lines.length === 0 || hold.isPending}
+                onPress={() => hold.mutate(cart, { onError: (e) => setProblem(errorText(e)) })}
+              >
+                <Pause className={iconClass.sm} aria-hidden="true" />
+                {t('hold')}
+              </Button>
+              <Button
+                variant="dangerGhost"
+                isDisabled={cart.lines.length === 0}
+                onPress={() => cartStore.set((c) => clearCart(c))}
+              >
+                <Trash2 className={iconClass.sm} aria-hidden="true" />
+                {t('clear')}
+              </Button>
+            </span>
+          </div>
+
+          <button
+            type="button"
+            className={styles.customer}
+            onClick={() => setChoosingCustomer(true)}
+            aria-label={t('chooseCustomer')}
           >
-            <Trash2 className={iconClass.sm} aria-hidden="true" />
-            {t('clear')}
-          </Button>
-        </div>
-        <CustomerPicker
-          value={cart.customer}
-          onChange={(c) => cartStore.set((cur) => ({ ...cur, customer: c }))}
-        />
-        {customer && (
-          <Note>
-            {customer.isVatRegistered
-              ? t('fullInvoice', { trn: customer.trn ?? '' })
-              : t('simplifiedInvoice')}
-          </Note>
-        )}
-        {cart.lines.length === 0 ? (
-          <p className={styles.empty}>{t('emptyCart')}</p>
-        ) : (
-          <ul className={styles.lines}>
-            {cart.lines.map((l, i) => {
-              const p = totals.lines[i];
-              return (
-                <li key={l.key} className={styles.line}>
-                  <div className={styles.lineName}>
-                    <b>{name(l)}</b>
-                    <span className={styles.muted}>
-                      <bdi>{l.code}</bdi>
-                      {l.discount.trim() !== '' &&
-                        ` · ${t('discountShort', { value: l.discount })}`}
-                      {l.unitPrice.trim() !== '' && ` · ${t('priceChanged')}`}
+            <Tile tone="primary">
+              <UserRound className={iconClass.sm} aria-hidden="true" />
+            </Tile>
+            <span className={styles.customerText}>
+              <b>{isWalkIn ? t('walkIn') : customer?.name}</b>
+              <span className={styles.muted}>
+                {customer?.isVatRegistered
+                  ? t('fullInvoice', { trn: customer.trn ?? '' })
+                  : t('simplifiedInvoice')}
+              </span>
+            </span>
+            <span className={styles.customerChange}>
+              {isWalkIn ? t('addCustomer') : t('changeCustomer')}
+            </span>
+          </button>
+
+          {cart.lines.length === 0 ? (
+            <div className={styles.emptyCart}>
+              <ShoppingCart className={styles.emptyIcon} aria-hidden="true" />
+              <b>{t('emptyCartTitle')}</b>
+              <span>{t('emptyCart')}</span>
+            </div>
+          ) : (
+            <ul className={styles.lines}>
+              {cart.lines.map((l, i) => {
+                const p = totals.lines[i];
+                const unit = BigInt(l.unitPrice.trim() !== '' ? '0' : l.listPrice4dp);
+                return (
+                  <li key={l.key} className={styles.line}>
+                    <span className={styles.lineName}>
+                      <b>{name(l)}</b>
+                      <span className={styles.muted}>
+                        <bdi>{l.code}</bdi>
+                        {l.unitPrice.trim() === '' && (
+                          <>
+                            {' · '}
+                            <bdi>{money(roundDiv(unit, 100n))}</bdi>
+                          </>
+                        )}
+                        {l.discount.trim() !== '' && (
+                          <span className={styles.disc}>
+                            {' · '}
+                            {t('discountShort', { value: l.discount })}
+                          </span>
+                        )}
+                        {l.unitPrice.trim() !== '' && ` · ${t('priceChanged')}`}
+                      </span>
                     </span>
-                  </div>
-                  <div className={styles.qty}>
-                    <Button
-                      aria-label={t('less')}
-                      onPress={() => cartStore.set((c) => stepQuantity(c, l.key, -1))}
-                    >
-                      <Minus className={iconClass.sm} aria-hidden="true" />
-                    </Button>
-                    <bdi className={styles.qtyValue}>{l.quantity}</bdi>
-                    <Button
-                      aria-label={t('more')}
-                      onPress={() => cartStore.set((c) => stepQuantity(c, l.key, 1))}
-                    >
-                      <Plus className={iconClass.sm} aria-hidden="true" />
-                    </Button>
-                  </div>
-                  <bdi className={styles.amount}>{p ? money(p.grossFils) : '—'}</bdi>
-                  <Button
-                    aria-label={t('editLine')}
-                    variant="ghost"
-                    onPress={() => setEditing(l.key)}
-                  >
-                    <Pencil className={iconClass.sm} aria-hidden="true" />
-                  </Button>
-                  <Button
-                    aria-label={t('removeLine')}
-                    variant="dangerGhost"
-                    onPress={() => cartStore.set((c) => removeLine(c, l.key))}
-                  >
-                    <Trash2 className={iconClass.sm} aria-hidden="true" />
-                  </Button>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-        <dl className={styles.totals}>
-          <dt>{t('net')}</dt>
-          <dd>
-            <bdi>{money(totals.netFils)}</bdi>
-          </dd>
-          <dt>{t('vat')}</dt>
-          <dd>
-            <bdi>{money(totals.vatFils)}</bdi>
-          </dd>
-          <dt className={styles.grand}>{t('total')}</dt>
-          <dd className={styles.grand}>
-            <bdi>
-              {money(totals.totalFils)} {t('currency')}
-            </bdi>
-          </dd>
-        </dl>
-        {problem && <Alert>{problem}</Alert>}
-        <div className={styles.payRow}>
-          <Button
-            isDisabled={cart.lines.length === 0 || hold.isPending}
-            onPress={() => hold.mutate(cart, { onError: (e) => setProblem(errorText(e)) })}
-          >
-            <Pause className={iconClass.sm} aria-hidden="true" />
-            {t('hold')} <kbd>{t('keys.f6')}</kbd>
-          </Button>
-          <Button
-            variant="fin"
-            className={styles.pay}
-            isDisabled={!canPay}
-            onPress={() => setPaying(true)}
-          >
-            {t('pay')} · <bdi>{money(totals.totalFils)}</bdi> <kbd>{t('keys.f12')}</kbd>
-          </Button>
-        </div>
-        {!can('sales.discount_over_limit') && <Note>{t('discountLimitNote')}</Note>}
-      </Card>
+                    <b className={styles.amount}>
+                      <bdi>{p ? money(p.grossFils) : '—'}</bdi>
+                    </b>
+                    <span className={styles.qty}>
+                      <button
+                        type="button"
+                        aria-label={t('less')}
+                        onClick={() => cartStore.set((c) => stepQuantity(c, l.key, -1))}
+                      >
+                        <Minus className={iconClass.sm} aria-hidden="true" />
+                      </button>
+                      <b>{l.quantity}</b>
+                      <button
+                        type="button"
+                        aria-label={t('more')}
+                        onClick={() => cartStore.set((c) => stepQuantity(c, l.key, 1))}
+                      >
+                        <Plus className={iconClass.sm} aria-hidden="true" />
+                      </button>
+                    </span>
+                    <span className={styles.lineActs}>
+                      <button
+                        type="button"
+                        className={styles.iconBtn}
+                        aria-label={t('editLine')}
+                        onClick={() => setEditing(l.key)}
+                      >
+                        <Pencil className={iconClass.sm} aria-hidden="true" />
+                      </button>
+                      <button
+                        type="button"
+                        className={cx(styles.iconBtn, styles.remove)}
+                        aria-label={t('removeLine')}
+                        onClick={() => cartStore.set((c) => removeLine(c, l.key))}
+                      >
+                        <Trash2 className={iconClass.sm} aria-hidden="true" />
+                      </button>
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+
+          <div className={styles.payBox}>
+            <div className={styles.sum}>
+              <span>{t('net')}</span>
+              <bdi>{money(totals.netFils)}</bdi>
+            </div>
+            <div className={styles.sum}>
+              <span>{vatLabel}</span>
+              <bdi>{money(totals.vatFils)}</bdi>
+            </div>
+            <div className={styles.grandRow}>
+              <span>{t('totalWithVat')}</span>
+              <b>
+                <bdi>
+                  {money(totals.totalFils)} <small>{t('currency')}</small>
+                </bdi>
+              </b>
+            </div>
+            {problem && <Alert>{problem}</Alert>}
+            <Button
+              variant="fin"
+              className={styles.pay}
+              isDisabled={!canPay}
+              onPress={() => setPaying(true)}
+            >
+              <span>{t('pay')}</span>
+              <kbd>{t('keys.f12')}</kbd>
+            </Button>
+          </div>
+        </Card>
+      </div>
 
       {paying && (
         <PaymentDialog
@@ -297,9 +370,35 @@ function Register({ state }: { state: PosState }) {
         />
       )}
       {returning && <ReturnDialog state={state} onClose={() => setReturning(false)} />}
+      {choosingCustomer && (
+        <Dialog isOpen onClose={() => setChoosingCustomer(false)} title={t('chooseCustomer')}>
+          <div className={styles.customerDialog}>
+            <CustomerPicker
+              value={null}
+              autoFocus
+              onChange={(c) => {
+                cartStore.set((cur) => ({ ...cur, customer: c }));
+                if (c) setChoosingCustomer(false);
+              }}
+            />
+            <Note>{t('fullInvoiceNote')}</Note>
+          </div>
+        </Dialog>
+      )}
     </div>
   );
 }
+
+/** The tile of a product card: an icon and a tone per category (design 03). */
+const CATEGORY_LOOK: Record<string, { icon: LucideIcon; tone: Tone }> = {
+  CHEM: { icon: FlaskConical, tone: 'info' },
+  EQUIP: { icon: Cog, tone: 'warn' },
+  CLEAN: { icon: Brush, tone: 'ok' },
+  PARTS: { icon: Wrench, tone: 'credit' },
+  SERV: { icon: Wrench, tone: 'primary' },
+};
+const lookOf = (category: CategoryItem | undefined) =>
+  (category && CATEGORY_LOOK[category.code]) ?? { icon: Package, tone: 'primary' as Tone };
 
 /** Search (name words, code, barcode), categories and the item cards with their stock. */
 function Catalog(props: {
@@ -318,6 +417,8 @@ function Catalog(props: {
   }, [text]);
   const catalog = useCatalog(q, category);
   const items = (catalog.data?.items ?? []).filter((i) => i.isActive && i.isSellable && i.price);
+  const activeCategories = (categories.data ?? []).filter((c) => c.isActive);
+  const categoryOf = (id: string) => activeCategories.find((c) => c.id === id);
 
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key !== 'Enter') return;
@@ -339,43 +440,51 @@ function Catalog(props: {
   };
 
   return (
-    <Card className={styles.catalog}>
-      <div className={styles.search}>
-        <Search className={iconClass.md} aria-hidden="true" />
-        <input
-          ref={props.searchRef}
-          className={styles.searchInput}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={onKeyDown}
-          placeholder={t('searchHint')}
-          aria-label={t('search')}
-          autoFocus
-        />
-        <kbd>{t('keys.f2')}</kbd>
+    <Card className={styles.catalog} padding="compact">
+      <div className={styles.searchRow}>
+        <label className={styles.search}>
+          <Search className={iconClass.md} aria-hidden="true" />
+          <input
+            ref={props.searchRef}
+            className={styles.searchInput}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={onKeyDown}
+            placeholder={t('searchHint')}
+            aria-label={t('search')}
+            autoFocus
+          />
+          <kbd>{t('keys.f2')}</kbd>
+        </label>
+        <Button onPress={() => props.searchRef.current?.focus()}>
+          <ScanBarcode className={iconClass.sm} aria-hidden="true" />
+          {t('scan')}
+        </Button>
       </div>
       <div className={styles.cats} role="group" aria-label={t('categories')}>
         <button
           type="button"
-          className={cx(styles.cat, category === null && styles.catOn)}
+          className={styles.cat}
           aria-pressed={category === null}
           onClick={() => setCategory(null)}
         >
           {t('allCategories')}
         </button>
-        {(categories.data ?? [])
-          .filter((c) => c.isActive)
-          .map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              className={cx(styles.cat, category === c.id && styles.catOn)}
-              aria-pressed={category === c.id}
-              onClick={() => setCategory(c.id)}
-            >
-              {name(c)}
-            </button>
-          ))}
+        {activeCategories.map((c) => (
+          <button
+            key={c.id}
+            type="button"
+            className={styles.cat}
+            aria-pressed={category === c.id}
+            onClick={() => setCategory(c.id)}
+          >
+            {name(c)}
+          </button>
+        ))}
+      </div>
+      <div className={styles.gridHead}>
+        <h2>{t('products')}</h2>
+        <span className={styles.muted}>{t('productsCount', { count: items.length })}</span>
       </div>
       {items.length === 0 && !catalog.isLoading ? (
         <p className={styles.empty}>{t('noItems')}</p>
@@ -384,24 +493,43 @@ function Catalog(props: {
           {items.map((item) => {
             const onHand = item.stock ? BigInt(item.stock.onHandMilli) : null;
             const out = onHand !== null && onHand <= 0n;
+            const low = !out && item.stock?.toReorder === true;
+            const look = lookOf(categoryOf(item.categoryId));
+            const Icon = look.icon;
+            const qty = onHand === null ? '' : formatQuantity(onHand).replace(/\.?0+$/, '');
             return (
               <li key={item.id}>
-                <button type="button" className={styles.itemCard} onClick={() => props.onAdd(item)}>
-                  <span className={styles.itemName}>{name(item)}</span>
-                  <span className={styles.muted}>
+                <button
+                  type="button"
+                  className={cx(styles.prod, out && styles.prodOut)}
+                  onClick={() => props.onAdd(item)}
+                >
+                  <span className={styles.prodHead}>
+                    <Tile tone={look.tone}>
+                      <Icon className={iconClass.sm} aria-hidden="true" />
+                    </Tile>
+                    {onHand !== null &&
+                      (out ? (
+                        <Chip tone="danger">{t('outOfStock')}</Chip>
+                      ) : (
+                        <Chip tone={low ? 'warn' : 'ok'}>
+                          {t(low ? 'lowStock' : 'inStock', { qty })}
+                        </Chip>
+                      ))}
+                  </span>
+                  <strong className={styles.prodName}>{name(item)}</strong>
+                  <span className={styles.code}>
                     <bdi>{item.code}</bdi>
                   </span>
-                  <span className={styles.itemFoot}>
-                    <b>
-                      <bdi>{money(roundPrice(item.price!.price4dp))}</bdi>
-                    </b>
-                    {onHand !== null && (
-                      <span className={cx(styles.stock, out && styles.stockOut)}>
-                        {out
-                          ? t('outOfStock')
-                          : t('inStock', { qty: formatQuantity(onHand).replace(/\.?0+$/, '') })}
-                      </span>
-                    )}
+                  <span className={styles.prodFoot}>
+                    <span className={styles.price}>
+                      <bdi>
+                        {money(roundPrice(item.price!.price4dp))} <small>{t('currency')}</small>
+                      </bdi>
+                    </span>
+                    <span className={styles.addMark} aria-hidden="true">
+                      <Plus className={iconClass.sm} />
+                    </span>
                   </span>
                 </button>
               </li>

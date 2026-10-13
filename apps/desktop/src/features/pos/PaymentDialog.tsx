@@ -6,7 +6,7 @@
  * After the sale the receipt prints by itself and the drawer opens when cash was paid.
  */
 import { useEffect, useState, type FormEvent } from 'react';
-import { CheckCircle2, CreditCard, FileText, Printer, Wallet } from 'lucide-react';
+import { CheckCircle2, FileText, Printer } from 'lucide-react';
 import { useNavigate } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
 import { MoneyFormatError, parseFils } from '@artepool/shared';
@@ -273,9 +273,7 @@ export function PaymentDialog(props: {
                   <bdi>{money(change)}</bdi>
                 </b>
               </div>
-              <Note>
-                <Wallet className={iconClass.sm} aria-hidden="true" /> {t('payment.drawerOpens')}
-              </Note>
+              <Note>{t('payment.drawerOpens')}</Note>
             </>
           )}
           {mode === 'split' && (
@@ -294,7 +292,6 @@ export function PaymentDialog(props: {
           {(mode === 'card' || mode === 'split') && (
             <>
               <Note>
-                <CreditCard className={iconClass.sm} aria-hidden="true" />{' '}
                 {t('payment.chargeTerminal', { amount: money(cardFils > 0n ? cardFils : 0n) })}
               </Note>
               <TextField
