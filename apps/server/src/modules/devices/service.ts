@@ -196,6 +196,15 @@ export async function complete(
         .where('is_active', '=', true)
         .orderBy('id')
         .executeTakeFirstOrThrow();
+      // The computer name is unique among active PCs (devices_active_code_uq). Say so plainly;
+      // the transaction rolls back and the code stays usable with another name.
+      const taken = await trx
+        .selectFrom('auth.devices')
+        .select('id')
+        .where(sql<string>`upper(code)`, '=', body.deviceCode.toUpperCase())
+        .where('status', '=', 'active')
+        .executeTakeFirst();
+      if (taken) throw new AppError('DEVICE_CODE_TAKEN', 'Computer name already enrolled');
       const days = await deps.settings.number('security.device_key_days');
       const device = await trx
         .insertInto('auth.devices')

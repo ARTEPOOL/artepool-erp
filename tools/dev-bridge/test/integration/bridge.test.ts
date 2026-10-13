@@ -118,6 +118,18 @@ describe('enrolling this PC', () => {
     expect(await readDevice(pc.deviceFile)).toBeNull();
   });
 
+  it('says when the computer name is taken; the same code then works with another name', async () => {
+    // COUNTER-01 was enrolled by the first test.
+    const code = await newCode();
+    const pc = await newPc();
+    expect(await pc.bridge.enroll(input(code, 'counter-01'))).toEqual({
+      ok: false,
+      reason: 'code_taken',
+    });
+    expect(await readDevice(pc.deviceFile)).toBeNull();
+    expect(await pc.bridge.enroll(input(code, 'OTHER-PC'))).toMatchObject({ ok: true });
+  });
+
   it('explains an address it cannot use or reach', async () => {
     const pc = await newPc();
     expect(await pc.bridge.enroll({ ...input('X'), serverAddress: 'http://plain' })).toEqual({

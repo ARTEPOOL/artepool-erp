@@ -76,6 +76,8 @@ export type EnrollFailure =
   | 'not_genuine'
   /** The server refused the code at the last step (expired meanwhile, or too many attempts). */
   | 'code_rejected'
+  /** Another active PC already has this computer name; the code stays usable. */
+  | 'code_taken'
   /** Too many attempts from this PC; wait a minute. */
   | 'rate_limited'
   /** The server could not enroll right now. */
