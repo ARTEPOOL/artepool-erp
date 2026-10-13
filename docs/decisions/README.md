@@ -61,6 +61,14 @@ There is one short file per decision, numbered in order.
 | [0052](0052-payment-allocation-oldest-first.md) | A payment without chosen invoices settles the oldest first; the rest is an advance | Accepted |
 | [0054](0054-no-approval-for-stock-adjustments.md) | Stock adjustments need no supervisor's approval (the limit setting is empty) | Accepted |
 | [0053](0053-new-item-quantity.md) | A new item's quantity on hand is entered with the item by the owner, accountant or storekeeper (as its opening stock) | Accepted |
+| [0055](0055-thermal-printer-esc-pos.md) | Thermal receipts: standard 80 mm ESC/POS printers, drawer on the printer | Accepted |
+| [0056](0056-blind-count-denominations.md) | Shift count: denominations down to 0.05 AED plus an "other amount" | Accepted |
+| [0057](0057-cash-drop-alert.md) | Cash drop alert above AED 3,000 | Accepted |
+| [0058](0058-shift-variance-acceptance.md) | Shift over/short: accepted by the owner or accountant; alert on repeated variances | Accepted |
+| [0059](0059-pos-discounts-and-prices.md) | POS discounts and price changes: the same rules as A4 invoices | Accepted |
+| [0060](0060-pos-returns.md) | POS returns: a credit note, refunded from the open shift | Accepted |
+| [0061](0061-card-payments-no-card-data.md) | Card payments: amount and approval code only | Accepted |
+| [0062](0062-pos-receipt-and-customer.md) | POS receipt in Arabic and English; cash customer by default | Accepted |
 
 ## Template
 
