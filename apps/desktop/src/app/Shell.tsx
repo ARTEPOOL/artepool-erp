@@ -36,7 +36,9 @@ type NavItem =
         | '/items'
         | '/customers'
         | '/suppliers'
-        | '/accounting';
+        | '/accounting'
+        | '/pos'
+        | '/shifts';
       permission: string;
     }
   /** Arrives in a later milestone: shown, greyed, so the layout matches the design. */
@@ -44,7 +46,7 @@ type NavItem =
 
 /** The side menu (design 02; decision 0034): every entry needs its permission. */
 const NAV: NavItem[] = [
-  { key: 'pos', icon: <ShoppingCart aria-hidden="true" />, later: true },
+  { key: 'pos', icon: <ShoppingCart aria-hidden="true" />, to: '/pos', permission: 'pos.sell' },
   // Sales (decision 0045): each section has its own entry.
   {
     key: 'invoices',
@@ -77,7 +79,7 @@ const NAV: NavItem[] = [
     to: '/suppliers',
     permission: 'suppliers.manage',
   },
-  { key: 'shifts', icon: <Wallet aria-hidden="true" />, later: true },
+  { key: 'shifts', icon: <Wallet aria-hidden="true" />, to: '/shifts', permission: 'shifts.open' },
   { key: 'reports', icon: <LineChart aria-hidden="true" />, later: true },
   {
     key: 'accounting',
@@ -91,6 +93,7 @@ const NAV: NavItem[] = [
 function crumbOf(path: string): string {
   if (path.startsWith('/settings')) return 'settings';
   if (path.startsWith('/stock')) return 'items';
+  if (path.startsWith('/pos')) return 'pos';
   const found = NAV.find((item) => 'to' in item && path.startsWith(item.to));
   return found?.key ?? 'dashboard';
 }

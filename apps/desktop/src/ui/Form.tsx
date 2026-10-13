@@ -27,7 +27,7 @@ export interface TextFieldProps {
   hint?: ReactNode;
   autoComplete?: string;
   autoFocus?: boolean;
-  inputMode?: 'text' | 'numeric';
+  inputMode?: 'text' | 'numeric' | 'decimal';
   maxLength?: number;
   placeholder?: string;
   multiline?: boolean;

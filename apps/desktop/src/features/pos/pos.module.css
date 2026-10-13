@@ -1,0 +1,423 @@
+/* The point of sale and the shift screens (designs 03, 04, 08). Tokens and logical properties
+   only, so the same layout works right to left and left to right. */
+
+.register {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(22rem, 28rem);
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: var(--space-4);
+  min-block-size: calc(100vh - var(--topbar-height) - var(--space-8));
+}
+
+.bar {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.barTitle {
+  font-size: var(--text-h2);
+  font-weight: 700;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.linkButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-block-size: var(--control-md);
+  padding-inline: var(--space-3);
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.linkButton:hover {
+  border-color: var(--color-primary);
+}
+
+.muted {
+  color: var(--color-text-secondary);
+  font-size: var(--text-caption);
+}
+
+.empty {
+  padding-block: var(--space-6);
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+
+/* --- catalog -------------------------------------------------------------------------------- */
+.catalog {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: var(--space-3);
+  min-block-size: 0;
+}
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding-inline: var(--space-3);
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.search:focus-within {
+  border-color: var(--color-primary);
+  outline: 3px solid var(--color-primary-soft);
+}
+
+.searchInput {
+  flex: 1;
+  min-block-size: var(--control-lg);
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--text-body);
+  outline: none;
+}
+
+.cats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.cat {
+  min-block-size: var(--control-sm);
+  padding-inline: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.catOn {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+  align-content: start;
+}
+
+.itemCard {
+  display: grid;
+  gap: var(--space-1);
+  inline-size: 100%;
+  min-block-size: var(--touch-target);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.itemCard:hover,
+.itemCard:focus-visible {
+  border-color: var(--color-primary);
+  outline: none;
+}
+
+.itemName {
+  font-weight: 600;
+}
+
+.itemFoot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.stock {
+  font-size: var(--text-caption);
+  color: var(--color-success);
+}
+
+.stockOut {
+  color: var(--color-danger);
+}
+
+/* --- cart ----------------------------------------------------------------------------------- */
+.cart {
+  display: grid;
+  align-content: start;
+  gap: var(--space-3);
+}
+
+.cartHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.cartHead h2 {
+  margin: 0;
+  font-size: var(--text-h3);
+}
+
+.lines {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  max-block-size: 40vh;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto auto;
+  align-items: center;
+  gap: var(--space-2);
+  padding-block: var(--space-2);
+  border-block-end: 1px solid var(--color-border);
+}
+
+.lineName {
+  display: grid;
+  min-inline-size: 0;
+}
+
+.qty {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.qtyValue {
+  min-inline-size: 2rem;
+  text-align: center;
+  font-weight: 600;
+}
+
+.amount {
+  min-inline-size: 5rem;
+  text-align: end;
+  font-weight: 600;
+}
+
+.totals {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
+}
+
+.totals dd {
+  margin: 0;
+  text-align: end;
+}
+
+.grand {
+  font-size: var(--text-pos-total);
+  font-weight: 700;
+}
+
+.payRow {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.pay {
+  flex: 1;
+}
+
+/* --- payment, dialogs ----------------------------------------------------------------------- */
+.payForm {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.due,
+.change {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-muted);
+}
+
+.due b,
+.change b {
+  font-size: var(--text-pos-total);
+}
+
+.quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.shortages {
+  margin: 0;
+  padding-inline-start: var(--space-4);
+}
+
+.done {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2);
+  text-align: center;
+}
+
+.doneIcon {
+  inline-size: var(--control-lg);
+  block-size: var(--control-lg);
+  color: var(--color-success);
+}
+
+.doneChange {
+  font-size: var(--text-h3);
+}
+
+.preview {
+  inline-size: 100%;
+  max-inline-size: 20rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+}
+
+.heldList {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.heldItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  padding-block: var(--space-2);
+  border-block-end: 1px solid var(--color-border);
+}
+
+.heldActions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.findRow {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+}
+
+.returnTable,
+.countTable {
+  inline-size: 100%;
+  border-collapse: collapse;
+}
+
+.returnTable th,
+.returnTable td,
+.countTable th,
+.countTable td {
+  padding: var(--space-1) var(--space-2);
+  border-block-end: 1px solid var(--color-border);
+  text-align: start;
+}
+
+.qtyInput {
+  inline-size: 6rem;
+  min-block-size: var(--control-sm);
+  padding-inline: var(--space-2);
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  text-align: end;
+}
+
+.bad {
+  border-color: var(--color-danger);
+}
+
+.varianceOff {
+  color: var(--color-danger);
+}
+
+/* --- shift screens -------------------------------------------------------------------------- */
+.openCard {
+  max-inline-size: 28rem;
+}
+
+.actionsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  gap: var(--space-4);
+  margin-block-end: var(--space-4);
+}
+
+.actionButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-block-end: var(--space-2);
+}
+
+.report {
+  display: grid;
+  margin: 0;
+}
+
+.reportRow {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-block: var(--space-1);
+  border-block-end: 1px solid var(--color-border);
+}
+
+.reportRow dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+.tableTools {
+  padding: var(--space-3);
+}
+
+.clickRow {
+  cursor: pointer;
+}
+
+@media (width <= 60rem) {
+  .register {
+    grid-template-columns: 1fr;
+  }
+}
