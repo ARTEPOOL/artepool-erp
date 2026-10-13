@@ -279,8 +279,9 @@ The detail is in [`database-schema.md` §16](database-schema.md#16-migration-ord
 | 0016 | e-invoice outbox, print templates | M4 |
 | 0017 | sales fixes (quotation prices kept on conversion, notes on payment invoices, credit-limit permission) | M4 |
 | 0018 | sales review fixes (separate price and discount approvals, notes follow the original line, prepaid invoices settled) | M4 |
-| 0019 | cash movements, drawer events | M5 |
-| 0020 | backup and integrity records | M6 |
+| 0019 | a new item's quantity on hand (decision 0053) | M4 |
+| 0020 | cash movements, drawer events | M5 |
+| 0021 | backup and integrity records | M6 |
 
 ---
 
@@ -388,7 +389,7 @@ A milestone is done only when its tests pass in CI.
 ### M4 — Invoices (A4) section
 
 **Delivers:**
-- Migrations 0014–0018.
+- Migrations 0014–0019.
 - Quotations (with revisions) → invoices (`INV-`).
 - Simplified or full format chosen automatically from the customer's VAT registration.
 - Per-line price, discount, net and VAT; the document discount spread across lines.
@@ -418,7 +419,7 @@ A milestone is done only when its tests pass in CI.
 ### M5 — POS and cash
 
 **Delivers:**
-- Migration 0019.
+- Migration 0020.
 - The POS screen: keyboard and scanner, split tender, hold/resume.
 - **Silent thermal receipts** (simplified or full), the drawer kick only on cash.
 - Cart-removal events logged without approval.
@@ -453,7 +454,7 @@ A milestone is done only when its tests pass in CI.
 ### M6 — Operations
 
 **Delivers:**
-- Migration 0020.
+- Migration 0021.
 - The backup agent: WAL archive, hourly dump, nightly base backup, `age`-encrypted daily off-site upload, external-drive reminders.
 - The restore test into `artepool_restore_test`, the nightly integrity checks and the system-health screen.
 - The server installer (PostgreSQL configuration, roles, CA and certificates, firewall, services) and the client installer (CA trust, offline WebView2).

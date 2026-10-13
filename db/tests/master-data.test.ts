@@ -447,7 +447,8 @@ describe('kits (bundles)', () => {
       [kit, chlorine],
     );
     const { rows } = await api.query(
-      `SELECT action FROM audit.log WHERE entity_type = 'md.bundle_components' AND entity_id = $1`,
+      `SELECT action FROM audit.log WHERE entity_type = 'md.bundle_components' AND entity_id = $1
+        ORDER BY id`,
       [`${kit}:${chlorine}`],
     );
     expect(rows).toEqual([{ action: 'insert' }, { action: 'delete' }]);

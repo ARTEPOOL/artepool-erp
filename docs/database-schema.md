@@ -1670,10 +1670,11 @@ Migrations are written **in build order** (milestones in [`phase-1-plan.md`](pha
 | 0016 | `outbox_print` | M4 | `ops.outbox`, `sys.print_templates`, `sys.print_template_versions` (default A4 designs, decision 0050) | `print_template_version_id` on documents, quotations and payments |
 | 0017 | `sales_fixes` | M4 | — (a converted line keeps the quotation price; prices and discounts checked when a quotation is sent; advance lines on a credit note of a payment invoice; `sales.credit_over_limit` bypasses the credit check) | `sales.document_lines.quotation_line_id` |
 | 0018 | `sales_review_fixes` | M4 | — (a price approval never waives the discount limit; note lines follow their original line; an issued document with nothing to pay is settled) | `sales.quotations.price_approval_id` |
-| 0019 | `cash_events` | M5 | `cash.movements`, `cash.drawer_events` + shift summary view | `gl.journal_entries.cash_movement_id` |
-| 0020 | `ops_backup` | M6 | `ops.backup_runs`, `ops.integrity_runs` + backup role grants | — |
+| 0019 | `new_item_quantity` | M4 | — (permission `stock.new_item_quantity` for owner, accountant, storekeeper; opening stock allowed for an item created in the same transaction, decision 0053) | — |
+| 0020 | `cash_events` | M5 | `cash.movements`, `cash.drawer_events` + shift summary view | `gl.journal_entries.cash_movement_id` |
+| 0021 | `ops_backup` | M6 | `ops.backup_runs`, `ops.integrity_runs` + backup role grants | — |
 
-After 0020, a final check asserts that every business table has the audit trigger, the no-delete guard and the expected grants. The same check runs as an automated test.
+After 0021, a final check asserts that every business table has the audit trigger, the no-delete guard and the expected grants. The same check runs as an automated test.
 
 ---
 

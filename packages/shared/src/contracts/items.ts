@@ -232,7 +232,8 @@ export const CreateItemRequest = ItemFields.extend({
   code: Code,
   /**
    * A new stock item's quantity on hand now, posted as its opening stock in the same transaction
-   * (owner only, stock.opening, decision 0042). Without a cost: the item's purchase price.
+   * (stock.new_item_quantity: owner, accountant, storekeeper; decision 0053). Without a cost: the
+   * item's purchase price. Only someone with stock.view_cost may type the cost.
    */
   openingStock: z
     .object({

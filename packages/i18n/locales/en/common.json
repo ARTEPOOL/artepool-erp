@@ -99,6 +99,7 @@
       "COST_UNKNOWN": "This item has no cost: type the unit cost or set the item's purchase price.",
       "OPENING_OWNER_ONLY": "Only the owner posts opening stock.",
       "OPENING_ALREADY_POSTED": "Opening stock is already posted for an item in this document. Any later change is a stock adjustment.",
+      "PRINTER_UNAVAILABLE": "The server could not prepare the PDF: the printing browser is missing. On the server PC run: pnpm --filter @artepool/server exec playwright-core install chromium-headless-shell",
       "QUOTATION_LINE": "This line is not on the document's quotation.",
       "PRINT_OWNER_ONLY": "Only the owner designs print templates.",
       "ADVANCE_DEDUCTION": "A deduction cannot be more than what remains of the payment, nor another customer's payment.",

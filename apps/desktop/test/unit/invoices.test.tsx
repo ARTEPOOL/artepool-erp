@@ -516,6 +516,53 @@ describe('Invoices (A4): a new invoice', () => {
     );
   });
 
+  it('starts with the cash customer; the lists open on focus; a new customer can be added', async () => {
+    const WALK_IN: CustomerListItem = {
+      ...CUSTOMER,
+      id: '1',
+      code: 'C-0001',
+      customerType: 'individual',
+      name: 'عميل نقدي',
+      phone: null,
+      isVatRegistered: false,
+      trn: null,
+      isWalkIn: true,
+    };
+    const bridge = bridgeFor([...OFFICE, 'customers.manage'], '/invoices/new').on(
+      'GET',
+      '/api/v1/customers',
+      ok({ customers: [WALK_IN, CUSTOMER], total: 2, counts: { active: 2, vatRegistered: 1 } }),
+    );
+    await signIn(bridge, 'New tax invoice');
+    // The cash customer is chosen by default (simplified invoice).
+    const chosen = await screen.findByRole('group', { name: 'Customer' });
+    expect(await within(chosen).findByText('Cash customer')).toBeTruthy();
+    expect(
+      screen.getByText('The customer is not VAT-registered: a simplified tax invoice.'),
+    ).toBeTruthy();
+
+    // The items list opens on focus, before anything is typed.
+    fireEvent.focus(screen.getByRole('searchbox', { name: /Search items/ }));
+    const results = await screen.findByRole('list', { name: 'Search results' });
+    expect(await within(results).findByRole('button', { name: /Pool pump/ })).toBeTruthy();
+    expect(bridge.calls.some((c) => c.path === '/api/v1/items?status=active&pageSize=20')).toBe(
+      true,
+    );
+
+    // "Change customer": the list opens straight away, with "Add a new customer".
+    fireEvent.click(within(chosen).getByRole('button', { name: 'Change customer' }));
+    const search = await screen.findByRole('searchbox', {
+      name: 'Search customers by name, phone or TRN',
+    });
+    fireEvent.focus(search);
+    const customers = await screen.findByRole('list', { name: 'Customers' });
+    expect(
+      await within(customers).findByRole('button', { name: /Blue Lagoon Villas/ }),
+    ).toBeTruthy();
+    fireEvent.click(within(customers).getByRole('button', { name: 'Add a new customer' }));
+    expect(await screen.findByRole('dialog', { name: 'New customer' })).toBeTruthy();
+  });
+
   it('a saved draft is updated with PUT and its row version; earlier payments are deducted', async () => {
     const ADVANCE = item({
       id: '201',

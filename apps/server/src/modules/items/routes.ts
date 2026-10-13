@@ -64,11 +64,17 @@ export function registerItemRoutes(app: FastifyInstance): void {
           .where('category', '=', 'other')
           .where('code', '=', 'OPENING')
           .executeTakeFirstOrThrow();
-        await createAdjustment(trx, request.auth, {
-          kind: 'opening',
-          reasonCodeId: reason.id.toString(),
-          lines: [{ itemId: item.id, ...body.openingStock }],
-        });
+        await createAdjustment(
+          trx,
+          request.auth,
+          {
+            kind: 'opening',
+            reasonCodeId: reason.id.toString(),
+            lines: [{ itemId: item.id, ...body.openingStock }],
+          },
+          null,
+          { newItem: true },
+        );
       }
       return { status: 201, body: item };
     },

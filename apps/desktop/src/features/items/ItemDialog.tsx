@@ -341,8 +341,10 @@ export function ItemDialog(props: {
   const isNew = base === undefined;
   const canPrice = can('prices.manage');
   const canCost = can('items.cost');
-  // The owner types a new stock item's quantity on hand straight away (its opening stock, 0042).
-  const canOpening = can('stock.opening');
+  // A new stock item's quantity on hand, typed straight away (its opening stock, decision 0053):
+  // owner, accountant, storekeeper. Its cost only by those who see costs (decision 0040).
+  const canOpening = can('stock.opening') || can('stock.new_item_quantity');
+  const canOpeningCost = can('stock.view_cost');
   const [form, setForm] = useState<ItemForm>(() =>
     props.item ? formFromItem(props.item) : emptyForm({ unitId: '', vatCategoryId: '' }),
   );
@@ -721,16 +723,18 @@ export function ItemDialog(props: {
                 hint={unit ? t('dialog.openingQtyHint', { unit: name(unit) }) : undefined}
                 error={fieldText('openingQty')}
               />
-              <TextField
-                label={t('fields.openingCost')}
-                value={form.openingCost}
-                onChange={(openingCost) => set({ openingCost })}
-                ltr
-                inputMode="text"
-                autoComplete="off"
-                hint={t('dialog.openingCostHint')}
-                error={fieldText('openingCost')}
-              />
+              {canOpeningCost && (
+                <TextField
+                  label={t('fields.openingCost')}
+                  value={form.openingCost}
+                  onChange={(openingCost) => set({ openingCost })}
+                  ltr
+                  inputMode="text"
+                  autoComplete="off"
+                  hint={t('dialog.openingCostHint')}
+                  error={fieldText('openingCost')}
+                />
+              )}
             </div>
           </fieldset>
         )}

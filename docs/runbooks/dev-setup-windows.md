@@ -243,7 +243,7 @@ The server turns invoices, quotations, receipts and statements into PDFs with a 
 ```
 pnpm --filter @artepool/server exec playwright-core install chromium-headless-shell
 ```
-- Without it, printing an A4 document answers with an error; everything else works.
+- Without it, the server uses Microsoft Edge (on every Windows PC) to make the PDF. If neither starts, printing shows a message saying what to install; everything else works.
 - On the server PC the installer (M6) puts a fixed browser in place and sets `ARTEPOOL_CHROMIUM` to it.
 
 ## Step 17 (optional): Run the screen tests and the Rust tests

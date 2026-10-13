@@ -66,11 +66,11 @@ export async function listCustomers(
   if (query.q) {
     const q = query.q;
     const phone = normalizePhone(q);
+    // A phone number is matched as a phone; anything else by its words, in any order.
     base = base.where((eb) =>
-      eb.or([
-        matchesWords('search_key', q),
-        ...(phone ? [eb('phone', '=', phone), eb('phone_alt', '=', phone)] : []),
-      ]),
+      phone
+        ? eb.or([eb('phone', '=', phone), eb('phone_alt', '=', phone)])
+        : matchesWords('search_key', q),
     );
   }
   const total = await base

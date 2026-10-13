@@ -695,3 +695,86 @@ describe('stock figures, oversell review and the journal', () => {
     ).toBe(403);
   });
 });
+
+describe("a new item's quantity on hand (decision 0053)", () => {
+  it('the accountant creates a stock item with its quantity: opening stock in the same step', async () => {
+    const r = await accountant('POST', '/api/v1/items', {
+      code: 'NEWQ-01',
+      itemType: 'stock',
+      nameAr: 'صنف بكمية',
+      nameEn: 'Item with quantity',
+      categoryId: ids.category,
+      unitId: ids.unit,
+      vatCategoryId: ids.vat,
+      isSellable: false,
+      // The accountant sees costs, so may type one (decision 0040): 1.25 a unit.
+      openingStock: { quantityMilli: '8000', unitCost4dp: '12500' },
+    });
+    expect(r.statusCode).toBe(201);
+    const created = r.json<ItemDetail>();
+    const stock = (
+      await owner('GET', `/api/v1/items/${created.id}/stock`)
+    ).json<ItemStockResponse>();
+    // 8 × 1.25 = 10.00.
+    expect(stock.balances[0]).toMatchObject({ quantityMilli: '8000', value4dp: '100000' });
+    // Opening stock for an item that already exists stays the owner's.
+    const existing = await item('NEWQ-02', '10000');
+    expect(
+      await refusal(
+        adjust(accountant, {
+          kind: 'opening',
+          reasonCodeId: ids.opening,
+          lines: [{ itemId: existing.id, quantityMilli: '1000' }],
+        }),
+      ),
+    ).toMatchObject({ status: 403 });
+  });
+
+  it('a refused quantity leaves no item behind (one transaction)', async () => {
+    const r = await cashier('POST', '/api/v1/items', {
+      code: 'NEWQ-03',
+      itemType: 'stock',
+      nameAr: 'صنف',
+      nameEn: 'Item',
+      categoryId: ids.category,
+      unitId: ids.unit,
+      vatCategoryId: ids.vat,
+      isSellable: false,
+      openingStock: { quantityMilli: '1000' },
+    });
+    expect(r.statusCode).toBe(403);
+    const { rows } = await server.admin.query(`SELECT 1 FROM md.items WHERE code = 'NEWQ-03'`);
+    expect(rows).toHaveLength(0);
+  });
+});
+
+describe('search by words in any order', () => {
+  it('finds an item from its words typed in another order, with other Arabic letter forms', async () => {
+    const r = await owner('POST', '/api/v1/items', {
+      code: 'SRCH-01',
+      itemType: 'stock',
+      nameAr: 'كلور شمس أقراص',
+      nameEn: 'Sun chlorine tablets',
+      categoryId: ids.category,
+      unitId: ids.unit,
+      vatCategoryId: ids.vat,
+      isSellable: false,
+    });
+    expect(r.statusCode).toBe(201);
+    for (const q of ['شمس كلور', 'اقراص شمس', 'tablets sun', 'SRCH chlorine']) {
+      const found = (await owner('GET', `/api/v1/items?q=${encodeURIComponent(q)}`)).json<{
+        items: { code: string }[];
+      }>();
+      expect(found.items.map((i) => i.code)).toContain('SRCH-01');
+    }
+    const none = (await owner('GET', `/api/v1/items?q=${encodeURIComponent('شمس صودا')}`)).json<{
+      items: { code: string }[];
+    }>();
+    expect(none.items.map((i) => i.code)).not.toContain('SRCH-01');
+    // % and _ are plain characters, not wildcards.
+    const wild = (await owner('GET', `/api/v1/items?q=${encodeURIComponent('%')}`)).json<{
+      items: unknown[];
+    }>();
+    expect(wild.items).toHaveLength(0);
+  });
+});

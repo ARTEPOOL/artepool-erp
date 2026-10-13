@@ -185,4 +185,18 @@ test('decision 0013: quotation, two advances with their VAT, the final invoice d
   await expect(page.getByText(first).first()).toBeVisible();
   await expect(page.getByText(second).first()).toBeVisible();
   await snap(page, '74-invoice-final');
+
+  // Print: the server's PDF opens in a hidden frame for the print dialog, which the page's
+  // security policy allows (blob: frames only) — nothing is blocked.
+  const blocked: string[] = [];
+  page.on('console', (m) => {
+    if (m.text().includes('Content Security Policy')) blocked.push(m.text());
+  });
+  await page.evaluate(() => {
+    // The real dialog cannot open in a hidden browser; count the requests instead.
+    (window as unknown as { printed: number }).printed = 0;
+  });
+  await page.getByRole('button', { name: t('sales:print.print'), exact: true }).click();
+  await expect(page.locator('iframe[src^="blob:"]')).toHaveCount(1);
+  expect(blocked).toEqual([]);
 });

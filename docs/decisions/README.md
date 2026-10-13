@@ -59,6 +59,7 @@ There is one short file per decision, numbered in order.
 | [0050](0050-print-designer-after-m4.md) | M4 prints with a default design; the print designer screen follows as M4b | Accepted |
 | [0051](0051-customer-opening-balances-owner-only.md) | Customer opening balances: once at go-live, owner only | Accepted |
 | [0052](0052-payment-allocation-oldest-first.md) | A payment without chosen invoices settles the oldest first; the rest is an advance | Accepted |
+| [0053](0053-new-item-quantity.md) | A new item's quantity on hand is entered with the item by the owner, accountant or storekeeper (as its opening stock) | Accepted |
 
 ## Template
 
