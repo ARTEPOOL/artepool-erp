@@ -175,7 +175,9 @@ async function approval(permission: string) {
 }
 
 // The PDF renderer uses the pinned browser; locally the one the screen tests use.
-process.env.ARTEPOOL_CHROMIUM ??= process.env.ARTEPOOL_E2E_CHROMIUM;
+// (Only when one is named: assigning undefined would store the text "undefined".)
+if (process.env.ARTEPOOL_E2E_CHROMIUM)
+  process.env.ARTEPOOL_CHROMIUM ??= process.env.ARTEPOOL_E2E_CHROMIUM;
 
 beforeAll(async () => {
   server = await startTestServer();
