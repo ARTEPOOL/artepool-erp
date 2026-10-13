@@ -22,7 +22,7 @@
   - printing works: the page's security policy now allows the hidden print frame (only for files the app itself makes), and the server falls back to Microsoft Edge to make the PDF;
   - a new invoice starts with the **cash customer**; clicking the customer search shows the customers at once, with **"Add a new customer"**;
   - **search by any words in any order** (items, customers, suppliers); the lists open as soon as the search box is clicked; arrow keys move through them;
-  - a new stock item can get its **quantity on hand** in the same window (owner, accountant, storekeeper; decision 0053, migration 0019).
+  - the item window shows the **current quantity**: for a new stock item it becomes its opening stock, and when editing a change becomes a stock correction (with a supervisor's approval above the limit); the storekeeper now adds and edits items (decision 0053, migrations 0019–0020).
 - **Not yet:** the Excel import of opening balances, a separate refund screen (refunds go through a credit note), and the print designer screen (M4b).
 
 ## M3 — Inventory and the posting engine (2026-10-12)

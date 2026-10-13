@@ -21,6 +21,8 @@ import {
   type SelectOption,
 } from '../../ui';
 import { errorField, useCan, useErrorText } from '../auth/context';
+import { ruleOf } from '../inventory/parts';
+import { ApprovalDialog } from '../masterdata/ApprovalDialog';
 import { money, priceBoth, rate } from '../masterdata/format';
 import mdStyles from '../masterdata/masterdata.module.css';
 import {
@@ -344,7 +346,12 @@ export function ItemDialog(props: {
   // A new stock item's quantity on hand, typed straight away (its opening stock, decision 0053):
   // owner, accountant, storekeeper. Its cost only by those who see costs (decision 0040).
   const canOpening = can('stock.opening') || can('stock.new_item_quantity');
-  const canOpeningCost = can('stock.view_cost');
+  // Editing: the quantity on hand can be corrected (a stock adjustment, decision 0041).
+  const canEditStock = can('stock.adjust');
+  const [awaitingApproval, setAwaitingApproval] = useState<{
+    body: NonNullable<ReturnType<typeof buildItem>['body']>;
+    code: string;
+  } | null>(null);
   const [form, setForm] = useState<ItemForm>(() =>
     props.item ? formFromItem(props.item) : emptyForm({ unitId: '', vatCategoryId: '' }),
   );
@@ -422,13 +429,27 @@ export function ItemDialog(props: {
       canPrice,
       canCost,
       canOpening,
+      canEditStock,
+      stockNote: t('dialog.stockNote'),
       original: base,
     });
     setErrors(built.errors);
     setFailure(null);
     if (!built.body) return;
-    save.mutate({ body: built.body, code: built.code }, { onError: setFailure });
+    send({ body: built.body, code: built.code });
   };
+
+  const send = (input: { body: NonNullable<ReturnType<typeof buildItem>['body']>; code: string }) =>
+    save.mutate(input, {
+      onError: (error) => {
+        // A large change of the quantity needs a supervisor's approval (decision 0041).
+        if (ruleOf(error) === 'APPROVAL_REQUIRED' && input.body.stockOnHand) {
+          setAwaitingApproval(input);
+          return;
+        }
+        setFailure(error);
+      },
+    });
 
   /** Someone else saved first: load their version and start again from it. */
   const reload = async () => {
@@ -505,277 +526,313 @@ export function ItemDialog(props: {
   const hasErrors = Object.keys(errors).length > 0;
 
   return (
-    <Dialog
-      isOpen
-      onClose={props.onClose}
-      title={isNew ? t('dialog.newTitle') : t('dialog.editTitle')}
-      wide
-      dismissable={false}
-    >
-      <form onSubmit={submit} noValidate className={mdStyles.form}>
-        {stale && (
-          <Alert tone="warn">
-            <div className={styles.staleRow}>
-              <span>{tm('stale')}</span>
-              <Button busy={reloading} onPress={() => void reload()}>
-                <RefreshCw className={iconClass.sm} aria-hidden="true" />
-                {tm('actions.reload')}
-              </Button>
-            </div>
-          </Alert>
-        )}
-        {failure !== null && !stale && !serverField && <Alert>{errorText(failure)}</Alert>}
-        {hasErrors && <Alert>{t('dialog.fixErrors')}</Alert>}
-
-        <div className={styles.field}>
-          <span className={styles.label}>{t('fields.type')}</span>
-          {typeFixed ? (
-            <div className={styles.fixedType}>
-              <span className={styles.typeChip}>
-                <ItemIcon type={form.itemType} />
-                <TypeLabel type={form.itemType} />
-              </span>
-              <Note>
-                {t(`dialog.typeFixed.${base?.inUse ?? ''}`, {
-                  defaultValue: t('dialog.typeFixedOther'),
-                })}
-              </Note>
-            </div>
-          ) : (
-            <Segmented<ItemType>
-              label={t('fields.type')}
-              value={form.itemType}
-              onChange={(itemType) => set({ itemType })}
-              options={(['stock', 'service', 'bundle'] as const).map((type) => ({
-                value: type,
-                label: t(`types.${type}`),
-                icon: <ItemIcon type={type} />,
-              }))}
-            />
-          )}
-          <FieldMessage>{fieldText('itemType')}</FieldMessage>
-        </div>
-
-        <div className={mdStyles.grid2}>
-          <div className={styles.field}>
-            <SelectField
-              id="item-category"
-              label={t('fields.category')}
-              value={form.categoryId}
-              options={categoryOptions}
-              onChange={chooseCategory}
-            />
-            <FieldMessage>{fieldText('categoryId')}</FieldMessage>
-          </div>
-          <TextField
-            label={t('fields.code')}
-            value={form.code}
-            onChange={(code) => set({ code })}
-            ltr
-            autoComplete="off"
-            maxLength={32}
-            isRequired={isNew}
-            isDisabled={!isNew}
-            hint={isNew ? t('dialog.codeHint') : t('dialog.codeFixed')}
-            error={fieldText('code')}
-          />
-          <TextField
-            label={t('fields.nameAr')}
-            value={form.nameAr}
-            onChange={(nameAr) => set({ nameAr })}
-            isRequired
-            maxLength={200}
-            error={fieldText('nameAr')}
-          />
-          <TextField
-            label={t('fields.nameEn')}
-            value={form.nameEn}
-            onChange={(nameEn) => set({ nameEn })}
-            ltr
-            isRequired
-            maxLength={200}
-            error={fieldText('nameEn')}
-          />
-        </div>
-
-        {showDescriptions ? (
-          <div className={mdStyles.grid2}>
-            <TextField
-              label={t('fields.descriptionAr')}
-              value={form.descriptionAr}
-              onChange={(descriptionAr) => set({ descriptionAr })}
-              multiline
-              maxLength={1000}
-            />
-            <TextField
-              label={t('fields.descriptionEn')}
-              value={form.descriptionEn}
-              onChange={(descriptionEn) => set({ descriptionEn })}
-              multiline
-              ltr
-              maxLength={1000}
-            />
-          </div>
-        ) : (
-          <div>
-            <Button variant="ghost" onPress={() => setShowDescriptions(true)}>
-              <Plus className={iconClass.sm} aria-hidden="true" />
-              {t('dialog.addDescriptions')}
-            </Button>
-          </div>
-        )}
-
-        <div className={mdStyles.grid3}>
-          <div className={styles.field}>
-            <SelectField
-              id="item-unit"
-              label={t('fields.unit')}
-              value={form.unitId}
-              options={unitOptions}
-              onChange={(unitId) => set({ unitId })}
-            />
-            <FieldMessage>{fieldText('unitId')}</FieldMessage>
-          </div>
-          <div className={styles.field}>
-            <SelectField
-              id="item-vat"
-              label={t('fields.vatCategory')}
-              value={form.vatCategoryId}
-              options={vatOptions}
-              onChange={(vatCategoryId) => set({ vatCategoryId })}
-            />
-            <FieldMessage>{fieldText('vatCategoryId')}</FieldMessage>
-          </div>
-          <SelectField
-            id="item-line"
-            label={t('fields.businessLine')}
-            value={form.businessLineId}
-            options={lineOptions}
-            onChange={(businessLineId) => set({ businessLineId })}
-          />
-        </div>
-
-        <fieldset className={styles.section}>
-          <legend>{t('dialog.priceSection')}</legend>
-          <div className={mdStyles.grid2}>
-            <TextField
-              label={t('fields.price')}
-              value={form.price}
-              onChange={(price) => set({ price })}
-              ltr
-              inputMode="text"
-              autoComplete="off"
-              isRequired={form.isSellable}
-              isDisabled={!canPrice}
-              hint={canPrice ? t('dialog.priceHint') : t('dialog.priceLocked')}
-              error={fieldText('price')}
-            />
-            <div className={styles.switches}>
-              <Switch
-                isSelected={form.includesVat}
-                isDisabled={!canPrice}
-                onChange={(includesVat) => set({ includesVat })}
-              >
-                {t('fields.includesVat')}
-              </Switch>
-              <Switch isSelected={form.isSellable} onChange={(isSellable) => set({ isSellable })}>
-                {t('fields.forSale')}
-              </Switch>
-            </div>
-          </div>
-          <PriceLine text={form.price} includesVat={form.includesVat} rateBp={rateBp} />
-          {canCost && form.itemType !== 'bundle' && (
-            <>
-              <div className={mdStyles.grid2}>
-                <TextField
-                  label={t('fields.purchaseCost')}
-                  value={form.purchaseCost}
-                  onChange={(purchaseCost) => set({ purchaseCost })}
-                  ltr
-                  inputMode="text"
-                  autoComplete="off"
-                  hint={t('dialog.costHint')}
-                  error={fieldText('purchaseCost4dp')}
-                />
+    <>
+      <Dialog
+        isOpen
+        onClose={props.onClose}
+        title={isNew ? t('dialog.newTitle') : t('dialog.editTitle')}
+        wide
+        dismissable={false}
+      >
+        <form onSubmit={submit} noValidate className={mdStyles.form}>
+          {stale && (
+            <Alert tone="warn">
+              <div className={styles.staleRow}>
+                <span>{tm('stale')}</span>
+                <Button busy={reloading} onPress={() => void reload()}>
+                  <RefreshCw className={iconClass.sm} aria-hidden="true" />
+                  {tm('actions.reload')}
+                </Button>
               </div>
-              <ProfitLine
-                price={form.price}
-                includesVat={form.includesVat}
-                cost={form.purchaseCost}
-                rateBp={rateBp}
-              />
-            </>
+            </Alert>
           )}
-          {canCost && form.itemType === 'bundle' && <Note>{t('dialog.kitCost')}</Note>}
-        </fieldset>
+          {failure !== null && !stale && !serverField && <Alert>{errorText(failure)}</Alert>}
+          {hasErrors && <Alert>{t('dialog.fixErrors')}</Alert>}
 
-        {isNew && canOpening && form.itemType === 'stock' && (
-          <fieldset className={styles.section}>
-            <legend>{t('dialog.openingSection')}</legend>
+          <div className={styles.field}>
+            <span className={styles.label}>{t('fields.type')}</span>
+            {typeFixed ? (
+              <div className={styles.fixedType}>
+                <span className={styles.typeChip}>
+                  <ItemIcon type={form.itemType} />
+                  <TypeLabel type={form.itemType} />
+                </span>
+                <Note>
+                  {t(`dialog.typeFixed.${base?.inUse ?? ''}`, {
+                    defaultValue: t('dialog.typeFixedOther'),
+                  })}
+                </Note>
+              </div>
+            ) : (
+              <Segmented<ItemType>
+                label={t('fields.type')}
+                value={form.itemType}
+                onChange={(itemType) => set({ itemType })}
+                options={(['stock', 'service', 'bundle'] as const).map((type) => ({
+                  value: type,
+                  label: t(`types.${type}`),
+                  icon: <ItemIcon type={type} />,
+                }))}
+              />
+            )}
+            <FieldMessage>{fieldText('itemType')}</FieldMessage>
+          </div>
+
+          <div className={mdStyles.grid2}>
+            <div className={styles.field}>
+              <SelectField
+                id="item-category"
+                label={t('fields.category')}
+                value={form.categoryId}
+                options={categoryOptions}
+                onChange={chooseCategory}
+              />
+              <FieldMessage>{fieldText('categoryId')}</FieldMessage>
+            </div>
+            <TextField
+              label={t('fields.code')}
+              value={form.code}
+              onChange={(code) => set({ code })}
+              ltr
+              autoComplete="off"
+              maxLength={32}
+              isRequired={isNew}
+              isDisabled={!isNew}
+              hint={isNew ? t('dialog.codeHint') : t('dialog.codeFixed')}
+              error={fieldText('code')}
+            />
+            <TextField
+              label={t('fields.nameAr')}
+              value={form.nameAr}
+              onChange={(nameAr) => set({ nameAr })}
+              isRequired
+              maxLength={200}
+              error={fieldText('nameAr')}
+            />
+            <TextField
+              label={t('fields.nameEn')}
+              value={form.nameEn}
+              onChange={(nameEn) => set({ nameEn })}
+              ltr
+              isRequired
+              maxLength={200}
+              error={fieldText('nameEn')}
+            />
+          </div>
+
+          {showDescriptions ? (
             <div className={mdStyles.grid2}>
               <TextField
-                label={t('fields.openingQty')}
-                value={form.openingQty}
-                onChange={(openingQty) => set({ openingQty })}
+                label={t('fields.descriptionAr')}
+                value={form.descriptionAr}
+                onChange={(descriptionAr) => set({ descriptionAr })}
+                multiline
+                maxLength={1000}
+              />
+              <TextField
+                label={t('fields.descriptionEn')}
+                value={form.descriptionEn}
+                onChange={(descriptionEn) => set({ descriptionEn })}
+                multiline
+                ltr
+                maxLength={1000}
+              />
+            </div>
+          ) : (
+            <div>
+              <Button variant="ghost" onPress={() => setShowDescriptions(true)}>
+                <Plus className={iconClass.sm} aria-hidden="true" />
+                {t('dialog.addDescriptions')}
+              </Button>
+            </div>
+          )}
+
+          <div className={mdStyles.grid3}>
+            <div className={styles.field}>
+              <SelectField
+                id="item-unit"
+                label={t('fields.unit')}
+                value={form.unitId}
+                options={unitOptions}
+                onChange={(unitId) => set({ unitId })}
+              />
+              <FieldMessage>{fieldText('unitId')}</FieldMessage>
+            </div>
+            <div className={styles.field}>
+              <SelectField
+                id="item-vat"
+                label={t('fields.vatCategory')}
+                value={form.vatCategoryId}
+                options={vatOptions}
+                onChange={(vatCategoryId) => set({ vatCategoryId })}
+              />
+              <FieldMessage>{fieldText('vatCategoryId')}</FieldMessage>
+            </div>
+            <SelectField
+              id="item-line"
+              label={t('fields.businessLine')}
+              value={form.businessLineId}
+              options={lineOptions}
+              onChange={(businessLineId) => set({ businessLineId })}
+            />
+          </div>
+
+          <fieldset className={styles.section}>
+            <legend>{t('dialog.priceSection')}</legend>
+            <div className={mdStyles.grid2}>
+              <TextField
+                label={t('fields.price')}
+                value={form.price}
+                onChange={(price) => set({ price })}
                 ltr
                 inputMode="text"
                 autoComplete="off"
-                hint={unit ? t('dialog.openingQtyHint', { unit: name(unit) }) : undefined}
-                error={fieldText('openingQty')}
+                isRequired={form.isSellable}
+                isDisabled={!canPrice}
+                hint={canPrice ? t('dialog.priceHint') : t('dialog.priceLocked')}
+                error={fieldText('price')}
               />
-              {canOpeningCost && (
-                <TextField
-                  label={t('fields.openingCost')}
-                  value={form.openingCost}
-                  onChange={(openingCost) => set({ openingCost })}
-                  ltr
-                  inputMode="text"
-                  autoComplete="off"
-                  hint={t('dialog.openingCostHint')}
-                  error={fieldText('openingCost')}
-                />
-              )}
+              <div className={styles.switches}>
+                <Switch
+                  isSelected={form.includesVat}
+                  isDisabled={!canPrice}
+                  onChange={(includesVat) => set({ includesVat })}
+                >
+                  {t('fields.includesVat')}
+                </Switch>
+                <Switch isSelected={form.isSellable} onChange={(isSellable) => set({ isSellable })}>
+                  {t('fields.forSale')}
+                </Switch>
+              </div>
             </div>
+            <PriceLine text={form.price} includesVat={form.includesVat} rateBp={rateBp} />
+            {canCost && form.itemType !== 'bundle' && (
+              <>
+                <div className={mdStyles.grid2}>
+                  <TextField
+                    label={t('fields.purchaseCost')}
+                    value={form.purchaseCost}
+                    onChange={(purchaseCost) => set({ purchaseCost })}
+                    ltr
+                    inputMode="text"
+                    autoComplete="off"
+                    hint={t('dialog.costHint')}
+                    error={fieldText('purchaseCost4dp')}
+                  />
+                </div>
+                <ProfitLine
+                  price={form.price}
+                  includesVat={form.includesVat}
+                  cost={form.purchaseCost}
+                  rateBp={rateBp}
+                />
+              </>
+            )}
+            {canCost && form.itemType === 'bundle' && <Note>{t('dialog.kitCost')}</Note>}
           </fieldset>
-        )}
 
-        {form.itemType === 'stock' && (
-          <div className={mdStyles.grid2}>
-            <TextField
-              label={t('fields.reorderLevel')}
-              value={form.reorderLevel}
-              onChange={(reorderLevel) => set({ reorderLevel })}
-              ltr
-              inputMode="text"
-              autoComplete="off"
-              hint={unit ? t('dialog.reorderHint', { unit: name(unit) }) : undefined}
-              error={fieldText('reorderLevelMilli')}
-            />
-          </div>
-        )}
+          {form.itemType === 'stock' &&
+            (isNew ? canOpening : canEditStock && base?.stock !== undefined) && (
+              <fieldset className={styles.section}>
+                <legend>{t('dialog.openingSection')}</legend>
+                <div className={mdStyles.grid2}>
+                  <TextField
+                    label={t('fields.openingQty')}
+                    value={form.openingQty}
+                    onChange={(openingQty) => set({ openingQty })}
+                    ltr
+                    inputMode="text"
+                    autoComplete="off"
+                    hint={
+                      unit
+                        ? t(isNew ? 'dialog.openingQtyHint' : 'dialog.stockEditHint', {
+                            unit: name(unit),
+                          })
+                        : undefined
+                    }
+                    error={fieldText('openingQty')}
+                  />
+                </div>
+              </fieldset>
+            )}
 
-        <BarcodesEditor
-          rows={form.barcodes}
-          onChange={(barcodes) => set({ barcodes })}
-          error={fieldText('barcodes')}
-        />
+          {form.itemType === 'stock' && (
+            <div className={mdStyles.grid2}>
+              <TextField
+                label={t('fields.reorderLevel')}
+                value={form.reorderLevel}
+                onChange={(reorderLevel) => set({ reorderLevel })}
+                ltr
+                inputMode="text"
+                autoComplete="off"
+                hint={unit ? t('dialog.reorderHint', { unit: name(unit) }) : undefined}
+                error={fieldText('reorderLevelMilli')}
+              />
+            </div>
+          )}
 
-        {form.itemType === 'bundle' && (
-          <ComponentsEditor
-            form={form}
-            selfId={base?.id}
-            onChange={(components) => set({ components })}
-            error={fieldText('components')}
+          <BarcodesEditor
+            rows={form.barcodes}
+            onChange={(barcodes) => set({ barcodes })}
+            error={fieldText('barcodes')}
           />
-        )}
 
-        <DialogFooter>
-          <Button onPress={props.onClose}>{tm('actions.cancel')}</Button>
-          <Button type="submit" variant="primary" busy={save.isPending} isDisabled={stale}>
-            {t('dialog.save')}
-          </Button>
-        </DialogFooter>
-      </form>
-    </Dialog>
+          {form.itemType === 'bundle' && (
+            <ComponentsEditor
+              form={form}
+              selfId={base?.id}
+              onChange={(components) => set({ components })}
+              error={fieldText('components')}
+            />
+          )}
+
+          <DialogFooter>
+            <Button onPress={props.onClose}>{tm('actions.cancel')}</Button>
+            <Button type="submit" variant="primary" busy={save.isPending} isDisabled={stale}>
+              {t('dialog.save')}
+            </Button>
+          </DialogFooter>
+        </form>
+      </Dialog>
+      {awaitingApproval?.body.stockOnHand && base && (
+        <ApprovalDialog
+          permission="stock.adjust_over_threshold"
+          explanation={t('adjust.approvalExplain')}
+          subject={
+            <>
+              <b>{name(base)}</b> · <bdi>{base.code}</bdi>
+            </>
+          }
+          context={{
+            action: 'stock_adjustment',
+            kind:
+              BigInt(awaitingApproval.body.stockOnHand.quantityMilli) >
+              BigInt(awaitingApproval.body.stockOnHand.expectedMilli)
+                ? 'increase'
+                : 'decrease',
+            lines: [
+              {
+                itemId: base.id,
+                quantityMilli: (() => {
+                  const d =
+                    BigInt(awaitingApproval.body.stockOnHand.quantityMilli) -
+                    BigInt(awaitingApproval.body.stockOnHand.expectedMilli);
+                  return (d < 0n ? -d : d).toString();
+                })(),
+              },
+            ],
+          }}
+          onApproved={(approvalId) => {
+            const input = awaitingApproval;
+            setAwaitingApproval(null);
+            send({
+              ...input,
+              body: { ...input.body, stockOnHand: { ...input.body.stockOnHand!, approvalId } },
+            });
+          }}
+          onClose={() => setAwaitingApproval(null)}
+        />
+      )}
+    </>
   );
 }

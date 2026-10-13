@@ -83,8 +83,7 @@
     "components": "Kit components",
     "purchaseCost": "Purchase price (excl. VAT)",
     "kitCost": "Kit cost (from its components)",
-    "openingQty": "Quantity on hand now",
-    "openingCost": "Cost per unit (excl. VAT)"
+    "openingQty": "Current quantity"
   },
   "barcodes": {
     "primary": "Main",
@@ -138,9 +137,10 @@
     },
     "costHint": "Without VAT, up to 4 decimals, e.g. 62.50. Only the owner sees it.",
     "kitCost": "A kit's cost is worked out from its components; it is not typed here.",
-    "openingSection": "Stock on hand now",
+    "openingSection": "Stock",
     "openingQtyHint": "In {unit}. Saved as this item's opening stock, with the item.",
-    "openingCostHint": "Optional: empty uses the purchase price."
+    "stockNote": "Quantity corrected in the item window",
+    "stockEditHint": "In {unit}. A change is saved as a stock adjustment (data correction)."
   },
   "stock": {
     "title": "Stock",

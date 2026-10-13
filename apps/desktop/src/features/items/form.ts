@@ -14,7 +14,13 @@ import {
   parse4dp,
   parseQuantity,
 } from '@artepool/shared';
-import type { CreateItemRequest, ItemDetail, ItemType, UnitItem } from '@artepool/shared/contracts';
+import type {
+  CreateItemRequest,
+  ItemDetail,
+  ItemType,
+  UnitItem,
+  UpdateItemRequest,
+} from '@artepool/shared/contracts';
 
 export interface BarcodeRow {
   key: string;
@@ -52,9 +58,8 @@ export interface ItemForm {
   barcodes: BarcodeRow[];
   components: ComponentRow[];
   reorderLevel: string;
-  /** New stock items (owner, stock.opening): the quantity on hand now and its cost per unit. */
+  /** Stock items: the quantity on hand now (a new item's opening stock, or a correction). */
   openingQty: string;
-  openingCost: string;
 }
 
 /** The fields a message can be shown under (the same names the server uses). */
@@ -71,13 +76,14 @@ export type FormField =
   | 'barcodes'
   | 'components'
   | 'reorderLevelMilli'
-  | 'openingQty'
-  | 'openingCost';
+  | 'openingQty';
 
 /** Field → translation key of the message to show under it. */
 export type FormErrors = Partial<Record<FormField, string>>;
 
-export type ItemBody = Omit<CreateItemRequest, 'code'>;
+export type ItemBody = Omit<CreateItemRequest, 'code'> & {
+  stockOnHand?: UpdateItemRequest['stockOnHand'];
+};
 
 let counter = 0;
 export const rowKey = (): string => `row-${++counter}`;
@@ -110,7 +116,6 @@ export function emptyForm(defaults: { unitId: string; vatCategoryId: string }): 
     components: [],
     reorderLevel: '',
     openingQty: '',
-    openingCost: '',
   };
 }
 
@@ -150,8 +155,7 @@ export function formFromItem(item: ItemDetail): ItemForm {
       qty: quantityText(c.quantityMilli),
     })),
     reorderLevel: quantityText(item.reorderLevelMilli),
-    openingQty: '',
-    openingCost: '',
+    openingQty: item.stock ? quantityText(item.stock.onHandMilli) : '',
   };
 }
 
@@ -194,6 +198,9 @@ export function buildItem(
     canCost: boolean;
     /** A new stock item may come with its quantity on hand now (stock.opening). */
     canOpening?: boolean;
+    /** Editing a stock item: its quantity may be corrected (stock.adjust), with this note. */
+    canEditStock?: boolean;
+    stockNote?: string;
     original?: ItemDetail;
   },
 ): { errors: FormErrors; body: ItemBody | null; code: string } {
@@ -282,14 +289,21 @@ export function buildItem(
     const qty = typedQuantity(form.openingQty);
     if (qty === null || qty <= 0n) errors.openingQty = 'masterdata:fields.invalid_number';
     else if (unit && !fitsUnitDecimals(qty, unit.decimals)) errors.openingQty = DECIMALS_KEY;
-    let unitCost4dp: string | undefined;
-    if (form.openingCost.trim()) {
-      const cost = typedPrice(form.openingCost);
-      if (cost === null) errors.openingCost = 'items:dialog.errors.price';
-      else unitCost4dp = cost.toString();
-    }
-    if (qty !== null && qty > 0n)
-      openingStock = { quantityMilli: qty.toString(), ...(unitCost4dp ? { unitCost4dp } : {}) };
+    if (qty !== null && qty > 0n) openingStock = { quantityMilli: qty.toString() };
+  }
+  // Editing: a changed quantity becomes a stock adjustment on the server (from what was shown).
+  let stockOnHand: ItemBody['stockOnHand'];
+  const shown = options.original?.stock?.onHandMilli;
+  if (!options.isNew && options.canEditStock && form.itemType === 'stock' && shown !== undefined) {
+    const qty = form.openingQty.trim() ? typedQuantity(form.openingQty) : null;
+    if (qty === null || qty < 0n) errors.openingQty = 'masterdata:fields.invalid_number';
+    else if (unit && !fitsUnitDecimals(qty, unit.decimals)) errors.openingQty = DECIMALS_KEY;
+    else if (qty !== BigInt(shown))
+      stockOnHand = {
+        quantityMilli: qty.toString(),
+        expectedMilli: shown,
+        note: options.stockNote ?? 'Item window',
+      };
   }
   const reorderQtyMilli =
     form.itemType === 'stock' ? (options.original?.reorderQtyMilli ?? null) : null;
@@ -316,6 +330,7 @@ export function buildItem(
       barcodes,
       components,
       ...(openingStock ? { openingStock } : {}),
+      ...(stockOnHand ? { stockOnHand } : {}),
     },
   };
 }

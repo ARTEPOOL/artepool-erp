@@ -243,7 +243,23 @@ export const CreateItemRequest = ItemFields.extend({
     .optional(),
 });
 export type CreateItemRequest = z.infer<typeof CreateItemRequest>;
-export const UpdateItemRequest = ItemFields.extend({ rowVersion: RowVersion });
+export const UpdateItemRequest = ItemFields.extend({
+  rowVersion: RowVersion,
+  /**
+   * A stock item's quantity on hand, changed in the item window (needs stock.adjust): the
+   * difference is posted as a stock adjustment (increase or decrease, "Data correction") in the
+   * same transaction. `expectedMilli` is the quantity the person saw; if the stock moved since,
+   * the change is refused. Above the threshold a supervisor's approval is needed (decision 0041).
+   */
+  stockOnHand: z
+    .object({
+      quantityMilli: NonNegativeIntText,
+      expectedMilli: NonNegativeIntText,
+      approvalId: IdText.optional(),
+      note: z.string().trim().min(1).max(1000),
+    })
+    .optional(),
+});
 export type UpdateItemRequest = z.infer<typeof UpdateItemRequest>;
 
 export const NextItemCodeQuery = z.object({ categoryId: IdText });

@@ -778,3 +778,65 @@ describe('search by words in any order', () => {
     expect(wild.items).toHaveLength(0);
   });
 });
+
+describe('the quantity in the item window (owner decision, 2026-10-13)', () => {
+  it('the storekeeper adds an item; a changed quantity becomes a correction from what was shown', async () => {
+    const r = await storekeeper('POST', '/api/v1/items', {
+      code: 'EDQ-01',
+      itemType: 'stock',
+      nameAr: 'صنف للتعديل',
+      nameEn: 'Item to edit',
+      categoryId: ids.category,
+      unitId: ids.unit,
+      vatCategoryId: ids.vat,
+      isSellable: false,
+    });
+    expect(r.statusCode).toBe(201);
+    const made = r.json<ItemDetail>();
+    // Give it stock first (the owner, with a cost), then correct it from the item window.
+    await adjust(owner, {
+      kind: 'opening',
+      reasonCodeId: ids.opening,
+      lines: [{ itemId: made.id, quantityMilli: '4000', unitCost4dp: '10000' }],
+    });
+    const fields = {
+      itemType: 'stock',
+      nameAr: made.nameAr,
+      nameEn: made.nameEn,
+      categoryId: ids.category,
+      unitId: ids.unit,
+      vatCategoryId: ids.vat,
+      isSellable: false,
+    };
+    const fresh = (await owner('GET', `/api/v1/items/${made.id}`)).json<ItemDetail>();
+    // The stock moved since it was shown: refused.
+    expect(
+      await refusal(
+        storekeeper('PUT', `/api/v1/items/${made.id}`, {
+          ...fields,
+          rowVersion: fresh.rowVersion,
+          stockOnHand: { quantityMilli: '6000', expectedMilli: '3000', note: 'Item window' },
+        }),
+      ),
+    ).toMatchObject({ code: 'STALE_VERSION' });
+    const saved = await storekeeper('PUT', `/api/v1/items/${made.id}`, {
+      ...fields,
+      rowVersion: fresh.rowVersion,
+      stockOnHand: { quantityMilli: '6000', expectedMilli: '4000', note: 'Item window' },
+    });
+    expect(saved.statusCode).toBe(200);
+    expect(saved.json<ItemDetail>().stock).toMatchObject({ onHandMilli: '6000' });
+    const stock = (await owner('GET', `/api/v1/items/${made.id}/stock`)).json<ItemStockResponse>();
+    expect(stock.balances[0]).toMatchObject({ quantityMilli: '6000', value4dp: '60000' });
+    // The cashier cannot change items at all.
+    expect(
+      (
+        await cashier('PUT', `/api/v1/items/${made.id}`, {
+          ...fields,
+          rowVersion: saved.json<ItemDetail>().rowVersion,
+          stockOnHand: { quantityMilli: '1000', expectedMilli: '6000', note: 'x' },
+        })
+      ).statusCode,
+    ).toBe(403);
+  });
+});

@@ -282,8 +282,27 @@ export async function getItem(db: Kysely<DB>, id: bigint, showCost = false): Pro
     .orderBy('i.code')
     .execute();
   const primary = barcodes.find((b) => b.is_primary);
+  // Stock items: the same figures as the list (the item window shows the quantity on hand).
+  const totals =
+    item.item_type === 'stock'
+      ? await stockTotals(db).where('item_id', '=', id).executeTakeFirst()
+      : undefined;
   return {
     ...(showCost ? { purchaseCost4dp: purchaseCostOf(item, components) } : {}),
+    ...(item.item_type === 'stock'
+      ? {
+          stock: stockFigures(
+            {
+              reorder_level: item.reorder_level,
+              on_hand: totals?.on_hand ?? null,
+              defective: totals?.defective ?? null,
+              value_4dp: totals?.value_4dp ?? null,
+              last_avg: totals?.last_avg ?? null,
+            },
+            showCost,
+          ),
+        }
+      : {}),
     id: item.id.toString(),
     code: item.code,
     itemType: item.item_type as ItemType,
