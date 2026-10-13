@@ -129,7 +129,15 @@ mod imp {
         let mut returned = 0u32;
         // SAFETY: the first call only asks for the size needed.
         unsafe {
-            EnumPrintersW(flags, std::ptr::null(), 4, std::ptr::null_mut(), 0, &mut needed, &mut returned);
+            EnumPrintersW(
+                flags,
+                std::ptr::null(),
+                4,
+                std::ptr::null_mut(),
+                0,
+                &mut needed,
+                &mut returned,
+            );
         }
         if needed == 0 {
             return Ok(Vec::new());
@@ -188,11 +196,18 @@ mod imp {
                     page = Err(last_error());
                 } else {
                     let mut written = 0u32;
-                    let ok = WritePrinter(handle, bytes.as_ptr().cast(), bytes.len() as u32, &mut written);
+                    let ok = WritePrinter(
+                        handle,
+                        bytes.as_ptr().cast(),
+                        bytes.len() as u32,
+                        &mut written,
+                    );
                     if ok == 0 {
                         page = Err(last_error());
                     } else if written as usize != bytes.len() {
-                        page = Err(PrintError::Unavailable("the printer took only part of the job".into()));
+                        page = Err(PrintError::Unavailable(
+                            "the printer took only part of the job".into(),
+                        ));
                     }
                     EndPagePrinter(handle);
                 }
@@ -212,7 +227,9 @@ mod imp {
     use std::io::Write as _;
 
     pub fn list() -> Result<Vec<String>, PrintError> {
-        let Some(dir) = file_printer_dir() else { return Ok(Vec::new()) };
+        let Some(dir) = file_printer_dir() else {
+            return Ok(Vec::new());
+        };
         let mut names: Vec<String> = std::fs::read_dir(&dir)
             .map_err(|e| PrintError::Unavailable(e.to_string()))?
             .filter_map(|e| e.ok())
@@ -224,15 +241,19 @@ mod imp {
     }
 
     pub fn send(printer: &str, _document_name: &str, bytes: &[u8]) -> Result<(), PrintError> {
-        let dir = file_printer_dir().ok_or_else(|| PrintError::Unavailable("no printer folder".into()))?;
+        let dir = file_printer_dir()
+            .ok_or_else(|| PrintError::Unavailable("no printer folder".into()))?;
         let path = dir.join(format!("{printer}.bin"));
         if !path.exists() {
-            return Err(PrintError::Unavailable(format!("no printer named {printer}")));
+            return Err(PrintError::Unavailable(format!(
+                "no printer named {printer}"
+            )));
         }
         let mut file = std::fs::OpenOptions::new()
             .append(true)
             .open(path)
             .map_err(|e| PrintError::Unavailable(e.to_string()))?;
-        file.write_all(bytes).map_err(|e| PrintError::Unavailable(e.to_string()))
+        file.write_all(bytes)
+            .map_err(|e| PrintError::Unavailable(e.to_string()))
     }
 }

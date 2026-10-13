@@ -72,7 +72,11 @@ async fn printer_list() -> Result<Vec<String>, String> {
 /// Sends a receipt (ESC/POS bytes made by the screens, base64) RAW to the chosen printer:
 /// silent, no dialog (decisions 0008, 0055).
 #[tauri::command]
-async fn printer_print(printer: String, document_name: String, data_base64: String) -> Result<(), String> {
+async fn printer_print(
+    printer: String,
+    document_name: String,
+    data_base64: String,
+) -> Result<(), String> {
     use base64::Engine as _;
     let bytes = base64::engine::general_purpose::STANDARD
         .decode(data_base64.as_bytes())

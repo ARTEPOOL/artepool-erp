@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | **Approved** (2026-10-13), with the owner's answers recorded as decisions [0055](../decisions/0055-thermal-printer-esc-pos.md)–[0062](../decisions/0062-pos-receipt-and-customer.md) |
+| **Status** | **Built** (2026-10-13), in review; approved 2026-10-13 with the owner's answers recorded as decisions [0055](../decisions/0055-thermal-printer-esc-pos.md)–[0062](../decisions/0062-pos-receipt-and-customer.md) |
 | **Date** | 2026-10-13 |
 | **Milestone** | M5 of the [Phase 1 plan](../phase-1-plan.md) |
 | **Design reference** | [`03-pos.html`](../../design/screens/03-pos.html) (the POS), [`04-payment.html`](../../design/screens/04-payment.html) (payment), [`08-shift-close.html`](../../design/screens/08-shift-close.html) (shift close), [`10-thermal-receipt.html`](../../design/screens/10-thermal-receipt.html) (the receipt) |

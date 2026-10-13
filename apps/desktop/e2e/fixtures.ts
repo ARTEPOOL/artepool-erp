@@ -71,6 +71,14 @@ export const control = {
     (await control.call<{ code: string }>('POST', '/code', { userId })).code,
   resetOwnerTwoStep: () => control.call('POST', '/owner/reset-2fa'),
   addDevice: (code: string, name: string) => control.call('POST', '/devices', { code, name }),
+  addPosItem: (item: {
+    code: string;
+    nameAr: string;
+    nameEn: string;
+    barcode: string;
+    price4dp: string;
+    quantityMilli: string;
+  }) => control.call<{ id: string }>('POST', '/pos-item', item),
   enrollmentCode: async () =>
     (await control.call<{ code: string }>('POST', '/enrollment-code')).code,
   stopServer: () => control.call('POST', '/server/stop'),

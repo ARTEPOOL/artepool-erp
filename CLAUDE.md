@@ -186,7 +186,7 @@ Run from the repository root. Setup on a new PC: [`docs/runbooks/dev-setup-windo
 | Run the API in dev mode (HTTPS: `https://localhost:3100/health`, trust `.secrets/tls/ca.crt`) | `pnpm dev:server` |
 | Run the screens in a browser (`http://localhost:1420`; the dev server plays the PC's secure side, device file `.secrets/dev-device.json`) | `pnpm dev:desktop:web` |
 | Run the Windows app (Tauri; Rust + Microsoft C++ Build Tools needed) / build its installer | `pnpm dev:desktop` / `pnpm build:desktop` |
-| Rust tests (the PC's secure side: enrollment, TLS rules, device key) | `pnpm test:rust` |
+| Rust tests (the PC's secure side: enrollment, TLS rules, device key; the RAW receipt printer) | `pnpm test:rust` |
 | Server console: first owner / enrollment code / emergency owner 2-step reset / emergency owner password reset (decisions 0022, 0025, 0029) | `pnpm owner:create` / `pnpm device:code` / `pnpm owner:reset-2fa` / `pnpm owner:reset-password` |
 
 Not yet available: `pnpm build:server` (M6), `pnpm backup:run` / `pnpm backup:restore-test` (M6).

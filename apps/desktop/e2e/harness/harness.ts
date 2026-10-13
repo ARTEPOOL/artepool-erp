@@ -121,6 +121,13 @@ const routes: Record<string, (input: Record<string, unknown>) => Promise<unknown
     id: await support.addUser(server, input as unknown as Parameters<typeof support.addUser>[1]),
   }),
   'POST /enrollment-code': async () => ({ code: await newCode() }),
+  /** A stock item with a barcode, a price and opening stock (and the company details once). */
+  'POST /pos-item': async (input) =>
+    support.addPosItem(
+      server,
+      owner.id,
+      input as unknown as Parameters<typeof support.addPosItem>[2],
+    ),
   /** Enrolls one more PC through the real protocol (for tests that revoke a PC). */
   'POST /devices': async (input) => {
     const deviceCode = typeof input.code === 'string' ? input.code : 'EXTRA-PC';

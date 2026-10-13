@@ -165,9 +165,9 @@ jobs:
       - name: Formatting
         run: cargo fmt --all --check
       - name: Lints
-        run: cargo clippy -p artepool-bridge --all-targets -- -D warnings
-      - name: Tests (protocol vectors, TLS rules, enrollment and renewal)
-        run: cargo test -p artepool-bridge
+        run: cargo clippy -p artepool-bridge -p artepool-printer --all-targets -- -D warnings
+      - name: Tests (protocol vectors, TLS rules, enrollment and renewal; the RAW receipt printer)
+        run: cargo test -p artepool-bridge -p artepool-printer
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v5
         with:

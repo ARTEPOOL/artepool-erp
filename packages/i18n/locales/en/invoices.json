@@ -104,7 +104,8 @@
       "payment": "Receipt",
       "credit_note": "Credit note"
     },
-    "receive": "Receive payment"
+    "receive": "Receive payment",
+    "soldAtPos": "sold at the POS — A4 copy, same number"
   },
   "notes": {
     "creditButton": "Credit note",
