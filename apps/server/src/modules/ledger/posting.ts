@@ -43,7 +43,9 @@ export type PostingSource =
   | { type: 'inventory_count'; id: bigint }
   | { type: 'sales_document'; id: bigint }
   | { type: 'payment'; id: bigint }
-  | { type: 'opening_balance'; id: bigint };
+  | { type: 'opening_balance'; id: bigint }
+  | { type: 'cash_movement'; id: bigint }
+  | { type: 'shift_close'; id: bigint };
 
 export interface PostedEntry {
   id: bigint;
@@ -56,6 +58,8 @@ const SOURCE_COLUMN = {
   sales_document: 'sales_document_id',
   payment: 'payment_id',
   opening_balance: 'opening_balance_id',
+  cash_movement: 'cash_movement_id',
+  shift_close: 'shift_id',
 } as const;
 
 const linkName = (link: PostingAmount['link']): string =>

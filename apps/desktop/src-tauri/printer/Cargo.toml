@@ -1,0 +1,11 @@
+[package]
+name = "artepool-printer"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+publish = false
+license = "LicenseRef-ARTEPOOL-internal"
+description = "Silent receipt printing for ARTÉPOOL ERP: RAW bytes to a Windows printer (decisions 0008, 0055)."
+
+[dependencies]
+thiserror = "2"

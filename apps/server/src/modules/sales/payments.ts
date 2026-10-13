@@ -47,13 +47,15 @@ async function methodAccount(db: Db, methodId: bigint, channel: 'office' | 'pos'
   return channel === 'office' ? (m.office_gl_account_id ?? m.gl_account_id) : m.gl_account_id;
 }
 
-async function insertPayment(
+export async function insertPayment(
   trx: Transaction<DB>,
   p: {
     kind: 'receipt' | 'refund' | 'reversal';
     customerId: bigint;
     part: PaymentPart;
     date: string;
+    /** At the POS: the drawer shift, and cash handed over (change = tendered − amount). */
+    pos?: { shiftId: bigint; tenderedFils?: bigint | null };
     reversalOfId?: bigint;
     reasonCodeId?: bigint;
     approvalId?: bigint | null;
@@ -74,7 +76,11 @@ async function insertPayment(
         cheque_date: p.part.chequeDate ?? null,
         cheque_bank: p.part.chequeBank ?? null,
         payment_date: p.date,
-        channel: 'office',
+        channel: p.pos ? 'pos' : 'office',
+        shift_id: p.pos?.shiftId ?? null,
+        tendered_fils: p.pos?.tenderedFils ?? null,
+        change_fils:
+          p.pos?.tenderedFils != null ? p.pos.tenderedFils - BigInt(p.part.amountFils) : null,
         device_id: sql<bigint>`sys.ctx_device_id()`,
         reason_code_id: p.reasonCodeId ?? null,
         approval_id: p.approvalId ?? null,
@@ -86,7 +92,7 @@ async function insertPayment(
     .executeTakeFirstOrThrow();
 }
 
-async function allocate(
+export async function allocate(
   trx: Transaction<DB>,
   paymentId: bigint,
   target: { documentId?: bigint; openingBalanceId?: bigint },
@@ -105,7 +111,7 @@ async function allocate(
     .execute();
 }
 
-async function postPayment(trx: Transaction<DB>, paymentId: bigint) {
+export async function postPayment(trx: Transaction<DB>, paymentId: bigint) {
   const p = await trx
     .selectFrom('sales.payments as p')
     .leftJoin('sales.payments as o', 'o.id', 'p.reversal_of_id')
