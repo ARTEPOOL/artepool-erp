@@ -10,6 +10,7 @@ import arSettings from '../locales/ar/settings.json';
 import arSetup from '../locales/ar/setup.json';
 import arShell from '../locales/ar/shell.json';
 import arReceipts from '../locales/ar/receipts.json';
+import arPos from '../locales/ar/pos.json';
 import arQuotations from '../locales/ar/quotations.json';
 import arInvoices from '../locales/ar/invoices.json';
 import arSales from '../locales/ar/sales.json';
@@ -25,6 +26,7 @@ import enSettings from '../locales/en/settings.json';
 import enSetup from '../locales/en/setup.json';
 import enShell from '../locales/en/shell.json';
 import enReceipts from '../locales/en/receipts.json';
+import enPos from '../locales/en/pos.json';
 import enQuotations from '../locales/en/quotations.json';
 import enInvoices from '../locales/en/invoices.json';
 import enSales from '../locales/en/sales.json';
@@ -52,6 +54,7 @@ export const resources = {
     invoices: arInvoices,
     quotations: arQuotations,
     receipts: arReceipts,
+    pos: arPos,
   },
   en: {
     common: enCommon,
@@ -69,6 +72,7 @@ export const resources = {
     invoices: enInvoices,
     quotations: enQuotations,
     receipts: enReceipts,
+    pos: enPos,
   },
 } as const;
 

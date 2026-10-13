@@ -202,7 +202,6 @@
     "noCode": "No code is open.",
     "codeCreated": "New code created; any earlier code no longer works",
     "printers": "Printers & cash drawer",
-    "printersLater": "Receipt printers, the cash drawer and the A4 printer are set up with the POS and invoices (coming later).",
     "revokeTitle": "Revoke device",
     "revokeNote": "This cannot be undone: a revoked device can only connect again after a new enrollment.",
     "revokeConfirm": "Revoke",
@@ -220,7 +219,25 @@
     "warehouseFor": "Warehouse of {code}",
     "defaultWarehouse": "Default warehouse",
     "warehouseSaved": "Warehouse of {code} saved.",
-    "warehouseNote": "The warehouse each PC sells and issues stock from. “Default warehouse” follows the default warehouse in Lists."
+    "warehouseNote": "The warehouse each PC sells and issues stock from. “Default warehouse” follows the default warehouse in Lists.",
+    "receiptPrinter": "Receipt printer of this PC",
+    "receiptPrinterHelp": "The POS prints receipts to this printer without a print dialog, and opens the cash drawer connected to it. The choice is kept on this PC only.",
+    "printerWindowsOnly": "Printers can be chosen in the Windows app only.",
+    "printerListFailed": "The list of printers could not be read.",
+    "noPrinter": "No printer",
+    "printerSaved": "Receipt printer saved for this PC",
+    "testPrint": "Print a test receipt",
+    "testDrawer": "Open the drawer",
+    "testSent": "Test receipt sent to the printer",
+    "drawerSent": "Drawer signal sent",
+    "printerA4": "A4 invoices print through the Windows print dialog, to any printer.",
+    "testReceiptTitle": "Printer test",
+    "testReceiptBody": "If you can read this text clearly, the printer works.",
+    "printerProblem": {
+      "browser": "Printing works in the Windows app only.",
+      "no_printer": "Choose the receipt printer first.",
+      "failed": "The printer did not respond. Check that it is on, connected and has paper."
+    }
   },
   "audit": {
     "title": "Audit log",

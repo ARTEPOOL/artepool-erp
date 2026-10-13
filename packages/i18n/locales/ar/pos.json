@@ -1,0 +1,28 @@
+{
+  "receipt": {
+    "trn": "الرقم الضريبي",
+    "titleSimplified": "فاتورة ضريبية مبسطة",
+    "titleFull": "فاتورة ضريبية",
+    "titleCreditNote": "إشعار دائن ضريبي",
+    "copy": "نسخة",
+    "reprint": "إعادة طباعة {n}",
+    "number": "رقم",
+    "original": "الفاتورة الأصلية",
+    "date": "التاريخ",
+    "cashier": "الكاشير",
+    "device": "الجهاز",
+    "customer": "العميل",
+    "customerTrn": "الرقم الضريبي للعميل",
+    "discount": "خصم",
+    "net": "الإجمالي قبل الضريبة",
+    "vat": "ضريبة القيمة المضافة {rate}",
+    "discountTotal": "إجمالي الخصم",
+    "total": "الإجمالي",
+    "currency": "درهم",
+    "approvalCode": "رقم الموافقة",
+    "change": "الباقي",
+    "items": "عدد القطع",
+    "pricesIncludeVat": "الأسعار شاملة ضريبة القيمة المضافة",
+    "thanks": "شكرًا لزيارتكم"
+  }
+}

@@ -45,6 +45,7 @@ import { useWarehouses } from '../lists/queries';
 import { CardHead, NoAccess, PanelHeader, settingsClasses as styles } from '../parts';
 import { ReasonDialog } from '../users/dialogs';
 import deviceStyles from './devices.module.css';
+import { ReceiptPrinterCard } from './ReceiptPrinter';
 
 const KIND_ICON: Record<DeviceKind, ReactNode> = {
   pos: <ShoppingCart aria-hidden="true" />,
@@ -283,10 +284,7 @@ export function DevicesPanel() {
           </div>
         </Card>
       </div>
-      <Card rise index={3}>
-        <CardHead title={t('devices.printers')} />
-        <Note>{t('devices.printersLater')}</Note>
-      </Card>
+      <ReceiptPrinterCard index={3} />
       {revoking && <RevokeDialog device={revoking} onClose={() => setRevoking(null)} />}
       {editing && <EditDeviceDialog device={editing} onClose={() => setEditing(null)} />}
       {untrusting && <EndTrustDialog device={untrusting} onClose={() => setUntrusting(null)} />}

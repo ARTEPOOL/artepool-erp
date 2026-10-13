@@ -1,0 +1,28 @@
+{
+  "receipt": {
+    "trn": "TRN",
+    "titleSimplified": "Simplified Tax Invoice",
+    "titleFull": "Tax Invoice",
+    "titleCreditNote": "Tax Credit Note",
+    "copy": "COPY",
+    "reprint": "Reprint {n}",
+    "number": "No.",
+    "original": "Original invoice",
+    "date": "Date",
+    "cashier": "Cashier",
+    "device": "Device",
+    "customer": "Customer",
+    "customerTrn": "Customer TRN",
+    "discount": "Discount",
+    "net": "Total excl. VAT",
+    "vat": "VAT {rate}",
+    "discountTotal": "Total discount",
+    "total": "TOTAL",
+    "currency": "AED",
+    "approvalCode": "Approval code",
+    "change": "Change",
+    "items": "Items",
+    "pricesIncludeVat": "Prices include VAT",
+    "thanks": "Thank you"
+  }
+}
