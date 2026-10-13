@@ -228,7 +228,19 @@ const ItemFields = z.object({
     .default([]),
 });
 
-export const CreateItemRequest = ItemFields.extend({ code: Code });
+export const CreateItemRequest = ItemFields.extend({
+  code: Code,
+  /**
+   * A new stock item's quantity on hand now, posted as its opening stock in the same transaction
+   * (owner only, stock.opening, decision 0042). Without a cost: the item's purchase price.
+   */
+  openingStock: z
+    .object({
+      quantityMilli: z.string().regex(/^[1-9][0-9]{0,17}$/),
+      unitCost4dp: NonNegativeIntText.optional(),
+    })
+    .optional(),
+});
 export type CreateItemRequest = z.infer<typeof CreateItemRequest>;
 export const UpdateItemRequest = ItemFields.extend({ rowVersion: RowVersion });
 export type UpdateItemRequest = z.infer<typeof UpdateItemRequest>;

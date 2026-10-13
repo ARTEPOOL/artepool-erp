@@ -52,6 +52,9 @@ export interface ItemForm {
   barcodes: BarcodeRow[];
   components: ComponentRow[];
   reorderLevel: string;
+  /** New stock items (owner, stock.opening): the quantity on hand now and its cost per unit. */
+  openingQty: string;
+  openingCost: string;
 }
 
 /** The fields a message can be shown under (the same names the server uses). */
@@ -67,7 +70,9 @@ export type FormField =
   | 'purchaseCost4dp'
   | 'barcodes'
   | 'components'
-  | 'reorderLevelMilli';
+  | 'reorderLevelMilli'
+  | 'openingQty'
+  | 'openingCost';
 
 /** Field → translation key of the message to show under it. */
 export type FormErrors = Partial<Record<FormField, string>>;
@@ -104,6 +109,8 @@ export function emptyForm(defaults: { unitId: string; vatCategoryId: string }): 
     barcodes: [],
     components: [],
     reorderLevel: '',
+    openingQty: '',
+    openingCost: '',
   };
 }
 
@@ -143,6 +150,8 @@ export function formFromItem(item: ItemDetail): ItemForm {
       qty: quantityText(c.quantityMilli),
     })),
     reorderLevel: quantityText(item.reorderLevelMilli),
+    openingQty: '',
+    openingCost: '',
   };
 }
 
@@ -183,6 +192,8 @@ export function buildItem(
     canPrice: boolean;
     /** The owner (`items.cost`): the purchase price is part of the form and of the request. */
     canCost: boolean;
+    /** A new stock item may come with its quantity on hand now (stock.opening). */
+    canOpening?: boolean;
     original?: ItemDetail;
   },
 ): { errors: FormErrors; body: ItemBody | null; code: string } {
@@ -265,6 +276,21 @@ export function buildItem(
     else if (unit && !fitsUnitDecimals(qty, unit.decimals)) errors.reorderLevelMilli = DECIMALS_KEY;
     else reorderLevelMilli = qty.toString();
   }
+  // The quantity on hand now (new stock items only): posted as the item's opening stock.
+  let openingStock: ItemBody['openingStock'];
+  if (options.isNew && options.canOpening && form.itemType === 'stock' && form.openingQty.trim()) {
+    const qty = typedQuantity(form.openingQty);
+    if (qty === null || qty <= 0n) errors.openingQty = 'masterdata:fields.invalid_number';
+    else if (unit && !fitsUnitDecimals(qty, unit.decimals)) errors.openingQty = DECIMALS_KEY;
+    let unitCost4dp: string | undefined;
+    if (form.openingCost.trim()) {
+      const cost = typedPrice(form.openingCost);
+      if (cost === null) errors.openingCost = 'items:dialog.errors.price';
+      else unitCost4dp = cost.toString();
+    }
+    if (qty !== null && qty > 0n)
+      openingStock = { quantityMilli: qty.toString(), ...(unitCost4dp ? { unitCost4dp } : {}) };
+  }
   const reorderQtyMilli =
     form.itemType === 'stock' ? (options.original?.reorderQtyMilli ?? null) : null;
 
@@ -289,6 +315,7 @@ export function buildItem(
       ...(purchaseCost4dp === undefined ? {} : { purchaseCost4dp }),
       barcodes,
       components,
+      ...(openingStock ? { openingStock } : {}),
     },
   };
 }

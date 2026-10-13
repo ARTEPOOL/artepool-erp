@@ -13,6 +13,7 @@ import {
 } from '@artepool/shared/contracts';
 import { defineActivation, defineRoute, defineWrite } from '../../platform/http/route';
 import * as catalog from './catalog';
+import { createAdjustment } from '../inventory/service';
 import * as items from './service';
 
 const Params = z.object({ id: IdText });
@@ -53,10 +54,24 @@ export function registerItemRoutes(app: FastifyInstance): void {
     url: '/api/v1/items',
     access: manage,
     body: CreateItemRequest,
-    handler: async ({ trx, request, body }) => ({
-      status: 201,
-      body: await items.createItem(trx, request.auth, body),
-    }),
+    handler: async ({ trx, request, body }) => {
+      const item = await items.createItem(trx, request.auth, body);
+      if (body.openingStock) {
+        // The quantity on hand now: the item's opening stock, in the same transaction.
+        const reason = await trx
+          .selectFrom('sys.reason_codes')
+          .select('id')
+          .where('category', '=', 'other')
+          .where('code', '=', 'OPENING')
+          .executeTakeFirstOrThrow();
+        await createAdjustment(trx, request.auth, {
+          kind: 'opening',
+          reasonCodeId: reason.id.toString(),
+          lines: [{ itemId: item.id, ...body.openingStock }],
+        });
+      }
+      return { status: 201, body: item };
+    },
   });
   defineWrite(app, {
     method: 'PUT',

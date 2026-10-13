@@ -5,7 +5,7 @@
  * server. A price different from the item's is marked: it needs sales.price_override or a
  * supervisor's approval when saving.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Plus, Search, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { ItemListItem } from '@artepool/shared/contracts';
@@ -13,6 +13,7 @@ import { cx, IconButton, iconClass, tableClasses as tbl } from '../../ui';
 import { money, price, rate } from '../masterdata/format';
 import { localName, useUnits, useVat } from '../masterdata/refs';
 import { useSellableItemSearch } from './api';
+import { useSuggest } from './suggest';
 import {
   lineFromItem,
   preview,
@@ -56,56 +57,62 @@ export function useLinesPreview(lines: EditorLine[], docDiscount: string): Previ
 export function SellableItemPicker(props: { onAdd: (item: ItemListItem) => void }) {
   const { t, i18n } = useTranslation('sales');
   const name = localName(i18n.language);
-  const [text, setText] = useState('');
-  const [q, setQ] = useState('');
-  useEffect(() => {
-    const timer = setTimeout(() => setQ(text.trim()), 250);
-    return () => clearTimeout(timer);
-  }, [text]);
-  const found = useSellableItemSearch(q);
-  const choices = (found.data?.items ?? []).filter(
-    (i) => i.isSellable && i.isActive && i.price !== null,
-  );
+  const box = useSuggest();
+  const found = useSellableItemSearch(box.q, box.open || box.q.length > 0);
+  const choices = (found.data?.items ?? []).filter((i) => i.isActive);
+  const sellable = (i: ItemListItem) => i.isSellable && i.price !== null;
   const add = (item: ItemListItem) => {
     props.onAdd(item);
-    setText('');
-    setQ('');
+    box.reset();
   };
   return (
-    <div className={styles.picker}>
+    <div className={styles.picker} {...box.container}>
       <label className={styles.pickSearch}>
         <Search aria-hidden="true" />
         <input
           type="search"
           aria-label={t('lines.search')}
           placeholder={t('lines.search')}
-          value={text}
-          onChange={(event) => setText(event.target.value)}
+          autoComplete="off"
+          aria-expanded={box.open}
+          {...box.input}
           onKeyDown={(event) => {
             // A scanned barcode or a full code adds the item at once.
             if (event.key !== 'Enter') return;
             event.preventDefault();
-            const typed = text.trim();
-            const exact = choices.find((c) => c.primaryBarcode === typed || c.code === typed);
+            const typed = box.text.trim();
+            const exact = choices.find(
+              (c) =>
+                sellable(c) &&
+                (c.primaryBarcode === typed || c.code.toUpperCase() === typed.toUpperCase()),
+            );
+            const only = choices.filter(sellable);
             if (exact) add(exact);
-            else setQ(typed);
+            else if (box.q === typed && only.length === 1) add(only[0]!);
+            else box.setQ(typed);
           }}
         />
       </label>
-      {q && (
-        <ul className={styles.choices} aria-label={t('lines.results')}>
+      {box.open && (
+        <ul className={styles.choices} aria-label={t('lines.results')} ref={box.listRef}>
           {choices.map((choice) => (
             <li key={choice.id}>
-              <button type="button" onClick={() => add(choice)}>
+              <button type="button" disabled={!sellable(choice)} onClick={() => add(choice)}>
                 <Plus className={iconClass.sm} aria-hidden="true" />
                 <span className={styles.choiceMain}>
                   <span>{name(choice)}</span>
-                  <bdi className={styles.muted}>{choice.code}</bdi>
+                  <span className={styles.muted}>
+                    <bdi>{choice.code}</bdi>
+                    {!sellable(choice) && <> · {t('lines.notForSale')}</>}
+                  </span>
                 </span>
                 {choice.price && <bdi>{price(BigInt(choice.price.price4dp))}</bdi>}
               </button>
             </li>
           ))}
+          {found.isFetching && choices.length === 0 && (
+            <li className={styles.muted}>{t('loading')}</li>
+          )}
           {!found.isFetching && choices.length === 0 && (
             <li className={styles.muted}>{t('lines.none')}</li>
           )}

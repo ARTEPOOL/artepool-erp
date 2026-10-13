@@ -119,6 +119,7 @@
 
 /* --- pickers (items and customers) --------------------------------------------------------- */
 .picker {
+  position: relative;
   display: grid;
   gap: var(--space-2);
 }
@@ -194,7 +195,12 @@
   cursor: pointer;
 }
 
-.choices button:hover,
+.choices button:disabled {
+  color: var(--color-text-secondary);
+  cursor: not-allowed;
+}
+
+.choices button:not(:disabled):hover,
 .choices button:focus-visible {
   background: var(--color-primary-soft);
   outline: none;

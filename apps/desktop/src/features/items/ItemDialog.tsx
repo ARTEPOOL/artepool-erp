@@ -341,6 +341,8 @@ export function ItemDialog(props: {
   const isNew = base === undefined;
   const canPrice = can('prices.manage');
   const canCost = can('items.cost');
+  // The owner types a new stock item's quantity on hand straight away (its opening stock, 0042).
+  const canOpening = can('stock.opening');
   const [form, setForm] = useState<ItemForm>(() =>
     props.item ? formFromItem(props.item) : emptyForm({ unitId: '', vatCategoryId: '' }),
   );
@@ -401,7 +403,7 @@ export function ItemDialog(props: {
             { idempotencyKey: key },
           ),
     {
-      invalidate: [MD_KEYS.items],
+      invalidate: [MD_KEYS.items, MD_KEYS.stock],
       onSuccess: (saved) => {
         queryClient.setQueryData(MD_KEYS.item(saved.id), saved);
         toast(tm('saved'));
@@ -417,6 +419,7 @@ export function ItemDialog(props: {
       units: units.data ?? [],
       canPrice,
       canCost,
+      canOpening,
       original: base,
     });
     setErrors(built.errors);
@@ -703,6 +706,34 @@ export function ItemDialog(props: {
           )}
           {canCost && form.itemType === 'bundle' && <Note>{t('dialog.kitCost')}</Note>}
         </fieldset>
+
+        {isNew && canOpening && form.itemType === 'stock' && (
+          <fieldset className={styles.section}>
+            <legend>{t('dialog.openingSection')}</legend>
+            <div className={mdStyles.grid2}>
+              <TextField
+                label={t('fields.openingQty')}
+                value={form.openingQty}
+                onChange={(openingQty) => set({ openingQty })}
+                ltr
+                inputMode="text"
+                autoComplete="off"
+                hint={unit ? t('dialog.openingQtyHint', { unit: name(unit) }) : undefined}
+                error={fieldText('openingQty')}
+              />
+              <TextField
+                label={t('fields.openingCost')}
+                value={form.openingCost}
+                onChange={(openingCost) => set({ openingCost })}
+                ltr
+                inputMode="text"
+                autoComplete="off"
+                hint={t('dialog.openingCostHint')}
+                error={fieldText('openingCost')}
+              />
+            </div>
+          </fieldset>
+        )}
 
         {form.itemType === 'stock' && (
           <div className={mdStyles.grid2}>

@@ -3,6 +3,7 @@
  * with a "price includes VAT" switch (decision 0032). The code is suggested by the app and never
  * changes (decision 0037). Items are deactivated with a reason, never deleted.
  */
+import { matchesWords } from '../../platform/db/search';
 import { sql, type Kysely, type Transaction } from 'kysely';
 import {
   fitsUnitDecimals,
@@ -97,7 +98,7 @@ export async function listItems(
     const q = query.q;
     base = base.where((eb) =>
       eb.or([
-        sql<boolean>`i.search_key LIKE '%' || sys.normalize_search(${q}) || '%'`,
+        matchesWords('i.search_key', q),
         eb(
           'i.id',
           'in',

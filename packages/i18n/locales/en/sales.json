@@ -84,7 +84,8 @@
     "deduction": "Earlier payment deducted",
     "unitDecimals": "This unit does not take this many decimals.",
     "discountMode": "Switch between percent and amount",
-    "aed": "AED"
+    "aed": "AED",
+    "notForSale": "not for sale or without a price"
   },
   "totals": {
     "docDiscount": "Discount on the total",
@@ -105,7 +106,9 @@
     "cash": "Cash (no credit)",
     "credit": "Credit up to {limit}",
     "balance": "Current balance: {amount}",
-    "trn": "TRN: {trn}"
+    "trn": "TRN: {trn}",
+    "add": "Add a new customer",
+    "walkIn": "Cash customer"
   },
   "print": {
     "print": "Print",

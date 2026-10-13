@@ -173,8 +173,8 @@ export function useStatement(customerId: string | null, from: string, to: string
   });
 }
 
-/** Active customers matching a search (name, phone, TRN), for the customer pickers. */
-export function useCustomerSearch(q: string) {
+/** Active customers matching a search (name, phone, TRN); the first ones when nothing is typed. */
+export function useCustomerSearch(q: string, enabled = q.length > 0) {
   const api = useApi();
   return useQuery({
     queryKey: [...MD_KEYS.customers, 'pick', q] as QueryKey,
@@ -182,18 +182,18 @@ export function useCustomerSearch(q: string) {
       api.get<CustomersResponse>(
         `/api/v1/customers?${queryString({ q, status: 'active', pageSize: 20 })}`,
       ),
-    enabled: q.length > 0,
+    enabled,
   });
 }
 
-/** Sellable items matching a search (name, code, barcode), for the line editor. */
-export function useSellableItemSearch(q: string) {
+/** Items matching a search (any words of the name, code, barcode); the first ones when empty. */
+export function useSellableItemSearch(q: string, enabled = q.length > 0) {
   const api = useApi();
   return useQuery({
     queryKey: [...MD_KEYS.items, 'sell', q] as QueryKey,
     queryFn: () =>
       api.get<ItemsResponse>(`/api/v1/items?${queryString({ q, status: 'active', pageSize: 20 })}`),
-    enabled: q.length > 0,
+    enabled,
   });
 }
 

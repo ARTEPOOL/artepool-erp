@@ -4,7 +4,7 @@
  * to deduct (0013), and a live preview of VAT per line (0009). A draft has no number; it gets one
  * when it is issued (0011). Issuing needs the draft saved and unchanged.
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Ban, Save, Send } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
@@ -30,7 +30,12 @@ import { useCustomer } from '../customers/api';
 import { SaveError } from '../inventory/parts';
 import { money } from '../masterdata/format';
 import { SALES_INVALIDATE, SALES_KEYS, SALES_PATHS, useDocuments } from '../sales/api';
-import { chosenFrom, CustomerPicker, type ChosenCustomer } from '../sales/CustomerPicker';
+import {
+  chosenFrom,
+  CustomerPicker,
+  useWalkInCustomer,
+  type ChosenCustomer,
+} from '../sales/CustomerPicker';
 import {
   LineEditor,
   PreviewTotals,
@@ -103,6 +108,16 @@ export function DraftEditor({ doc }: { doc: DocumentDetail | null }) {
   const [discarding, setDiscarding] = useState(false);
   const [issuing, setIssuing] = useState(false);
   const patch = (p: Partial<EditorState>) => setState((s) => ({ ...s, ...p }));
+
+  // A new invoice starts with the cash customer; the person can pick another at once.
+  const walkIn = useWalkInCustomer();
+  const customerTouched = useRef(doc !== null);
+  useEffect(() => {
+    if (walkIn && !customerTouched.current) {
+      customerTouched.current = true;
+      setState((s) => (s.customer === null ? { ...s, customer: walkIn } : s));
+    }
+  }, [walkIn]);
 
   // The customer's VAT registration decides the format; a saved draft reads it from the customer.
   const customerDetail = useCustomer(
@@ -206,7 +221,10 @@ export function DraftEditor({ doc }: { doc: DocumentDetail | null }) {
         <div className={salesStyles.cardBody}>
           <CustomerPicker
             value={customer}
-            onChange={(c) => patch({ customer: c, deductions: [] })}
+            onChange={(c) => {
+              customerTouched.current = true;
+              patch({ customer: c, deductions: [] });
+            }}
             showBalance
           />
           {customer && (
