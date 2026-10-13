@@ -117,6 +117,15 @@ beforeAll(async () => {
   const office = await addDevice(server, { code: 'OFFICE-01' });
   officeId = office.id.toString();
   const ownerId = await addOwner(server);
+  // The approval limit is off by default (decision 0054); these tests check it when it is on.
+  await server.admin.query('BEGIN');
+  await server.admin.query(`SELECT sys.set_context($1, p_reason => 'test: approval limit on')`, [
+    ownerId.toString(),
+  ]);
+  await server.admin.query(
+    `UPDATE sys.settings SET value = '50000'::jsonb WHERE key = 'inventory.adjustment_approval_threshold_fils'`,
+  );
+  await server.admin.query('COMMIT');
   owner = actor(
     office,
     (await openSession(server, { userId: ownerId, deviceId: office.id, method: 'password_totp' }))

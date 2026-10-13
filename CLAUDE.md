@@ -95,7 +95,7 @@ It runs client–server on the local network: PostgreSQL and the API service on 
 
 **Inventory**
 - **Cost visibility:** average cost and stock values only for `stock.view_cost` (owner, accountant); storekeeper and cashier see quantities. (0040)
-- **Adjustments** above 500.00 AED (setting) need a supervisor's approval. (0041)
+- **Adjustments** need no supervisor's approval (the limit setting is empty; a value turns it back on). (0054, replaces 0041)
 - **Opening stock:** once at go-live, owner only (`stock.opening`); empty cost → the item's purchase price. (0042)
 - **Item quantity in the item window:** a new stock item's quantity is posted as its opening stock (owner, accountant, storekeeper: `stock.new_item_quantity`); editing shows the current quantity and a change becomes a "Data correction" adjustment (`stock.adjust`, approval above the limit). No cost is typed there: the purchase price is used. The storekeeper manages items. (0053)
 - **Labels:** preset sizes + custom sizes (`md.label_sizes`), printed through the print dialog for now. (0043)

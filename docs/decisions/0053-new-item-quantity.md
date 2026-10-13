@@ -12,7 +12,7 @@
 - It is posted as that item's **opening stock**, in the same transaction as the item (Inventory – sellable 1310 / Opening balance equity 3900, as [0042](0042-opening-stock-owner-only.md)); once per item.
 - **Cost per unit:** not typed in the item window; the item's purchase price is used ([0038](0038-item-purchase-price-owner-only.md)). An item without one is refused with a clear message.
 - **The storekeeper adds and edits items** (`items.manage` added to the role, migration 0020); prices and the purchase price keep their own permissions.
-- **Editing an item** also shows its current quantity. A change is posted as a stock adjustment ("Data correction") from the quantity that was shown, in the same transaction; above the limit a supervisor approves ([0041](0041-stock-adjustment-approval-threshold.md)); if the stock moved meanwhile, the change is refused.
+- **Editing an item** also shows its current quantity. A change is posted as a stock adjustment ("Data correction") from the quantity that was shown, in the same transaction; if the stock moved meanwhile, the change is refused.
 
 ## Why
 - The owner asked for a simple way to give a new item its current stock without a separate opening-stock document.

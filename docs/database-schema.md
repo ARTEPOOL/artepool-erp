@@ -929,7 +929,7 @@ After posting, only the `review_*` columns may change, and only `pending → rev
 | posted_by | bigint? → auth.users | |
 | [std] | | |
 
-As built (migration 0011): a count is created straight in `counting` (the snapshot is taken then); `count_date`, `total_value_fils` (net) and `variance_abs_fils` (Σ |differences|, used for the approval threshold, decision 0041) are set at posting; **one open count per warehouse** (`counts_open_uq`). Counted quantities are hidden from the counters while counting (decision 0044, API).
+As built (migration 0011): a count is created straight in `counting` (the snapshot is taken then); `count_date`, `total_value_fils` (net) and `variance_abs_fils` (Σ |differences|, used for the approval threshold when one is set: decisions 0041, 0054) are set at posting; **one open count per warehouse** (`counts_open_uq`). Counted quantities are hidden from the counters while counting (decision 0044, API).
 
 ### 8.6 `inv.count_lines`
 
@@ -1672,10 +1672,11 @@ Migrations are written **in build order** (milestones in [`phase-1-plan.md`](pha
 | 0018 | `sales_review_fixes` | M4 | — (a price approval never waives the discount limit; note lines follow their original line; an issued document with nothing to pay is settled) | `sales.quotations.price_approval_id` |
 | 0019 | `new_item_quantity` | M4 | — (permission `stock.new_item_quantity` for owner, accountant, storekeeper; opening stock allowed for an item created in the same transaction, decision 0053) | — |
 | 0020 | `storekeeper_items` | M4 | — (`items.manage` for the storekeeper role, decision 0053) | — |
-| 0021 | `cash_events` | M5 | `cash.movements`, `cash.drawer_events` + shift summary view | `gl.journal_entries.cash_movement_id` |
-| 0022 | `ops_backup` | M6 | `ops.backup_runs`, `ops.integrity_runs` + backup role grants | — |
+| 0021 | `no_adjustment_approval` | M4 | — (the adjustment approval limit setting is emptied, decision 0054) | — |
+| 0022 | `cash_events` | M5 | `cash.movements`, `cash.drawer_events` + shift summary view | `gl.journal_entries.cash_movement_id` |
+| 0023 | `ops_backup` | M6 | `ops.backup_runs`, `ops.integrity_runs` + backup role grants | — |
 
-After 0022, a final check asserts that every business table has the audit trigger, the no-delete guard and the expected grants. The same check runs as an automated test.
+After 0023, a final check asserts that every business table has the audit trigger, the no-delete guard and the expected grants. The same check runs as an automated test.
 
 ---
 

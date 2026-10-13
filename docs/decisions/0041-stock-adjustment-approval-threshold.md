@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Accepted |
+| **Status** | Replaced by [0054](0054-no-approval-for-stock-adjustments.md) (2026-10-13) |
 | **Date** | 2026-10-11 |
 | **Decided by** | Owner |
 

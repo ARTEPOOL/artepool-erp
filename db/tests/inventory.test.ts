@@ -223,6 +223,13 @@ beforeAll(async () => {
   warehouse = (await one<{ id: string }>(api, `SELECT id FROM md.warehouses WHERE code = 'MAIN'`))
     .id;
   today = (await one<{ d: string }>(api, `SELECT sys.business_date()::text AS d`)).d;
+  // The approval limit is off by default (decision 0054); these tests check it when it is on.
+  await admin.query('BEGIN');
+  await admin.query(`SELECT sys.set_context($1, p_reason => 'test: approval limit on')`, [owner]);
+  await admin.query(
+    `UPDATE sys.settings SET value = '50000'::jsonb WHERE key = 'inventory.adjustment_approval_threshold_fils'`,
+  );
+  await admin.query('COMMIT');
 });
 afterAll(() => db.drop());
 
