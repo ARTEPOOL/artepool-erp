@@ -266,10 +266,49 @@ export interface CashCounts {
   counted_at: Generated<Timestamp>;
   counted_by: bigint;
   id: Generated<bigint>;
+  other_amount_fils: Generated<bigint>;
   purpose: string;
   shift_id: bigint;
   supersedes_id: bigint | null;
   total_fils: bigint;
+}
+
+export interface CashDrawerEvents {
+  approval_id: bigint | null;
+  cash_movement_id: bigint | null;
+  device_id: bigint | null;
+  event_type: string;
+  id: Generated<bigint>;
+  note: string | null;
+  occurred_at: Generated<Timestamp>;
+  payment_id: bigint | null;
+  reason_code_id: bigint | null;
+  register_id: bigint;
+  sales_document_id: bigint | null;
+  shift_id: bigint | null;
+  user_id: bigint;
+}
+
+export interface CashMovements {
+  amount_fils: bigint;
+  approval_id: bigint | null;
+  counterparty: string | null;
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  device_id: bigint | null;
+  direction: string;
+  drop_count_id: bigint | null;
+  id: Generated<bigint>;
+  movement_date: string;
+  movement_type: string;
+  note: string | null;
+  reason_code_id: bigint | null;
+  register_id: bigint;
+  seq_no: bigint;
+  series_id: bigint;
+  shift_id: bigint;
+  uuid: Generated<string>;
+  voucher_number: string;
 }
 
 export interface CashRegisters {
@@ -324,6 +363,16 @@ export interface CashShifts {
   variance_note: string | null;
   variance_reason_code_id: bigint | null;
   z_snapshot: Json | null;
+}
+
+export interface CashVarianceAcceptances {
+  accepted_at: Generated<Timestamp>;
+  accepted_by: bigint;
+  id: Generated<bigint>;
+  note: string | null;
+  reason_code_id: bigint | null;
+  shift_id: bigint;
+  variance_fils: bigint;
 }
 
 export interface GlAccountMappings {
@@ -1271,8 +1320,11 @@ export interface DB {
   "auth.users": AuthUsers;
   "cash.count_lines": CashCountLines;
   "cash.counts": CashCounts;
+  "cash.drawer_events": CashDrawerEvents;
+  "cash.movements": CashMovements;
   "cash.registers": CashRegisters;
   "cash.shifts": CashShifts;
+  "cash.variance_acceptances": CashVarianceAcceptances;
   "gl.account_mappings": GlAccountMappings;
   "gl.accounts": GlAccounts;
   "gl.journal_entries": GlJournalEntries;

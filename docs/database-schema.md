@@ -1285,7 +1285,7 @@ The money columns work exactly as in `sales.document_lines` (item lines only).
 | quantity | integer | `>= 0` |
 | amount_fils | bigint | Trigger: `= value × quantity` |
 
-### 10.5 `cash.movements` (append-only)
+### 10.5 `cash.movements` (append-only, migration 0022)
 
 | Column | Type | Rules |
 |---|---|---|
@@ -1294,32 +1294,58 @@ The money columns work exactly as in `sales.document_lines` (item lines only).
 | series_id | bigint → sys.document_series | `CV-`; `UNIQUE (series_id, seq_no)` |
 | seq_no | bigint | |
 | voucher_number | text | |
-| shift_id | bigint → cash.shifts | Open; the user must be its cashier |
-| movement_type | text | `CHECK IN ('paid_in','paid_out','cash_drop','float_top_up')` |
-| amount_fils | bigint | `> 0` |
-| reason_code_id | bigint → sys.reason_codes | Mandatory |
+| shift_id | bigint → cash.shifts | Open; the user must be its cashier (`cash.assert_shift_owner`) |
+| register_id | bigint → cash.registers | From the shift |
+| device_id | bigint? → auth.devices | From the request context |
+| movement_type | text | `CHECK IN ('opening_float','paid_in','paid_out','cash_drop','float_top_up','closing_transfer')`; the opening float and the closing transfer once per shift |
+| direction | text | `in` (opening float, paid-in, top-up) / `out` (the rest), set by the trigger |
+| amount_fils | bigint | `> 0`; money out never above `cash.expected_cash()` (except the closing transfer) |
+| movement_date | date | Business date; the month must be open |
+| reason_code_id | bigint? → sys.reason_codes | Required for paid-in / paid-out, of that category (the reason names the account, rows 16–17) |
 | note | text? | |
 | counterparty | text? | |
-| approval_id | bigint? → auth.approvals | |
-| drop_count_id | bigint? → cash.counts | |
+| approval_id | bigint? → auth.approvals | A paid-out needs `cash.paid_out` or an approval for it |
+| drop_count_id | bigint? → cash.counts | Drops only; a `drop` count of the same shift for the same amount |
 | [ins] | | |
+
+At commit, every movement has its journal entry (posting map rows 16–18).
+
+`cash.expected_cash(shift)` = cash payments on the shift (in − out, net of change) + movements (in − out), the closing transfer left out.
+
+**Close** (`cash.shift_close_rules`): the shift must have a closing count; the recount, when there is one, is the final count. The database sets `closing_count_id`, `counted_cash_fils`, `expected_cash_fils` and `variance_fils`; a counted amount above zero needs the closing transfer in the same transaction. **Open**: an opening float above zero needs the `opening_float` movement in the same transaction.
+
+**Counts** (0022): `other_amount_fils` (≥ 0) for cash that is not a listed denomination ([0056](decisions/0056-cash-count-denominations.md)); total = lines + other amount. Only the open shift's cashier counts; a recount replaces the closing count once, with a `shifts.recount` approval.
 
 ### 10.6 `cash.drawer_events` (append-only)
 
 | Column | Type | Rules |
 |---|---|---|
 | id | bigint PK | |
-| register_id | bigint → cash.registers | |
-| shift_id | bigint? → cash.shifts | |
+| register_id | bigint → cash.registers | From the shift when there is one |
+| shift_id | bigint? → cash.shifts | Its own cashier only |
 | event_type | text | `CHECK IN ('open_sale','open_payment','open_cash_movement','open_count','open_no_sale','reported_open','reported_closed','left_open_alert')` |
 | sales_document_id | bigint? → sales.documents | |
 | payment_id | bigint? → sales.payments | |
 | cash_movement_id | bigint? → cash.movements | |
-| reason_code_id | bigint? → sys.reason_codes | Required for `open_no_sale` |
+| reason_code_id | bigint? → sys.reason_codes | Required for `open_no_sale`, category `no_sale`; the user needs `pos.no_sale` |
+| note | text? | |
 | approval_id | bigint? → auth.approvals | |
-| user_id | bigint → auth.users | |
-| device_id | bigint → auth.devices | |
+| user_id | bigint → auth.users | The signed-in user |
+| device_id | bigint? → auth.devices | From the request context |
 | occurred_at | timestamptz | |
+
+### 10.7 `cash.variance_acceptances` (append-only, decision 0058)
+
+| Column | Type | Rules |
+|---|---|---|
+| id | bigint PK | |
+| shift_id | bigint → cash.shifts | `UNIQUE`; the shift must be closed |
+| variance_fils | bigint | Copied from the shift by the trigger |
+| reason_code_id | bigint? → sys.reason_codes | |
+| note | text? | 3–1000 characters |
+| accepted_at / accepted_by | | Stamped; needs `cash.variance_accept`; never the shift's own cashier |
+
+At commit, a non-zero accepted variance has its `shift_close` journal entry (row 19).
 
 ---
 
@@ -1633,7 +1659,9 @@ All series use 6 digits and continuous numbering ([0011](decisions/0011-document
 | `print.receipt_language` | `"both"` | |
 | `print.mark_reprints_as_copy` | `true` | |
 | `inventory.adjustment_approval_threshold_fils` | `50000` | 500 AED; adjustable |
-| `cash.variance_alert_repeat_count` | `3` | Within 30 days |
+| `cash.variance_alert_repeat_count` | `3` | Variances above `cash.variance_alert_fils` within `cash.variance_alert_days` ([0058](decisions/0058-shift-variance-acceptance.md)) |
+| `cash.variance_alert_fils` / `cash.variance_alert_days` | `2000` / `30` | [0058](decisions/0058-shift-variance-acceptance.md) (migration 0022) |
+| `cash.drop_alert_fils` | `300000` | A drawer above AED 3,000 raises the cash-drop alert ([0057](decisions/0057-cash-drop-alert.md)) |
 | `sales.quotation_validity_days` | `30` | |
 | `einvoice.mandatory_from` | `null` | **Pending accountant** ([0019](decisions/0019-einvoicing-via-accredited-provider.md)) |
 | `backup.max_age_minutes.local` / `backup.max_age_hours.offsite` | `90` / `30` | |
@@ -1673,7 +1701,7 @@ Migrations are written **in build order** (milestones in [`phase-1-plan.md`](pha
 | 0019 | `new_item_quantity` | M4 | — (permission `stock.new_item_quantity` for owner, accountant, storekeeper; opening stock allowed for an item created in the same transaction, decision 0053) | — |
 | 0020 | `storekeeper_items` | M4 | — (`items.manage` for the storekeeper role, decision 0053) | — |
 | 0021 | `no_adjustment_approval` | M4 | — (the adjustment approval limit setting is emptied, decision 0054) | — |
-| 0022 | `cash_events` | M5 | `cash.movements`, `cash.drawer_events` + shift summary view | `gl.journal_entries.cash_movement_id` |
+| 0022 | `cash_events` | M5 | `cash.movements`, `cash.drawer_events`, `cash.variance_acceptances`, `cash.expected_cash()`, count other amount, 0.10/0.05 coins, cash alert settings, cashier 5% discount | `gl.journal_entries.cash_movement_id`, `shift_id` |
 | 0023 | `ops_backup` | M6 | `ops.backup_runs`, `ops.integrity_runs` + backup role grants | — |
 
 After 0023, a final check asserts that every business table has the audit trigger, the no-delete guard and the expected grants. The same check runs as an automated test.
