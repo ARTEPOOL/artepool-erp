@@ -1,6 +1,6 @@
 # ARTÉPOOL ERP — Product Requirements Document (PRD)
 
-**Version:** 1.9
+**Version:** 1.10
 **Date:** 2026-10-07
 **Owner:** Mohammed Yasser Al Huraidi (partner, ARTÉPOOL)
 **Status:** Scope approved. Owner and accountant decisions applied (see `docs/decisions/`). **Phase 1 plan approved (2026-10-07).**
@@ -271,7 +271,9 @@ Phase tags: **[P1]** to **[P4]** (see section 13).
 - Settings → **Print designer**: the owner customises the layout of printed documents with a live preview ([0020](docs/decisions/0020-print-template-designer.md); design: `design/screens/11-print-designer.html`).
 - Phase 1 templates: A4 tax invoice, quotation, credit note, 80 mm thermal receipt. Z report and barcode labels follow with their milestones.
 - Adjustable: logo (upload, position, size), main colour (A4), print language (Arabic + English / Arabic / English), text size, optional fields on or off, welcome line, terms, footer, A4 margins, thermal width (80 or 58 mm).
-- **Legally required fields are locked** and always printed (title and type, seller name and TRN, number and dates, customer TRN on a full tax invoice, VAT per line and in total).
+- **Legally required fields are locked** and always printed. The list per document type is in [0064](docs/decisions/0064-print-designer-and-locked-fields.md) (pending the accountant's review): among them the seller's name, **address** and TRN on every tax invoice, and the customer's name, **address** and TRN on a full tax invoice. A full tax invoice is refused at issue without the customer's address.
+- Receipts and statements use the A4 invoice design. The thermal receipt's language is chosen here. No QR code until e-invoicing ([0067](docs/decisions/0067-qr-code-deferred.md)).
+- **Bank accounts** (several, UAE IBAN checked) are kept in Company details; the template chooses which one prints ([0065](docs/decisions/0065-company-bank-accounts.md)). An optional **customer PO number** on A4 invoices and quotations prints when filled ([0066](docs/decisions/0066-customer-po-number.md)).
 - Templates are **versioned**; each issued document keeps the version it was issued with, so reprints match the original. Saves are audited. Owner only.
 
 ### 9.7 Purchasing and suppliers [P2]
@@ -432,6 +434,7 @@ Each phase ends with automated tests passing, a security review, an accountant r
 
 | Version | Date | Change |
 |---|---|---|
+| 1.10 | 2026-10-14 | M4b decisions 0064–0067: print designer with locked tax fields per document type (seller address on every tax invoice, customer address on full tax invoices; a full tax invoice needs the customer's address); company bank accounts with UAE IBAN check; customer PO number on A4 invoices and quotations; no QR code until e-invoicing. |
 | 1.9 | 2026-10-13 | Decision 0063: A4 cash taken by a cashier on their open shift goes into the drawer; A4 invoices shown in the shift's sales (POS, A4, total) but never in its expected cash. |
 | 1.0 | 2026-10-06 | Initial approved scope for Phase 1 planning |
 | 1.1 | 2026-10-06 | Applied owner and accountant decisions 0001–0019: confirmed stack; separate repository; POS oversell with approval; one cashier per shift; cart removals logged without approval; one recount with approval; no code-signing for now; POS silent printing and separate A4 section; VAT per line; invoice format by VAT registration; POS-/INV- series; discounts net per line; VAT on advance/progress payments; 4-decimal unit precision and no cash rounding; defective held at cost; monthly lock; quarterly VAT export and annual archive; chart of accounts by line of business (pending review); e-invoicing via accredited provider (go-live pending). Ledger core moved into P1. |

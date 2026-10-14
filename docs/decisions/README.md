@@ -70,6 +70,10 @@ There is one short file per decision, numbered in order.
 | [0061](0061-card-payments-no-card-data.md) | Card payments: amount and approval code only | Accepted |
 | [0062](0062-pos-receipt-and-customer.md) | POS receipt in Arabic and English; cash customer by default | Accepted |
 | [0063](0063-a4-cash-on-the-drawer.md) | A4 cash taken by the cashier goes into their drawer; A4 invoices in the shift's sales | Accepted |
+| [0064](0064-print-designer-and-locked-fields.md) | The print designer (M4b) and the fields that can never be hidden | Accepted (locked fields pending accountant review) |
+| [0065](0065-company-bank-accounts.md) | Company bank accounts, and which one prints | Accepted |
+| [0066](0066-customer-po-number.md) | Customer PO number on A4 invoices and quotations | Accepted |
+| [0067](0067-qr-code-deferred.md) | No QR code on printed documents until e-invoicing | Accepted |
 
 ## Template
 
