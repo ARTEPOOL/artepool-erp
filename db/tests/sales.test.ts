@@ -53,7 +53,7 @@ const one = async <T extends pg.QueryResultRow>(
 
 async function customer(
   name: string,
-  opts: { trn?: string; creditLimit?: number } = {},
+  opts: { trn?: string; creditLimit?: number; address?: string | null } = {},
 ): Promise<string> {
   phoneNo += 1;
   const credit = opts.creditLimit !== undefined;
@@ -63,8 +63,8 @@ async function customer(
         await one<{ id: string }>(
           c,
           `INSERT INTO md.customers (code, customer_type, name, phone, is_vat_registered, trn, credit_mode,
-                                   credit_limit_fils, payment_terms_days)
-         VALUES ($1, 'company', $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+                                   credit_limit_fils, payment_terms_days, address_line)
+         VALUES ($1, 'company', $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
           [
             `C${phoneNo}`,
             name,
@@ -74,6 +74,12 @@ async function customer(
             credit ? 'credit' : 'cash',
             opts.creditLimit ?? 0,
             credit ? 30 : 0,
+            // A VAT-registered customer has an address unless a test says otherwise (0064).
+            opts.address !== undefined
+              ? opts.address
+              : opts.trn !== undefined
+                ? 'Industrial Area'
+                : null,
           ],
         )
       ).id,
@@ -387,6 +393,48 @@ describe('issue (decisions 0010, 0011)', () => {
     await expect(tx((c) => line(c, full.doc, { item: svc, price: 1 }))).rejects.toMatchObject({
       code: 'AP006',
     });
+  });
+
+  it('a full tax invoice needs the customer’s address, taken from the customer at issue (0064)', async () => {
+    const noAddress = await customer('No address', {
+      trn: '100777888900003',
+      creditLimit: 10_000_000,
+      address: null,
+    });
+    const svc = await item('S-ADDR', 'service', 1_000_000, false);
+    const draftFor = (cust: string) =>
+      tx(async (c) => {
+        const doc = await draft(c, 'invoice', cust);
+        await line(c, doc, { item: svc, price: 1_000_000 });
+        return doc;
+      });
+    const doc = await draftFor(noAddress);
+    await expect(tx((c) => issue(c, doc, noAddress))).rejects.toMatchObject(
+      rule('FULL_INVOICE_ADDRESS'),
+    );
+    // The address added to the customer later is printed on the invoice (the draft had none).
+    await tx(
+      (c) =>
+        c.query(`UPDATE md.customers SET address_line = 'Sanaiya', city = 'Al Ain' WHERE id = $1`, [
+          noAddress,
+        ]),
+      owner,
+      'Address added',
+    );
+    await tx((c) => issue(c, doc, noAddress));
+    expect(
+      (
+        await one<{ a: string }>(
+          api,
+          `SELECT bill_to_address AS a FROM sales.documents WHERE id = $1`,
+          [doc],
+        )
+      ).a,
+    ).toBe('Sanaiya، Al Ain');
+    // A customer who is not VAT-registered needs no address (simplified invoice).
+    const plain = await customer('Plain, no address', { creditLimit: 10_000_000 });
+    const simple = await draftFor(plain);
+    await tx((c) => issue(c, simple, plain));
   });
 
   it('a POS document needs an open shift of its own cashier; an office one never uses POS-', async () => {

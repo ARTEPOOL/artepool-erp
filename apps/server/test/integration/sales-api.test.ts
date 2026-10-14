@@ -97,7 +97,7 @@ async function customer(
       name,
       phone: `050 ${phone}`,
       isVatRegistered: opts.trn !== undefined,
-      ...(opts.trn ? { trn: opts.trn } : {}),
+      ...(opts.trn ? { trn: opts.trn, addressLine: 'Industrial Area 1' } : {}),
     }),
     201,
   );

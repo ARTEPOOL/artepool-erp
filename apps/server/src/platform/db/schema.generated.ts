@@ -957,6 +957,7 @@ export interface SalesDocuments {
   credit_approval_id: bigint | null;
   currency: Generated<string>;
   customer_id: bigint;
+  customer_po: string | null;
   device_id: bigint;
   discount_total_fils: Generated<bigint>;
   doc_discount_fils: Generated<bigint>;
@@ -1112,6 +1113,7 @@ export interface SalesQuotations {
   created_at: Generated<Timestamp>;
   created_by: bigint;
   customer_id: bigint;
+  customer_po: string | null;
   decided_at: Timestamp | null;
   discount_total_fils: Generated<bigint>;
   doc_discount_fils: Generated<bigint>;
@@ -1167,6 +1169,21 @@ export interface SysBranches {
   name_ar: string;
   name_en: string;
   row_version: Generated<number>;
+  updated_at: Generated<Timestamp>;
+  updated_by: bigint;
+}
+
+export interface SysCompanyBankAccounts {
+  account_name: string;
+  bank_name: string;
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  iban: string;
+  id: Generated<bigint>;
+  is_active: Generated<boolean>;
+  row_version: Generated<number>;
+  sort_order: Generated<number>;
+  swift: string | null;
   updated_at: Generated<Timestamp>;
   updated_by: bigint;
 }
@@ -1364,6 +1381,7 @@ export interface DB {
   "sales.quotations": SalesQuotations;
   "sys.alerts": SysAlerts;
   "sys.branches": SysBranches;
+  "sys.company_bank_accounts": SysCompanyBankAccounts;
   "sys.company_profile": SysCompanyProfile;
   "sys.document_series": SysDocumentSeries;
   "sys.idempotency_keys": SysIdempotencyKeys;

@@ -419,6 +419,7 @@ describe('POS sales', () => {
         phone: `050 ${phone}`,
         isVatRegistered: true,
         trn: '100987654321003',
+        addressLine: 'Sanaiya, Al Ain',
       }),
       201,
     );
