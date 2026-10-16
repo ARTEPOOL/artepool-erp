@@ -8,6 +8,7 @@ import { registerApprovalRoutes } from './modules/approvals/routes';
 import { registerAuditRoutes } from './modules/audit/routes';
 import { registerAuthRoutes } from './modules/auth/routes';
 import { registerCompanyRoutes } from './modules/company/routes';
+import { registerPrintingRoutes } from './modules/printing/routes';
 import { registerDeviceRoutes } from './modules/devices/routes';
 import { registerImportRoutes } from './modules/imports/routes';
 import { registerInventoryRoutes } from './modules/inventory/routes';
@@ -98,6 +99,7 @@ export function buildApp(options: AppOptions, deps: AppDeps): FastifyInstance {
   registerApprovalRoutes(app);
   registerAuditRoutes(app);
   registerCompanyRoutes(app);
+  registerPrintingRoutes(app);
   registerSettingsRoutes(app);
   registerLedgerRoutes(app);
   registerInventoryRoutes(app);

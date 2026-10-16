@@ -161,6 +161,7 @@ const quotation = (patch: Partial<QuotationDetail> = {}): QuotationDetail => ({
   businessLineId: '1',
   billToName: 'Al Waha Hotel',
   billToTrn: '100456789000003',
+  customerPo: null,
   termsAr: null,
   termsEn: 'Payment on delivery.',
   notes: null,

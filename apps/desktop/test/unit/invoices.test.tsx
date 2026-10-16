@@ -208,6 +208,7 @@ const detail = (patch: Partial<DocumentDetail>): DocumentDetail => ({
   businessLineId: '1',
   billToName: 'Blue Lagoon Villas',
   billToNameAlt: null,
+  customerPo: null,
   billToTrn: '100123456700003',
   billToAddress: 'Al Jimi, Al Ain',
   billToPhone: '+971501234567',

@@ -5,6 +5,7 @@
  * 0055–0062. Amounts travel as whole-number text: fils, 4-decimal prices, quantities in thousandths.
  */
 import { z } from 'zod';
+import type { TemplateSettings } from './printing';
 import { IdText } from './auth';
 import { NonNegativeIntText, OptionalText, Reason } from './common';
 import type { DocumentDetail } from './sales';
@@ -134,6 +135,7 @@ export interface ReceiptData {
     addressEn: string;
     trn: string | null;
     phone: string | null;
+    email: string | null;
   };
   document: DocumentDetail;
   payments: PosPaymentResult[];
@@ -144,6 +146,8 @@ export interface ReceiptData {
   /** Prints so far: 0 = the original; after that every print is a copy (0008). */
   printCount: number;
   markCopies: boolean;
+  /** The receipt template version stored on the document (decisions 0020, 0064). */
+  template: TemplateSettings;
 }
 
 export interface PosSaleResponse {

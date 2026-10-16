@@ -4,7 +4,12 @@
  * simplified vs full tax invoice, net / VAT / total, change, the card approval code, copies.
  */
 import { describe, expect, it } from 'vitest';
-import type { DocumentDetail, ReceiptData, SalesLine } from '@artepool/shared/contracts';
+import {
+  defaultTemplateSettings,
+  type DocumentDetail,
+  type ReceiptData,
+  type SalesLine,
+} from '@artepool/shared/contracts';
 import i18n from 'i18next';
 import {
   DRAWER_KICK,
@@ -53,6 +58,7 @@ function receipt(over: Partial<ReceiptData> = {}, doc: Partial<DocumentDetail> =
       addressEn: 'Al Ain',
       trn: '100987654300003',
       phone: '+971 3 000 0000',
+      email: null,
     },
     document: {
       id: '9',
@@ -89,6 +95,7 @@ function receipt(over: Partial<ReceiptData> = {}, doc: Partial<DocumentDetail> =
     deviceCode: 'COUNTER-01',
     printCount: 0,
     markCopies: true,
+    template: defaultTemplateSettings('receipt_thermal'),
     ...over,
   };
 }

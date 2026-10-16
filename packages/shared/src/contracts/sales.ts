@@ -110,6 +110,8 @@ export const SaveQuotationRequest = z.object({
   /** Defaults to the date + sales.quotation_valid_days (15). */
   validUntil: DateText.optional(),
   subject: OptionalText(300),
+  /** The customer's own purchase order number (decision 0066). */
+  customerPo: OptionalText(50),
   termsAr: OptionalText(4000),
   termsEn: OptionalText(4000),
   notes: OptionalText(2000),
@@ -152,6 +154,7 @@ export interface QuotationDetail extends QuotationItem {
   businessLineId: string;
   billToName: string;
   billToTrn: string | null;
+  customerPo: string | null;
   termsAr: string | null;
   termsEn: string | null;
   notes: string | null;
@@ -180,6 +183,8 @@ export const SaveInvoiceRequest = z.object({
   supplyDate: DateText.optional(),
   dueDate: DateText.optional(),
   quotationId: IdText.optional(),
+  /** The customer's own purchase order number (decision 0066). */
+  customerPo: OptionalText(50),
   notes: OptionalText(2000),
   internalNote: OptionalText(2000),
   docDiscountFils: NonNegativeIntText.optional(),
@@ -288,6 +293,7 @@ export interface DocumentDetail extends DocumentItem {
   billToTrn: string | null;
   billToAddress: string | null;
   billToPhone: string | null;
+  customerPo: string | null;
   supplyDate: string | null;
   issuedAt: string | null;
   issuedByName: { displayNameAr: string; displayNameEn: string } | null;

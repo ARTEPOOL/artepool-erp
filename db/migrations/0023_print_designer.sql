@@ -7,6 +7,7 @@
 --     customer at issue when the draft has none, and the issue is refused when there is still none.
 --   * The current template of a kind can only point at one of its own versions, and only the owner
 --     changes it (0020).
+--   * Office receipts store the A4 invoice template's version (they print with its design, 0064).
 --   * The thermal receipt's language moves into its template (0064): a new receipt version with
 --     the value of the old setting print.receipt_language, which is no longer read.
 -- Never edit this file after it has been applied anywhere. Add a new migration instead.
@@ -112,6 +113,31 @@ BEGIN
 END $$;
 CREATE TRIGGER b_print_current_rules BEFORE UPDATE OF current_version_id ON sys.print_templates
   FOR EACH ROW EXECUTE FUNCTION sys.print_current_rules();
+
+-- ---------------------------------------------------------------------------------------------
+-- Receipts (سند قبض) print with the A4 invoice's design (0064): a new office receipt stores the
+-- invoice template's version, so its reprint looks like the original.
+-- ---------------------------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION sales.stamp_print_version() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+  IF TG_TABLE_NAME = 'documents' THEN
+    IF NEW.status = 'issued' AND OLD.status = 'draft' THEN
+      NEW.print_template_version_id := sys.current_print_version(CASE
+        WHEN NEW.channel = 'pos' THEN 'receipt_thermal'
+        WHEN NEW.doc_type = 'credit_note' THEN 'credit_note_a4'
+        ELSE 'tax_invoice_a4' END);
+    END IF;
+  ELSIF TG_TABLE_NAME = 'quotations' THEN
+    IF NEW.status = 'sent' AND OLD.status = 'draft' THEN
+      NEW.print_template_version_id := sys.current_print_version('quotation_a4');
+    END IF;
+  ELSE
+    NEW.print_template_version_id := sys.current_print_version(
+      CASE WHEN NEW.channel = 'pos' THEN 'receipt_thermal' ELSE 'tax_invoice_a4' END);
+  END IF;
+  RETURN NEW;
+END $$;
 
 -- ---------------------------------------------------------------------------------------------
 -- The thermal receipt's language moves into its template (0064)

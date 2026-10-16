@@ -1,9 +1,15 @@
 /**
- * What each printed document shows (decision 0050: the default template version stored on the
- * document, so a reprint looks like the original). Issued documents print the seller details
- * frozen at issue; a reprint is marked "Copy" (decision 0008, setting print.mark_reprints_as_copy).
+ * What each printed document shows. Every issued document prints with the template version stored
+ * on it (decisions 0020, 0050), so a reprint looks like the original; receipts and statements use
+ * the A4 invoice's design (0064). Issued documents print the seller details frozen at issue; a
+ * reprint is marked "Copy" (decision 0008, setting print.mark_reprints_as_copy).
  */
 import { sql, type Kysely, type Transaction } from 'kysely';
+import {
+  readTemplateSettings,
+  type DesignedKind,
+  type TemplateSettings,
+} from '@artepool/shared/contracts';
 import type { DB } from '../../platform/db/schema.generated';
 import { ruleError } from '../../platform/errors/app-error';
 import { getDocument } from '../sales/documents';
@@ -14,14 +20,14 @@ import {
   date,
   money,
   renderHtml,
+  type PrintBankAccount,
   type PrintDocument,
   type Seller,
-  type TemplateSettings,
 } from './templates';
 
 type Db = Kysely<DB> | Transaction<DB>;
 
-async function company(db: Db): Promise<{ seller: Seller; logo: string | null }> {
+export async function company(db: Db): Promise<{ seller: Seller; logo: string | null }> {
   const c = await db
     .selectFrom('sys.company_profile')
     .selectAll()
@@ -37,10 +43,11 @@ async function company(db: Db): Promise<{ seller: Seller; logo: string | null }>
   };
 }
 
-async function settingsOf(
+/** A version's settings (the stored one, or the kind's current one), read with their defaults. */
+export async function settingsOf(
   db: Db,
   versionId: bigint | null,
-  kind: string,
+  kind: DesignedKind,
 ): Promise<TemplateSettings> {
   const row = versionId
     ? await db
@@ -54,7 +61,23 @@ async function settingsOf(
         .select('v.settings')
         .where('t.doc_kind', '=', kind)
         .executeTakeFirst();
-  return (row?.settings ?? {}) as TemplateSettings;
+  return readTemplateSettings(kind, row?.settings);
+}
+
+/** The bank account a template prints (decision 0065); kept even after it is deactivated. */
+export async function bankAccountOf(
+  db: Db,
+  settings: TemplateSettings,
+): Promise<PrintBankAccount | null> {
+  if (!settings.fields.bankDetails || !settings.bankAccountId) return null;
+  const a = await db
+    .selectFrom('sys.company_bank_accounts')
+    .select(['bank_name', 'account_name', 'iban', 'swift'])
+    .where('id', '=', BigInt(settings.bankAccountId))
+    .executeTakeFirst();
+  return a
+    ? { bankName: a.bank_name, accountName: a.account_name, iban: a.iban, swift: a.swift }
+    : null;
 }
 
 async function markCopies(db: Db): Promise<boolean> {
@@ -66,29 +89,52 @@ async function markCopies(db: Db): Promise<boolean> {
   return row?.on ?? true;
 }
 
+async function render(
+  db: Db,
+  doc: PrintDocument,
+  seller: Seller,
+  kind: DesignedKind,
+  settings: TemplateSettings,
+): Promise<string> {
+  return renderHtml(doc, seller, {
+    kind,
+    settings,
+    bankAccount: await bankAccountOf(db, settings),
+  });
+}
+
+const userName = (u: { display_name_ar: string | null; display_name_en: string | null }) =>
+  [u.display_name_ar, u.display_name_en].filter(Boolean).join(' · ') || null;
+
 export async function documentHtml(
   db: Db,
   id: bigint,
 ): Promise<{ html: string; number: string | null }> {
   const d = await getDocument(db, id);
   const extra = await db
-    .selectFrom('sales.documents')
-    .select(['seller_snapshot', 'print_template_version_id'])
-    .where('id', '=', id)
+    .selectFrom('sales.documents as d')
+    .leftJoin('sales.documents as o', 'o.id', 'd.original_document_id')
+    .leftJoin('auth.users as s', 's.id', 'd.salesperson_id')
+    .select([
+      'd.seller_snapshot',
+      'd.print_template_version_id',
+      'o.issue_date as original_date',
+      's.display_name_ar',
+      's.display_name_en',
+    ])
+    .where('d.id', '=', id)
     .executeTakeFirstOrThrow();
   const { seller: current, logo } = await company(db);
   const seller = (extra.seller_snapshot as Seller | null) ?? current;
-  const settings = await settingsOf(
-    db,
-    extra.print_template_version_id,
-    d.docType === 'credit_note' ? 'credit_note_a4' : 'tax_invoice_a4',
-  );
+  const kind: DesignedKind = d.docType === 'credit_note' ? 'credit_note_a4' : 'tax_invoice_a4';
+  const settings = await settingsOf(db, extra.print_template_version_id, kind);
   const deductions = d.lines.filter((l) => l.lineKind === 'advance_deduction');
   const items = d.lines.filter((l) => l.lineKind !== 'advance_deduction');
   const before = items.reduce(
     (s, l) => ({ net: s.net + BigInt(l.netFils), vat: s.vat + BigInt(l.vatFils) }),
     { net: 0n, vat: 0n },
   );
+  const isNote = d.docType === 'credit_note' || d.docType === 'debit_note';
   const doc: PrintDocument = {
     kind: d.docType,
     format: d.invoiceFormat,
@@ -107,10 +153,8 @@ export async function documentHtml(
             },
           ]
         : []),
-      ...(d.dueDate && settings.optional?.dueDate !== false
-        ? [{ label: ['تاريخ الاستحقاق', 'Due date'] as [string, string], value: date(d.dueDate) }]
-        : []),
     ],
+    dueDate: d.dueDate ? date(d.dueDate) : null,
     customer: {
       name: d.billToName,
       nameAlt: d.billToNameAlt,
@@ -119,12 +163,20 @@ export async function documentHtml(
       address: d.billToAddress,
       phone: d.billToPhone,
     },
-    reference: d.originalDocumentNumber
-      ? { label: ['المستند الأصلي', 'Original document'], value: d.originalDocumentNumber }
-      : null,
+    customerPo: d.customerPo,
+    salesperson: extra.display_name_ar || extra.display_name_en ? userName(extra) : null,
+    original:
+      isNote && d.originalDocumentNumber
+        ? {
+            number: d.originalDocumentNumber,
+            date: extra.original_date ? date(String(extra.original_date).slice(0, 10)) : null,
+          }
+        : null,
+    reason: isNote ? d.reasonText : null,
     lines: d.lines.map((l) => ({
       descriptionAr: l.descriptionAr,
       descriptionEn: l.descriptionEn,
+      itemCode: l.itemCode,
       quantityMilli: l.quantityMilli,
       unitPrice4dp: l.unitPrice4dp,
       discountFils: (BigInt(l.lineDiscountFils) + BigInt(l.docDiscountAllocFils)).toString(),
@@ -135,6 +187,14 @@ export async function documentHtml(
       deduction: l.lineKind === 'advance_deduction',
     })),
     totals: [
+      ...(d.discountTotalFils !== '0'
+        ? [
+            {
+              label: ['إجمالي الخصم', 'Total discount'] as [string, string],
+              fils: d.discountTotalFils,
+            },
+          ]
+        : []),
       ...(deductions.length > 0
         ? [
             {
@@ -151,18 +211,26 @@ export async function documentHtml(
       { label: ['ضريبة القيمة المضافة', 'VAT'], fils: d.vatFils },
       { label: ['الإجمالي المستحق', 'Total payable'], fils: d.totalFils, strong: true },
     ],
-    notes: [d.reasonText, d.notes].filter(Boolean).join(' — ') || null,
+    wordsFils: d.totalFils,
+    notes: d.notes,
     logoDataUri: logo,
   };
-  return { html: renderHtml(doc, seller, settings), number: d.docNumber };
+  return { html: await render(db, doc, seller, kind, settings), number: d.docNumber };
 }
 
 export async function quotationHtml(db: Db, id: bigint): Promise<{ html: string; number: string }> {
   const q = await getQuotation(db, id);
   const extra = await db
-    .selectFrom('sales.quotations')
-    .select('print_template_version_id')
-    .where('id', '=', id)
+    .selectFrom('sales.quotations as q')
+    .leftJoin('auth.users as s', 's.id', 'q.salesperson_id')
+    .select([
+      'q.print_template_version_id',
+      'q.bill_to_address',
+      'q.bill_to_phone',
+      's.display_name_ar',
+      's.display_name_en',
+    ])
+    .where('q.id', '=', id)
     .executeTakeFirstOrThrow();
   const { seller, logo } = await company(db);
   const settings = await settingsOf(db, extra.print_template_version_id, 'quotation_a4');
@@ -176,13 +244,21 @@ export async function quotationHtml(db: Db, id: bigint): Promise<{ html: string;
       { label: ['التاريخ', 'Date'], value: date(q.quotationDate) },
       { label: ['صالح حتى', 'Valid until'], value: date(q.validUntil) },
     ],
-    customer: { name: q.billToName, trn: q.billToTrn },
+    customer: {
+      name: q.billToName,
+      trn: q.billToTrn,
+      address: extra.bill_to_address,
+      phone: extra.bill_to_phone,
+    },
+    customerPo: q.customerPo,
+    salesperson: extra.display_name_ar || extra.display_name_en ? userName(extra) : null,
     reference: q.subject ? { label: ['الموضوع', 'Subject'], value: q.subject } : null,
     lines: q.lines
       .filter((l) => !l.isOptional)
       .map((l) => ({
         descriptionAr: l.descriptionAr,
         descriptionEn: l.descriptionEn,
+        itemCode: l.itemCode,
         quantityMilli: l.quantityMilli,
         unitPrice4dp: l.unitPrice4dp,
         discountFils: (BigInt(l.lineDiscountFils) + BigInt(l.docDiscountAllocFils)).toString(),
@@ -196,18 +272,20 @@ export async function quotationHtml(db: Db, id: bigint): Promise<{ html: string;
       { label: ['ضريبة القيمة المضافة', 'VAT'], fils: q.vatFils },
       { label: ['الإجمالي', 'Total'], fils: q.totalFils, strong: true },
     ],
+    wordsFils: q.totalFils,
     notes: q.notes,
     logoDataUri: logo,
   };
+  // A quotation's own terms replace the template's.
   const withTerms: TemplateSettings = {
     ...settings,
     texts: {
       ...settings.texts,
-      termsAr: q.termsAr ?? settings.texts?.termsAr ?? '',
-      termsEn: q.termsEn ?? settings.texts?.termsEn ?? '',
+      termsAr: q.termsAr ?? settings.texts.termsAr,
+      termsEn: q.termsEn ?? settings.texts.termsEn,
     },
   };
-  return { html: renderHtml(doc, seller, withTerms), number };
+  return { html: await render(db, doc, seller, 'quotation_a4', withTerms), number };
 }
 
 export async function receiptHtml(db: Db, id: bigint): Promise<{ html: string; number: string }> {
@@ -223,7 +301,7 @@ export async function receiptHtml(db: Db, id: bigint): Promise<{ html: string; n
     .where('id', '=', id)
     .executeTakeFirstOrThrow();
   const { seller, logo } = await company(db);
-  const settings = await settingsOf(db, extra.print_template_version_id, 'receipt_a4');
+  const settings = await settingsOf(db, extra.print_template_version_id, 'tax_invoice_a4');
   const doc: PrintDocument = {
     kind: 'receipt',
     number: p.docNumber,
@@ -244,10 +322,14 @@ export async function receiptHtml(db: Db, id: bigint): Promise<{ html: string; n
       ]),
     },
     totals: [{ label: ['المبلغ المستلم', 'Amount received'], fils: p.amountFils, strong: true }],
+    wordsFils: p.amountFils,
     notes: p.notes,
     logoDataUri: logo,
   };
-  return { html: renderHtml(doc, seller, settings), number: p.docNumber };
+  return {
+    html: await render(db, doc, seller, 'tax_invoice_a4', settings),
+    number: p.docNumber,
+  };
 }
 
 export async function statementHtml(
@@ -263,7 +345,7 @@ export async function statementHtml(
     .where('id', '=', customerId)
     .executeTakeFirstOrThrow();
   const { seller, logo } = await company(db);
-  const settings = await settingsOf(db, null, 'statement_a4');
+  const settings = await settingsOf(db, null, 'tax_invoice_a4');
   const doc: PrintDocument = {
     kind: 'statement',
     number: null,
@@ -297,5 +379,5 @@ export async function statementHtml(
     ],
     logoDataUri: logo,
   };
-  return renderHtml(doc, seller, settings);
+  return render(db, doc, seller, 'tax_invoice_a4', settings);
 }

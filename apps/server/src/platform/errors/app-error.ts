@@ -103,6 +103,7 @@ const DUPLICATE_FIELDS: Readonly<Record<string, string>> = {
   warehouses_code_uq: 'code',
   reason_codes_code_uq: 'code',
   series_prefix_uq: 'prefix',
+  company_bank_accounts_iban_uq: 'iban',
 };
 
 /** Extra, safe details of a database error: the broken rule, or the duplicate field. */
