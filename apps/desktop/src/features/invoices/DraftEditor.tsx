@@ -53,6 +53,7 @@ import styles from './invoices.module.css';
 interface EditorState {
   customer: ChosenCustomer | null;
   dueDate: string;
+  customerPo: string;
   notes: string;
   docDiscount: string;
   lines: EditorLine[];
@@ -61,7 +62,15 @@ interface EditorState {
 
 function initialState(doc: DocumentDetail | null): EditorState {
   if (!doc) {
-    return { customer: null, dueDate: '', notes: '', docDiscount: '', lines: [], deductions: [] };
+    return {
+      customer: null,
+      dueDate: '',
+      customerPo: '',
+      notes: '',
+      docDiscount: '',
+      lines: [],
+      deductions: [],
+    };
   }
   const discount = BigInt(doc.docDiscountFils);
   return {
@@ -73,6 +82,7 @@ function initialState(doc: DocumentDetail | null): EditorState {
       isVatRegistered: doc.invoiceFormat === 'full',
     },
     dueDate: doc.dueDate ?? '',
+    customerPo: doc.customerPo ?? '',
     notes: doc.notes ?? '',
     docDiscount: discount === 0n ? '' : formatFils(discount),
     lines: doc.lines
@@ -89,6 +99,7 @@ const contentKey = (s: EditorState) =>
   JSON.stringify({
     customer: s.customer?.id ?? null,
     dueDate: s.dueDate,
+    customerPo: s.customerPo.trim(),
     notes: s.notes.trim(),
     docDiscount: s.docDiscount.trim(),
     deductions: [...s.deductions].sort(),
@@ -188,9 +199,11 @@ export function DraftEditor({ doc }: { doc: DocumentDetail | null }) {
     if (discount === null || (discount > 0n && !preview.complete))
       return setProblem(t('form.problems.discount'));
     const notes = state.notes.trim();
+    const customerPo = state.customerPo.trim();
     save.mutate({
       customerId: customer.id,
       ...(state.dueDate ? { dueDate: state.dueDate } : {}),
+      ...(customerPo ? { customerPo } : {}),
       ...(notes ? { notes } : {}),
       ...(discount > 0n ? { docDiscountFils: discount.toString() } : {}),
       lines,
@@ -303,6 +316,14 @@ export function DraftEditor({ doc }: { doc: DocumentDetail | null }) {
                       ? t('form.problems.discount')
                       : undefined
                 }
+              />
+              <TextField
+                label={t('sales:fields.customerPo')}
+                value={state.customerPo}
+                onChange={(customerPo) => patch({ customerPo })}
+                ltr
+                maxLength={50}
+                hint={t('sales:fields.customerPoHint')}
               />
               <TextField
                 label={t('sales:fields.notes')}

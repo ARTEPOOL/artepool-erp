@@ -138,6 +138,7 @@ function QuotationEditor(props: {
   const [date, setDate] = useState(q?.quotationDate ?? dubaiDay());
   const [validUntil, setValidUntil] = useState(q?.validUntil ?? '');
   const [subject, setSubject] = useState(q?.subject ?? '');
+  const [customerPo, setCustomerPo] = useState(q?.customerPo ?? '');
   const [termsAr, setTermsAr] = useState(q?.termsAr ?? '');
   const [termsEn, setTermsEn] = useState(q?.termsEn ?? '');
   const [notes, setNotes] = useState(q?.notes ?? '');
@@ -209,6 +210,7 @@ function QuotationEditor(props: {
       ...(date ? { quotationDate: date } : {}),
       ...(validUntil ? { validUntil } : {}),
       ...(subject.trim() ? { subject: subject.trim() } : {}),
+      ...(customerPo.trim() ? { customerPo: customerPo.trim() } : {}),
       ...(termsAr.trim() ? { termsAr: termsAr.trim() } : {}),
       ...(termsEn.trim() ? { termsEn: termsEn.trim() } : {}),
       ...(notes.trim() ? { notes: notes.trim() } : {}),
@@ -244,6 +246,14 @@ function QuotationEditor(props: {
             value={subject}
             onChange={edit(setSubject)}
             maxLength={300}
+          />
+          <TextField
+            label={t('sales:fields.customerPo')}
+            value={customerPo}
+            onChange={edit(setCustomerPo)}
+            ltr
+            maxLength={50}
+            hint={t('sales:fields.customerPoHint')}
           />
         </div>
       </Card>
@@ -466,6 +476,9 @@ function QuotationFacts({ quotation }: { quotation: QuotationDetail }) {
             ),
           },
           ...(quotation.subject ? [{ label: t('fields.subject'), value: quotation.subject }] : []),
+          ...(quotation.customerPo
+            ? [{ label: t('sales:fields.customerPo'), value: <bdi>{quotation.customerPo}</bdi> }]
+            : []),
           { label: t('fields.revision'), value: <bdi>{quotation.revision}</bdi> },
           ...(quotation.convertedDocumentId
             ? [

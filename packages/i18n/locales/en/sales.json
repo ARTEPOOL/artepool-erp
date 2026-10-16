@@ -59,7 +59,9 @@
     "businessLine": "Line of business",
     "reference": "Reference",
     "method": "Payment method",
-    "amount": "Amount"
+    "amount": "Amount",
+    "customerPo": "Customer PO number",
+    "customerPoHint": "Optional. The customer's own purchase order number; printed when filled."
   },
   "lines": {
     "title": "Lines",

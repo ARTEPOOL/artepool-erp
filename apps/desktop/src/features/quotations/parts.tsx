@@ -126,6 +126,7 @@ export function revisionRequest(
     customerId: q.customerId,
     businessLineId: q.businessLineId,
     ...(q.subject ? { subject: q.subject } : {}),
+    ...(q.customerPo ? { customerPo: q.customerPo } : {}),
     ...(q.termsAr ? { termsAr: q.termsAr } : {}),
     ...(q.termsEn ? { termsEn: q.termsEn } : {}),
     ...(q.notes ? { notes: q.notes } : {}),

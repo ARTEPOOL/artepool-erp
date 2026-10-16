@@ -37,6 +37,7 @@ import { useLineRefs } from '../sales/LineEditor';
 import { toRequest } from '../sales/lines';
 import { APPROVAL_FIELD, APPROVAL_FOR_RULE, POS_INVALIDATE, POS_PATHS } from './api';
 import { cartStore, useCart } from './cart';
+import { useReceiptLogo } from './receipt/logo';
 import { printReceipt, type PrintOutcome } from './receipt/printer';
 import styles from './pos.module.css';
 
@@ -70,6 +71,7 @@ export function PaymentDialog(props: {
 }) {
   const { t, i18n } = useTranslation('pos');
   const api = useApi();
+  const logo = useReceiptLogo();
   const navigate = useNavigate();
   const errorText = useErrorText();
   const cart = useCart();
@@ -166,7 +168,7 @@ export function PaymentDialog(props: {
   const afterSale = async (result: PosSaleResponse) => {
     cartStore.reset();
     const printed = await printReceipt(result.receipt, {
-      language: props.state.receiptLanguage,
+      logo,
       i18n,
       kickDrawer: result.opensDrawer,
     });
@@ -203,7 +205,7 @@ export function PaymentDialog(props: {
           // The receipt as the server has it now: after a first print, it is marked as a copy.
           const fresh = await api.get<ReceiptData>(POS_PATHS.receipt(done.sale.document.id));
           const again = await printReceipt(fresh, {
-            language: props.state.receiptLanguage,
+            logo,
             i18n,
             kickDrawer: false,
           });

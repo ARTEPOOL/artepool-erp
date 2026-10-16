@@ -23,7 +23,9 @@
     "change": "Change",
     "items": "Items",
     "pricesIncludeVat": "Prices include VAT",
-    "thanks": "Thank you"
+    "thanks": "Thank you",
+    "customerAddress": "Customer address",
+    "customerPhone": "Customer phone"
   },
   "title": "Point of sale",
   "subtitle": "Sell at the counter on your own shift.",

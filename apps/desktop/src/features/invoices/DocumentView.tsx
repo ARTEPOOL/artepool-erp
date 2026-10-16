@@ -344,6 +344,8 @@ export function DocumentView({ doc }: { doc: DocumentDetail }) {
   if (doc.billToPhone)
     customerRows.push({ label: t('view.phone'), value: <bdi>{doc.billToPhone}</bdi> });
   if (doc.billToAddress) customerRows.push({ label: t('view.address'), value: doc.billToAddress });
+  if (doc.customerPo)
+    customerRows.push({ label: t('sales:fields.customerPo'), value: <bdi>{doc.customerPo}</bdi> });
   if (doc.notes) customerRows.push({ label: t('sales:fields.notes'), value: doc.notes });
 
   return (

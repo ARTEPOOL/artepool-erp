@@ -104,19 +104,40 @@ function layout(
   return Math.ceil(y + MARGIN);
 }
 
-export function renderReceipt(model: ReceiptModel, family = receiptFontFamily()): ReceiptImage {
-  const width = PAPER_DOTS;
+/** Printer dots across the paper: 80 mm paper prints 576 dots, 58 mm paper 384. */
+export const paperDots = (mm: 80 | 58 = 80): number => (mm === 58 ? 384 : PAPER_DOTS);
+
+/** The logo's height on the receipt, in dots. */
+const LOGO_DOTS = 120;
+
+export function renderReceipt(
+  model: ReceiptModel,
+  family = receiptFontFamily(),
+  logo: (CanvasImageSource & { width: number; height: number }) | null = null,
+): ReceiptImage {
+  const width = paperDots(model.paperWidthMm);
+  const drawLogo = model.logo && logo && logo.width > 0 && logo.height > 0 ? logo : null;
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = 10;
   const measure = canvas.getContext('2d');
   if (!measure) throw new Error('Canvas is not available');
-  const height = layout(measure, model, family, width, false);
+  const top = drawLogo ? LOGO_DOTS + MARGIN : 0;
+  const height = layout(measure, model, family, width, false) + top;
   canvas.height = height;
   const ctx = canvas.getContext('2d')!;
   ctx.fillStyle = '#fff';
   ctx.fillRect(0, 0, width, height);
+  if (drawLogo) {
+    // Centred, scaled to fit; the printer prints it in black and white.
+    const scale = Math.min(LOGO_DOTS / drawLogo.height, (width - 2 * MARGIN) / drawLogo.width);
+    const w = drawLogo.width * scale;
+    const h = drawLogo.height * scale;
+    ctx.drawImage(drawLogo, (width - w) / 2, MARGIN, w, h);
+  }
+  ctx.translate(0, top);
   layout(ctx, model, family, width, true);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
   const { bits, widthBytes } = toMonochrome(
     ctx.getImageData(0, 0, width, height).data,
     width,

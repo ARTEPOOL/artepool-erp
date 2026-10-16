@@ -53,16 +53,25 @@ export async function sendJob(bytes: Uint8Array, documentName: string): Promise<
   }
 }
 
-/** Draws and prints a receipt; returns the outcome and the image (for a preview on screen). */
+/**
+ * Draws and prints a receipt with the template version stored on its document (decision 0064):
+ * its language, paper width and fields. Returns the outcome and the image (for a preview).
+ */
 export async function printReceipt(
   data: ReceiptData,
-  opts: { language: ReceiptLanguage; i18n: I18n; kickDrawer: boolean },
+  opts: {
+    /** Only for receipts from before decision 0064, which carry no template. */
+    language?: ReceiptLanguage;
+    i18n: I18n;
+    kickDrawer: boolean;
+    logo?: HTMLImageElement | null;
+  },
 ): Promise<{ outcome: PrintOutcome; imageUrl: string }> {
-  const model = receiptModel(data, opts.language, {
+  const model = receiptModel(data, data.template?.language ?? opts.language ?? 'both', {
     ar: opts.i18n.getFixedT('ar', 'pos'),
     en: opts.i18n.getFixedT('en', 'pos'),
   });
-  const image = renderReceipt(model);
+  const image = renderReceipt(model, undefined, opts.logo ?? null);
   const job = receiptJob({ ...image, kickDrawer: opts.kickDrawer });
   const outcome = await sendJob(job, data.document.docNumber ?? 'receipt');
   return { outcome, imageUrl: image.canvas.toDataURL('image/png') };
