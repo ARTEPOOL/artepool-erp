@@ -191,6 +191,52 @@ describe('receipt content', () => {
     expect(all).toContain('Customer TRN = 100111222333003');
   });
 
+  it('follows its template: the customer address stays on a full invoice even when switched off (0064)', () => {
+    const base = defaultTemplateSettings('receipt_thermal');
+    const off: typeof base = {
+      ...base,
+      paperWidthMm: 58,
+      fields: { ...base.fields, customerAddress: false, cashierName: false, itemCode: false },
+      texts: { ...base.texts, footerAr: '', footerEn: 'See you soon' },
+    };
+    const m = receiptModel(
+      receipt(
+        { template: off },
+        {
+          invoiceFormat: 'full',
+          billToName: 'Pool LLC',
+          billToTrn: '100111222333003',
+          billToAddress: 'Sanaiya, Al Ain',
+        },
+      ),
+      'en',
+      t(),
+    );
+    const all = texts(m.lines);
+    expect(all).toContain('Customer address = Sanaiya, Al Ain');
+    expect(all.some((x) => x.startsWith('Cashier'))).toBe(false);
+    expect(all).toContain('2 × 126.00 = 252.00');
+    expect(all).toContain('See you soon');
+    expect(m.paperWidthMm).toBe(58);
+    // A simplified invoice for a named customer leaves the address out when it is switched off.
+    const simple = receiptModel(
+      receipt({ template: off }, { billToTrn: '100111222333003', billToAddress: 'Sanaiya' }),
+      'en',
+      t(),
+    );
+    expect(texts(simple.lines).some((x) => x.startsWith('Customer address'))).toBe(false);
+  });
+
+  it('writes the amount in words when the template asks for it', () => {
+    const base = defaultTemplateSettings('receipt_thermal');
+    const m = receiptModel(
+      receipt({ template: { ...base, fields: { ...base.fields, amountInWords: true } } }),
+      'en',
+      t(),
+    );
+    expect(texts(m.lines)).toContain('Two hundred fifty-two UAE dirhams only');
+  });
+
   it('a card payment shows the approval code only; a reprint is marked as a copy', () => {
     const m = receiptModel(
       receipt({

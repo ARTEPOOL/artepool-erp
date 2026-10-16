@@ -158,6 +158,7 @@
 }
 
 .iban {
+  justify-self: start;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.02em;
 }

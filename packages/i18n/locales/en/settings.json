@@ -428,5 +428,119 @@
       "ended_at": "Ended at",
       "end_reason": "Why it ended"
     }
+  },
+  "print": {
+    "title": "Print designer",
+    "subtitle": "How invoices, quotations, credit notes and receipts look. Fields the tax law requires are locked. Owner only.",
+    "kinds": {
+      "label": "Document",
+      "tax_invoice_a4": "A4 invoice",
+      "quotation_a4": "Quotation",
+      "credit_note_a4": "Credit note",
+      "receipt_thermal": "Thermal receipt"
+    },
+    "saved": "Saved as version {version}.",
+    "version": "Version {version}",
+    "unsaved": "Not saved",
+    "default": "Default",
+    "testPrint": "Test print",
+    "save": "Save",
+    "testThermal": {
+      "browser": "Test printing on the receipt printer works in the Windows app only.",
+      "no_printer": "Choose the receipt printer first in Settings → Devices and printers.",
+      "failed": "The receipt printer did not print. Check that it is on and connected."
+    },
+    "look": "Look",
+    "noLogo": "No logo yet: add one in Settings → Company.",
+    "logoPosition": "Logo position",
+    "positions": {
+      "beside": "Beside the details",
+      "center": "Centred",
+      "opposite": "Opposite side"
+    },
+    "logoSize": "Logo size (mm)",
+    "logoSizeHint": "Between 10 and 60 mm.",
+    "color": "Main colour",
+    "colorHint": "For titles, the table header and the total (A4).",
+    "language": "Language",
+    "languages": {
+      "both": "Arabic + English",
+      "ar": "Arabic",
+      "en": "English"
+    },
+    "textSize": "Text size",
+    "sizes": {
+      "small": "Small",
+      "normal": "Normal",
+      "large": "Large"
+    },
+    "paperWidth": "Paper width",
+    "widths": {
+      "80": "80 mm",
+      "58": "58 mm"
+    },
+    "margins": "Margins",
+    "marginSizes": {
+      "narrow": "Narrow",
+      "normal": "Normal",
+      "wide": "Wide"
+    },
+    "fieldsTitle": "Fields",
+    "requiredLabel": "Required fields",
+    "required": "Required",
+    "locked": {
+      "title": "Document title and type",
+      "sellerName": "Seller name",
+      "sellerAddressTrn": "Seller address and TRN",
+      "customerFull": "Customer name, address and TRN (full tax invoice)",
+      "numberAndDates": "Number and dates",
+      "lines": "Lines: description, quantity, unit price, amount",
+      "discount": "Discount (when there is one)",
+      "vat": "VAT per line and in total",
+      "totals": "Totals in AED",
+      "deductions": "Earlier payments deducted",
+      "originalInvoice": "Original invoice number and date",
+      "reason": "Reason for the credit note"
+    },
+    "fields": {
+      "logo": "Logo",
+      "sellerAddress": "Seller address",
+      "sellerTrn": "Seller TRN",
+      "sellerContact": "Phone and email",
+      "welcome": "Welcome line",
+      "customerAddress": "Customer address",
+      "customerPhone": "Customer phone",
+      "poNumber": "Customer PO number",
+      "itemCode": "Item code",
+      "lineDiscount": "Discount column",
+      "amountInWords": "Amount in words",
+      "bankDetails": "Bank details",
+      "terms": "Terms and notes text",
+      "notes": "Document notes",
+      "signature": "Received-by and signature",
+      "salesperson": "Salesperson",
+      "dueDate": "Due date",
+      "cashierName": "Cashier name"
+    },
+    "customerAddressLocked": "Always printed on a full tax invoice.",
+    "discountLocked": "Always printed when the document has a discount.",
+    "bankAccount": "Bank account to print",
+    "chooseBank": "Choose an account",
+    "noBank": "No bank account yet: add one in Settings → Company.",
+    "textsTitle": "Texts",
+    "texts": {
+      "welcomeAr": "Welcome line (Arabic)",
+      "welcomeEn": "Welcome line (English)",
+      "termsAr": "Terms and notes (Arabic)",
+      "termsEn": "Terms and notes (English)",
+      "footerAr": "Footer (Arabic)",
+      "footerEn": "Footer (English)"
+    },
+    "quotationTerms": "A quotation's own terms, when it has them, replace these.",
+    "versionsNote": "Every save is a new version, written to the audit log. Documents already issued print with the version they were issued with.",
+    "preview": "Live preview",
+    "fullSample": "Full tax invoice sample",
+    "previewAlt": "Preview of the printed document",
+    "loading": "Preparing the preview…"
   }
 }

@@ -27,6 +27,7 @@ import { ListsPanel } from '../features/settings/lists/ListsPanel';
 import { TaxPanel } from '../features/settings/tax/TaxPanel';
 import { SuppliersPage } from '../features/suppliers/SuppliersPage';
 import { AuditPanel } from '../features/settings/audit/AuditPanel';
+import { PrintDesignerPanel } from '../features/settings/print/PrintDesignerPanel';
 import { DevicesPanel } from '../features/settings/devices/DevicesPanel';
 import { SettingsIndex, SettingsPage } from '../features/settings/SettingsPage';
 import { UsersPanel } from '../features/settings/users/UsersPanel';
@@ -141,6 +142,11 @@ const company = createRoute({
 });
 const tax = createRoute({ getParentRoute: () => settings, path: 'tax', component: TaxPanel });
 const lists = createRoute({ getParentRoute: () => settings, path: 'lists', component: ListsPanel });
+const print = createRoute({
+  getParentRoute: () => settings,
+  path: 'print',
+  component: PrintDesignerPanel,
+});
 
 const routeTree = root.addChildren([
   home,
@@ -161,7 +167,7 @@ const routeTree = root.addChildren([
   customers,
   suppliers,
   accounting,
-  settings.addChildren([settingsIndex, company, users, tax, lists, devices, audit]),
+  settings.addChildren([settingsIndex, company, users, tax, lists, devices, print, audit]),
 ]);
 
 export function createAppRouter(initialPath = '/') {

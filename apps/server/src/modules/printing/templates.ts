@@ -249,6 +249,7 @@ ${fonts()}
 @page { size: A4; margin: ${MARGINS_MM[settings.margins]}mm; }
 :root { --main: ${escapeHtml(settings.color)}; }
 * { box-sizing: border-box; }
+html { background: #fff; }
 body { font-family: 'Plex Arabic', sans-serif; font-size: ${TEXT_PT[settings.textSize]}pt; color: #111; margin: 0; }
 .en { display: block; font-size: 0.85em; color: #444; direction: ltr; unicode-bidi: isolate; }
 header { display: flex; justify-content: space-between; align-items: flex-start; gap: 8mm; border-block-end: 1.5pt solid var(--main); padding-block-end: 4mm; }

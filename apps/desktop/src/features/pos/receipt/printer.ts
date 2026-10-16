@@ -9,7 +9,7 @@ import type { i18n as I18n } from 'i18next';
 import type { ReceiptData } from '@artepool/shared/contracts';
 import { drawerKickJob, receiptJob, toBase64 } from './escpos';
 import { receiptModel, type ReceiptLanguage } from './layout';
-import { renderReceipt } from './render';
+import { renderReceipt, type ReceiptImage } from './render';
 
 const PRINTER_KEY = 'artepool.receiptPrinter';
 
@@ -75,6 +75,12 @@ export async function printReceipt(
   const job = receiptJob({ ...image, kickDrawer: opts.kickDrawer });
   const outcome = await sendJob(job, data.document.docNumber ?? 'receipt');
   return { outcome, imageUrl: image.canvas.toDataURL('image/png') };
+}
+
+/** Prints an image already drawn (the print designer's test receipt); never opens the drawer. */
+export function printReceiptImage(image: ReceiptImage | null): Promise<PrintOutcome> {
+  if (!image) return Promise.resolve({ printed: false, reason: 'failed' });
+  return sendJob(receiptJob({ ...image, kickDrawer: false }), 'test-receipt');
 }
 
 /** Opens the drawer without printing (No Sale, cash movements). */
