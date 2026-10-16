@@ -78,7 +78,9 @@
       "deactivated": "تم إيقاف الحساب البنكي.",
       "reactivated": "أُعيد تفعيل الحساب البنكي.",
       "deactivateTitle": "إيقاف الحساب البنكي",
-      "deactivateHelp": "لن يظهر للفواتير الجديدة. الفواتير التي طُبعت به تحتفظ به."
+      "deactivateHelp": "لن يظهر للفواتير الجديدة. الفواتير التي طُبعت به تحتفظ به.",
+      "ibanPlaceholder": "AE07 0331 2345 6789 0123 456",
+      "swiftPlaceholder": "EBILAEAD"
     }
   },
   "tax": {

@@ -224,7 +224,10 @@ export function defaultTemplateSettings(kind: DesignedKind): TemplateSettings {
     textSize: 'normal',
     margins: 'normal',
     paperWidthMm: 80,
-    fields: { ...DEFAULT_FIELDS, ...(kind === 'receipt_thermal' ? { logo: false, itemCode: true } : {}) },
+    fields: {
+      ...DEFAULT_FIELDS,
+      ...(kind === 'receipt_thermal' ? { logo: false, itemCode: true } : {}),
+    },
     texts: {
       welcomeAr: '',
       welcomeEn: '',

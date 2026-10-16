@@ -78,7 +78,9 @@
       "deactivated": "Bank account deactivated.",
       "reactivated": "Bank account reactivated.",
       "deactivateTitle": "Deactivate the bank account",
-      "deactivateHelp": "It will not be offered for new invoices. Invoices already printed with it keep it."
+      "deactivateHelp": "It will not be offered for new invoices. Invoices already printed with it keep it.",
+      "ibanPlaceholder": "AE07 0331 2345 6789 0123 456",
+      "swiftPlaceholder": "EBILAEAD"
     }
   },
   "tax": {

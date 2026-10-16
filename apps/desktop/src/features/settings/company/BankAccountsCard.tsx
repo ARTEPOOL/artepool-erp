@@ -247,7 +247,7 @@ function BankAccountDialog({
           ltr
           maxLength={40}
           isRequired
-          placeholder="AE07 0331 2345 6789 0123 456"
+          placeholder={t('company.bank.ibanPlaceholder')}
           hint={t('company.bank.ibanHint')}
           error={fieldError('iban')}
         />
@@ -257,7 +257,7 @@ function BankAccountDialog({
           onChange={(swift) => set({ swift })}
           ltr
           maxLength={11}
-          placeholder="EBILAEAD"
+          placeholder={t('company.bank.swiftPlaceholder')}
           error={fieldError('swift')}
         />
         {save.error !== null && !serverField && (
