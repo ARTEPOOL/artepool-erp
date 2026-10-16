@@ -275,7 +275,22 @@ Written in the same transaction as the operation. Insert-only (a trigger stamps 
 | note | text? | |
 | [ins] | | Never updated or deleted (`sys.forbid_update`, `sys.forbid_delete`) |
 
-Every issued document (`sales.documents`, receipts, Z reports) stores `print_template_version_id` at issue, and reprints use that version. Permission: `print_templates.manage` (Owner only).
+Every issued document (`sales.documents`, receipts, Z reports) stores `print_template_version_id` at issue, and reprints use that version. Office receipts store the A4 invoice template's version (they print with its design, decision 0064). `sys.print_templates.current_version_id` must be one of the template's own versions and is changed by the owner only (migration 0023). Permission: `print_templates.manage` (Owner only). The `settings` shape and the fields locked per document type are in `packages/shared/src/contracts/printing.ts` and decision 0064.
+
+### 4.12 `sys.company_bank_accounts` (migration 0023, decision 0065)
+
+| Column | Type | Rules |
+|---|---|---|
+| id | bigint PK | |
+| bank_name | text | 1–100 characters |
+| account_name | text | 1–150 characters |
+| iban | text | `sys.valid_uae_iban()`: `AE` + 21 digits, ISO 13616 checksum; unique among active accounts |
+| swift | text? | 8 or 11 characters |
+| sort_order | smallint | |
+| is_active | boolean | Deactivated with a reason (`sys.add_deactivation_reason`) |
+| [touch] | | Audited; never deleted; written by the owner only (`system.company.edit`, checked by a trigger) |
+
+Which account prints is the template's `bankAccountId` setting, so a reprint shows the account printed originally.
 
 ---
 
@@ -969,6 +984,7 @@ As built (migration 0011): a count is created straight in `counting` (the snapsh
 | customer_id | bigint → md.customers | |
 | bill_to_name | text | Snapshot |
 | bill_to_name_alt, bill_to_trn, bill_to_address, bill_to_phone | text? | Snapshot |
+| customer_po | text? | Customer PO number, up to 50 characters (decision 0066) |
 | quotation_date | date | |
 | valid_until | date | `>= quotation_date` |
 | price_level_id | bigint → md.price_levels | Level used to price the lines ([0032](decisions/0032-one-sale-price-with-vat-flag-and-customer-types.md)) |
@@ -1029,7 +1045,8 @@ The money columns work exactly as in `sales.document_lines` (item lines only).
 | pos_cart_id | uuid? | Links the cart-removal audit events ([0005](decisions/0005-cart-removals-logged-without-approval.md)) |
 | customer_id | bigint → md.customers | |
 | bill_to_name | text | Snapshot at issue |
-| bill_to_name_alt, bill_to_trn, bill_to_address, bill_to_phone | text? | Snapshot; the TRN is copied only if the customer is VAT-registered |
+| bill_to_name_alt, bill_to_trn, bill_to_address, bill_to_phone | text? | Snapshot; the TRN is copied only if the customer is VAT-registered; a full tax invoice needs the address (taken from the customer at issue when empty, refused when there is none, decision 0064) |
+| customer_po | text? | Customer PO number, up to 50 characters (decision 0066) |
 | seller_snapshot | jsonb? | |
 | issue_date | date? | |
 | supply_date | date? | |
@@ -1702,9 +1719,10 @@ Migrations are written **in build order** (milestones in [`phase-1-plan.md`](pha
 | 0020 | `storekeeper_items` | M4 | — (`items.manage` for the storekeeper role, decision 0053) | — |
 | 0021 | `no_adjustment_approval` | M4 | — (the adjustment approval limit setting is emptied, decision 0054) | — |
 | 0022 | `cash_events` | M5 | `cash.movements`, `cash.drawer_events`, `cash.variance_acceptances`, `cash.expected_cash()`, count other amount, 0.10/0.05 coins, cash alert settings, cashier 5% discount | `gl.journal_entries.cash_movement_id`, `shift_id` |
-| 0023 | `ops_backup` | M6 | `ops.backup_runs`, `ops.integrity_runs` + backup role grants | — |
+| 0023 | `print_designer` | M4b | `sys.company_bank_accounts`, `sys.valid_uae_iban()`, `customer_po` on documents and quotations, the full-invoice address rule, the current-template rule, receipts stamped with the invoice template, the receipt language into its template | — |
+| 0024 | `ops_backup` | M6 | `ops.backup_runs`, `ops.integrity_runs` + backup role grants | — |
 
-After 0023, a final check asserts that every business table has the audit trigger, the no-delete guard and the expected grants. The same check runs as an automated test.
+After 0024, a final check asserts that every business table has the audit trigger, the no-delete guard and the expected grants. The same check runs as an automated test.
 
 ---
 
