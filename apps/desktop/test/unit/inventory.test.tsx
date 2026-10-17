@@ -451,8 +451,8 @@ describe('Stock counts: review and post', () => {
     const dialog = await screen.findByRole('dialog');
     await within(dialog).findByRole('option', { name: 'خالد سالم' });
     fireEvent.change(within(dialog).getByLabelText('المشرف'), { target: { value: '8' } });
-    fireEvent.change(within(dialog).getByLabelText(/الرمز السري للمشرف/), {
-      target: { value: '4826' },
+    fireEvent.change(within(dialog).getByLabelText(/الرمز من تليفون الموافِق/), {
+      target: { value: '482611' },
     });
     fireEvent.change(within(dialog).getByLabelText(/^السبب/), {
       target: { value: 'كيس ممزق في المستودع' },

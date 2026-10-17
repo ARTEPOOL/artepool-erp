@@ -689,8 +689,8 @@ describe('Items & stock: the item form', () => {
     const approval = await screen.findByRole('dialog', { name: /موافقة/ });
     await within(approval).findByRole('option', { name: 'خالد سالم' });
     fireEvent.change(within(approval).getByLabelText('المشرف'), { target: { value: '8' } });
-    fireEvent.change(within(approval).getByLabelText(/الرمز السري للمشرف/), {
-      target: { value: '4826' },
+    fireEvent.change(within(approval).getByLabelText(/الرمز من تليفون الموافِق/), {
+      target: { value: '482611' },
     });
     fireEvent.change(within(approval).getByLabelText(/^السبب/), {
       target: { value: 'وصلت شحنة' },

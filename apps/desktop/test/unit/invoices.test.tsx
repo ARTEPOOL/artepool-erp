@@ -356,8 +356,8 @@ async function approve(reason: string) {
   const dialog = await screen.findByRole('dialog', { name: /approval/i });
   await within(dialog).findByRole('option', { name: 'Khalid Salem' });
   fireEvent.change(within(dialog).getByLabelText('Supervisor'), { target: { value: '8' } });
-  fireEvent.change(within(dialog).getByLabelText(/Supervisor's PIN/), {
-    target: { value: '4826' },
+  fireEvent.change(within(dialog).getByLabelText(/Code from the approver/), {
+    target: { value: '482611' },
   });
   fireEvent.change(within(dialog).getByLabelText(/^Reason/), { target: { value: reason } });
   fireEvent.click(within(dialog).getByRole('button', { name: 'Approve' }));
@@ -714,7 +714,7 @@ describe('Invoices (A4): issuing', () => {
     expect(bridge.callsTo('POST', '/api/v1/approvals')[0]!.body).toMatchObject({
       permission: 'sales.discount_over_limit',
       approverId: '8',
-      pin: '4826',
+      code: '482611',
       reason: 'Long-standing customer',
     });
     const issues = bridge.callsTo('POST', '/api/v1/sales/documents/300/issue');

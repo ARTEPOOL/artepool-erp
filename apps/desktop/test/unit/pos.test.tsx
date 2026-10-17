@@ -323,8 +323,8 @@ describe('POS sale', () => {
     expect(within(approval).getByText(/needed 5, in stock 3/)).toBeTruthy();
     await within(approval).findByRole('option', { name: 'Khalid Salem' });
     fireEvent.change(within(approval).getByLabelText('Supervisor'), { target: { value: '8' } });
-    fireEvent.change(within(approval).getByLabelText(/Supervisor's PIN/), {
-      target: { value: '4826' },
+    fireEvent.change(within(approval).getByLabelText(/Code from the approver/), {
+      target: { value: '482611' },
     });
     fireEvent.change(within(approval).getByLabelText(/^Reason/), {
       target: { value: 'Customer is waiting' },

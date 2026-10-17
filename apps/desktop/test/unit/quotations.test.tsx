@@ -455,8 +455,8 @@ describe('Sending, revising and converting', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Price change approval' });
     await within(dialog).findByRole('option', { name: 'Khalid Salem' });
     fireEvent.change(within(dialog).getByLabelText('Supervisor'), { target: { value: '8' } });
-    fireEvent.change(within(dialog).getByLabelText(/Supervisor's PIN/), {
-      target: { value: '4826' },
+    fireEvent.change(within(dialog).getByLabelText(/Code from the approver/), {
+      target: { value: '482611' },
     });
     fireEvent.change(within(dialog).getByLabelText(/^Reason/), {
       target: { value: 'Agreed project price' },

@@ -28,7 +28,7 @@ export function ApprovalDialog(props: {
   const nameOf = useDisplayName();
   const errorText = useErrorText();
   const [approverId, setApproverId] = useState('');
-  const [pin, setPin] = useState('');
+  const [code, setCode] = useState('');
   const [reason, setReason] = useState('');
   const [problem, setProblem] = useState<string | null>(null);
 
@@ -48,19 +48,19 @@ export function ApprovalDialog(props: {
   const submit = (event: FormEvent) => {
     event.preventDefault();
     setProblem(null);
-    if (!approverId || !pin.trim()) return setProblem(t('fields.required'));
+    if (!approverId || !/^\d{6}$/.test(code.trim())) return setProblem(t('approval.codeSix'));
     if (reason.trim().length < 3) return setProblem(t('deactivate.reasonTooShort'));
     approve.mutate(
       {
         permission: props.permission,
         approverId,
-        pin: pin.trim(),
+        code: code.trim(),
         reason: reason.trim(),
         context: props.context ?? {},
       },
       {
         onSuccess: (result) => props.onApproved(result.approvalId),
-        onError: () => setPin(''),
+        onError: () => setCode(''),
       },
     );
   };
@@ -85,12 +85,13 @@ export function ApprovalDialog(props: {
           ]}
         />
         <TextField
-          label={t('approval.pin')}
-          value={pin}
-          onChange={setPin}
-          type="password"
+          label={t('approval.code')}
+          value={code}
+          onChange={setCode}
           inputMode="numeric"
-          autoComplete="off"
+          autoComplete="one-time-code"
+          maxLength={6}
+          hint={t('approval.codeHint')}
           ltr
           isRequired
         />

@@ -220,6 +220,8 @@ export interface AuthUserRoles {
 }
 
 export interface AuthUsers {
+  approval_blocked_at: Timestamp | null;
+  approval_failed_count: Generated<number>;
   created_at: Generated<Timestamp>;
   created_by: bigint;
   deactivated_at: Timestamp | null;

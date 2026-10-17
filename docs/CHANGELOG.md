@@ -1,10 +1,10 @@
 # Changelog
 
-## Approval PIN for the owner and supervisors (2026-10-17)
+## Approvals with the code from the approver's phone (2026-10-17)
 
-**In plain words:** the owner, the accountant and other office users can now choose their own 4-digit **approval PIN** from the account menu (top corner → Approval PIN). They type it when approving something for someone else, such as cancelling an invoice, a discount or a return. It never signs anyone in.
+**In plain words:** a supervisor approves anything (a discount, a return, cancelling an invoice…) by choosing their name and typing the **6-digit code shown now in their phone's verification app**. The code changes every 30 seconds and works once, so watching someone type it is useless. Only people with 2-step turned on can approve: in Settings → Users set the supervisor's sign-in to "password + verification code". The approval PIN from earlier today is removed.
 
-- Decision 0073.
+- Decision 0074 (replaces 0073); migration 0028.
 
 ## A4 invoices: details from the customer only (2026-10-17)
 

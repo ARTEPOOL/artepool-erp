@@ -35,6 +35,7 @@
     "INVALID_PIN": "Wrong PIN. Try again.",
     "PIN_BLOCKED": "This PIN is blocked after too many wrong tries. Ask the owner to unblock it in Settings.",
     "INVALID_TWO_STEP_CODE": "That code is wrong or expired. Enter the new code from the app.",
+    "APPROVAL_BLOCKED": "This person's approvals are blocked after too many wrong codes. The owner unblocks them in Settings → Users.",
     "RECOVERY_REFUSED": "The username, the 6-digit code or the recovery code is wrong. Check them and try again.",
     "PASSWORD_REJECTED": "This password cannot be used. Choose a longer or less common one.",
     "PIN_REJECTED": "This PIN cannot be used. Choose 4 digits that are not easy to guess.",

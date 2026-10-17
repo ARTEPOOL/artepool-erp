@@ -1,6 +1,6 @@
 # ARTÉPOOL ERP — Product Requirements Document (PRD)
 
-**Version:** 1.15
+**Version:** 1.16
 **Date:** 2026-10-07
 **Owner:** Mohammed Yasser Al Huraidi (partner, ARTÉPOOL)
 **Status:** Scope approved. Owner and accountant decisions applied (see `docs/decisions/`). **Phase 1 plan approved (2026-10-07).**
@@ -129,7 +129,7 @@ These rules apply to every table and every feature.
 | Owner 2FA | TOTP (authenticator app) for owner/admin accounts; works offline. 10 one-time recovery codes, plus an audited emergency reset that works only on the server PC ([0022](docs/decisions/0022-owner-2-step-recovery.md)). On a PC the person chooses to trust, the phone code is asked once every 30 days; never on POS PCs; the owner can end it at any time ([0027](docs/decisions/0027-trust-this-pc-for-the-2-step-code.md)). A forgotten password is recovered in the app with the phone code and one recovery code ([0028](docs/decisions/0028-forgot-password-with-phone-and-recovery-code.md)). If the phone or the recovery codes are lost too, an audited emergency password reset works only on the server PC ([0029](docs/decisions/0029-owner-password-reset-on-the-server-pc.md)). |
 | Devices | Only enrolled PCs can reach the server. Enrollment uses a 10-minute one-time code that also proves the server is genuine ([0024](docs/decisions/0024-device-enrollment-proves-the-server.md)). The first owner and first PC are created by commands on the server PC ([0025](docs/decisions/0025-first-owner-and-pc-from-server-commands.md)). Users are deactivated and PCs revoked, always with a reason, never deleted ([0026](docs/decisions/0026-users-and-devices-never-deleted.md)). |
 | Roles & permissions | Granular permissions per action, not just per screen. Default roles: Owner, Accountant, Cashier, Technician, Storekeeper. Custom roles allowed. Company details (printed on every tax invoice) are edited by the owner only ([0030](docs/decisions/0030-company-details-owner-only.md)). |
-| Supervisor approval | Required (supervisor PIN + mandatory reason) for: discounts above the user's limit, refunds and credit notes, price override, selling beyond available stock (oversell), stock adjustments above a threshold, shift-close recount, cash variance above a threshold. **"No Sale" drawer open** requires its own permission plus a reason and is always logged. **Removing items from an unpaid POS cart needs no approval** but is always logged ([0005](docs/decisions/0005-cart-removals-logged-without-approval.md)). |
+| Supervisor approval | Required (the supervisor's one-time 2-step code + mandatory reason, [0074](docs/decisions/0074-approvals-with-the-phone-code.md)) for: discounts above the user's limit, refunds and credit notes, price override, selling beyond available stock (oversell), stock adjustments above a threshold, shift-close recount, cash variance above a threshold. **"No Sale" drawer open** requires its own permission plus a reason and is always logged. **Removing items from an unpaid POS cart needs no approval** but is always logged ([0005](docs/decisions/0005-cart-removals-logged-without-approval.md)). |
 | Audit | Every sensitive action is logged (see rule 7) and viewable by the owner |
 | App integrity | Signed updates (the app refuses unsigned or tampered updates) and no secrets in client code. **No installer code-signing certificate for now**; revisit later ([0007](docs/decisions/0007-no-code-signing-certificate-for-now.md)). |
 | Ransomware resilience | At least one backup copy that is not continuously connected to the network |
@@ -437,6 +437,7 @@ Each phase ends with automated tests passing, a security review, an accountant r
 | Version | Date | Change |
 |---|---|---|
 | 1.10 | 2026-10-14 | M4b decisions 0064–0067: print designer with locked tax fields per document type (seller address on every tax invoice, customer address on full tax invoices; a full tax invoice needs the customer's address); company bank accounts with UAE IBAN check; customer PO number on A4 invoices and quotations; no QR code until e-invoicing. |
+| 1.16 | 2026-10-17 | Decision 0074: supervisor approvals with the approver's one-time 2-step code instead of a PIN. |
 | 1.15 | 2026-10-17 | Decision 0071 revised: no name/address fields on A4 invoices; full when the customer is registered or has an address on file, else simplified. |
 | 1.14 | 2026-10-17 | Decision 0072: an issued A4 invoice is cancelled or edited with the owner's approval, through a full credit note (refund at once) and, for edits, a new draft. |
 | 1.13 | 2026-10-17 | Decision 0071: A4 invoices are always full tax invoices (the cash customer's name and address typed); reprints use today's design with unchanged content. |

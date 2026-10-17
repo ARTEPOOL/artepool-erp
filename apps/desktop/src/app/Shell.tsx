@@ -1,10 +1,9 @@
-import { useState, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import {
   BookOpen,
   CheckCircle2,
   FileSignature,
   FileText,
-  KeyRound,
   LayoutGrid,
   LineChart,
   Lock,
@@ -24,7 +23,6 @@ import { useAuthController, useAuthState, useCan, useDisplayName } from '../feat
 import { canSeeSettings } from '../features/settings/sections';
 import { ActionMenu, Avatar, Brand, Chip, iconClass } from '../ui';
 import styles from './Shell.module.css';
-import { ApprovalPinDialog } from './ApprovalPinDialog';
 import { LanguageSwitch, ThemeToggle } from './TopTools';
 
 type NavItem =
@@ -104,7 +102,6 @@ function crumbOf(path: string): string {
 export function Shell() {
   const { t } = useTranslation('settings');
   const controller = useAuthController();
-  const [settingPin, setSettingPin] = useState(false);
   const { user, server } = useAuthState();
   const can = useCan();
   const nameOf = useDisplayName();
@@ -182,17 +179,6 @@ export function Shell() {
                 </>
               }
               actions={[
-                // Supervisors who sign in with a password choose the PIN they approve with.
-                ...(user?.signInMethod !== 'pin'
-                  ? [
-                      {
-                        id: 'approvalPin',
-                        label: t('approvalPin.menu'),
-                        icon: <KeyRound className={iconClass.sm} aria-hidden="true" />,
-                        onAction: () => setSettingPin(true),
-                      },
-                    ]
-                  : []),
                 {
                   id: 'lock',
                   label: t('user.lock'),
@@ -212,7 +198,6 @@ export function Shell() {
         <main className={styles.page}>
           <Outlet />
         </main>
-        {settingPin && <ApprovalPinDialog onClose={() => setSettingPin(false)} />}
       </div>
     </div>
   );

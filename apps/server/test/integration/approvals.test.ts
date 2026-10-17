@@ -1,6 +1,7 @@
 /**
  * T6: supervisor approvals (architecture §5.5) — a single-use loan of a permission, for five
- * minutes, from someone else who holds it, with their PIN and a reason.
+ * minutes, from someone else who holds it, with the one-time code from their phone's 2-step app
+ * and a reason (decision 0074).
  */
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
@@ -19,6 +20,8 @@ import {
   type TestDevice,
   type TestServer,
 } from '../support/server';
+import { addOwnerWithTwoStep } from '../support/https';
+import { totpCode } from '../../src/platform/auth/totp';
 
 let server: TestServer;
 let pos: TestDevice;
@@ -26,7 +29,8 @@ let cashier: bigint;
 let cashierToken: string;
 let supervisor: bigint;
 let supervisorToken: string;
-let noPin: bigint;
+let supervisorSecret: string;
+let noTwoStep: bigint;
 
 beforeAll(async () => {
   server = await startTestServer((app) => {
@@ -51,17 +55,24 @@ beforeAll(async () => {
   });
   pos = await addDevice(server, { code: 'COUNTER-01', kind: 'pos' });
   cashier = await addUser(server, { username: 'ahmed.cashier', method: 'pin', roles: ['cashier'] });
-  supervisor = await addUser(server, {
-    username: 'khaled.acc',
-    roles: ['accountant'],
-    pin: '5291',
-  });
-  noPin = await addUser(server, { username: 'no.pin', roles: ['accountant'] });
+  const sup = await addOwnerWithTwoStep(server, { username: 'khaled.acc', roles: ['accountant'] });
+  supervisor = sup.id;
+  supervisorSecret = sup.secret;
+  // An accountant with a PIN but no 2-step: never an approver.
+  noTwoStep = await addUser(server, { username: 'no.twostep', roles: ['accountant'], pin: '5291' });
   cashierToken = (await openSession(server, { userId: cashier, deviceId: pos.id, method: 'pin' }))
     .token;
-  supervisorToken = (await openSession(server, { userId: supervisor, deviceId: pos.id })).token;
+  supervisorToken = (
+    await openSession(server, { userId: supervisor, deviceId: pos.id, method: 'password_totp' })
+  ).token;
 });
 afterAll(() => server.close());
+
+/** The supervisor's current code, as their phone shows it; each code works once. */
+async function code(): Promise<string> {
+  await ageRow(server, `UPDATE auth.users SET totp_last_step = NULL WHERE id = $1`, [supervisor]);
+  return totpCode(supervisorSecret, Date.now());
+}
 
 const ask = (token: string, body: Record<string, unknown>) =>
   call(server, 'POST', '/api/v1/approvals', {
@@ -84,27 +95,30 @@ const use = (token: string, approvalId: string, permission?: string) =>
   });
 
 describe('approvals', () => {
-  it('lists who can approve: holds the permission, has a PIN, is someone else', async () => {
+  it('lists who can approve: holds the permission, has 2-step on, is someone else', async () => {
     const response = await call(
       server,
       'GET',
       '/api/v1/approvals/approvers?permission=sales.discount_over_limit',
-      {
-        device: pos,
-        token: cashierToken,
-      },
+      { device: pos, token: cashierToken },
     );
     const { approvers } = response.json<{ approvers: Approver[] }>();
     expect(approvers.map((a) => a.id)).toEqual([supervisor.toString()]);
+    expect(approvers.map((a) => a.id)).not.toContain(noTwoStep.toString());
   });
 
-  it('is given with the supervisor PIN and a reason, for five minutes, and used once', async () => {
-    const given = await ask(cashierToken, { approverId: supervisor.toString(), pin: '5291' });
+  it('is given with the code from the phone and a reason, for five minutes, and used once', async () => {
+    const now = await code();
+    const given = await ask(cashierToken, { approverId: supervisor.toString(), code: now });
     expect(given.statusCode).toBe(201);
     const approval = given.json<ApprovalResponse>();
     const minutes = (Date.parse(approval.expiresAt) - Date.now()) / 60_000;
     expect(minutes).toBeGreaterThan(4.5);
     expect(minutes).toBeLessThanOrEqual(5);
+    // The same code never works twice, even seen over a shoulder.
+    expect(
+      errorCode(await ask(cashierToken, { approverId: supervisor.toString(), code: now })),
+    ).toBe('INVALID_TWO_STEP_CODE');
     expect((await use(cashierToken, approval.approvalId)).json()).toEqual({ discountBp: 800 });
     expect(errorCode(await use(cashierToken, approval.approvalId))).toBe('APPROVAL_INVALID');
     const row = await server.db
@@ -123,7 +137,7 @@ describe('approvals', () => {
 
   it('is refused for the wrong action, by someone else, or after it expires', async () => {
     const approvalId = (
-      await ask(cashierToken, { approverId: supervisor.toString(), pin: '5291' })
+      await ask(cashierToken, { approverId: supervisor.toString(), code: await code() })
     ).json<ApprovalResponse>().approvalId;
     expect(errorCode(await use(cashierToken, approvalId, 'pos.oversell'))).toBe('APPROVAL_INVALID');
     expect(errorCode(await use(supervisorToken, approvalId))).toBe('APPROVAL_INVALID');
@@ -136,88 +150,66 @@ describe('approvals', () => {
     expect(errorCode(await use(cashierToken, approvalId))).toBe('APPROVAL_INVALID');
   });
 
-  it('refuses self-approval, approvers without the permission, and actions that cannot be approved', async () => {
+  it('refuses self-approval, approvers without 2-step or the permission, and unapprovable actions', async () => {
     expect(
-      errorCode(await ask(supervisorToken, { approverId: supervisor.toString(), pin: '5291' })),
+      errorCode(
+        await ask(supervisorToken, { approverId: supervisor.toString(), code: await code() }),
+      ),
     ).toBe('APPROVAL_INVALID');
-    const tech = await addUser(server, {
-      username: 'tech.one',
-      roles: ['technician'],
-      pin: '6183',
-    });
-    expect(errorCode(await ask(cashierToken, { approverId: tech.toString(), pin: '6183' }))).toBe(
-      'APPROVAL_INVALID',
-    );
+    // A PIN is no longer an approval code.
+    expect(
+      errorCode(await ask(cashierToken, { approverId: noTwoStep.toString(), code: '529100' })),
+    ).toBe('INVALID_TWO_STEP_CODE');
+    const tech = await addOwnerWithTwoStep(server, { username: 'tech.one', roles: ['technician'] });
+    expect(
+      errorCode(
+        await ask(cashierToken, {
+          approverId: tech.id.toString(),
+          code: totpCode(tech.secret, Date.now()),
+        }),
+      ),
+    ).toBe('APPROVAL_INVALID');
     expect(
       errorCode(
         await ask(cashierToken, {
           approverId: supervisor.toString(),
-          pin: '5291',
+          code: await code(),
           permission: 'users.manage',
         }),
       ),
     ).toBe('APPROVAL_INVALID');
     expect(
       errorCode(
-        await ask(cashierToken, { approverId: supervisor.toString(), pin: '5291', reason: 'x' }),
+        await ask(cashierToken, { approverId: supervisor.toString(), code: '1234', reason: 'x' }),
       ),
     ).toBe('VALIDATION_FAILED');
   });
 
-  it('blocks the approver PIN after 5 wrong tries', async () => {
+  it('blocks the approver’s approvals (never their sign-in) after 5 wrong codes', async () => {
     const answers: string[] = [];
     for (let i = 0; i < 5; i++) {
       answers.push(
-        errorCode(await ask(cashierToken, { approverId: supervisor.toString(), pin: `30${i}7` })) ??
-          '',
+        errorCode(
+          await ask(cashierToken, { approverId: supervisor.toString(), code: `00000${i}` }),
+        ) ?? '',
       );
     }
     expect(answers).toEqual([
-      'INVALID_PIN',
-      'INVALID_PIN',
-      'INVALID_PIN',
-      'INVALID_PIN',
-      'PIN_BLOCKED',
+      'INVALID_TWO_STEP_CODE',
+      'INVALID_TWO_STEP_CODE',
+      'INVALID_TWO_STEP_CODE',
+      'INVALID_TWO_STEP_CODE',
+      'APPROVAL_BLOCKED',
     ]);
-    // Even the right PIN is refused until the owner unblocks it.
+    // Even the right code is refused until the owner unblocks it.
     expect(
-      errorCode(await ask(cashierToken, { approverId: supervisor.toString(), pin: '5291' })),
-    ).toBe('PIN_BLOCKED');
-  });
-
-  it('a supervisor who signs in with a password sets an approval PIN; it never signs them in', async () => {
-    const office = await addDevice(server, { code: 'OFFICE-PIN' });
-    const token = (await openSession(server, { userId: noPin, deviceId: office.id })).token;
-    const listed = async () =>
-      (
-        await call(
-          server,
-          'GET',
-          '/api/v1/approvals/approvers?permission=sales.discount_over_limit',
-          {
-            device: pos,
-            token: cashierToken,
-          },
-        )
-      )
-        .json<{ approvers: Approver[] }>()
-        .approvers.map((a) => a.id);
-    expect(await listed()).not.toContain(noPin.toString());
-    // The password confirms it; a weak PIN is refused.
-    const set = (current: string, newPin: string) =>
-      call(server, 'POST', '/api/v1/auth/change-pin', {
-        device: office,
-        token,
-        body: { current, newPin },
-      });
-    expect(errorCode(await set('wrong-password-here', '7316'))).not.toBeNull();
-    expect(errorCode(await set('pool-water-blue', '1234'))).toBe('PIN_REJECTED');
-    expect((await set('pool-water-blue', '7316')).statusCode).toBe(200);
-    expect(await listed()).toContain(noPin.toString());
-    const given = await ask(cashierToken, { approverId: noPin.toString(), pin: '7316' });
-    expect(given.statusCode).toBe(201);
-    // Not a PIN sign-in user: never offered at the POS sign-in.
-    const pinUsers = await call(server, 'GET', '/api/v1/auth/pin-users', { device: pos });
-    expect(JSON.stringify(pinUsers.json())).not.toContain('no.pin');
+      errorCode(await ask(cashierToken, { approverId: supervisor.toString(), code: await code() })),
+    ).toBe('APPROVAL_BLOCKED');
+    const user = await server.db
+      .selectFrom('auth.users')
+      .select(['locked_until'])
+      .where('id', '=', supervisor)
+      .executeTakeFirstOrThrow();
+    expect(user.locked_until).toBeNull(); // their sign-in is not affected
   });
 });

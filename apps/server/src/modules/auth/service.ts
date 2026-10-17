@@ -45,7 +45,7 @@ const RECOVERY_CODE_COUNT = 10;
 const TWO_STEP_SETUP_MS = 10 * 60_000;
 
 /** The 2-step secret is bound to its user row, so it cannot be copied to another user. */
-const totpAad = (userId: bigint): string => `auth.users.totp_secret_enc:${userId}`;
+export const totpAad = (userId: bigint): string => `auth.users.totp_secret_enc:${userId}`;
 
 /** Secrets of a 2-step setup in progress, by session (memory only, at most 10 minutes). */
 const pendingTwoStep = new Map<bigint, { secret: string; expires: number }>();

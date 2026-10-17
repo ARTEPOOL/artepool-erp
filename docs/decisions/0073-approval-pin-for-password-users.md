@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Accepted |
+| **Status** | Replaced by [0074](0074-approvals-with-the-phone-code.md) |
 | **Date** | 2026-10-17 |
 | **Decided by** | Owner |
 | **Refines** | [0021](0021-cashier-pin-sign-in-on-pos-pcs.md) |

@@ -526,8 +526,8 @@ describe('Items & stock: the stock adjustment dialog', () => {
     const approver = within(approval).getByLabelText('المشرف');
     await within(approver).findByRole('option', { name: 'سالم المشرف' });
     fireEvent.change(approver, { target: { value: '7' } });
-    fireEvent.change(within(approval).getByLabelText('الرمز السري للمشرف'), {
-      target: { value: '4826' },
+    fireEvent.change(within(approval).getByLabelText(/الرمز من تليفون الموافِق/), {
+      target: { value: '482611' },
     });
     fireEvent.change(within(approval).getByLabelText('السبب'), {
       target: { value: 'شحنة وصلت بدون فاتورة' },
@@ -538,7 +538,7 @@ describe('Items & stock: the stock adjustment dialog', () => {
     expect(bridge.callsTo('POST', '/api/v1/approvals')[0]!.body).toMatchObject({
       permission: 'stock.adjust_over_threshold',
       approverId: '7',
-      pin: '4826',
+      code: '482611',
     });
     const [first, second] = bridge.callsTo('POST', '/api/v1/stock/adjustments');
     const sent = {
