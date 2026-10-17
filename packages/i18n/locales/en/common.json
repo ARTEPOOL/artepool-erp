@@ -149,7 +149,7 @@
       "OVERSELL_APPROVAL": "Not enough stock: a supervisor must approve selling beyond stock.",
       "PAYMENT_MISMATCH": "The payments do not match the amount due.",
       "SHIFT_ALREADY_OPEN": "This drawer already has an open shift.",
-      "SHIFT_OPEN_ELSEWHERE": "You already have an open shift on the PC “{{deviceCode}}”. Close it there first; one cashier holds one shift at a time.",
+      "SHIFT_OPEN_ELSEWHERE": "You already have an open shift on the PC “{deviceCode}”. Close it there first; one cashier holds one shift at a time.",
       "COUNT_ALREADY_DONE": "The closing count is already done; a recount needs a supervisor.",
       "RECOUNT_USED": "The one recount of this shift is already used.",
       "APPROVAL_INVALID": "This approval is for something else.",

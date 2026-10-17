@@ -23,6 +23,19 @@ describe('translation checks', () => {
     );
   });
 
+  it('reports double braces, which would show on screen as written', () => {
+    const problems = checkLocales({
+      ar: { common: { a: 'على الجهاز {{code}}' } },
+      en: { common: { a: 'On PC {code}' } },
+    });
+    expect(problems).toContainEqual({
+      language: 'ar',
+      namespace: 'common',
+      key: 'a',
+      issue: 'double_braces',
+    });
+  });
+
   it('reports required keys that no language has', () => {
     const problems = checkLocales({ ar: { common: {} }, en: { common: {} } }, { common: ['x'] });
     expect(problems).toHaveLength(2);

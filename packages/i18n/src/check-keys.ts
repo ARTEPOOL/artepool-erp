@@ -11,7 +11,7 @@ export interface Problem {
   language: string;
   namespace: string;
   key: string;
-  issue: 'missing' | 'empty' | 'placeholders' | 'not_text' | 'plural_form';
+  issue: 'missing' | 'empty' | 'placeholders' | 'not_text' | 'plural_form' | 'double_braces';
   detail?: string;
 }
 
@@ -95,6 +95,9 @@ export function checkLocales(
           problems.push({ language, namespace, key, issue: 'not_text' });
         } else if (value.trim() === '') {
           problems.push({ language, namespace, key, issue: 'empty' });
+        } else if (value.includes('{{')) {
+          // Our placeholders are {name}; "{{name}}" would show on screen as written.
+          problems.push({ language, namespace, key, issue: 'double_braces' });
         } else {
           texts.set(language, value);
         }
