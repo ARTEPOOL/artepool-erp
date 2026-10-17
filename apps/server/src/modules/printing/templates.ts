@@ -106,17 +106,25 @@ const fontFile = (name: string): string => {
   return readFileSync(join(dir, 'files', name)).toString('base64');
 };
 
+/** The owner's Arabic font (decision 0068), for Arabic letters only (it draws 0-9 as Arabic-Indic). */
+const ARABIC_FONT = new URL('../../../../../assets/fonts/ge-ss-tv-medium.otf', import.meta.url);
+const ARABIC_LETTERS =
+  'U+0600-065F, U+066A-06EF, U+06FA-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF';
+
 let fontsCss: string | null = null;
-/** The app's font, embedded, so Arabic is shaped the same on every server. */
+/** The app's fonts, embedded, so Arabic is shaped the same on every server. */
 function fonts(): string {
-  fontsCss ??= ['arabic', 'latin']
-    .flatMap((subset) =>
-      [400, 700].map(
-        (weight) => `@font-face { font-family: 'Plex Arabic'; font-weight: ${weight};
+  fontsCss ??=
+    `@font-face { font-family: 'ARTEPOOL Arabic'; font-weight: 100 900; unicode-range: ${ARABIC_LETTERS};
+      src: url(data:font/otf;base64,${readFileSync(ARABIC_FONT).toString('base64')}) format('opentype'); }\n` +
+    ['arabic', 'latin']
+      .flatMap((subset) =>
+        [400, 700].map(
+          (weight) => `@font-face { font-family: 'Plex Arabic'; font-weight: ${weight};
           src: url(data:font/woff2;base64,${fontFile(`ibm-plex-sans-arabic-${subset}-${weight}-normal.woff2`)}) format('woff2'); }`,
-      ),
-    )
-    .join('\n');
+        ),
+      )
+      .join('\n');
   return fontsCss;
 }
 
@@ -268,7 +276,7 @@ ${fonts()}
 :root { --main: ${escapeHtml(settings.color)}; }
 * { box-sizing: border-box; }
 html { background: #fff; }
-body { font-family: 'Plex Arabic', sans-serif; font-size: ${TEXT_PT[settings.textSize]}pt; color: #111; margin: 0; }
+body { font-family: 'ARTEPOOL Arabic', 'Plex Arabic', sans-serif; font-size: ${TEXT_PT[settings.textSize]}pt; color: #111; margin: 0; }
 .en { display: block; font-size: 0.85em; color: #444; direction: ltr; unicode-bidi: isolate; }
 header { display: flex; justify-content: space-between; align-items: flex-start; gap: 8mm; border-block-end: 1.5pt solid var(--main); padding-block-end: 4mm; }
 header.opposite { flex-direction: row-reverse; }

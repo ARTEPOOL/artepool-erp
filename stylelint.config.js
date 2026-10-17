@@ -41,8 +41,12 @@ export default {
   },
   overrides: [
     {
-      // The token files are where raw values belong.
-      files: ['apps/desktop/src/theme/tokens.css', 'apps/desktop/src/theme/tokens-app.css'],
+      // The token files and the font faces are where raw values belong.
+      files: [
+        'apps/desktop/src/theme/tokens.css',
+        'apps/desktop/src/theme/tokens-app.css',
+        'apps/desktop/src/theme/fonts.css',
+      ],
       rules: {
         'color-no-hex': null,
         'function-disallowed-list': null,

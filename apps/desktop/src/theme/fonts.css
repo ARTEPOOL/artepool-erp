@@ -1,0 +1,13 @@
+/*
+ * The owner's Arabic font (decision 0068): GE SS TV, for Arabic letters only. Digits and Latin
+ * letters fall through to IBM Plex Sans Arabic, because this font draws 0-9 as Arabic-Indic
+ * digits. One file serves every weight (the browser makes the bold).
+ */
+@font-face {
+  font-family: 'ARTEPOOL Arabic';
+  src: url('../../../../assets/fonts/ge-ss-tv-medium.otf') format('opentype');
+  font-weight: 100 900;
+  font-display: swap;
+  unicode-range:
+    U+0600-065F, U+066A-06EF, U+06FA-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
+}
