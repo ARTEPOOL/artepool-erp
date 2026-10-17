@@ -561,5 +561,18 @@
     "previewAlt": "Preview of the printed document",
     "loading": "Preparing the preview…",
     "logoSizeValue": "{mm} mm"
+  },
+  "approvalPin": {
+    "menu": "Approval PIN",
+    "title": "My approval PIN",
+    "help": "The 4 digits you type when you approve something for someone else (a discount, a return, cancelling an invoice). It never signs you in. Choose digits that are not easy to guess.",
+    "password": "Your password",
+    "pin": "New approval PIN (4 digits)",
+    "again": "The PIN again",
+    "save": "Save PIN",
+    "saved": "Approval PIN saved.",
+    "passwordRequired": "Type your password.",
+    "fourDigits": "The PIN is exactly 4 digits.",
+    "mismatch": "The two PINs are not the same."
   }
 }

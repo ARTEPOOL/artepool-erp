@@ -26,6 +26,7 @@ let cashier: bigint;
 let cashierToken: string;
 let supervisor: bigint;
 let supervisorToken: string;
+let noPin: bigint;
 
 beforeAll(async () => {
   server = await startTestServer((app) => {
@@ -55,7 +56,7 @@ beforeAll(async () => {
     roles: ['accountant'],
     pin: '5291',
   });
-  await addUser(server, { username: 'no.pin', roles: ['accountant'] });
+  noPin = await addUser(server, { username: 'no.pin', roles: ['accountant'] });
   cashierToken = (await openSession(server, { userId: cashier, deviceId: pos.id, method: 'pin' }))
     .token;
   supervisorToken = (await openSession(server, { userId: supervisor, deviceId: pos.id })).token;
@@ -182,5 +183,41 @@ describe('approvals', () => {
     expect(
       errorCode(await ask(cashierToken, { approverId: supervisor.toString(), pin: '5291' })),
     ).toBe('PIN_BLOCKED');
+  });
+
+  it('a supervisor who signs in with a password sets an approval PIN; it never signs them in', async () => {
+    const office = await addDevice(server, { code: 'OFFICE-PIN' });
+    const token = (await openSession(server, { userId: noPin, deviceId: office.id })).token;
+    const listed = async () =>
+      (
+        await call(
+          server,
+          'GET',
+          '/api/v1/approvals/approvers?permission=sales.discount_over_limit',
+          {
+            device: pos,
+            token: cashierToken,
+          },
+        )
+      )
+        .json<{ approvers: Approver[] }>()
+        .approvers.map((a) => a.id);
+    expect(await listed()).not.toContain(noPin.toString());
+    // The password confirms it; a weak PIN is refused.
+    const set = (current: string, newPin: string) =>
+      call(server, 'POST', '/api/v1/auth/change-pin', {
+        device: office,
+        token,
+        body: { current, newPin },
+      });
+    expect(errorCode(await set('wrong-password-here', '7316'))).not.toBeNull();
+    expect(errorCode(await set('pool-water-blue', '1234'))).toBe('PIN_REJECTED');
+    expect((await set('pool-water-blue', '7316')).statusCode).toBe(200);
+    expect(await listed()).toContain(noPin.toString());
+    const given = await ask(cashierToken, { approverId: noPin.toString(), pin: '7316' });
+    expect(given.statusCode).toBe(201);
+    // Not a PIN sign-in user: never offered at the POS sign-in.
+    const pinUsers = await call(server, 'GET', '/api/v1/auth/pin-users', { device: pos });
+    expect(JSON.stringify(pinUsers.json())).not.toContain('no.pin');
   });
 });

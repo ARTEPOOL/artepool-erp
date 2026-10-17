@@ -79,6 +79,7 @@ There is one short file per decision, numbered in order.
 | [0070](0070-receipt-printer-modes-and-layout.md) | Receipt printer: ESC/POS or any printer through its Windows driver; the new receipt look with a separator between items | Accepted |
 | [0071](0071-a4-invoices-full-and-reprints-current-design.md) | A4 invoices are full tax invoices when the customer is registered or has an address on file (else simplified); reprints use today's design | Accepted (pending accountant review) |
 | [0072](0072-cancel-or-edit-issued-invoice.md) | Cancel or edit an issued A4 invoice with the owner's approval: a full credit note, refund at once, a new draft for edits | Accepted |
+| [0073](0073-approval-pin-for-password-users.md) | Supervisors who sign in with a password set their own approval PIN (account menu); it never signs anyone in | Accepted |
 
 ## Template
 

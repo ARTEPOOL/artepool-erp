@@ -1,5 +1,11 @@
 # Changelog
 
+## Approval PIN for the owner and supervisors (2026-10-17)
+
+**In plain words:** the owner, the accountant and other office users can now choose their own 4-digit **approval PIN** from the account menu (top corner → Approval PIN). They type it when approving something for someone else, such as cancelling an invoice, a discount or a return. It never signs anyone in.
+
+- Decision 0073.
+
 ## A4 invoices: details from the customer only (2026-10-17)
 
 **In plain words:** the "customer name / address on the invoice" fields are gone. A4 invoices take the name, address and TRN from the customer record. A registered customer, or a customer with a saved address, gets a full tax invoice; the cash customer or a customer without an address gets a simplified one, so an invoice is never blocked for lack of a typed name or address.
