@@ -222,6 +222,22 @@ describe('the POS PC and its shift (decisions 0004, 0021)', () => {
     expect(await refusal(b('POST', '/api/v1/shifts', { openingFloatFils: '0' }))).toMatchObject({
       rule: 'SHIFT_ALREADY_OPEN',
     });
+    // The same cashier on another POS PC: refused, naming the PC the shift is open on.
+    const aPc = await server.db
+      .selectFrom('auth.devices')
+      .select('code')
+      .where('id', '=', a.pc.id)
+      .executeTakeFirstOrThrow();
+    pcNo += 1;
+    const other = await addDevice(server, { code: `PC-${pcNo}`, kind: 'pos' });
+    const aThere = asActor(
+      other,
+      a.id,
+      (await openSession(server, { userId: a.id, deviceId: other.id })).token,
+    );
+    expect(
+      await refusal(aThere('POST', '/api/v1/shifts', { openingFloatFils: '0' })),
+    ).toMatchObject({ rule: 'SHIFT_OPEN_ELSEWHERE', deviceCode: aPc.code });
     const state = await ok<PosState>(b('GET', '/api/v1/pos/state'));
     expect(state.shift).toBeNull();
     expect(state.drawerBusyWith).not.toBeNull();

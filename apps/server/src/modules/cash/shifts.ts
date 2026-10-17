@@ -111,6 +111,20 @@ export async function openShift(
   if (await openShiftOnDevice(trx, device.id)) {
     throw ruleError('SHIFT_ALREADY_OPEN', 'This drawer already has an open shift');
   }
+  // One open shift per cashier (decision 0004): name the PC it is open on, so it can be closed there.
+  const elsewhere = await trx
+    .selectFrom('cash.shifts as s')
+    .innerJoin('cash.registers as r', 'r.id', 's.register_id')
+    .innerJoin('auth.devices as d', 'd.id', 'r.device_id')
+    .select(['d.code'])
+    .where('s.cashier_id', '=', request.auth!.userId)
+    .where('s.status', '=', 'open')
+    .executeTakeFirst();
+  if (elsewhere) {
+    throw ruleError('SHIFT_OPEN_ELSEWHERE', 'The cashier has an open shift on another PC', {
+      deviceCode: elsewhere.code,
+    });
+  }
   const float = BigInt(body.openingFloatFils);
   const shift = await trx
     .insertInto('cash.shifts')
