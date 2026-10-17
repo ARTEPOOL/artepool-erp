@@ -4,6 +4,7 @@ import { z } from 'zod';
 import {
   DESIGNED_KINDS,
   PreviewTemplateRequest,
+  SaveReceiptLogoRequest,
   SaveTemplateRequest,
   type FilePayload,
   type PreviewTemplateResponse,
@@ -77,5 +78,19 @@ export function registerPrintingRoutes(app: FastifyInstance): void {
       status: 201,
       body: await designer.saveTemplate(trx, params.kind, body),
     }),
+  });
+  // The thermal receipt's own logo (decision 0075): read by every PC that prints receipts.
+  defineRoute(app, {
+    method: 'GET',
+    url: '/api/v1/print-templates/receipt-logo',
+    access: { kind: 'session' },
+    handler: () => designer.receiptLogo(db),
+  });
+  defineWrite(app, {
+    method: 'PUT',
+    url: '/api/v1/print-templates/receipt-logo',
+    access: manage,
+    body: SaveReceiptLogoRequest,
+    handler: async ({ trx, body }) => ({ body: await designer.saveReceiptLogo(trx, body) }),
   });
 }

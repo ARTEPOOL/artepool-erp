@@ -1,5 +1,11 @@
 # Changelog
 
+## The thermal receipt's own logo (2026-10-17)
+
+**In plain words:** in Settings → Print designer → Thermal receipt you can now upload a logo used only on the thermal receipt (a simple black-and-white logo prints best). Without it, the receipt prints the company logo as before. A4 documents keep the company logo.
+
+- Decision 0075; migration 0029 (`ops_backup` moves to 0030).
+
 ## Approvals with the code from the approver's phone (2026-10-17)
 
 **In plain words:** a supervisor approves anything (a discount, a return, cancelling an invoice…) by choosing their name and typing the **6-digit code shown now in their phone's verification app**. The code changes every 30 seconds and works once, so watching someone type it is useless. Only people with 2-step turned on can approve: in Settings → Users set the supervisor's sign-in to "password + verification code". The approval PIN from earlier today is removed.

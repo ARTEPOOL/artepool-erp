@@ -8,6 +8,7 @@ import { randomUUID } from 'node:crypto';
 import { sql } from 'kysely';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type {
+  ReceiptLogoResponse,
   BankAccount,
   BankAccountsResponse,
   CustomerDetail,
@@ -378,5 +379,40 @@ describe('printed documents (decisions 0064, 0066)', () => {
     expect(rows[0]!.kind).toBe('tax_invoice_a4');
     const receipt = await receiptHtml(server.db, BigInt(rows[0]!.id));
     expect(receipt.html).toContain('--main: #0a5c8a');
+  });
+});
+
+describe('the thermal receipt’s own logo (decision 0075)', () => {
+  // A 1×1 PNG.
+  const PNG =
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+  it('the owner sets it; the receipt prints it, else the company logo; nobody else changes it', async () => {
+    const before = await ok<ReceiptLogoResponse>(
+      accountant('GET', '/api/v1/print-templates/receipt-logo'),
+    );
+    expect(before.own).toBe(false);
+    const body = { logo: { type: 'image/png', dataBase64: PNG } };
+    expect((await accountant('PUT', '/api/v1/print-templates/receipt-logo', body)).statusCode).toBe(
+      403,
+    );
+    // A file that is not the PNG it claims to be is refused.
+    expect(
+      await refusal(
+        owner('PUT', '/api/v1/print-templates/receipt-logo', {
+          logo: { type: 'image/png', dataBase64: Buffer.from('not a png').toString('base64') },
+        }),
+      ),
+    ).toMatchObject({ rule: 'LOGO_INVALID' });
+    const set = await ok<ReceiptLogoResponse>(
+      owner('PUT', '/api/v1/print-templates/receipt-logo', body),
+    );
+    expect(set).toMatchObject({ own: true, logo: { type: 'image/png', dataBase64: PNG } });
+    expect((await templates()).hasReceiptLogo).toBe(true);
+    // Back to the company logo.
+    const cleared = await ok<ReceiptLogoResponse>(
+      owner('PUT', '/api/v1/print-templates/receipt-logo', { logo: null }),
+    );
+    expect(cleared.own).toBe(false);
+    expect(cleared.logo).toEqual(before.logo);
   });
 });

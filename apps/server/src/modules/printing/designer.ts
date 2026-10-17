@@ -12,14 +12,17 @@ import {
   type PrintTemplateItem,
   type PrintTemplatesResponse,
   type PrintTemplateVersionItem,
+  type ReceiptLogoResponse,
+  type SaveReceiptLogoRequest,
   type SaveTemplateRequest,
   type TemplateSettings,
 } from '@artepool/shared/contracts';
 import type { DB } from '../../platform/db/schema.generated';
 import { filledByDatabase } from '../../platform/db/stamped';
 import { fieldError } from '../../platform/db/versioned';
-import { AppError } from '../../platform/errors/app-error';
+import { AppError, ruleError } from '../../platform/errors/app-error';
 import { listBankAccounts } from '../company/bank-accounts';
+import { detectImageType, getLogo } from '../company/service';
 import { company } from './service';
 import { renderHtml, type PrintDocument } from './templates';
 
@@ -72,6 +75,7 @@ export async function listTemplates(db: Db, canEdit: boolean): Promise<PrintTemp
       iban: a.iban,
     })),
     hasLogo: logo?.has ?? false,
+    hasReceiptLogo: (await receiptLogo(db)).own,
     canEdit,
   };
 }
@@ -282,4 +286,47 @@ export async function previewTemplate(
     settings,
     bankAccount: account ?? null,
   });
+}
+
+// ---------------------------------------------------------------------------------------------
+// The thermal receipt's own logo (decision 0075)
+// ---------------------------------------------------------------------------------------------
+
+/** The logo the receipt prints: its own if set, else the company logo. */
+export async function receiptLogo(db: Db): Promise<ReceiptLogoResponse> {
+  const row = await db
+    .selectFrom('sys.receipt_logo')
+    .select(['logo', 'logo_mime'])
+    .where('id', '=', 1)
+    .executeTakeFirst();
+  if (row?.logo && row.logo_mime) {
+    return {
+      logo: {
+        type: row.logo_mime as 'image/png' | 'image/jpeg',
+        dataBase64: row.logo.toString('base64'),
+      },
+      own: true,
+    };
+  }
+  return { logo: (await getLogo(db)).logo, own: false };
+}
+
+/** Sets the receipt's own logo, or removes it (back to the company logo). The content is checked. */
+export async function saveReceiptLogo(
+  trx: Transaction<DB>,
+  body: SaveReceiptLogoRequest,
+): Promise<ReceiptLogoResponse> {
+  let logo: Buffer | null = null;
+  if (body.logo) {
+    logo = Buffer.from(body.logo.dataBase64, 'base64');
+    if (logo.length === 0 || logo.length > 524_288 || detectImageType(logo) !== body.logo.type) {
+      throw ruleError('LOGO_INVALID', 'The logo must be a PNG or JPEG file of at most 512 KB');
+    }
+  }
+  await trx
+    .updateTable('sys.receipt_logo')
+    .set({ logo, logo_mime: body.logo ? body.logo.type : null })
+    .where('id', '=', 1)
+    .execute();
+  return receiptLogo(trx);
 }

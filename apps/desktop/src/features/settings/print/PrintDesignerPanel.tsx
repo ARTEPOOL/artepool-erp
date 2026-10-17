@@ -47,6 +47,7 @@ import { renderReceipt } from '../../pos/receipt/render';
 import { printPdf } from '../../sales/print';
 import { SaveProblem } from '../company/SaveProblem';
 import { CardHead, NoAccess, PanelHeader } from '../parts';
+import { ReceiptLogo } from './ReceiptLogo';
 import { sampleReceipt } from './sample';
 import styles from './print.module.css';
 
@@ -201,7 +202,10 @@ function Designer({
               <Switch isSelected={settings.fields.logo} onChange={(on) => setField('logo', on)}>
                 {t('print.fields.logo')}
               </Switch>
-              {!data.hasLogo && settings.fields.logo && <Note>{t('print.noLogo')}</Note>}
+              {!data.hasLogo && !(thermal && data.hasReceiptLogo) && settings.fields.logo && (
+                <Note>{t('print.noLogo')}</Note>
+              )}
+              {settings.fields.logo && thermal && <ReceiptLogo canEdit={data.canEdit} />}
               {settings.fields.logo && !thermal && (
                 <>
                   <Segmented

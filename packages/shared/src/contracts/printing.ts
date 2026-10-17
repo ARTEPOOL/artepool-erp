@@ -7,6 +7,7 @@
 import { z } from 'zod';
 import { IdText } from './auth';
 import { RowVersion } from './common';
+import { LOGO_MAX_BYTES, LOGO_TYPES, type LogoType } from './company';
 
 /** The templates the owner designs. Receipts and statements print with the A4 invoice's design. */
 export const DESIGNED_KINDS = [
@@ -291,6 +292,8 @@ export interface PrintTemplatesResponse {
   /** Active bank accounts the "Bank details" field can print. */
   bankAccounts: { id: string; bankName: string; accountName: string; iban: string }[];
   hasLogo: boolean;
+  /** The thermal receipt has a logo of its own (decision 0075). */
+  hasReceiptLogo: boolean;
   canEdit: boolean;
 }
 
@@ -355,3 +358,23 @@ export const SaveBankAccountRequest = z.object({
   rowVersion: RowVersion.optional(),
 });
 export type SaveBankAccountRequest = z.infer<typeof SaveBankAccountRequest>;
+
+/**
+ * The thermal receipt's own logo (decision 0075): PNG or JPEG up to 512 KB, or null to go back to
+ * the company logo. Owner only.
+ */
+export const SaveReceiptLogoRequest = z.object({
+  logo: z
+    .object({
+      type: z.enum(LOGO_TYPES),
+      dataBase64: z.string().max(Math.ceil((LOGO_MAX_BYTES * 4) / 3) + 4),
+    })
+    .nullable(),
+});
+export type SaveReceiptLogoRequest = z.infer<typeof SaveReceiptLogoRequest>;
+
+export interface ReceiptLogoResponse {
+  /** The logo the receipt prints: its own, else the company's (null when neither exists). */
+  logo: { type: LogoType; dataBase64: string } | null;
+  own: boolean;
+}

@@ -89,4 +89,18 @@ test('bank account, A4 invoice design, thermal receipt design', async ({ page, o
   await snap(page, '72-print-designer-receipt');
   await page.getByRole('button', { name: t('settings:print.save'), exact: true }).click();
   await expect(page.getByText(t('settings:print.unsaved'))).toHaveCount(0);
+
+  // The receipt's own logo (decision 0075): upload one, then go back to the company logo.
+  await turnOn(page.getByRole('switch', { name: t('settings:print.fields.logo') }));
+  await main.getByLabel(t('settings:print.receiptLogo.upload')).setInputFiles({
+    name: 'receipt-logo.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAAAAAA6fptVAAAACklEQVR4nGNgAAAAAgABSK+kcQAAAABJRU5ErkJggg==',
+      'base64',
+    ),
+  });
+  await expect(main.getByText(t('settings:print.receiptLogo.own'))).toBeVisible();
+  await main.getByRole('button', { name: t('settings:print.receiptLogo.useCompany') }).click();
+  await expect(main.getByText(t('settings:print.receiptLogo.company'))).toBeVisible();
 });

@@ -1302,6 +1302,17 @@ export interface SysReasonCodes {
   updated_by: bigint;
 }
 
+export interface SysReceiptLogo {
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  id: Generated<number>;
+  logo: Buffer | null;
+  logo_mime: string | null;
+  row_version: Generated<number>;
+  updated_at: Generated<Timestamp>;
+  updated_by: bigint;
+}
+
 export interface SysSchemaMigrations {
   applied_at: Generated<Timestamp>;
   applied_by: string;
@@ -1393,6 +1404,7 @@ export interface DB {
   "sys.print_template_versions": SysPrintTemplateVersions;
   "sys.print_templates": SysPrintTemplates;
   "sys.reason_codes": SysReasonCodes;
+  "sys.receipt_logo": SysReceiptLogo;
   "sys.schema_migrations": SysSchemaMigrations;
   "sys.settings": SysSettings;
 }

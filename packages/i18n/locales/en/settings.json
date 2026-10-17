@@ -560,6 +560,17 @@
     "fullSample": "Full tax invoice sample",
     "previewAlt": "Preview of the printed document",
     "loading": "Preparing the preview…",
-    "logoSizeValue": "{mm} mm"
+    "logoSizeValue": "{mm} mm",
+    "receiptLogo": {
+      "title": "Receipt logo",
+      "alt": "The logo printed on the thermal receipt",
+      "own": "The receipt prints its own logo.",
+      "company": "The receipt prints the company logo (Settings → Company).",
+      "upload": "Upload a receipt logo",
+      "useCompany": "Use the company logo",
+      "uploaded": "Receipt logo saved.",
+      "removed": "The receipt prints the company logo again.",
+      "hint": "PNG or JPEG up to 512 KB. The thermal printer prints in black and white: a simple, high-contrast logo prints best. A4 documents keep the company logo."
+    }
   }
 }
