@@ -74,12 +74,8 @@ async function customer(
             credit ? 'credit' : 'cash',
             opts.creditLimit ?? 0,
             credit ? 30 : 0,
-            // A VAT-registered customer has an address unless a test says otherwise (0064).
-            opts.address !== undefined
-              ? opts.address
-              : opts.trn !== undefined
-                ? 'Industrial Area'
-                : null,
+            // An A4 invoice is a full tax invoice and needs the address (0064, 0071).
+            opts.address !== undefined ? opts.address : 'Industrial Area',
           ],
         )
       ).id,
@@ -386,7 +382,9 @@ describe('issue (decisions 0010, 0011)', () => {
         )
       ).t,
     ).toBe('100123456700003');
-    expect((await issueFor(plain)).invoice_format).toBe('simplified');
+    // An A4 invoice is a full tax invoice for every customer, without a TRN when unregistered (0071).
+    const a4 = await issueFor(plain);
+    expect(a4.invoice_format).toBe('full');
     await expect(
       tx((c) => c.query(`UPDATE sales.documents SET notes = 'changed' WHERE id = $1`, [full.doc])),
     ).rejects.toMatchObject({ code: 'AP003' });
@@ -431,10 +429,36 @@ describe('issue (decisions 0010, 0011)', () => {
         )
       ).a,
     ).toBe('Sanaiya، Al Ain');
-    // A customer who is not VAT-registered needs no address (simplified invoice).
-    const plain = await customer('Plain, no address', { creditLimit: 10_000_000 });
-    const simple = await draftFor(plain);
-    await tx((c) => issue(c, simple, plain));
+    // An A4 invoice for an unregistered customer is full too, and needs the address (0071).
+    const plain = await customer('Plain, no address', { creditLimit: 10_000_000, address: null });
+    const a4 = await draftFor(plain);
+    await expect(tx((c) => issue(c, a4, plain))).rejects.toMatchObject(
+      rule('FULL_INVOICE_ADDRESS'),
+    );
+  });
+
+  it('the walk-in cash customer on an A4 invoice: their real name and address are typed (0071)', async () => {
+    const walkIn = await one<{ id: string; name: string }>(
+      api,
+      `SELECT id::text, name FROM md.customers WHERE is_walk_in`,
+    );
+    const svc = await item('S-WALK', 'service', 1_000_000, false);
+    const doc = await tx(async (c) => {
+      const d = await draft(c, 'invoice', walkIn.id);
+      await c.query(
+        `UPDATE sales.documents SET bill_to_name = $2, bill_to_address = 'Al Ain' WHERE id = $1`,
+        [d, walkIn.name],
+      );
+      await line(c, d, { item: svc, price: 1_000_000 });
+      return d;
+    });
+    // Still "Cash customer": refused.
+    const pay = (c: pg.Client) => issue(c, doc, walkIn.id);
+    await expect(tx(pay)).rejects.toMatchObject(rule('FULL_INVOICE_NAME'));
+    await tx((c) =>
+      c.query(`UPDATE sales.documents SET bill_to_name = 'Saeed Ali' WHERE id = $1`, [doc]),
+    );
+    expect((await tx(pay)).invoice_format).toBe('full');
   });
 
   it('a POS document needs an open shift of its own cashier; an office one never uses POS-', async () => {

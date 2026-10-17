@@ -54,6 +54,9 @@ interface EditorState {
   customer: ChosenCustomer | null;
   dueDate: string;
   customerPo: string;
+  /** Typed on the full tax invoice (decision 0071): the walk-in's real name, any address. */
+  billToName: string;
+  billToAddress: string;
   notes: string;
   docDiscount: string;
   lines: EditorLine[];
@@ -66,6 +69,8 @@ function initialState(doc: DocumentDetail | null): EditorState {
       customer: null,
       dueDate: '',
       customerPo: '',
+      billToName: '',
+      billToAddress: '',
       notes: '',
       docDiscount: '',
       lines: [],
@@ -83,6 +88,8 @@ function initialState(doc: DocumentDetail | null): EditorState {
     },
     dueDate: doc.dueDate ?? '',
     customerPo: doc.customerPo ?? '',
+    billToName: doc.billToName,
+    billToAddress: doc.billToAddress ?? '',
     notes: doc.notes ?? '',
     docDiscount: discount === 0n ? '' : formatFils(discount),
     lines: doc.lines
@@ -100,6 +107,8 @@ const contentKey = (s: EditorState) =>
     customer: s.customer?.id ?? null,
     dueDate: s.dueDate,
     customerPo: s.customerPo.trim(),
+    billToName: s.billToName.trim(),
+    billToAddress: s.billToAddress.trim(),
     notes: s.notes.trim(),
     docDiscount: s.docDiscount.trim(),
     deductions: [...s.deductions].sort(),
@@ -138,6 +147,12 @@ export function DraftEditor({ doc }: { doc: DocumentDetail | null }) {
     state.customer && customerDetail.data?.id === state.customer.id
       ? chosenFrom(customerDetail.data)
       : state.customer;
+
+  // The cash customer types their real name on the full tax invoice (decision 0071).
+  const isWalkIn = Boolean(customer?.isWalkIn || (walkIn && customer?.id === walkIn.id));
+  useEffect(() => {
+    if (walkIn && isWalkIn && state.billToName === walkIn.name) patch({ billToName: '' });
+  }, [walkIn, isWalkIn, state.billToName]);
 
   const preview = useLinesPreview(state.lines, state.docDiscount);
   const discount = readDocDiscount(state.docDiscount);
@@ -200,10 +215,14 @@ export function DraftEditor({ doc }: { doc: DocumentDetail | null }) {
       return setProblem(t('form.problems.discount'));
     const notes = state.notes.trim();
     const customerPo = state.customerPo.trim();
+    const billToName = isWalkIn ? state.billToName.trim() : '';
+    const billToAddress = state.billToAddress.trim();
     save.mutate({
       customerId: customer.id,
       ...(state.dueDate ? { dueDate: state.dueDate } : {}),
       ...(customerPo ? { customerPo } : {}),
+      ...(billToName ? { billToName } : {}),
+      ...(billToAddress ? { billToAddress } : {}),
       ...(notes ? { notes } : {}),
       ...(discount > 0n ? { docDiscountFils: discount.toString() } : {}),
       lines,
@@ -236,16 +255,34 @@ export function DraftEditor({ doc }: { doc: DocumentDetail | null }) {
             value={customer}
             onChange={(c) => {
               customerTouched.current = true;
-              patch({ customer: c, deductions: [] });
+              patch({ customer: c, deductions: [], billToName: '', billToAddress: '' });
             }}
             showBalance
           />
           {customer && (
             <InfoBar>
-              {t(
-                customer.isVatRegistered ? 'sales:formatHint.full' : 'sales:formatHint.simplified',
-              )}
+              {t(customer.isVatRegistered ? 'sales:formatHint.full' : 'sales:formatHint.a4')}
             </InfoBar>
+          )}
+          {customer && isWalkIn && (
+            <TextField
+              label={t('sales:fields.billToName')}
+              value={state.billToName}
+              onChange={(billToName) => patch({ billToName })}
+              maxLength={200}
+              hint={t('sales:fields.billToNameHint')}
+            />
+          )}
+          {customer && (
+            <TextField
+              label={t('sales:fields.billToAddress')}
+              value={state.billToAddress}
+              onChange={(billToAddress) => patch({ billToAddress })}
+              maxLength={500}
+              hint={t(
+                isWalkIn ? 'sales:fields.billToAddressWalkIn' : 'sales:fields.billToAddressHint',
+              )}
+            />
           )}
         </div>
       </Card>

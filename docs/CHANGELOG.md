@@ -1,5 +1,12 @@
 # Changelog
 
+## A4 invoices: always full tax invoices; reprints in today's design (2026-10-17)
+
+**In plain words:** every A4 invoice now says **"Tax Invoice"**, also for customers who are not VAT-registered. A4 invoices need the customer's name and address: the address comes from the customer or is typed on the invoice, and the cash customer's real name is typed there too. Reprinting an old invoice uses today's colours and layout; its contents never change. On the A4 page the English company name now lines up with the Arabic one, and the total payable is black.
+
+- **Decision 0071**; migration 0025 (format check and issue rule, `FULL_INVOICE_NAME`).
+- POS receipts, advance invoices and debit notes are unchanged (0010).
+
 ## Receipt printing and the new receipt look (2026-10-17)
 
 **In plain words:** receipts no longer come out as blank pages on printers that do not speak the thermal-printer language. In **Settings → Devices → Receipt printer** choose **Any printer (Windows driver)** for an A4 printer or such a receipt printer. The receipt has a new look after the owner's sample: an Item / Amount table with a separator between items, a large total and a "Paid" box.

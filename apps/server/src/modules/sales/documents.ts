@@ -57,20 +57,40 @@ export async function defaultBranch(db: Db): Promise<bigint> {
   return row.id;
 }
 
-/** The customer's details as printed on the document (the TRN is set by the database at issue). */
-export async function billTo(db: Db, customerId: bigint) {
+/**
+ * The customer's details as printed on the document (the TRN is set by the database at issue).
+ * An address typed on an A4 invoice is printed; for the walk-in cash customer, the typed name too
+ * (decision 0071).
+ */
+export async function billTo(
+  db: Db,
+  customerId: bigint,
+  typed: { billToName?: string | null | undefined; billToAddress?: string | null | undefined } = {},
+) {
   const c = await db
     .selectFrom('md.customers')
-    .select(['id', 'name', 'name_alt', 'phone', 'address_line', 'area', 'city', 'is_active'])
+    .select([
+      'id',
+      'name',
+      'name_alt',
+      'phone',
+      'address_line',
+      'area',
+      'city',
+      'is_active',
+      'is_walk_in',
+    ])
     .where('id', '=', customerId)
     .executeTakeFirst();
   if (!c || !c.is_active) throw fieldError('customerId', 'unknown');
   const address = [c.address_line, c.area, c.city].filter(Boolean).join('، ');
+  const walkIn = c.is_walk_in;
   return {
-    bill_to_name: c.name,
-    bill_to_name_alt: c.name_alt,
+    bill_to_name: (walkIn && typed.billToName) || c.name,
+    bill_to_name_alt: walkIn && typed.billToName ? null : c.name_alt,
     bill_to_phone: c.phone,
-    bill_to_address: address === '' ? null : address,
+    // An address typed on the invoice wins (a customer without one on file, decision 0071).
+    bill_to_address: typed.billToAddress || (address === '' ? null : address),
   };
 }
 
@@ -199,7 +219,7 @@ export async function saveInvoiceDraft(
   const header = {
     customer_id: customerId,
     business_line_id: businessLineId,
-    ...(await billTo(trx, customerId)),
+    ...(await billTo(trx, customerId, body)),
     issue_date: body.issueDate ?? null,
     supply_date: body.supplyDate ?? null,
     due_date: body.dueDate ?? null,

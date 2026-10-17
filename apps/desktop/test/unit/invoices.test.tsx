@@ -535,12 +535,13 @@ describe('Invoices (A4): a new invoice', () => {
       ok({ customers: [WALK_IN, CUSTOMER], total: 2, counts: { active: 2, vatRegistered: 1 } }),
     );
     await signIn(bridge, 'New tax invoice');
-    // The cash customer is chosen by default (simplified invoice).
+    // The cash customer is chosen by default; an A4 invoice is a full tax invoice (0071), so
+    // their real name and address are typed on it.
     const chosen = await screen.findByRole('group', { name: 'Customer' });
     expect(await within(chosen).findByText('Cash customer')).toBeTruthy();
-    expect(
-      screen.getByText('The customer is not VAT-registered: a simplified tax invoice.'),
-    ).toBeTruthy();
+    expect(screen.getByText(/A4 invoices are full tax invoices/)).toBeTruthy();
+    expect(screen.getByLabelText('Customer name on the invoice')).toBeTruthy();
+    expect(screen.getByLabelText('Customer address on the invoice')).toBeTruthy();
 
     // The items list opens on focus, before anything is typed.
     fireEvent.focus(screen.getByRole('searchbox', { name: /Search items/ }));
@@ -598,6 +599,8 @@ describe('Invoices (A4): a new invoice', () => {
     await screen.findByText('Draft saved.');
     expect(bridge.callsTo('PUT', '/api/v1/sales/invoices/300')[0]!.body).toEqual({
       customerId: '20',
+      // The address shown on the draft is the one printed (0071).
+      billToAddress: 'Al Jimi, Al Ain',
       docDiscountFils: '500',
       lines: [{ itemId: '10', quantityMilli: '2000', lineDiscountFils: '2500' }],
       deductions: [{ advanceDocumentId: '201' }],

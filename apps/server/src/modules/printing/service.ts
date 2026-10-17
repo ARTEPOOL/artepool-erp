@@ -118,7 +118,6 @@ export async function documentHtml(
     .leftJoin('auth.users as s', 's.id', 'd.salesperson_id')
     .select([
       'd.seller_snapshot',
-      'd.print_template_version_id',
       'o.issue_date as original_date',
       's.display_name_ar',
       's.display_name_en',
@@ -128,7 +127,8 @@ export async function documentHtml(
   const { seller: current, logo } = await company(db);
   const seller = (extra.seller_snapshot as Seller | null) ?? current;
   const kind: DesignedKind = d.docType === 'credit_note' ? 'credit_note_a4' : 'tax_invoice_a4';
-  const settings = await settingsOf(db, extra.print_template_version_id, kind);
+  // Reprints use today's design; the data, number and seller stay as issued (decision 0071).
+  const settings = await settingsOf(db, null, kind);
   const deductions = d.lines.filter((l) => l.lineKind === 'advance_deduction');
   const items = d.lines.filter((l) => l.lineKind !== 'advance_deduction');
   const before = items.reduce(
@@ -224,17 +224,11 @@ export async function quotationHtml(db: Db, id: bigint): Promise<{ html: string;
   const extra = await db
     .selectFrom('sales.quotations as q')
     .leftJoin('auth.users as s', 's.id', 'q.salesperson_id')
-    .select([
-      'q.print_template_version_id',
-      'q.bill_to_address',
-      'q.bill_to_phone',
-      's.display_name_ar',
-      's.display_name_en',
-    ])
+    .select(['q.bill_to_address', 'q.bill_to_phone', 's.display_name_ar', 's.display_name_en'])
     .where('q.id', '=', id)
     .executeTakeFirstOrThrow();
   const { seller, logo } = await company(db);
-  const settings = await settingsOf(db, extra.print_template_version_id, 'quotation_a4');
+  const settings = await settingsOf(db, null, 'quotation_a4');
   const number = q.revision > 1 ? `${q.docNumber}/${q.revision}` : q.docNumber;
   const doc: PrintDocument = {
     kind: 'quotation',
@@ -296,13 +290,8 @@ export async function receiptHtml(db: Db, id: bigint): Promise<{ html: string; n
     .select(['name', 'trn', 'phone'])
     .where('id', '=', BigInt(p.customerId))
     .executeTakeFirstOrThrow();
-  const extra = await db
-    .selectFrom('sales.payments')
-    .select('print_template_version_id')
-    .where('id', '=', id)
-    .executeTakeFirstOrThrow();
   const { seller, logo } = await company(db);
-  const settings = await settingsOf(db, extra.print_template_version_id, 'tax_invoice_a4');
+  const settings = await settingsOf(db, null, 'tax_invoice_a4');
   const doc: PrintDocument = {
     kind: 'receipt',
     number: p.docNumber,

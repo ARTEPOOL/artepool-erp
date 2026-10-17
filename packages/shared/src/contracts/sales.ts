@@ -185,6 +185,12 @@ export const SaveInvoiceRequest = z.object({
   quotationId: IdText.optional(),
   /** The customer's own purchase order number (decision 0066). */
   customerPo: OptionalText(50),
+  /**
+   * Printed on the full tax invoice (decision 0071): the address for any customer (else the one
+   * on file), the name for the walk-in cash customer only.
+   */
+  billToName: OptionalText(200),
+  billToAddress: OptionalText(500),
   notes: OptionalText(2000),
   internalNote: OptionalText(2000),
   docDiscountFils: NonNegativeIntText.optional(),

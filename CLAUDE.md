@@ -45,7 +45,8 @@ It runs client–server on the local network: PostgreSQL and the API service on 
 
 **VAT and invoices**
 - **VAT** is calculated per line, and the invoice VAT is the sum of the line VAT. It is shown per line and in the total. Every customer pays VAT; the rate comes from the item's VAT category (standard 5%). (0009)
-- **Invoice format** follows the customer's VAT registration: not registered → simplified tax invoice; registered → full tax invoice with the customer's TRN. (0010)
+- **Invoice format** follows the customer's VAT registration at the POS: not registered → simplified tax invoice; registered → full tax invoice with the customer's TRN. (0010)
+- **A4 invoices (INV-) are always full tax invoices**: name and address (saved or typed on the invoice; the cash customer's real name typed), TRN only when registered. Advance invoices and debit notes follow 0010. (0071)
 - **Numbering:**
   - `POS-` for POS sales; `INV-` for A4 invoices and advance/progress payment tax invoices. Both are gapless.
   - Credit notes, receipts and the rest each have their own series.
@@ -89,7 +90,7 @@ It runs client–server on the local network: PostgreSQL and the API service on 
 - **Card:** amount + terminal approval code only; never any card digits. (0061)
 - **Receipt** in Arabic and English; cash customer by default, a VAT-registered customer → full invoice with TRN. (0062)
 - **Printing:** the POS prints thermal receipts silently. The "Invoices (A4)" section prints through the print dialog. A POS sale can be reprinted in A4 with the same number. (0008)
-- **Print designer:** the owner customises print templates (logo, colour, language, optional fields, texts, margins) in Settings → Print designer. Tax-required fields are locked (list per document type in 0064, pending accountant review); seller address on every tax invoice and customer address on full tax invoices are locked, and a full tax invoice is refused without the customer's address. Receipts and statements use the A4 invoice design; the thermal receipt's language is set there too. Templates are versioned; each document stores its template version and reprints with it. No QR code until e-invoicing. (0020, 0064, 0067)
+- **Print designer:** the owner customises print templates (logo, colour, language, optional fields, texts, margins) in Settings → Print designer. Tax-required fields are locked (list per document type in 0064, pending accountant review); seller address on every tax invoice and customer address on full tax invoices are locked, and a full tax invoice is refused without the customer's address. Receipts and statements use the A4 invoice design; the thermal receipt's language is set there too. Templates are versioned; each document stores its template version, but a reprint uses today's design (content unchanged, 0071). No QR code until e-invoicing. (0020, 0064, 0067)
 - **Bank accounts:** several per company (bank, account name, UAE IBAN with checksum, optional SWIFT), owner only, audited; the template chooses which one prints. (0065)
 - **Customer PO number:** optional on A4 invoices and quotations; prints only when filled. (0066)
 - **Fonts:** GE SS TV for Arabic letters only (screens, A4, receipt); digits and English never use it (it draws Arabic-Indic digits); Tw Cen MT Condensed Extra Bold for English headings only (`--font-heading`); body English and digits stay IBM Plex Sans Arabic. Files in `assets/fonts/`. (0068)

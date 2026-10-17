@@ -24,7 +24,6 @@ export async function receiptData(db: Db, documentId: bigint): Promise<ReceiptDa
       'd.status',
       'd.seller_snapshot',
       'd.print_count',
-      'd.print_template_version_id',
       'dev.code as device_code',
       'u.display_name_ar',
       'u.display_name_en',
@@ -88,7 +87,8 @@ export async function receiptData(db: Db, documentId: bigint): Promise<ReceiptDa
     deviceCode: d.device_code,
     printCount: d.print_count,
     markCopies: markCopies?.v ?? true,
-    template: await settingsOf(db, d.print_template_version_id, 'receipt_thermal'),
+    // Today's receipt design, also for a reprint (decision 0071).
+    template: await settingsOf(db, null, 'receipt_thermal'),
   };
 }
 

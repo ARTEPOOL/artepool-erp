@@ -779,6 +779,7 @@ describe('A4 cash taken on the drawer (decision 0063)', () => {
         name: 'Villa owner',
         isVatRegistered: false,
         phone: `050 ${phone}`,
+        addressLine: 'Falaj Hazza',
       }),
       201,
     );

@@ -293,7 +293,7 @@ describe('the print designer (decisions 0020, 0064)', () => {
 });
 
 describe('printed documents (decisions 0064, 0066)', () => {
-  it('a full tax invoice prints the customer address and PO; the stored version reprints unchanged', async () => {
+  it('a full tax invoice prints the customer address and PO; a reprint uses today’s design (0071)', async () => {
     const c = await customer('Villa Contracting', {
       trn: '100555666700003',
       address: 'Falaj Hazza, Al Ain',
@@ -321,9 +321,11 @@ describe('printed documents (decisions 0064, 0066)', () => {
     const first = await documentHtml(server.db, BigInt(issued.id));
     expect(first.html).toContain('Falaj Hazza, Al Ain');
     expect(first.html).toContain('PO-77');
-    // A new design later does not change how this invoice reprints.
+    // A reprint follows today's design (0071); the stored version stays for the record.
     await save('tax_invoice_a4', (s) => ({ ...s, fields: { ...s.fields, poNumber: false } }));
-    expect((await documentHtml(server.db, BigInt(issued.id))).html).toContain('PO-77');
+    const reprint = (await documentHtml(server.db, BigInt(issued.id))).html;
+    expect(reprint).not.toContain('PO-77');
+    expect(reprint).toContain('Falaj Hazza, Al Ain');
   });
 
   it('a full tax invoice for a customer without an address is refused at issue', async () => {

@@ -1723,9 +1723,10 @@ Migrations are written **in build order** (milestones in [`phase-1-plan.md`](pha
 | 0022 | `cash_events` | M5 | `cash.movements`, `cash.drawer_events`, `cash.variance_acceptances`, `cash.expected_cash()`, count other amount, 0.10/0.05 coins, cash alert settings, cashier 5% discount | `gl.journal_entries.cash_movement_id`, `shift_id` |
 | 0023 | `print_designer` | M4b | `sys.company_bank_accounts`, `sys.valid_uae_iban()`, `customer_po` on documents and quotations, the full-invoice address rule, the current-template rule, receipts stamped with the invoice template, the receipt language into its template | — |
 | 0024 | `stuck_shifts` | M5 fix | `shifts.force_close`, closing a stuck shift from another PC, moving a drawer to a re-enrolled PC, no revoking a PC with an open shift (0069) | — |
-| 0025 | `ops_backup` | M6 | `ops.backup_runs`, `ops.integrity_runs` + backup role grants | — |
+| 0025 | `a4_full_invoices` | M4 fix | A4 invoices always full tax invoices; the cash customer's typed name required (0071) | — |
+| 0026 | `ops_backup` | M6 | `ops.backup_runs`, `ops.integrity_runs` + backup role grants | — |
 
-After 0025, a final check asserts that every business table has the audit trigger, the no-delete guard and the expected grants. The same check runs as an automated test.
+After 0026, a final check asserts that every business table has the audit trigger, the no-delete guard and the expected grants. The same check runs as an automated test.
 
 ---
 
