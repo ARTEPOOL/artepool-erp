@@ -5,7 +5,7 @@
  * note, and receiving a payment (in the Receipts section).
  */
 import { useState, type ReactNode } from 'react';
-import { FileMinus, FilePlus, Printer, Wallet } from 'lucide-react';
+import { Ban, FileMinus, FilePlus, Pencil, Printer, Wallet } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { formatQuantity } from '@artepool/shared';
@@ -15,6 +15,7 @@ import { formatDate, formatDateTime } from '../../lib/format';
 import {
   Button,
   Card,
+  Chip,
   CardHeader,
   cx,
   DefinitionList,
@@ -30,6 +31,7 @@ import { fetchPdf, SALES_KEYS, SALES_PATHS } from '../sales/api';
 import { TotalsBox } from '../sales/LineEditor';
 import { printPdf } from '../sales/print';
 import salesStyles from '../sales/sales.module.css';
+import { CancelInvoiceDialog } from './CancelInvoiceDialog';
 import { NoteDialog } from './NoteDialog';
 import { FormatChip, SettlementChip, StatusChip } from './parts';
 import styles from './invoices.module.css';
@@ -260,6 +262,7 @@ export function DocumentView({ doc }: { doc: DocumentDetail }) {
   const navigate = useNavigate();
   const toast = useToast();
   const [note, setNote] = useState<'credit_note' | 'debit_note' | null>(null);
+  const [cancelling, setCancelling] = useState<'cancel' | 'edit' | null>(null);
   const issued = doc.status === 'issued';
   const dueFils = BigInt(doc.totalFils) - BigInt(doc.settledFils);
   const isInvoice = doc.docType === 'invoice';
@@ -268,6 +271,15 @@ export function DocumentView({ doc }: { doc: DocumentDetail }) {
   const canCredit =
     issued && can('invoices.create') && (isInvoice || (isAdvance && advanceLeft > 0n));
   const canDebit = issued && isInvoice && can('invoices.create') && can('invoices.issue');
+  // Decision 0072: an issued A4 invoice is cancelled, or cancelled and copied to edit it.
+  const canCancel =
+    issued &&
+    isInvoice &&
+    doc.channel === 'office' &&
+    can('invoices.create') &&
+    !doc.hasNotes &&
+    !doc.cancelledBy &&
+    !doc.lines.some((l) => l.lineKind === 'advance_deduction');
   const canReceive =
     issued &&
     can('payments.receive') &&
@@ -290,6 +302,13 @@ export function DocumentView({ doc }: { doc: DocumentDetail }) {
         <span className={styles.chips}>
           <StatusChip status={doc.status} />
           {issued && <SettlementChip status={doc.settlementStatus} />}
+          {doc.cancelledBy && (
+            <Chip tone="danger">
+              {t(doc.cancelledBy.edited ? 'cancel.replacedBy' : 'cancel.cancelledBy', {
+                number: doc.cancelledBy.docNumber,
+              })}
+            </Chip>
+          )}
         </span>
       ),
     },
@@ -399,11 +418,39 @@ export function DocumentView({ doc }: { doc: DocumentDetail }) {
                 {t('notes.creditButton')}
               </Button>
             )}
+            {canCancel && (
+              <Button onPress={() => setCancelling('edit')}>
+                <Pencil className={iconClass.sm} aria-hidden="true" />
+                {t('cancel.editButton')}
+              </Button>
+            )}
+            {canCancel && (
+              <Button variant="dangerGhost" onPress={() => setCancelling('cancel')}>
+                <Ban className={iconClass.sm} aria-hidden="true" />
+                {t('cancel.cancelButton')}
+              </Button>
+            )}
             {doc.status !== 'discarded' && <PrintButton doc={doc} />}
           </div>
         </div>
       </Card>
 
+      {cancelling && (
+        <CancelInvoiceDialog
+          doc={doc}
+          mode={cancelling}
+          onClose={() => setCancelling(null)}
+          onDone={(result) => {
+            setCancelling(null);
+            toast(t('cancel.done', { number: result.creditNote.docNumber ?? '' }));
+            if (result.draftId)
+              void navigate({
+                to: '/invoices/$documentId',
+                params: { documentId: result.draftId },
+              });
+          }}
+        />
+      )}
       {note && (
         <NoteDialog
           kind={note}

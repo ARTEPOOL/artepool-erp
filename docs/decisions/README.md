@@ -78,6 +78,7 @@ There is one short file per decision, numbered in order.
 | [0069](0069-stuck-shifts.md) | Stuck shifts: close from another PC; the drawer moves with its PC; no revoking a PC with an open shift | Accepted |
 | [0070](0070-receipt-printer-modes-and-layout.md) | Receipt printer: ESC/POS or any printer through its Windows driver; the new receipt look with a separator between items | Accepted |
 | [0071](0071-a4-invoices-full-and-reprints-current-design.md) | A4 invoices are always full tax invoices (cash customer's name and address typed); reprints use today's design | Accepted (pending accountant review) |
+| [0072](0072-cancel-or-edit-issued-invoice.md) | Cancel or edit an issued A4 invoice with the owner's approval: a full credit note, refund at once, a new draft for edits | Accepted |
 
 ## Template
 

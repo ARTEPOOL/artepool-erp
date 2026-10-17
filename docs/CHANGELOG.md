@@ -1,5 +1,11 @@
 # Changelog
 
+## Cancel or edit an issued A4 invoice (2026-10-17)
+
+**In plain words:** an issued A4 invoice now has **Edit invoice** and **Cancel invoice** buttons. The invoice itself never changes, as the tax law requires. A credit note cancels all of it: the goods go back to stock, the VAT is reversed and the money paid is refunded at once. "Edit" then opens a new draft copied from it, where you change the customer or the items and issue it with a new number. Only the owner does it, or approves it for someone else, always with a reason.
+
+- **Decision 0072**; migration 0026 (`invoices.cancel`, owner only; two credit-note reasons).
+
 ## A4 invoices: always full tax invoices; reprints in today's design (2026-10-17)
 
 **In plain words:** every A4 invoice now says **"Tax Invoice"**, also for customers who are not VAT-registered. A4 invoices need the customer's name and address: the address comes from the customer or is typed on the invoice, and the cash customer's real name is typed there too. Reprinting an old invoice uses today's colours and layout; its contents never change. On the A4 page the English company name now lines up with the Arabic one, and the total payable is black.

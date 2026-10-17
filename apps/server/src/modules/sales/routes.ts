@@ -7,6 +7,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { FilePayload, SalesPaymentMethod } from '@artepool/shared/contracts';
 import {
+  CancelInvoiceRequest,
   CreateNoteRequest,
   DiscardRequest,
   DocumentsQuery,
@@ -26,6 +27,7 @@ import {
 import { defineRoute, defineWrite } from '../../platform/http/route';
 import { requireAlso } from '../../platform/permissions';
 import * as documents from './documents';
+import { cancelInvoice } from './cancel';
 import { createNote, creditWholeAdvance } from './notes';
 import * as payments from './payments';
 import * as quotations from './quotations';
@@ -173,6 +175,18 @@ export function registerSalesRoutes(app: FastifyInstance): void {
       await documents.discardDocument(trx, BigInt(params.id), body.rowVersion);
       return { body: await documents.getDocument(trx, BigInt(params.id)) };
     },
+  });
+  // Decision 0072: the owner's permission, or the owner's approval checked inside.
+  defineWrite(app, {
+    method: 'POST',
+    url: '/api/v1/sales/documents/:id/cancel',
+    access: allow('invoices.view'),
+    params: Params,
+    body: CancelInvoiceRequest,
+    reason: ({ body }) => body.reason,
+    handler: async ({ trx, request, params, body }) => ({
+      body: await cancelInvoice(trx, request, BigInt(params.id), body),
+    }),
   });
   defineWrite(app, {
     method: 'POST',

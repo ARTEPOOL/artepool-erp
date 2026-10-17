@@ -256,6 +256,27 @@ export const CreateNoteRequest = z.object({
 });
 export type CreateNoteRequest = z.infer<typeof CreateNoteRequest>;
 
+/**
+ * Cancel an issued A4 invoice, or cancel it to edit it (decision 0072): a credit note for the
+ * whole invoice, the paid money refunded at once, and for "edit" a new draft copied from it.
+ * The owner's permission, or the owner's approval.
+ */
+export const CancelInvoiceRequest = z.object({
+  mode: z.enum(['cancel', 'edit']),
+  reason: Reason,
+  approvalId: IdText.optional(),
+  /** How the paid amount goes back; together exactly what the customer paid. */
+  refund: z.array(PaymentPart).max(10).optional(),
+  rowVersion: RowVersion,
+});
+export type CancelInvoiceRequest = z.infer<typeof CancelInvoiceRequest>;
+
+export interface CancelInvoiceResponse {
+  creditNote: DocumentDetail;
+  /** The new draft to edit ("edit" only). */
+  draftId: string | null;
+}
+
 export const DocumentsQuery = z.object({
   q: z.string().trim().max(100).optional(),
   docType: z.enum(DOC_TYPES).optional(),
@@ -320,6 +341,10 @@ export interface DocumentDetail extends DocumentItem {
   }[];
   /** The payment invoices of the same customer that can still be deducted (draft invoices). */
   deductible?: DocumentItem[];
+  /** Issued invoices: any credit or debit note already issued against it. */
+  hasNotes?: boolean;
+  /** Cancelled (or replaced by an edit) with the owner's approval (decision 0072). */
+  cancelledBy?: { id: string; docNumber: string; edited: boolean } | null;
 }
 
 export interface DocumentsResponse {

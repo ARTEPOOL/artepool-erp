@@ -11,6 +11,7 @@ import { sql } from 'kysely';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { computeLine } from '@artepool/shared';
 import type {
+  CancelInvoiceResponse,
   CustomerBalance,
   CustomerDetail,
   DocumentDetail,
@@ -51,6 +52,7 @@ let clerk: Actor;
 let clerkId: bigint;
 let clerkPc: TestDevice;
 let accountantId: bigint;
+let ownerId: bigint;
 const ids: Record<string, string> = {};
 let phone = 1_000_000;
 
@@ -161,7 +163,7 @@ async function entryOf(doc: { journalEntryId: string | null }) {
   return out;
 }
 
-async function approval(permission: string) {
+async function approval(permission: string, approver?: bigint) {
   return withBusinessTx(
     server.db,
     { userId: clerkId, deviceId: clerkPc.id, requestId: randomUUID() },
@@ -170,7 +172,7 @@ async function approval(permission: string) {
         await sql<{
           id: string;
         }>`INSERT INTO auth.approvals (permission_code, approved_by, reason_text)
-                                  VALUES (${permission}, ${accountantId}, 'Approved at the counter')
+                                  VALUES (${permission}, ${approver ?? accountantId}, 'Approved at the counter')
                                   RETURNING id::text`.execute(trx)
       ).rows[0]!.id,
   );
@@ -184,7 +186,7 @@ if (process.env.ARTEPOOL_E2E_CHROMIUM)
 beforeAll(async () => {
   server = await startTestServer();
   const office = await addDevice(server, { code: 'OFFICE-01' });
-  const ownerId = await addOwner(server);
+  ownerId = await addOwner(server);
   owner = actor(
     office,
     (await openSession(server, { userId: ownerId, deviceId: office.id, method: 'password_totp' }))
@@ -956,5 +958,104 @@ describe('fixes from the M4 screens review', () => {
     );
     expect(note).toMatchObject({ netFils: '10000', vatFils: '500', totalFils: '10500' });
     expect(note.lines[0]).toMatchObject({ listPrice4dp: '1000000', priceIncludesVat: false });
+  });
+});
+
+describe('cancelling or editing an issued A4 invoice (decision 0072)', () => {
+  it('the owner cancels a paid invoice: a credit note for all of it, stock back, cash refunded', async () => {
+    const cust = await customer('Cancel me');
+    const pump = await item('CANCEL-PUMP', 'stock', '1000000');
+    await openingStock(pump.id, '5000', '600000');
+    const d = await draft(owner, {
+      customerId: cust,
+      lines: [{ itemId: pump.id, quantityMilli: '2000' }],
+    });
+    const issued = await ok<DocumentDetail>(issue(owner, d, { payments: [cash('21000')] }));
+    // The whole paid amount goes back, no more and no less.
+    expect(
+      await refusal(
+        owner('POST', `/api/v1/sales/documents/${issued.id}/cancel`, {
+          mode: 'cancel',
+          reason: 'Customer changed their mind',
+          refund: [cash('10000')],
+          rowVersion: issued.rowVersion,
+        }),
+      ),
+    ).toMatchObject({ code: 'VALIDATION_FAILED' });
+    const result = await ok<CancelInvoiceResponse>(
+      owner('POST', `/api/v1/sales/documents/${issued.id}/cancel`, {
+        mode: 'cancel',
+        reason: 'Customer changed their mind',
+        refund: [cash('21000')],
+        rowVersion: issued.rowVersion,
+      }),
+    );
+    expect(result.draftId).toBeNull();
+    expect(result.creditNote).toMatchObject({ docType: 'credit_note', totalFils: '21000' });
+    expect(result.creditNote.docNumber).toMatch(/^CN-/);
+    const after = await ok<DocumentDetail>(owner('GET', `/api/v1/sales/documents/${issued.id}`));
+    expect(after.status).toBe('issued'); // never changed, never deleted
+    expect(after.cancelledBy).toMatchObject({
+      docNumber: result.creditNote.docNumber,
+      edited: false,
+    });
+    const stock = await ok<ItemStockResponse>(owner('GET', `/api/v1/items/${pump.id}/stock`));
+    expect(stock.balances[0]).toMatchObject({ quantityMilli: '5000' });
+    const balance = await ok<{ balanceFils: string }>(
+      owner('GET', `/api/v1/customers/${cust}/balance`),
+    );
+    expect(balance.balanceFils).toBe('0');
+    // Only once.
+    expect(
+      await refusal(
+        owner('POST', `/api/v1/sales/documents/${issued.id}/cancel`, {
+          mode: 'cancel',
+          reason: 'Again',
+          rowVersion: after.rowVersion,
+        }),
+      ),
+    ).toMatchObject({ rule: 'INVOICE_HAS_NOTES' });
+  });
+
+  it('someone else needs the owner’s approval; editing opens a new draft copied from it', async () => {
+    const cust = await customer('Edit me', { credit: '10000000' });
+    const svc = await item('EDIT-SVC', 'service', '1000000');
+    const d = await draft(clerk, {
+      customerId: cust,
+      customerPo: 'PO-9',
+      lines: [{ itemId: svc.id, quantityMilli: '3000' }],
+    });
+    const issued = await ok<DocumentDetail>(issue(accountant, d));
+    const body = { mode: 'edit', reason: 'Wrong quantity', rowVersion: issued.rowVersion };
+    expect(
+      await refusal(clerk('POST', `/api/v1/sales/documents/${issued.id}/cancel`, body)),
+    ).toMatchObject({ code: 'PERMISSION_DENIED' });
+    // The accountant cannot approve it: the permission is the owner's.
+    await expect(approval('invoices.cancel')).rejects.toBeTruthy();
+    const approved = await approval('invoices.cancel', ownerId);
+    const result = await ok<CancelInvoiceResponse>(
+      clerk('POST', `/api/v1/sales/documents/${issued.id}/cancel`, {
+        ...body,
+        approvalId: approved,
+      }),
+    );
+    expect(result.creditNote.totalFils).toBe(issued.totalFils);
+    const copy = await ok<DocumentDetail>(
+      owner('GET', `/api/v1/sales/documents/${result.draftId}`),
+    );
+    expect(copy).toMatchObject({
+      status: 'draft',
+      docNumber: null,
+      customerId: cust,
+      customerPo: 'PO-9',
+    });
+    expect(copy.lines.map((l) => l.quantityMilli)).toEqual(['3000']);
+    const original = await ok<DocumentDetail>(owner('GET', `/api/v1/sales/documents/${issued.id}`));
+    expect(original.cancelledBy).toMatchObject({ edited: true });
+    // The unpaid invoice was settled by the credit note: nothing is owed.
+    const balance = await ok<{ balanceFils: string }>(
+      owner('GET', `/api/v1/customers/${cust}/balance`),
+    );
+    expect(balance.balanceFils).toBe('0');
   });
 });

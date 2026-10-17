@@ -784,8 +784,25 @@ export async function getDocument(db: Db, id: bigint): Promise<DocumentDetail> {
     .where('a.invoice_id', '=', id)
     .orderBy('n.id')
     .execute();
+  const notes = await db
+    .selectFrom('sales.documents as n')
+    .leftJoin('sys.reason_codes as r', 'r.id', 'n.reason_code_id')
+    .select(['n.id', 'n.doc_number', 'r.code'])
+    .where('n.original_document_id', '=', id)
+    .where('n.status', '=', 'issued')
+    .orderBy('n.id')
+    .execute();
+  const cancel = notes.find((n) => n.code === 'INVOICE_CANCELLED' || n.code === 'INVOICE_EDITED');
   const detail: DocumentDetail = {
     ...documentItem(row),
+    hasNotes: notes.length > 0,
+    cancelledBy: cancel
+      ? {
+          id: cancel.id.toString(),
+          docNumber: cancel.doc_number ?? '',
+          edited: cancel.code === 'INVOICE_EDITED',
+        }
+      : null,
     businessLineId: row.business_line_id.toString(),
     billToName: row.bill_to_name,
     billToNameAlt: row.bill_to_name_alt,
