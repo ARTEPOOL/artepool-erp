@@ -6,7 +6,6 @@
  */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { MoneyFormatError, parseFils } from '@artepool/shared';
 import type { CountResult, PosState, ShiftReport } from '@artepool/shared/contracts';
 import { useSave } from '../../../api/hooks';
 import { Alert, Button, cx, Dialog, DialogFooter, Note, TextField } from '../../../ui';
@@ -14,12 +13,8 @@ import { useErrorText } from '../../auth/context';
 import { ApprovalDialog } from '../../masterdata/ApprovalDialog';
 import { money } from '../../masterdata/format';
 import { POS_INVALIDATE, POS_PATHS } from '../api';
+import { CountFields, useCountForm } from './CountFields';
 import styles from '../pos.module.css';
-
-type Counts = Record<string, string>;
-
-const readCount = (text: string): number | null =>
-  text.trim() === '' ? 0 : /^\d{1,6}$/.test(text.trim()) ? Number(text.trim()) : null;
 
 export function CloseShiftDialog(props: {
   state: PosState;
@@ -28,8 +23,6 @@ export function CloseShiftDialog(props: {
 }) {
   const { t } = useTranslation('pos');
   const errorText = useErrorText();
-  const [counts, setCounts] = useState<Counts>({});
-  const [other, setOther] = useState('');
   const [result, setResult] = useState<CountResult | null>(null);
   const [recounting, setRecounting] = useState(false);
   const [approving, setApproving] = useState(false);
@@ -37,32 +30,14 @@ export function CloseShiftDialog(props: {
   const [problem, setProblem] = useState<string | null>(null);
 
   const denominations = props.state.denominations;
-  const otherFils = (() => {
-    try {
-      return other.trim() === '' ? 0n : parseFils(other.trim());
-    } catch (e) {
-      if (e instanceof MoneyFormatError) return null;
-      throw e;
-    }
-  })();
-  const total = denominations.reduce((sum, d) => {
-    const n = readCount(counts[d.id] ?? '');
-    return n === null ? sum : sum + BigInt(d.valueFils) * BigInt(n);
-  }, otherFils ?? 0n);
-  const invalid =
-    otherFils === null ||
-    otherFils < 0n ||
-    denominations.some((d) => readCount(counts[d.id] ?? '') === null);
+  const form = useCountForm(denominations);
 
   const count = useSave(
     (api, body: { recount: boolean; approvalId?: string }, key) =>
       api.post<CountResult>(
         body.recount ? POS_PATHS.recount : POS_PATHS.count,
         {
-          lines: denominations
-            .map((d) => ({ denominationId: d.id, quantity: readCount(counts[d.id] ?? '') ?? 0 }))
-            .filter((l) => l.quantity > 0),
-          otherAmountFils: (otherFils ?? 0n).toString(),
+          ...form.body(),
           ...(body.approvalId ? { approvalId: body.approvalId } : {}),
         },
         { idempotencyKey: key },
@@ -85,7 +60,7 @@ export function CloseShiftDialog(props: {
   const counting = result === null || recounting;
   const saveCount = (approvalId?: string) => {
     setProblem(null);
-    if (invalid) return setProblem(t('closeShift.invalid'));
+    if (form.invalid) return setProblem(t('closeShift.invalid'));
     count.mutate(
       { recount: recounting, ...(approvalId ? { approvalId } : {}) },
       { onError: (e) => setProblem(errorText(e)) },
@@ -103,49 +78,7 @@ export function CloseShiftDialog(props: {
         {counting ? (
           <div className={styles.payForm}>
             <Note>{t('closeShift.blindHelp')}</Note>
-            <div className={styles.countGrid}>
-              {(['note', 'coin'] as const).map((kind) => (
-                <div key={kind} className={styles.countGroup}>
-                  <h3>{t(`closeShift.${kind}s`)}</h3>
-                  {denominations
-                    .filter((d) => d.kind === kind)
-                    .map((d) => {
-                      const n = readCount(counts[d.id] ?? '');
-                      return (
-                        <div key={d.id} className={styles.countRow}>
-                          <bdi className={styles.countValue}>{money(BigInt(d.valueFils))}</bdi>
-                          <input
-                            className={cx(styles.qtyInput, n === null && styles.bad)}
-                            inputMode="numeric"
-                            aria-label={t('closeShift.countOf', {
-                              value: money(BigInt(d.valueFils)),
-                            })}
-                            value={counts[d.id] ?? ''}
-                            onChange={(e) => setCounts({ ...counts, [d.id]: e.target.value })}
-                          />
-                          <bdi className={styles.countAmount}>
-                            {n === null ? '—' : money(BigInt(d.valueFils) * BigInt(n))}
-                          </bdi>
-                        </div>
-                      );
-                    })}
-                </div>
-              ))}
-            </div>
-            <TextField
-              label={t('closeShift.other')}
-              value={other}
-              onChange={setOther}
-              inputMode="decimal"
-              ltr
-              hint={t('closeShift.otherHint')}
-            />
-            <div className={styles.change}>
-              <span>{t('closeShift.counted')}</span>
-              <b data-testid="count-total">
-                <bdi>{money(total)}</bdi>
-              </b>
-            </div>
+            <CountFields form={form} />
             {problem && <Alert>{problem}</Alert>}
             <DialogFooter>
               <Button onPress={props.onClose}>{t('cancel')}</Button>
@@ -196,8 +129,7 @@ export function CloseShiftDialog(props: {
               {result.canRecount && BigInt(result.varianceFils) !== 0n && (
                 <Button
                   onPress={() => {
-                    setCounts({});
-                    setOther('');
+                    form.reset();
                     setRecounting(true);
                   }}
                 >

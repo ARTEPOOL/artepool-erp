@@ -75,6 +75,7 @@ There is one short file per decision, numbered in order.
 | [0066](0066-customer-po-number.md) | Customer PO number on A4 invoices and quotations | Accepted |
 | [0067](0067-qr-code-deferred.md) | No QR code on printed documents until e-invoicing | Accepted |
 | [0068](0068-fonts.md) | The app's fonts: GE SS TV for Arabic, Tw Cen MT for English | Accepted |
+| [0069](0069-stuck-shifts.md) | Stuck shifts: close from another PC; the drawer moves with its PC; no revoking a PC with an open shift | Accepted |
 
 ## Template
 

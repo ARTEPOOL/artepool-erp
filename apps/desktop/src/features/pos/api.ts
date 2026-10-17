@@ -27,6 +27,7 @@ export const POS_PATHS = {
   shifts: '/api/v1/shifts',
   shift: (id: string) => `/api/v1/shifts/${id}`,
   accept: (id: string) => `/api/v1/shifts/${id}/accept-variance`,
+  forceClose: (id: string) => `/api/v1/shifts/${id}/force-close`,
   alerts: '/api/v1/shifts/alerts',
   movements: '/api/v1/shifts/current/movements',
   noSale: '/api/v1/shifts/current/no-sale',

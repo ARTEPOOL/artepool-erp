@@ -211,14 +211,14 @@ afterAll(() => server.close());
 
 describe('the POS PC and its shift (decisions 0004, 0021)', () => {
   it('a PC enrolled again under the same name gets a drawer of its own', async () => {
-    // The old enrollment made drawer REG-TWIN-PC, then was revoked.
+    // The old enrollment made drawer REG-TWIN-PC; its shift is closed, then the PC is revoked.
     const first = await addDevice(server, { code: 'TWIN-PC', kind: 'pos' });
     const oldCashier = await addUser(server, {
       username: 'cash.twin0',
       roles: ['cashier'],
       pin: '4829',
     });
-    await open(
+    const oldShift = await open(
       asActor(
         first,
         oldCashier,
@@ -226,17 +226,14 @@ describe('the POS PC and its shift (decisions 0004, 0021)', () => {
       ),
       '0',
     );
-    await withBusinessTx(
-      server.db,
-      { userId: owner.id, deviceId: owner.pc.id, requestId: randomUUID() },
-      (trx) =>
-        trx
-          .updateTable('auth.devices')
-          .set({ status: 'revoked', revoke_reason: 'Enrolled again' })
-          .where('id', '=', first.id)
-          .execute(),
+    await ok(
+      owner('POST', `/api/v1/shifts/${oldShift.id}/force-close`, {
+        ...countBody(0),
+        reason: 'PC replaced',
+      }),
     );
-    // The same PC enrolled again: opening a shift there works, on a drawer of its own.
+    await ok(owner('POST', `/api/v1/devices/${first.id}/revoke`, { reason: 'Enrolled again' }));
+    // The same PC enrolled again, before the drawer is moved: a drawer of its own, no clash.
     const again = await addDevice(server, { code: 'TWIN-PC', kind: 'pos' });
     const id = await addUser(server, { username: 'cash.twin', roles: ['cashier'], pin: '4829' });
     await open(
@@ -850,5 +847,118 @@ describe('A4 cash taken on the drawer (decision 0063)', () => {
     expect(
       (await ok<ShiftReport>(seller('GET', '/api/v1/shifts/current/x-report'))).expectedCashFils,
     ).toBe('20500');
+  });
+});
+
+describe('stuck shifts (decision 0069)', () => {
+  it('a PC with an open shift is not revoked; the owner closes the shift from another PC', async () => {
+    const cashier = await signedIn('cash.stuck', ['cashier']);
+    const shift = await open(cashier, '50000');
+    expect(
+      await refusal(
+        owner('POST', `/api/v1/devices/${cashier.pc.id}/revoke`, { reason: 'PC broken' }),
+      ),
+    ).toMatchObject({ rule: 'DEVICE_HAS_OPEN_SHIFT' });
+    // Not for a cashier; not on the shift's own PC; a reason is required.
+    const other = await signedIn('cash.other', ['cashier']);
+    expect(
+      (
+        await other('POST', `/api/v1/shifts/${shift.id}/force-close`, {
+          ...countBody(4),
+          reason: 'Stuck',
+        })
+      ).statusCode,
+    ).toBe(403);
+    expect(
+      (await owner('POST', `/api/v1/shifts/${shift.id}/force-close`, countBody(4))).statusCode,
+    ).toBe(422);
+    // The owner counts 450.00 of the expected 500.00: the 50.00 short stays the cashier's.
+    const safe = await balance('1120');
+    const report = await ok<ShiftReport>(
+      owner('POST', `/api/v1/shifts/${shift.id}/force-close`, {
+        ...countBody(4, '5000'),
+        reason: 'The PC was enrolled again',
+      }),
+    );
+    expect(report.shift.status).toBe('closed');
+    expect(report.varianceFils).toBe('-5000');
+    expect(await balance('1120')).toBe(safe + 45_000n);
+    const row = await server.db
+      .selectFrom('cash.shifts')
+      .select(['cashier_id', 'closed_by', 'force_closed_by', 'force_close_reason'])
+      .where('id', '=', BigInt(shift.id))
+      .executeTakeFirstOrThrow();
+    expect(row).toMatchObject({
+      cashier_id: cashier.id,
+      force_close_reason: 'The PC was enrolled again',
+    });
+    expect(row.force_closed_by).toBe(owner.id);
+    expect(row.closed_by).toBe(owner.id);
+    const listed = await ok<ShiftsResponse>(owner('GET', '/api/v1/shifts?status=closed'));
+    expect(listed.shifts.find((s) => s.id === shift.id)).toMatchObject({
+      forceCloseReason: 'The PC was enrolled again',
+      deviceRevoked: false,
+    });
+    // Once closed it stays closed; the PC may now be revoked.
+    expect(
+      await refusal(
+        owner('POST', `/api/v1/shifts/${shift.id}/force-close`, {
+          ...countBody(0),
+          reason: 'Again',
+        }),
+      ),
+    ).toMatchObject({ rule: 'SHIFT_NOT_OPEN' });
+    await ok(owner('POST', `/api/v1/devices/${cashier.pc.id}/revoke`, { reason: 'PC broken' }));
+  });
+
+  it('the owner moves a revoked PC’s drawer to the PC enrolled in its place', async () => {
+    const old = await signedIn('cash.move', ['cashier']);
+    const shift = await open(old, '0');
+    await ok(
+      owner('POST', `/api/v1/shifts/${shift.id}/force-close`, {
+        ...countBody(0),
+        reason: 'Moving',
+      }),
+    );
+    const oldDrawer = shift.registerCode;
+    // Only from a revoked PC.
+    const fresh = await addDevice(server, { code: `PC-NEW-${shift.id}`, kind: 'pos' });
+    expect(
+      await refusal(
+        owner('POST', `/api/v1/devices/${old.pc.id}/move-drawer`, {
+          targetDeviceId: fresh.id.toString(),
+          reason: 'Enrolled again',
+        }),
+      ),
+    ).toMatchObject({ rule: 'DRAWER_MOVE_INVALID' });
+    await ok(owner('POST', `/api/v1/devices/${old.pc.id}/revoke`, { reason: 'Enrolled again' }));
+    // Not by the accountant (devices are the owner's).
+    expect(
+      (
+        await accountant('POST', `/api/v1/devices/${old.pc.id}/move-drawer`, {
+          targetDeviceId: fresh.id.toString(),
+          reason: 'Enrolled again',
+        })
+      ).statusCode,
+    ).toBe(403);
+    await ok(
+      owner('POST', `/api/v1/devices/${old.pc.id}/move-drawer`, {
+        targetDeviceId: fresh.id.toString(),
+        reason: 'Enrolled again',
+      }),
+    );
+    // The same cashier opens the next shift on the new PC, on the old drawer.
+    const there = asActor(
+      fresh,
+      old.id,
+      (await openSession(server, { userId: old.id, deviceId: fresh.id })).token,
+    );
+    const next = await open(there, '0');
+    expect(next.registerCode).toBe(oldDrawer);
+    const devices = await ok<{ devices: { id: string; drawer: { code: string } | null }[] }>(
+      owner('GET', '/api/v1/devices'),
+    );
+    expect(devices.devices.find((d) => d.id === fresh.id.toString())?.drawer?.code).toBe(oldDrawer);
+    expect(devices.devices.find((d) => d.id === old.pc.id.toString())?.drawer).toBeNull();
   });
 });

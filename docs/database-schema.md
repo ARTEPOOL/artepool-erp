@@ -1270,6 +1270,8 @@ The money columns work exactly as in `sales.document_lines` (item lines only).
 | variance_note | text? | |
 | approval_id | bigint? → auth.approvals | Accepting a variance above threshold |
 | z_snapshot | jsonb? | Frozen totals per tender, VAT, discounts, refunds, no-sales, paid-in/out, drops, **both counts** |
+| force_closed_by | bigint? → auth.users | Closed from another PC as a stuck shift; set once by someone with `shifts.force_close` ([0069](decisions/0069-stuck-shifts.md)) |
+| force_close_reason | text? | Required with `force_closed_by` |
 | audit_anchor_seq | bigint? | |
 | audit_anchor_hash | bytea? | |
 | [std] | | |
@@ -1720,9 +1722,10 @@ Migrations are written **in build order** (milestones in [`phase-1-plan.md`](pha
 | 0021 | `no_adjustment_approval` | M4 | — (the adjustment approval limit setting is emptied, decision 0054) | — |
 | 0022 | `cash_events` | M5 | `cash.movements`, `cash.drawer_events`, `cash.variance_acceptances`, `cash.expected_cash()`, count other amount, 0.10/0.05 coins, cash alert settings, cashier 5% discount | `gl.journal_entries.cash_movement_id`, `shift_id` |
 | 0023 | `print_designer` | M4b | `sys.company_bank_accounts`, `sys.valid_uae_iban()`, `customer_po` on documents and quotations, the full-invoice address rule, the current-template rule, receipts stamped with the invoice template, the receipt language into its template | — |
-| 0024 | `ops_backup` | M6 | `ops.backup_runs`, `ops.integrity_runs` + backup role grants | — |
+| 0024 | `stuck_shifts` | M5 fix | `shifts.force_close`, closing a stuck shift from another PC, moving a drawer to a re-enrolled PC, no revoking a PC with an open shift (0069) | — |
+| 0025 | `ops_backup` | M6 | `ops.backup_runs`, `ops.integrity_runs` + backup role grants | — |
 
-After 0024, a final check asserts that every business table has the audit trigger, the no-delete guard and the expected grants. The same check runs as an automated test.
+After 0025, a final check asserts that every business table has the audit trigger, the no-delete guard and the expected grants. The same check runs as an automated test.
 
 ---
 

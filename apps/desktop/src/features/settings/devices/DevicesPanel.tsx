@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import {
+  ArrowRightLeft,
   Ban,
   CheckCircle2,
   Monitor,
@@ -33,6 +34,7 @@ import {
   iconClass,
   Note,
   Segmented,
+  SelectField,
   tableClasses,
   TextField,
   Tile,
@@ -83,6 +85,7 @@ export function DevicesPanel() {
   });
   const [shownCode, setShownCode] = useState<EnrollmentCodeResponse | null>(null);
   const [revoking, setRevoking] = useState<DeviceListItem | null>(null);
+  const [moving, setMoving] = useState<DeviceListItem | null>(null);
   const [editing, setEditing] = useState<DeviceListItem | null>(null);
   const [untrusting, setUntrusting] = useState<DeviceListItem | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -155,6 +158,17 @@ export function DevicesPanel() {
                               {t('devices.colSeen')}: <bdi>{formatDateTime(device.lastSeenAt)}</bdi>
                             </span>
                           )}
+                          {device.drawer && (
+                            <span className={tableClasses.sub}>
+                              {device.drawer.openShift
+                                ? t('devices.drawerWithShift', {
+                                    drawer: device.drawer.code,
+                                    shift: device.drawer.openShift.number,
+                                    name: nameOf(device.drawer.openShift),
+                                  })
+                                : t('devices.drawer', { drawer: device.drawer.code })}
+                            </span>
+                          )}
                           {device.trustedFor.map((person) => (
                             <span
                               key={person.userId}
@@ -204,6 +218,12 @@ export function DevicesPanel() {
                       {revoked ? '—' : <bdi>{formatDate(device.keyExpiresAt)}</bdi>}
                     </td>
                     <td className={tableClasses.num}>
+                      {revoked && device.drawer && (
+                        <Button variant="ghost" onPress={() => setMoving(device)}>
+                          <ArrowRightLeft className={iconClass.sm} aria-hidden="true" />
+                          {t('devices.moveDrawer')}
+                        </Button>
+                      )}
                       {!revoked && (
                         <span className={styles.tools}>
                           <Button
@@ -286,6 +306,9 @@ export function DevicesPanel() {
       </div>
       <ReceiptPrinterCard index={3} />
       {revoking && <RevokeDialog device={revoking} onClose={() => setRevoking(null)} />}
+      {moving && (
+        <MoveDrawerDialog device={moving} devices={list} onClose={() => setMoving(null)} />
+      )}
       {editing && <EditDeviceDialog device={editing} onClose={() => setEditing(null)} />}
       {untrusting && <EndTrustDialog device={untrusting} onClose={() => setUntrusting(null)} />}
     </>
@@ -429,6 +452,73 @@ function RevokeDialog({ device, onClose }: { device: DeviceListItem; onClose: ()
       onSubmit={submit}
       onClose={onClose}
     />
+  );
+}
+
+/**
+ * Decision 0069: a PC enrolled again keeps its drawer. The revoked enrollment's drawer (with its
+ * open shift, if any) moves to the active POS PC enrolled in its place; the PC with the same
+ * name is offered first.
+ */
+function MoveDrawerDialog(props: {
+  device: DeviceListItem;
+  devices: DeviceListItem[];
+  onClose: () => void;
+}) {
+  const { t } = useTranslation('settings');
+  const errorText = useErrorText();
+  const toast = useToast();
+  const { device } = props;
+  const targets = props.devices
+    .filter((d) => d.status === 'active' && d.kind === 'pos')
+    .sort((a, b) => Number(b.code === device.code) - Number(a.code === device.code));
+  const [target, setTarget] = useState(targets[0]?.id ?? '');
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const move = useSave(
+    (api, body: { targetDeviceId: string; reason: string }, key) =>
+      api.post(`/api/v1/devices/${device.id}/move-drawer`, body, { idempotencyKey: key }),
+    {
+      invalidate: [KEYS.devices],
+      onSuccess: () => {
+        toast(t('devices.drawerMoved', { drawer: device.drawer?.code ?? '' }));
+        props.onClose();
+      },
+    },
+  );
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    if (!target) return setError(t('devices.noPosTarget'));
+    if (reason.trim().length < 3) return setError(t('common.reasonShort'));
+    setError(null);
+    move.mutate(
+      { targetDeviceId: target, reason: reason.trim() },
+      { onError: (c) => setError(errorText(c)) },
+    );
+  };
+  return (
+    <Dialog isOpen onClose={props.onClose} title={t('devices.moveDrawerTitle')}>
+      <form className={styles.ucard} onSubmit={submit} noValidate>
+        <Note>
+          {t('devices.moveDrawerNote', { drawer: device.drawer?.code ?? '', code: device.code })}
+        </Note>
+        <SelectField
+          id="move-drawer-target"
+          label={t('devices.moveDrawerTo')}
+          value={target}
+          onChange={setTarget}
+          options={targets.map((d) => ({ value: d.id, label: `${d.code} · ${d.name}` }))}
+        />
+        <TextField label={t('common.reason')} value={reason} onChange={setReason} />
+        {error && <Alert>{error}</Alert>}
+        <DialogFooter>
+          <Button onPress={props.onClose}>{t('common.cancel')}</Button>
+          <Button type="submit" variant="primary" busy={move.isPending}>
+            {t('devices.moveDrawer')}
+          </Button>
+        </DialogFooter>
+      </form>
+    </Dialog>
   );
 }
 

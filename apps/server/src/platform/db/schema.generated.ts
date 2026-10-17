@@ -345,6 +345,8 @@ export interface CashShifts {
   created_at: Generated<Timestamp>;
   created_by: bigint;
   expected_cash_fils: bigint | null;
+  force_close_reason: string | null;
+  force_closed_by: bigint | null;
   id: Generated<bigint>;
   opened_at: Generated<Timestamp>;
   opened_by: bigint;

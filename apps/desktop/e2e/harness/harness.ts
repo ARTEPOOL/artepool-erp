@@ -146,6 +146,27 @@ const routes: Record<string, (input: Record<string, unknown>) => Promise<unknown
     if (!outcome.ok) throw new Error(`Could not enroll ${deviceCode}: ${outcome.reason}`);
     return outcome.device;
   },
+  /** A cashier's open shift on a POS PC of its own, to close from another PC (decision 0069). */
+  'POST /stuck-shift': async (input) => {
+    const code = String(input.code);
+    const pc = await support.addDevice(server, { code, kind: 'pos' });
+    const userId = await support.addUser(server, {
+      username: String(input.username),
+      displayNameAr: String(input.displayName),
+      displayNameEn: String(input.displayName),
+      roles: ['cashier'],
+      pin: '4829',
+    });
+    const { token } = await support.openSession(server, { userId, deviceId: pc.id });
+    const opened = await support.call(server, 'POST', '/api/v1/shifts', {
+      device: pc,
+      token,
+      idempotencyKey: randomUUID(),
+      body: { openingFloatFils: String(input.floatFils) },
+    });
+    if (opened.statusCode !== 201) throw new Error(`Could not open the shift: ${opened.body}`);
+    return opened.json<{ shiftNumber: string }>();
+  },
   'POST /server/stop': async () => {
     await https.stop();
     return {};

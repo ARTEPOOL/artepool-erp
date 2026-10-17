@@ -1,6 +1,6 @@
 # ARTÉPOOL ERP — Product Requirements Document (PRD)
 
-**Version:** 1.10
+**Version:** 1.11
 **Date:** 2026-10-07
 **Owner:** Mohammed Yasser Al Huraidi (partner, ARTÉPOOL)
 **Status:** Scope approved. Owner and accountant decisions applied (see `docs/decisions/`). **Phase 1 plan approved (2026-10-07).**
@@ -264,6 +264,7 @@ Phase tags: **[P1]** to **[P4]** (see section 13).
 - **X report** (mid-shift, no close).
 - **Z report / shift close** with a **blind count**: the cashier enters the counted cash by denomination (notes 1000–5, coins 1–0.05, plus an "other amount"; exact to the fils, [0056](docs/decisions/0056-blind-count-denominations.md)) without seeing the expected amount; the system then shows over/short.
 - **One recount** is allowed, only with supervisor approval. Both counts are kept and printed on the Z report ([0006](docs/decisions/0006-one-recount-with-supervisor-approval.md)).
+- A shift that can no longer be closed on its own PC (re-enrolled, broken or gone) is **closed from another PC by the owner or the accountant**, with a reason and a count; the drawer moves with a re-enrolled PC, and a PC with an open shift cannot be revoked ([0069](docs/decisions/0069-stuck-shifts.md)).
 - Over/short is **accepted by the owner or the accountant** and posts to Cash over/short. History per cashier, with an alert when a cashier has a difference above AED 20 three times in 30 days (both configurable, [0058](docs/decisions/0058-shift-variance-acceptance.md)).
 - Drawer-left-open alert where the hardware supports status reporting.
 
@@ -435,6 +436,7 @@ Each phase ends with automated tests passing, a security review, an accountant r
 | Version | Date | Change |
 |---|---|---|
 | 1.10 | 2026-10-14 | M4b decisions 0064–0067: print designer with locked tax fields per document type (seller address on every tax invoice, customer address on full tax invoices; a full tax invoice needs the customer's address); company bank accounts with UAE IBAN check; customer PO number on A4 invoices and quotations; no QR code until e-invoicing. |
+| 1.11 | 2026-10-17 | Decision 0069: stuck shifts closed from another PC by the owner or the accountant; the drawer moves with a re-enrolled PC; no revoking a PC with an open shift. |
 | 1.9 | 2026-10-13 | Decision 0063: A4 cash taken by a cashier on their open shift goes into the drawer; A4 invoices shown in the shift's sales (POS, A4, total) but never in its expected cash. |
 | 1.0 | 2026-10-06 | Initial approved scope for Phase 1 planning |
 | 1.1 | 2026-10-06 | Applied owner and accountant decisions 0001–0019: confirmed stack; separate repository; POS oversell with approval; one cashier per shift; cart removals logged without approval; one recount with approval; no code-signing for now; POS silent printing and separate A4 section; VAT per line; invoice format by VAT registration; POS-/INV- series; discounts net per line; VAT on advance/progress payments; 4-decimal unit precision and no cash rounding; defective held at cost; monthly lock; quarterly VAT export and annual archive; chart of accounts by line of business (pending review); e-invoicing via accredited provider (go-live pending). Ledger core moved into P1. |

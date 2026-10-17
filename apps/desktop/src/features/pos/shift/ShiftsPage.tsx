@@ -24,7 +24,15 @@ import {
 } from '../../../ui';
 import { useCan, useDisplayName, useErrorText } from '../../auth/context';
 import { money } from '../../masterdata/format';
-import { POS_INVALIDATE, POS_PATHS, useCashAlerts, useShiftReport, useShifts } from '../api';
+import {
+  POS_INVALIDATE,
+  POS_PATHS,
+  useCashAlerts,
+  usePosState,
+  useShiftReport,
+  useShifts,
+} from '../api';
+import { CountFields, useCountForm } from './CountFields';
 import { ShiftReportView } from './ShiftReportView';
 import styles from '../pos.module.css';
 
@@ -38,6 +46,7 @@ export function ShiftsPage() {
   const [filter, setFilter] = useState<Filter>('all');
   const [selected, setSelected] = useState<string | null>(null);
   const [accepting, setAccepting] = useState<ShiftListItem | null>(null);
+  const [closing, setClosing] = useState<ShiftListItem | null>(null);
   const shifts = useShifts({
     ...(filter === 'pending' ? { pendingAcceptance: true } : {}),
     ...(filter === 'open' ? { status: 'open' as const } : {}),
@@ -108,6 +117,21 @@ export function ShiftsPage() {
                     )}
                   </td>
                   <td>
+                    {s.forceCloseReason !== null && (
+                      <Chip tone="warn">{t('shifts.forceClosed')}</Chip>
+                    )}
+                    {s.status === 'open' && s.deviceRevoked && (
+                      <Chip tone="warn">{t('shifts.onRevokedPc')}</Chip>
+                    )}
+                    {s.status === 'open' && can('shifts.force_close') && (
+                      <Button
+                        onPress={() => {
+                          setClosing(s);
+                        }}
+                      >
+                        {t('shifts.forceClose')}
+                      </Button>
+                    )}
                     {s.accepted ? (
                       <Chip tone="ok" icon={<CheckCircle2 aria-hidden="true" />}>
                         {t('shifts.accepted')}
@@ -139,6 +163,16 @@ export function ShiftsPage() {
       </Card>
       {report.data && <ShiftReportView report={report.data} printable />}
       {accepting && <AcceptDialog shift={accepting} onClose={() => setAccepting(null)} />}
+      {closing && (
+        <ForceCloseDialog
+          shift={closing}
+          onClose={() => setClosing(null)}
+          onClosed={(id) => {
+            setClosing(null);
+            setSelected(id);
+          }}
+        />
+      )}
     </>
   );
 }
@@ -175,6 +209,68 @@ function AcceptDialog(props: { shift: ShiftListItem; onClose: () => void }) {
           <Button onPress={props.onClose}>{t('cancel')}</Button>
           <Button type="submit" variant="primary" busy={accept.isPending}>
             {t('shifts.accept')}
+          </Button>
+        </DialogFooter>
+      </form>
+    </Dialog>
+  );
+}
+
+/**
+ * Decision 0069: a shift that can no longer be closed on its own PC (enrolled again, broken or
+ * gone) is closed here by the owner or the accountant: why, and a count of the drawer's cash.
+ * The over/short stays the shift's cashier's and is accepted as usual.
+ */
+function ForceCloseDialog(props: {
+  shift: ShiftListItem;
+  onClose: () => void;
+  onClosed: (shiftId: string) => void;
+}) {
+  const { t } = useTranslation('pos');
+  const nameOf = useDisplayName();
+  const errorText = useErrorText();
+  const state = usePosState();
+  const form = useCountForm(state.data?.denominations ?? []);
+  const [reason, setReason] = useState('');
+  const [problem, setProblem] = useState<string | null>(null);
+  const close = useSave(
+    (api, body: { reason: string }, key) =>
+      api.post<ShiftReport>(
+        POS_PATHS.forceClose(props.shift.id),
+        { ...form.body(), reason: body.reason },
+        { idempotencyKey: key },
+      ),
+    { invalidate: POS_INVALIDATE, onSuccess: () => props.onClosed(props.shift.id) },
+  );
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    setProblem(null);
+    if (reason.trim().length < 3) return setProblem(t('shifts.noteRequired'));
+    if (form.invalid) return setProblem(t('closeShift.invalid'));
+    close.mutate({ reason: reason.trim() }, { onError: (e) => setProblem(errorText(e)) });
+  };
+  return (
+    <Dialog isOpen wide onClose={props.onClose} title={t('shifts.forceCloseTitle')}>
+      <form onSubmit={submit} noValidate className={styles.payForm}>
+        <Note>
+          {t('shifts.forceCloseHelp', {
+            number: props.shift.shiftNumber,
+            name: nameOf(props.shift.cashierName),
+            pc: props.shift.deviceCode ?? '—',
+          })}
+        </Note>
+        <TextField
+          label={t('shifts.forceCloseReason')}
+          value={reason}
+          onChange={setReason}
+          autoFocus
+        />
+        <CountFields form={form} />
+        {problem && <Alert>{problem}</Alert>}
+        <DialogFooter>
+          <Button onPress={props.onClose}>{t('cancel')}</Button>
+          <Button type="submit" variant="primary" busy={close.isPending}>
+            {t('shifts.forceClose')}
           </Button>
         </DialogFooter>
       </form>

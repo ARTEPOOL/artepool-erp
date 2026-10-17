@@ -4,6 +4,7 @@ import {
   EnrollCompleteRequest,
   EnrollHelloRequest,
   IdText,
+  MoveDrawerRequest,
   RenewKeyRequest,
   RevokeDeviceRequest,
   UpdateDeviceRequest,
@@ -84,6 +85,18 @@ export function registerDeviceRoutes(app: FastifyInstance): void {
     handler: async ({ trx, params }) => ({
       body: { ended: await devices.endDeviceTrust(trx, BigInt(params.id)) },
     }),
+  });
+  defineWrite(app, {
+    method: 'POST',
+    url: '/api/v1/devices/:id/move-drawer',
+    access: manage,
+    params: DeviceParams,
+    body: MoveDrawerRequest,
+    reason: ({ body }) => body.reason,
+    handler: async ({ trx, params, body }) => {
+      await devices.moveDrawer(trx, BigInt(params.id), body);
+      return { body: { ok: true } };
+    },
   });
   defineWrite(app, {
     method: 'POST',

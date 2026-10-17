@@ -10,6 +10,7 @@ import {
   CashMovementRequest,
   CloseShiftRequest,
   CountLines,
+  ForceCloseShiftRequest,
   IdText,
   NoSaleRequest,
   OpenShiftRequest,
@@ -112,6 +113,17 @@ export function registerCashRoutes(app: FastifyInstance): void {
     params: Params,
     handler: async ({ request, params }) =>
       shifts.getShiftReport(db, request.auth, BigInt(params.id)),
+  });
+  defineWrite(app, {
+    method: 'POST',
+    url: '/api/v1/shifts/:id/force-close',
+    access: allow('shifts.force_close'),
+    params: Params,
+    body: ForceCloseShiftRequest,
+    reason: ({ body }) => body.reason,
+    handler: async ({ trx, request, params, body }) => ({
+      body: await shifts.forceCloseShift(trx, request, BigInt(params.id), body),
+    }),
   });
   defineWrite(app, {
     method: 'POST',

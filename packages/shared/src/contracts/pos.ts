@@ -276,6 +276,13 @@ export type RecountRequest = z.infer<typeof RecountRequest>;
 export const CloseShiftRequest = z.object({ varianceNote: OptionalText(1000) });
 export type CloseShiftRequest = z.infer<typeof CloseShiftRequest>;
 
+/** A stuck shift closed from another PC (decision 0069): why, and the count of its drawer. */
+export const ForceCloseShiftRequest = CountLines.extend({
+  reason: Reason,
+  varianceNote: OptionalText(1000),
+});
+export type ForceCloseShiftRequest = z.infer<typeof ForceCloseShiftRequest>;
+
 export const AcceptVarianceRequest = z.object({
   note: Reason,
   reasonCodeId: IdText.optional(),
@@ -356,6 +363,12 @@ export interface ShiftListItem extends ShiftSummary {
   countedCashFils: string | null;
   varianceFils: string | null;
   accepted: boolean;
+  /** The PC the drawer is on (null once the drawer has none), and whether it is revoked. */
+  deviceCode: string | null;
+  deviceRevoked: boolean;
+  /** Closed from another PC as a stuck shift (decision 0069): by whom and why. */
+  forceClosedBy: { displayNameAr: string; displayNameEn: string } | null;
+  forceCloseReason: string | null;
 }
 
 export interface ShiftsResponse {

@@ -237,7 +237,15 @@
       "browser": "Printing works in the Windows app only.",
       "no_printer": "Choose the receipt printer first.",
       "failed": "The printer did not respond. Check that it is on, connected and has paper."
-    }
+    },
+    "drawer": "Drawer {drawer}",
+    "drawerWithShift": "Drawer {drawer} · open shift {shift} ({name})",
+    "moveDrawer": "Move drawer",
+    "moveDrawerTitle": "Move the drawer to another PC",
+    "moveDrawerNote": "Drawer {drawer} of the revoked PC “{code}” moves with its history, and its open shift if any, to the POS PC you choose. Use it when the same PC was enrolled again.",
+    "moveDrawerTo": "Move to",
+    "noPosTarget": "There is no active point-of-sale PC to move it to.",
+    "drawerMoved": "Drawer {drawer} moved."
   },
   "audit": {
     "title": "Audit log",

@@ -1,5 +1,12 @@
 # Changelog
 
+## Stuck shifts (2026-10-17)
+
+**In plain words:** a shift left open on a PC that was enrolled again, broke or is gone no longer blocks its cashier. The owner or the accountant closes it from **Shifts & cash → Close as stuck shift**, with a reason and a count of the drawer; the difference stays the cashier's and is accepted as usual. In **Settings → Devices**, every PC shows its drawer, and the owner can **move the drawer** of a revoked PC to the PC enrolled in its place. A PC with an open shift can no longer be revoked.
+
+- **Decision 0069**; migration 0024 (`shifts.force_close` for owner and accountant, enforced by the database).
+- **Fixes:** opening a shift on a PC enrolled again under the same name no longer fails with "a record with the same data already exists"; a cashier with a shift open elsewhere is told which PC holds it.
+
 ## M4b — Print designer, bank accounts, customer PO number (2026-10-16)
 
 **In plain words:** the owner can now change how every printed document looks, from **Settings → Print designer**, with a **live preview**: the logo (on or off, where, how big), the main colour, the language (Arabic + English, Arabic, English), the text size, the margins (or 58/80 mm paper for the receipt), the texts (welcome line, terms, footer) and which optional fields print. Fields the **UAE VAT law requires are locked** and always print; the list per document is in decision 0064 for the accountant to confirm. **Bank accounts** (several, UAE IBAN checked) live in **Settings → Company**, and the design chooses which one prints. A4 invoices and quotations have an optional **customer PO number**. Every save is a new version; documents already issued reprint exactly as they were.

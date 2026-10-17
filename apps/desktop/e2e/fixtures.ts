@@ -81,6 +81,8 @@ export const control = {
   }) => control.call<{ id: string }>('POST', '/pos-item', item),
   enrollmentCode: async () =>
     (await control.call<{ code: string }>('POST', '/enrollment-code')).code,
+  stuckShift: (shift: { code: string; username: string; displayName: string; floatFils: string }) =>
+    control.call<{ shiftNumber: string }>('POST', '/stuck-shift', shift),
   stopServer: () => control.call('POST', '/server/stop'),
   startServer: () => control.call('POST', '/server/start'),
 };

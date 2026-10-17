@@ -20,6 +20,14 @@ export interface DeviceListItem {
   defaultWarehouseId: string | null;
   /** People who may sign in here without the phone code, until when (decision 0027). */
   trustedFor: TrustedPerson[];
+  /** The POS drawer on this PC, if any, and its open shift (decision 0069). */
+  drawer: DeviceDrawer | null;
+}
+
+export interface DeviceDrawer {
+  id: string;
+  code: string;
+  openShift: { number: string; displayNameAr: string; displayNameEn: string } | null;
 }
 
 export interface TrustedPerson {
@@ -68,5 +76,12 @@ export const UpdateDeviceRequest = z
 export type UpdateDeviceRequest = z.infer<typeof UpdateDeviceRequest>;
 
 /** Revoking a PC is final and always needs a reason (decision 0026). */
+/** Settings → Devices: the drawer of a revoked PC moves to the PC enrolled in its place (0069). */
+export const MoveDrawerRequest = z.object({
+  targetDeviceId: z.string().regex(/^[1-9][0-9]{0,18}$/),
+  reason: z.string().trim().min(3).max(500),
+});
+export type MoveDrawerRequest = z.infer<typeof MoveDrawerRequest>;
+
 export const RevokeDeviceRequest = z.object({ reason: z.string().trim().min(3).max(500) });
 export type RevokeDeviceRequest = z.infer<typeof RevokeDeviceRequest>;

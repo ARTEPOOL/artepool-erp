@@ -191,6 +191,9 @@ export const RULE_CODES = [
   'COUNT_ALREADY_DONE',
   'RECOUNT_USED',
   'NOT_POS_SALE',
+  'DRAWER_MOVE_INVALID',
+  'DEVICE_HAS_OPEN_SHIFT',
+  'SHIFT_NOT_STUCK',
 ] as const;
 
 export type RuleCode = (typeof RULE_CODES)[number];
