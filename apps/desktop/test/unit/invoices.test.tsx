@@ -535,13 +535,13 @@ describe('Invoices (A4): a new invoice', () => {
       ok({ customers: [WALK_IN, CUSTOMER], total: 2, counts: { active: 2, vatRegistered: 1 } }),
     );
     await signIn(bridge, 'New tax invoice');
-    // The cash customer is chosen by default; an A4 invoice is a full tax invoice (0071), so
-    // their real name and address are typed on it.
+    // The cash customer is chosen by default: a simplified invoice, nothing to type (0071).
     const chosen = await screen.findByRole('group', { name: 'Customer' });
     expect(await within(chosen).findByText('Cash customer')).toBeTruthy();
-    expect(screen.getByText(/A4 invoices are full tax invoices/)).toBeTruthy();
-    expect(screen.getByLabelText('Customer name on the invoice')).toBeTruthy();
-    expect(screen.getByLabelText('Customer address on the invoice')).toBeTruthy();
+    expect(
+      screen.getByText('The customer is not VAT-registered: a simplified tax invoice.'),
+    ).toBeTruthy();
+    expect(screen.queryByLabelText('Customer name on the invoice')).toBeNull();
 
     // The items list opens on focus, before anything is typed.
     fireEvent.focus(screen.getByRole('searchbox', { name: /Search items/ }));
@@ -599,8 +599,6 @@ describe('Invoices (A4): a new invoice', () => {
     await screen.findByText('Draft saved.');
     expect(bridge.callsTo('PUT', '/api/v1/sales/invoices/300')[0]!.body).toEqual({
       customerId: '20',
-      // The address shown on the draft is the one printed (0071).
-      billToAddress: 'Al Jimi, Al Ain',
       docDiscountFils: '500',
       lines: [{ itemId: '10', quantityMilli: '2000', lineDiscountFils: '2500' }],
       deductions: [{ advanceDocumentId: '201' }],
@@ -608,7 +606,7 @@ describe('Invoices (A4): a new invoice', () => {
     });
   });
 
-  it('a saved draft for the cash customer can be issued; the real name and address are asked first (0071)', async () => {
+  it('a saved draft for the cash customer can be issued; nothing to type (0071)', async () => {
     const WALK_IN: CustomerListItem = {
       ...CUSTOMER,
       id: '1',
@@ -629,15 +627,12 @@ describe('Invoices (A4): a new invoice', () => {
         ok({ customers: [WALK_IN], total: 1, counts: { active: 1, vatRegistered: 0 } }),
       );
     await signIn(bridge, 'Invoice draft');
-    // Saved as it is: not "changed", so it can be issued (the name field only shows empty).
-    const name = await screen.findByLabelText('Customer name on the invoice');
-    await waitFor(() => expect((name as HTMLInputElement).value).toBe(''));
+    // Saved as it is: not "changed", so it can be issued straight away.
+    const issueButton = await screen.findByRole('button', { name: 'Issue invoice' });
+    await waitFor(() => expect(issueButton.hasAttribute('data-disabled')).toBe(false));
     expect(screen.queryByText('Save the draft before issuing it.')).toBeNull();
-    const issueButton = screen.getByRole('button', { name: 'Issue invoice' });
-    expect(issueButton.hasAttribute('data-disabled')).toBe(false);
     fireEvent.click(issueButton);
-    expect(await screen.findByText(/needs the customer's name/)).toBeTruthy();
-    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(await screen.findByRole('dialog')).toBeTruthy();
   });
 
   it('discarding a draft asks first, then sends its row version', async () => {

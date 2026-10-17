@@ -46,7 +46,7 @@ It runs client–server on the local network: PostgreSQL and the API service on 
 **VAT and invoices**
 - **VAT** is calculated per line, and the invoice VAT is the sum of the line VAT. It is shown per line and in the total. Every customer pays VAT; the rate comes from the item's VAT category (standard 5%). (0009)
 - **Invoice format** follows the customer's VAT registration at the POS: not registered → simplified tax invoice; registered → full tax invoice with the customer's TRN. (0010)
-- **A4 invoices (INV-) are always full tax invoices**: name and address (saved or typed on the invoice; the cash customer's real name typed), TRN only when registered. Advance invoices and debit notes follow 0010. (0071)
+- **A4 invoices (INV-)** are full tax invoices for a registered customer (address required) or a named customer with an address on file; the walk-in or a customer without an address gets a simplified one. Nothing is typed on the invoice. Advance invoices and debit notes follow 0010. (0071)
 - **Numbering:**
   - `POS-` for POS sales; `INV-` for A4 invoices and advance/progress payment tax invoices. Both are gapless.
   - Credit notes, receipts and the rest each have their own series.

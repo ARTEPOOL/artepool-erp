@@ -54,9 +54,6 @@ interface EditorState {
   customer: ChosenCustomer | null;
   dueDate: string;
   customerPo: string;
-  /** Typed on the full tax invoice (decision 0071): the walk-in's real name, any address. */
-  billToName: string;
-  billToAddress: string;
   notes: string;
   docDiscount: string;
   lines: EditorLine[];
@@ -69,8 +66,6 @@ function initialState(doc: DocumentDetail | null): EditorState {
       customer: null,
       dueDate: '',
       customerPo: '',
-      billToName: '',
-      billToAddress: '',
       notes: '',
       docDiscount: '',
       lines: [],
@@ -88,8 +83,6 @@ function initialState(doc: DocumentDetail | null): EditorState {
     },
     dueDate: doc.dueDate ?? '',
     customerPo: doc.customerPo ?? '',
-    billToName: doc.billToName,
-    billToAddress: doc.billToAddress ?? '',
     notes: doc.notes ?? '',
     docDiscount: discount === 0n ? '' : formatFils(discount),
     lines: doc.lines
@@ -107,8 +100,6 @@ const contentKey = (s: EditorState) =>
     customer: s.customer?.id ?? null,
     dueDate: s.dueDate,
     customerPo: s.customerPo.trim(),
-    billToName: s.billToName.trim(),
-    billToAddress: s.billToAddress.trim(),
     notes: s.notes.trim(),
     docDiscount: s.docDiscount.trim(),
     deductions: [...s.deductions].sort(),
@@ -150,10 +141,6 @@ export function DraftEditor({ doc }: { doc: DocumentDetail | null }) {
 
   // The cash customer types their real name on the full tax invoice (decision 0071).
   const isWalkIn = Boolean(customer?.isWalkIn || (walkIn && customer?.id === walkIn.id));
-  // "Cash customer" itself is not a name: the field shows empty until the real name is typed.
-  // (Only shown so: the saved draft and the state stay the same, so it is not "changed".)
-  const shownName = isWalkIn && walkIn && state.billToName === walkIn.name ? '' : state.billToName;
-
   const preview = useLinesPreview(state.lines, state.docDiscount);
   const discount = readDocDiscount(state.docDiscount);
 
@@ -215,14 +202,10 @@ export function DraftEditor({ doc }: { doc: DocumentDetail | null }) {
       return setProblem(t('form.problems.discount'));
     const notes = state.notes.trim();
     const customerPo = state.customerPo.trim();
-    const billToName = isWalkIn ? shownName.trim() : '';
-    const billToAddress = state.billToAddress.trim();
     save.mutate({
       customerId: customer.id,
       ...(state.dueDate ? { dueDate: state.dueDate } : {}),
       ...(customerPo ? { customerPo } : {}),
-      ...(billToName ? { billToName } : {}),
-      ...(billToAddress ? { billToAddress } : {}),
       ...(notes ? { notes } : {}),
       ...(discount > 0n ? { docDiscountFils: discount.toString() } : {}),
       lines,
@@ -255,34 +238,20 @@ export function DraftEditor({ doc }: { doc: DocumentDetail | null }) {
             value={customer}
             onChange={(c) => {
               customerTouched.current = true;
-              patch({ customer: c, deductions: [], billToName: '', billToAddress: '' });
+              patch({ customer: c, deductions: [] });
             }}
             showBalance
           />
           {customer && (
             <InfoBar>
-              {t(customer.isVatRegistered ? 'sales:formatHint.full' : 'sales:formatHint.a4')}
-            </InfoBar>
-          )}
-          {customer && isWalkIn && (
-            <TextField
-              label={t('sales:fields.billToName')}
-              value={shownName}
-              onChange={(billToName) => patch({ billToName })}
-              maxLength={200}
-              hint={t('sales:fields.billToNameHint')}
-            />
-          )}
-          {customer && (
-            <TextField
-              label={t('sales:fields.billToAddress')}
-              value={state.billToAddress}
-              onChange={(billToAddress) => patch({ billToAddress })}
-              maxLength={500}
-              hint={t(
-                isWalkIn ? 'sales:fields.billToAddressWalkIn' : 'sales:fields.billToAddressHint',
+              {t(
+                customer.isVatRegistered
+                  ? 'sales:formatHint.full'
+                  : isWalkIn
+                    ? 'sales:formatHint.simplified'
+                    : 'sales:formatHint.a4',
               )}
-            />
+            </InfoBar>
           )}
         </div>
       </Card>
@@ -412,19 +381,7 @@ export function DraftEditor({ doc }: { doc: DocumentDetail | null }) {
               {t('form.save')}
             </Button>
             {can('invoices.issue') && (
-              <Button
-                variant="primary"
-                isDisabled={!doc || dirty}
-                onPress={() => {
-                  // A full tax invoice for the cash customer needs their real name and address.
-                  if (isWalkIn && !shownName.trim())
-                    return setProblem(t('common:errors.rules.FULL_INVOICE_NAME'));
-                  if (isWalkIn && !state.billToAddress.trim())
-                    return setProblem(t('common:errors.rules.FULL_INVOICE_ADDRESS'));
-                  setProblem(null);
-                  setIssuing(true);
-                }}
-              >
+              <Button variant="primary" isDisabled={!doc || dirty} onPress={() => setIssuing(true)}>
                 <Send className={iconClass.sm} aria-hidden="true" />
                 {t('form.issue')}
               </Button>

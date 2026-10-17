@@ -1,6 +1,6 @@
 # ARTÉPOOL ERP — Product Requirements Document (PRD)
 
-**Version:** 1.14
+**Version:** 1.15
 **Date:** 2026-10-07
 **Owner:** Mohammed Yasser Al Huraidi (partner, ARTÉPOOL)
 **Status:** Scope approved. Owner and accountant decisions applied (see `docs/decisions/`). **Phase 1 plan approved (2026-10-07).**
@@ -219,7 +219,7 @@ Phase tags: **[P1]** to **[P4]** (see section 13).
 - **Invoice format follows the customer's VAT registration** ([0010](docs/decisions/0010-invoice-format-by-vat-registration.md)):
   - customer **not** VAT-registered → **simplified tax invoice**
   - customer VAT-registered → **full tax invoice** showing the customer's TRN
-  - **A4 invoices (INV-) are always full tax invoices**, with the customer's name and address (typed for the cash customer), and the TRN only when registered ([0071](docs/decisions/0071-a4-invoices-full-and-reprints-current-design.md)). The rule above applies to POS sales, advance invoices and debit notes.
+  - **A4 invoices (INV-)** are full tax invoices for a registered customer or a named customer with an address on file, simplified for the walk-in or a customer without an address; nothing is typed on the invoice ([0071](docs/decisions/0071-a4-invoices-full-and-reprints-current-design.md)). The rule above applies to POS sales, advance invoices and debit notes.
 - **Numbering:** two separate gapless invoice series ([0011](docs/decisions/0011-document-numbering-series.md)):
   - **`POS-`** for POS sales
   - **`INV-`** for A4 invoices, including advance and progress payment tax invoices
@@ -437,6 +437,7 @@ Each phase ends with automated tests passing, a security review, an accountant r
 | Version | Date | Change |
 |---|---|---|
 | 1.10 | 2026-10-14 | M4b decisions 0064–0067: print designer with locked tax fields per document type (seller address on every tax invoice, customer address on full tax invoices; a full tax invoice needs the customer's address); company bank accounts with UAE IBAN check; customer PO number on A4 invoices and quotations; no QR code until e-invoicing. |
+| 1.15 | 2026-10-17 | Decision 0071 revised: no name/address fields on A4 invoices; full when the customer is registered or has an address on file, else simplified. |
 | 1.14 | 2026-10-17 | Decision 0072: an issued A4 invoice is cancelled or edited with the owner's approval, through a full credit note (refund at once) and, for edits, a new draft. |
 | 1.13 | 2026-10-17 | Decision 0071: A4 invoices are always full tax invoices (the cash customer's name and address typed); reprints use today's design with unchanged content. |
 | 1.12 | 2026-10-17 | Decision 0070: receipts print on an ESC/POS thermal printer or on any printer through its Windows driver; new receipt look with a separator between items. |

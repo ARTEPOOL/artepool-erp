@@ -287,35 +287,16 @@ describe('line arithmetic (decisions 0009, 0012, 0014)', () => {
 });
 
 describe('invoices (decisions 0010, 0011, 0046)', () => {
-  it('the walk-in cash customer on an A4 invoice: the typed name and address print (0071)', async () => {
+  it('the walk-in cash customer on an A4 invoice: a simplified invoice, nothing to type (0071)', async () => {
     const { rows } = await sql<{ id: string }>`
       SELECT id::text FROM md.customers WHERE is_walk_in`.execute(server.db);
-    const walkIn = rows[0]!.id;
     const svc = await item('WALK-SVC', 'service', '1000000');
-    const plain = await draft(owner, {
-      customerId: walkIn,
+    const d = await draft(owner, {
+      customerId: rows[0]!.id,
       lines: [{ itemId: svc.id, quantityMilli: '1000' }],
     });
-    // "Cash customer" with no address: refused, the name first.
-    expect(await refusal(issue(owner, plain, { payments: [cash('10500')] }))).toMatchObject({
-      rule: 'FULL_INVOICE_NAME',
-    });
-    const typed = await ok<DocumentDetail>(
-      owner('PUT', `/api/v1/sales/invoices/${plain.id}`, {
-        customerId: walkIn,
-        billToName: 'Saeed Ali',
-        billToAddress: 'Al Jimi, Al Ain',
-        lines: [{ itemId: svc.id, quantityMilli: '1000' }],
-        rowVersion: (await ok<DocumentDetail>(owner('GET', `/api/v1/sales/documents/${plain.id}`)))
-          .rowVersion,
-      }),
-    );
-    expect(typed).toMatchObject({ billToName: 'Saeed Ali', billToAddress: 'Al Jimi, Al Ain' });
-    const issued = await ok<DocumentDetail>(issue(owner, typed, { payments: [cash('10500')] }));
-    expect(issued).toMatchObject({ invoiceFormat: 'full', billToTrn: null });
-    const { html } = await documentHtml(server.db, BigInt(issued.id));
-    expect(html).toContain('Saeed Ali');
-    expect(html).toContain('Al Jimi, Al Ain');
+    const issued = await ok<DocumentDetail>(issue(owner, d, { payments: [cash('10500')] }));
+    expect(issued).toMatchObject({ invoiceFormat: 'simplified', billToTrn: null });
   });
 
   it('a sale paid at issue: number, stock out at cost, Receivable/Revenue/VAT and Cost of sales/Inventory', async () => {

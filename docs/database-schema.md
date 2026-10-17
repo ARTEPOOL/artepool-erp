@@ -1725,9 +1725,10 @@ Migrations are written **in build order** (milestones in [`phase-1-plan.md`](pha
 | 0024 | `stuck_shifts` | M5 fix | `shifts.force_close`, closing a stuck shift from another PC, moving a drawer to a re-enrolled PC, no revoking a PC with an open shift (0069) | — |
 | 0025 | `a4_full_invoices` | M4 fix | A4 invoices always full tax invoices; the cash customer's typed name required (0071) | — |
 | 0026 | `invoice_cancel` | M4 fix | `invoices.cancel` (owner only), credit-note reasons for cancelled and edited invoices (0072) | — |
-| 0027 | `ops_backup` | M6 | `ops.backup_runs`, `ops.integrity_runs` + backup role grants | — |
+| 0027 | `a4_format_from_customer` | M4 fix | A4 invoice format from the customer only: full when registered or named with an address, else simplified (0071) | — |
+| 0028 | `ops_backup` | M6 | `ops.backup_runs`, `ops.integrity_runs` + backup role grants | — |
 
-After 0027, a final check asserts that every business table has the audit trigger, the no-delete guard and the expected grants. The same check runs as an automated test.
+After 0028, a final check asserts that every business table has the audit trigger, the no-delete guard and the expected grants. The same check runs as an automated test.
 
 ---
 

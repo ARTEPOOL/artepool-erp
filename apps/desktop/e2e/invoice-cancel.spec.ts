@@ -29,13 +29,11 @@ test('the owner edits an issued invoice: cancelled by a credit note, a new draft
   await open('office');
   await signInAsOwner(page, t);
 
-  // A new invoice for the cash customer: their name and address are typed (0071).
+  // A new invoice for the cash customer: nothing to type (a simplified invoice, 0071).
   await nav(page)
     .getByRole('link', { name: t('settings:nav.invoices') })
     .click();
   await page.getByRole('button', { name: t('invoices:list.new') }).click();
-  await page.getByLabel(t('sales:fields.billToName')).fill(`Saeed ${n}`);
-  await page.getByLabel(t('sales:fields.billToAddress')).fill('Al Jimi, Al Ain');
   await page.getByLabel(t('sales:lines.search')).fill(code);
   await page
     .getByRole('list', { name: t('sales:lines.results') })
@@ -65,7 +63,6 @@ test('the owner edits an issued invoice: cancelled by a credit note, a new draft
   await expect(
     page.getByRole('heading', { level: 1, name: t('invoices:form.draftTitle') }),
   ).toBeVisible();
-  await expect(page.getByLabel(t('sales:fields.billToName'))).toHaveValue(`Saeed ${n}`);
   await expect(page.getByText(new RegExp(code)).first()).toBeVisible();
   await snap(page, '76-invoice-edit-draft');
 

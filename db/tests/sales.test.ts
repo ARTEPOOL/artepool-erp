@@ -429,36 +429,24 @@ describe('issue (decisions 0010, 0011)', () => {
         )
       ).a,
     ).toBe('Sanaiya، Al Ain');
-    // An A4 invoice for an unregistered customer is full too, and needs the address (0071).
+    // An unregistered customer without an address: a simplified invoice, issued (0071).
     const plain = await customer('Plain, no address', { creditLimit: 10_000_000, address: null });
     const a4 = await draftFor(plain);
-    await expect(tx((c) => issue(c, a4, plain))).rejects.toMatchObject(
-      rule('FULL_INVOICE_ADDRESS'),
-    );
+    expect((await tx((c) => issue(c, a4, plain))).invoice_format).toBe('simplified');
   });
 
-  it('the walk-in cash customer on an A4 invoice: their real name and address are typed (0071)', async () => {
-    const walkIn = await one<{ id: string; name: string }>(
+  it('the walk-in cash customer on an A4 invoice: a simplified invoice, nothing to type (0071)', async () => {
+    const walkIn = await one<{ id: string }>(
       api,
-      `SELECT id::text, name FROM md.customers WHERE is_walk_in`,
+      `SELECT id::text FROM md.customers WHERE is_walk_in`,
     );
     const svc = await item('S-WALK', 'service', 1_000_000, false);
     const doc = await tx(async (c) => {
       const d = await draft(c, 'invoice', walkIn.id);
-      await c.query(
-        `UPDATE sales.documents SET bill_to_name = $2, bill_to_address = 'Al Ain' WHERE id = $1`,
-        [d, walkIn.name],
-      );
       await line(c, d, { item: svc, price: 1_000_000 });
       return d;
     });
-    // Still "Cash customer": refused.
-    const pay = (c: pg.Client) => issue(c, doc, walkIn.id);
-    await expect(tx(pay)).rejects.toMatchObject(rule('FULL_INVOICE_NAME'));
-    await tx((c) =>
-      c.query(`UPDATE sales.documents SET bill_to_name = 'Saeed Ali' WHERE id = $1`, [doc]),
-    );
-    expect((await tx(pay)).invoice_format).toBe('full');
+    expect((await tx((c) => issue(c, doc, walkIn.id))).invoice_format).toBe('simplified');
   });
 
   it('a POS document needs an open shift of its own cashier; an office one never uses POS-', async () => {

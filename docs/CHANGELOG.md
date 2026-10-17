@@ -1,5 +1,11 @@
 # Changelog
 
+## A4 invoices: details from the customer only (2026-10-17)
+
+**In plain words:** the "customer name / address on the invoice" fields are gone. A4 invoices take the name, address and TRN from the customer record. A registered customer, or a customer with a saved address, gets a full tax invoice; the cash customer or a customer without an address gets a simplified one, so an invoice is never blocked for lack of a typed name or address.
+
+- Decision 0071 revised; migration 0027.
+
 ## Cancel or edit an issued A4 invoice (2026-10-17)
 
 **In plain words:** an issued A4 invoice now has **Edit invoice** and **Cancel invoice** buttons. The invoice itself never changes, as the tax law requires. A credit note cancels all of it: the goods go back to stock, the VAT is reversed and the money paid is refunded at once. "Edit" then opens a new draft copied from it, where you change the customer or the items and issue it with a new number. Only the owner does it, or approves it for someone else, always with a reason.
