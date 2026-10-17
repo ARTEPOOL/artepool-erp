@@ -33,6 +33,13 @@ p {
   margin: 0;
 }
 
+/* Titles: Arabic in GE SS TV, English in Tw Cen MT Condensed Extra Bold (decision 0068). */
+h1,
+h2,
+h3 {
+  font-family: var(--font-heading);
+}
+
 :where(button, input, select, textarea) {
   font: inherit;
   color: inherit;

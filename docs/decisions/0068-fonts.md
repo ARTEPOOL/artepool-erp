@@ -2,14 +2,14 @@
 
 | | |
 |---|---|
-| **Status** | Accepted (Arabic installed; English waiting for its file) |
+| **Status** | Accepted |
 | **Date** | 2026-10-17 |
 | **Decided by** | Owner |
 
 ## Decision
 - **Arabic letters:** GE SS TV Medium (Boutros International), on every screen, every A4 printout and the thermal receipt.
-- **Digits and English:** they never use the Arabic font, because it draws 0–9 as Arabic-Indic digits, which must not appear in prices, totals, TRNs or IBANs. Until the English font arrives they use IBM Plex Sans Arabic, the font used so far.
-- **English headings:** Tw Cen MT Condensed Extra Bold, for titles only (it is too narrow and heavy for tables and body text). Added when its file arrives.
+- **Digits and English body text:** they never use the Arabic font, because it draws 0–9 as Arabic-Indic digits, which must not appear in prices, totals, TRNs or IBANs. They stay in IBM Plex Sans Arabic, which reads well in tables and forms.
+- **English headings:** Tw Cen MT Condensed Extra Bold (Monotype), for titles and headings only, on screens (h1–h3, the `--font-heading` token) and on A4 printouts (title, company name, section headings). It is too narrow and heavy for tables and body text. The thermal receipt keeps one font.
 - **Licence:** the owner confirmed the licence allows bundling the fonts in the app and printing with them.
 
 ## How it works

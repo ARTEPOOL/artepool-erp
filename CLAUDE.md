@@ -90,7 +90,7 @@ It runs client–server on the local network: PostgreSQL and the API service on 
 - **Print designer:** the owner customises print templates (logo, colour, language, optional fields, texts, margins) in Settings → Print designer. Tax-required fields are locked (list per document type in 0064, pending accountant review); seller address on every tax invoice and customer address on full tax invoices are locked, and a full tax invoice is refused without the customer's address. Receipts and statements use the A4 invoice design; the thermal receipt's language is set there too. Templates are versioned; each document stores its template version and reprints with it. No QR code until e-invoicing. (0020, 0064, 0067)
 - **Bank accounts:** several per company (bank, account name, UAE IBAN with checksum, optional SWIFT), owner only, audited; the template chooses which one prints. (0065)
 - **Customer PO number:** optional on A4 invoices and quotations; prints only when filled. (0066)
-- **Fonts:** GE SS TV for Arabic letters only (screens, A4, receipt); digits and English never use it (it draws Arabic-Indic digits); Tw Cen MT Condensed Extra Bold for English headings when its file arrives. Files in `assets/fonts/`. (0068)
+- **Fonts:** GE SS TV for Arabic letters only (screens, A4, receipt); digits and English never use it (it draws Arabic-Indic digits); Tw Cen MT Condensed Extra Bold for English headings only (`--font-heading`); body English and digits stay IBM Plex Sans Arabic. Files in `assets/fonts/`. (0068)
 
 **Security and access**
 - **Sign-in:** cashiers use a 4-digit PIN **only on PCs enrolled as POS** (weak PINs refused; 5 wrong → blocked until the owner unblocks). Office PCs always need a password. (0021)

@@ -111,12 +111,21 @@ const ARABIC_FONT = new URL('../../../../../assets/fonts/ge-ss-tv-medium.otf', i
 const ARABIC_LETTERS =
   'U+0600-065F, U+066A-06EF, U+06FA-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF';
 
+/** English headings (decision 0068): Tw Cen MT Condensed Extra Bold, Latin letters and digits only. */
+const HEADING_FONT = new URL(
+  '../../../../../assets/fonts/tw-cen-mt-condensed-extra-bold.ttf',
+  import.meta.url,
+);
+const LATIN = 'U+0020-007E, U+00A0-00FF, U+2013-2014, U+2018-201E, U+2022, U+2026, U+20AC';
+
 let fontsCss: string | null = null;
 /** The app's fonts, embedded, so Arabic is shaped the same on every server. */
 function fonts(): string {
   fontsCss ??=
     `@font-face { font-family: 'ARTEPOOL Arabic'; font-weight: 100 900; unicode-range: ${ARABIC_LETTERS};
       src: url(data:font/otf;base64,${readFileSync(ARABIC_FONT).toString('base64')}) format('opentype'); }\n` +
+    `@font-face { font-family: 'ARTEPOOL Heading'; font-weight: 100 900; unicode-range: ${LATIN};
+      src: url(data:font/ttf;base64,${readFileSync(HEADING_FONT).toString('base64')}) format('truetype'); }\n` +
     ['arabic', 'latin']
       .flatMap((subset) =>
         [400, 700].map(
@@ -283,6 +292,7 @@ header.opposite { flex-direction: row-reverse; }
 header.center { flex-direction: column; align-items: center; text-align: center; }
 header.center .logo { order: -1; }
 .logo { max-inline-size: 60mm; }
+h1, h2, h3, .heading { font-family: 'ARTEPOOL Arabic', 'ARTEPOOL Heading', 'Plex Arabic', sans-serif; }
 .seller h1 { font-size: 1.35em; margin: 0; color: #111; }
 .seller p { margin: 0.5mm 0; }
 .title { text-align: center; margin: 5mm 0 3mm; }
