@@ -20,6 +20,7 @@ import {
   date,
   money,
   renderHtml,
+  vatLabel,
   type PrintBankAccount,
   type PrintDocument,
   type Seller,
@@ -208,7 +209,7 @@ export async function documentHtml(
           ]
         : []),
       { label: ['المبلغ الخاضع للضريبة', 'Taxable amount'], fils: d.netFils },
-      { label: ['ضريبة القيمة المضافة', 'VAT'], fils: d.vatFils },
+      { label: vatLabel(items), fils: d.vatFils },
       { label: ['الإجمالي المستحق', 'Total payable'], fils: d.totalFils, strong: true },
     ],
     wordsFils: d.totalFils,
@@ -269,7 +270,7 @@ export async function quotationHtml(db: Db, id: bigint): Promise<{ html: string;
       })),
     totals: [
       { label: ['المبلغ قبل الضريبة', 'Amount before VAT'], fils: q.netFils },
-      { label: ['ضريبة القيمة المضافة', 'VAT'], fils: q.vatFils },
+      { label: vatLabel(q.lines.filter((l) => !l.isOptional)), fils: q.vatFils },
       { label: ['الإجمالي', 'Total'], fils: q.totalFils, strong: true },
     ],
     wordsFils: q.totalFils,

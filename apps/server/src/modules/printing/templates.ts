@@ -157,6 +157,14 @@ export function quantity(milli: string | bigint): string {
 /** yyyy-mm-dd → dd/mm/yyyy. */
 export const date = (d: string): string => `${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(0, 4)}`;
 
+/** "ضريبة القيمة المضافة 5% · VAT 5%": the VAT total with its rate when every line has the same one. */
+export function vatLabel(lines: { vatRateBp: number }[]): [string, string] {
+  const rates = [...new Set(lines.map((l) => l.vatRateBp))];
+  if (rates.length !== 1) return ['ضريبة القيمة المضافة', 'VAT'];
+  const pct = `${(rates[0]! / 100).toFixed(rates[0]! % 100 === 0 ? 0 : 2)}%`;
+  return [`ضريبة القيمة المضافة ${pct}`, `VAT ${pct}`];
+}
+
 const TITLES: Record<string, [string, string]> = {
   'invoice:full': ['فاتورة ضريبية', 'Tax Invoice'],
   'invoice:simplified': ['فاتورة ضريبية مبسطة', 'Simplified Tax Invoice'],
@@ -201,6 +209,16 @@ export function renderHtml(doc: PrintDocument, seller: Seller, options: RenderOp
       : lang === 'en'
         ? escapeHtml(pair[1])
         : `${escapeHtml(pair[0])} · ${escapeHtml(pair[1])}`;
+  /** A heading on one line, both languages the same size: "ملاحظات • Notes". */
+  const heading = (pair: [string, string]): string =>
+    lang === 'ar'
+      ? escapeHtml(pair[0])
+      : lang === 'en'
+        ? escapeHtml(pair[1])
+        : `${escapeHtml(pair[0])} <span class="sep">•</span> <bdi>${escapeHtml(pair[1])}</bdi>`;
+  /** "الرقم الضريبي · TRN 100…": the label isolated, so the number never jumps around it. */
+  const trnLine = (trn: string): string =>
+    `<span class="pair">${inline(['الرقم الضريبي', 'TRN'])}</span> <span class="ltr">${escapeHtml(trn)}</span>`;
   const title = TITLES[doc.format ? `${doc.kind}:${doc.format}` : doc.kind] ?? TITLES[doc.kind]!;
   const dir = lang === 'en' ? 'ltr' : 'rtl';
   const text = (ar?: string, en?: string) =>
@@ -257,14 +275,15 @@ header.opposite { flex-direction: row-reverse; }
 header.center { flex-direction: column; align-items: center; text-align: center; }
 header.center .logo { order: -1; }
 .logo { max-inline-size: 60mm; }
-.seller h1 { font-size: 1.35em; margin: 0; color: var(--main); }
+.seller h1 { font-size: 1.35em; margin: 0; color: #111; }
 .seller p { margin: 0.5mm 0; }
 .title { text-align: center; margin: 5mm 0 3mm; }
-.title h2 { font-size: 1.55em; margin: 0; color: var(--main); }
+.title h2 { font-size: 1.55em; margin: 0; color: #111; }
 .welcome { text-align: center; color: #333; }
+.sep { color: #888; font-weight: 400; }
 .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 3mm 8mm; margin-block-end: 4mm; }
 .box { border: 0.8pt solid #999; border-radius: 2mm; padding: 2.5mm 3mm; }
-.box h3 { font-size: 0.95em; margin: 0 0 1mm; color: #333; }
+.box h3 { font-size: 1em; margin: 0 0 1.5mm; color: #111; }
 .row { display: flex; justify-content: space-between; gap: 4mm; }
 .ltr { direction: ltr; unicode-bidi: isolate; }
 .code { font-size: 0.85em; color: #555; }
@@ -280,7 +299,10 @@ tr.deduction td { color: #333; font-style: italic; }
 .totals .row { padding: 1mm 0; border-block-end: 0.5pt solid #ddd; }
 .totals .strong { font-weight: 700; font-size: 1.15em; border-block-end: 1.5pt solid var(--main); color: var(--main); }
 .words, .bank, .notes { margin-block-start: 3mm; }
-.notes h3, .bank h3 { font-size: 0.95em; margin: 0 0 1mm; }
+.notes h3, .bank h3 { font-size: 1em; margin: 0 0 1mm; color: #111; }
+.notes p, .bank p { margin: 0.5mm 0; }
+.notes, .bank, .words { border-block-start: 0.5pt solid #ddd; padding-block-start: 2mm; }
+.pair { unicode-bidi: isolate; }
 .sign { display: grid; grid-template-columns: 1fr 1fr; gap: 12mm; margin-block-start: 12mm; }
 .sign div { border-block-start: 0.8pt solid #555; padding-block-start: 1.5mm; text-align: center; }
 footer { margin-block-start: 8mm; text-align: center; color: #555; font-size: 0.9em; }
@@ -292,21 +314,21 @@ ${doc.status === 'draft' ? `<div class="stamp">${t(['مسودة', 'DRAFT'])}</di
   <div class="seller">
     <h1>${lang !== 'en' ? escapeHtml(seller.legal_name_ar) : ''}${lang !== 'ar' ? `<span class="en">${escapeHtml(seller.legal_name_en)}</span>` : ''}</h1>
     ${sellerAddress ? text(seller.address_ar, seller.address_en) : ''}
-    ${sellerTrn && seller.trn ? `<p>${inline(['الرقم الضريبي', 'TRN'])}: <span class="ltr">${escapeHtml(seller.trn)}</span></p>` : ''}
-    ${contact.length > 0 ? `<p class="ltr">${contact.join(' · ')}</p>` : ''}
+    ${sellerTrn && seller.trn ? `<p>${trnLine(seller.trn)}</p>` : ''}
+    ${contact.length > 0 ? `<p><span class="ltr">${contact.join(' · ')}</span></p>` : ''}
   </div>
   ${logo}
 </header>
-<div class="title"><h2>${t(title)}</h2>${doc.copy && doc.status === 'final' ? `<div>${t(['نسخة', 'Copy'])}</div>` : ''}</div>
+<div class="title"><h2>${heading(title)}</h2>${doc.copy && doc.status === 'final' ? `<div>${t(['نسخة', 'Copy'])}</div>` : ''}</div>
 ${on('welcome') ? `<div class="welcome">${text(settings.texts.welcomeAr, settings.texts.welcomeEn)}</div>` : ''}
 <section class="meta">
   <div class="box">
-    <h3>${t(['العميل', 'Bill to'])}</h3>
+    <h3>${heading(['العميل', 'Bill to'])}</h3>
     <div><strong>${escapeHtml(doc.customer.name)}</strong></div>
     ${doc.customer.nameAlt ? `<div>${escapeHtml(doc.customer.nameAlt)}</div>` : ''}
     ${customerAddress && doc.customer.address ? `<div>${escapeHtml(doc.customer.address)}</div>` : ''}
-    ${doc.customer.trn ? `<div>${inline(['الرقم الضريبي', 'TRN'])}: <span class="ltr">${escapeHtml(doc.customer.trn)}</span></div>` : ''}
-    ${on('customerPhone') && doc.customer.phone ? `<div class="ltr">${escapeHtml(doc.customer.phone)}</div>` : ''}
+    ${doc.customer.trn ? `<div>${trnLine(doc.customer.trn)}</div>` : ''}
+    ${on('customerPhone') && doc.customer.phone ? `<div><span class="ltr">${escapeHtml(doc.customer.phone)}</span></div>` : ''}
   </div>
   <div class="box">
     ${row(['الرقم', 'Number'], doc.number ?? '—')}
@@ -343,9 +365,9 @@ ${
     ${words ? `<div class="words">${words}</div>` : ''}
     ${
       bank
-        ? `<div class="bank"><h3>${t(['بيانات البنك', 'Bank details'])}</h3>
+        ? `<div class="bank"><h3>${heading(['بيانات البنك', 'Bank details'])}</h3>
       <p>${escapeHtml(bank.bankName)} · ${escapeHtml(bank.accountName)}</p>
-      <p class="ltr">IBAN: ${escapeHtml(formatIban(bank.iban))}${bank.swift ? ` · SWIFT: ${escapeHtml(bank.swift)}` : ''}</p></div>`
+      <p><span class="ltr">IBAN: ${escapeHtml(formatIban(bank.iban))}${bank.swift ? ` · SWIFT: ${escapeHtml(bank.swift)}` : ''}</span></p></div>`
         : ''
     }
   </div>
@@ -353,8 +375,8 @@ ${
     ${doc.totals.map((x) => `<div class="row ${x.strong ? 'strong' : ''}"><span>${t(x.label)}</span><span class="ltr">${money(x.fils)} AED</span></div>`).join('')}
   </div>
 </section>
-${doc.reason ? `<section class="notes"><h3>${t(['سبب الإشعار', 'Reason'])}</h3><p>${escapeHtml(doc.reason)}</p></section>` : ''}
-${on('notes') && doc.notes ? `<section class="notes"><h3>${t(['ملاحظات', 'Notes'])}</h3><p>${escapeHtml(doc.notes)}</p></section>` : ''}
+${doc.reason ? `<section class="notes"><h3>${heading(['سبب الإشعار', 'Reason'])}</h3><p>${escapeHtml(doc.reason)}</p></section>` : ''}
+${on('notes') && doc.notes ? `<section class="notes"><h3>${heading(['ملاحظات', 'Notes'])}</h3><p>${escapeHtml(doc.notes)}</p></section>` : ''}
 ${on('terms') && (settings.texts.termsAr || settings.texts.termsEn) ? `<section class="notes">${text(settings.texts.termsAr, settings.texts.termsEn)}</section>` : ''}
 ${on('signature') ? `<section class="sign"><div>${t(['استلمت البضاعة', 'Received by'])}</div><div>${t(['الختم والتوقيع', 'Stamp & signature'])}</div></section>` : ''}
 <footer>${text(settings.texts.footerAr, settings.texts.footerEn)}</footer>

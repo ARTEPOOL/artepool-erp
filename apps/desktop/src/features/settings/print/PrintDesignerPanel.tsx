@@ -213,18 +213,19 @@ function Designer({
                       label: t(`print.positions.${v}`),
                     }))}
                   />
-                  <TextField
-                    label={t('print.logoSize')}
-                    value={String(settings.logoSizeMm)}
-                    onChange={(v) => {
-                      const n = Number(v.replace(/\D/g, ''));
-                      if (n >= 10 && n <= 60) set({ logoSizeMm: n });
-                    }}
-                    ltr
-                    inputMode="numeric"
-                    maxLength={2}
-                    hint={t('print.logoSizeHint')}
-                  />
+                  <label className={styles.slider}>
+                    <span>{t('print.logoSize')}</span>
+                    <input
+                      type="range"
+                      min={10}
+                      max={60}
+                      step={1}
+                      value={settings.logoSizeMm}
+                      onChange={(e) => set({ logoSizeMm: Number(e.target.value) })}
+                      aria-valuetext={t('print.logoSizeValue', { mm: settings.logoSizeMm })}
+                    />
+                    <bdi>{t('print.logoSizeValue', { mm: settings.logoSizeMm })}</bdi>
+                  </label>
                 </>
               )}
             </>

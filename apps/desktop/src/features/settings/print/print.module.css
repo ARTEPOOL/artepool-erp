@@ -146,3 +146,16 @@
 .loading {
   color: var(--color-text-secondary);
 }
+
+.slider {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--text-label);
+}
+
+.slider input {
+  inline-size: 100%;
+  accent-color: var(--color-primary);
+}

@@ -458,8 +458,7 @@
       "center": "Centred",
       "opposite": "Opposite side"
     },
-    "logoSize": "Logo size (mm)",
-    "logoSizeHint": "Between 10 and 60 mm.",
+    "logoSize": "Logo size",
     "color": "Main colour",
     "colorHint": "For titles, the table header and the total (A4).",
     "language": "Language",
@@ -541,6 +540,7 @@
     "preview": "Live preview",
     "fullSample": "Full tax invoice sample",
     "previewAlt": "Preview of the printed document",
-    "loading": "Preparing the preview…"
+    "loading": "Preparing the preview…",
+    "logoSizeValue": "{mm} mm"
   }
 }

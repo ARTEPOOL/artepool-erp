@@ -219,7 +219,7 @@ function sampleDocument(kind: DesignedKind, logo: string | null): PrintDocument 
     totals: [
       { label: ['إجمالي الخصم', 'Total discount'], fils: '10000' },
       { label: ['المبلغ الخاضع للضريبة', 'Taxable amount'], fils: '295000' },
-      { label: ['ضريبة القيمة المضافة', 'VAT'], fils: '14750' },
+      { label: ['ضريبة القيمة المضافة 5%', 'VAT 5%'], fils: '14750' },
       { label: ['الإجمالي المستحق', 'Total payable'], fils: '309750', strong: true },
     ],
     wordsFils: '309750',
@@ -239,7 +239,7 @@ function sampleDocument(kind: DesignedKind, logo: string | null): PrintDocument 
       dueDate: null,
       totals: [
         { label: ['المبلغ قبل الضريبة', 'Amount before VAT'], fils: '295000' },
-        { label: ['ضريبة القيمة المضافة', 'VAT'], fils: '14750' },
+        { label: ['ضريبة القيمة المضافة 5%', 'VAT 5%'], fils: '14750' },
         { label: ['الإجمالي', 'Total'], fils: '309750', strong: true },
       ],
     };
@@ -258,7 +258,7 @@ function sampleDocument(kind: DesignedKind, logo: string | null): PrintDocument 
       lines: [line],
       totals: [
         { label: ['المبلغ الخاضع للضريبة', 'Taxable amount'], fils: line.netFils },
-        { label: ['ضريبة القيمة المضافة', 'VAT'], fils: line.vatFils },
+        { label: ['ضريبة القيمة المضافة 5%', 'VAT 5%'], fils: line.vatFils },
         { label: ['الإجمالي', 'Total'], fils: line.grossFils, strong: true },
       ],
       wordsFils: line.grossFils,
