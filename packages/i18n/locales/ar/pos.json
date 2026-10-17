@@ -25,7 +25,12 @@
     "pricesIncludeVat": "الأسعار شاملة ضريبة القيمة المضافة",
     "thanks": "شكرًا لزيارتكم",
     "customerAddress": "عنوان العميل",
-    "customerPhone": "هاتف العميل"
+    "customerPhone": "هاتف العميل",
+    "phone": "هاتف",
+    "item": "الصنف",
+    "amount": "المبلغ",
+    "paid": "مدفوع",
+    "refunded": "تم الرد"
   },
   "title": "نقطة البيع",
   "subtitle": "البيع على الكاونتر في ورديتك.",

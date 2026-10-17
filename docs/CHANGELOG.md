@@ -1,5 +1,12 @@
 # Changelog
 
+## Receipt printing and the new receipt look (2026-10-17)
+
+**In plain words:** receipts no longer come out as blank pages on printers that do not speak the thermal-printer language. In **Settings → Devices → Receipt printer** choose **Any printer (Windows driver)** for an A4 printer or such a receipt printer. The receipt has a new look after the owner's sample: an Item / Amount table with a separator between items, a large total and a "Paid" box.
+
+- **Decision 0070.** The Windows app prints the receipt image through the printer's driver (GDI), silently, at its real width. The ESC/POS mode is unchanged and still opens the drawer.
+- Numbers, phones and dates read left to right inside Arabic. Long values on 58 mm paper go under their label.
+
 ## Stuck shifts (2026-10-17)
 
 **In plain words:** a shift left open on a PC that was enrolled again, broke or is gone no longer blocks its cashier. The owner or the accountant closes it from **Shifts & cash → Close as stuck shift**, with a reason and a count of the drawer; the difference stays the cashier's and is accepted as usual. In **Settings → Devices**, every PC shows its drawer, and the owner can **move the drawer** of a revoked PC to the PC enrolled in its place. A PC with an open shift can no longer be revoked.

@@ -9,6 +9,9 @@ import type { ReceiptModel } from './layout';
 
 const MARGIN = 8;
 const FONT_DOTS = { s: 22, m: 28, l: 36 } as const;
+/** A sold line's name and the "qty × price" under it. */
+const ITEM_DOTS = 24;
+const DETAIL_DOTS = 19;
 const LINE_GAP = 6;
 
 export interface ReceiptImage {
@@ -68,9 +71,10 @@ function layout(
     if (line.kind === 'space') {
       y += FONT_DOTS.s / 2;
     } else if (line.kind === 'rule') {
-      const thick = line.heavy ? 3 : 1;
+      const style = line.heavy ? 'heavy' : (line.style ?? 'dashed');
+      const thick = style === 'heavy' ? 4 : style === 'solid' ? 2 : 1;
       if (draw) {
-        ctx.setLineDash(line.heavy ? [] : [6, 4]);
+        ctx.setLineDash(style === 'dashed' ? [8, 5] : style === 'dotted' ? [2, 4] : []);
         ctx.lineWidth = thick;
         ctx.beginPath();
         ctx.moveTo(MARGIN, y + 6);
@@ -79,6 +83,42 @@ function layout(
         ctx.setLineDash([]);
       }
       y += 12 + thick;
+    } else if (line.kind === 'item') {
+      ctx.font = `400 ${ITEM_DOTS}px ${family}`;
+      const valueWidth = ctx.measureText(line.value).width;
+      const nameWidth = Math.max(usable - valueWidth - 16, usable / 2);
+      const names = line.names.flatMap((name) => wrap(ctx, name, nameWidth));
+      names.forEach((part, i) => {
+        if (draw) {
+          ctx.textAlign = 'start';
+          ctx.fillText(part, startX, y);
+          if (i === 0) {
+            ctx.textAlign = 'end';
+            ctx.fillText(line.value, endX, y);
+          }
+        }
+        y += ITEM_DOTS + LINE_GAP;
+      });
+      ctx.font = `400 ${DETAIL_DOTS}px ${family}`;
+      for (const part of wrap(ctx, line.detail, usable)) {
+        if (draw) {
+          ctx.textAlign = 'start';
+          ctx.fillText(part, startX, y);
+        }
+        y += DETAIL_DOTS + LINE_GAP;
+      }
+    } else if (line.kind === 'box') {
+      const size = FONT_DOTS.m;
+      const boxHeight = size + 18;
+      y += 4;
+      if (draw) {
+        ctx.lineWidth = 3;
+        ctx.strokeRect(MARGIN + 2, y, usable - 4, boxHeight);
+        ctx.font = `700 ${size}px ${family}`;
+        ctx.textAlign = 'center';
+        ctx.fillText(line.text, width / 2, y + 9);
+      }
+      y += boxHeight + 8;
     } else if (line.kind === 'text') {
       const size = font(line);
       for (const part of wrap(ctx, line.text, usable)) {
@@ -91,14 +131,30 @@ function layout(
     } else {
       const size = font(line);
       const valueWidth = ctx.measureText(line.value).width;
-      const labelLines = wrap(ctx, line.label, Math.max(usable - valueWidth - 16, usable / 3));
-      if (draw) {
-        ctx.textAlign = 'end';
-        ctx.fillText(line.value, endX, y);
-        ctx.textAlign = 'start';
-        labelLines.forEach((part, i) => ctx.fillText(part, startX, y + i * (size + LINE_GAP)));
+      const labelWidth = ctx.measureText(line.label).width;
+      const step = size + LINE_GAP;
+      if (labelWidth + valueWidth + 16 > usable) {
+        // Too long for one line (58 mm paper, long names): the value goes under its label.
+        const labelLines = wrap(ctx, line.label, usable);
+        const valueLines = wrap(ctx, line.value, usable);
+        if (draw) {
+          ctx.textAlign = 'start';
+          labelLines.forEach((part, i) => ctx.fillText(part, startX, y + i * step));
+          ctx.textAlign = 'end';
+          valueLines.forEach((part, i) =>
+            ctx.fillText(part, endX, y + (labelLines.length + i) * step),
+          );
+        }
+        y += (labelLines.length + valueLines.length) * step;
+      } else {
+        if (draw) {
+          ctx.textAlign = 'end';
+          ctx.fillText(line.value, endX, y);
+          ctx.textAlign = 'start';
+          ctx.fillText(line.label, startX, y);
+        }
+        y += step;
       }
-      y += labelLines.length * (size + LINE_GAP);
     }
   }
   return Math.ceil(y + MARGIN);

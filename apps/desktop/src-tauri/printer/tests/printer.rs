@@ -1,7 +1,7 @@
 //! The RAW sender: bytes reach the printer exactly as given; bad names and empty jobs are refused.
 #![cfg(not(windows))]
 
-use artepool_printer::{PrintError, list_printers, send_raw};
+use artepool_printer::{PrintError, ReceiptBitmap, list_printers, send_image, send_raw};
 
 #[test]
 fn sends_the_bytes_unchanged_and_refuses_bad_jobs() {
@@ -30,5 +30,26 @@ fn sends_the_bytes_unchanged_and_refuses_bad_jobs() {
         send_raw("Missing", "x", &job),
         Err(PrintError::Unavailable(_))
     ));
+
+    // Through the driver: the image as drawn (here a PBM file); bad images are refused.
+    let bits = [0b1000_0000u8, 0x00, 0xff, 0x01];
+    let image = ReceiptBitmap {
+        width_dots: 9,
+        height: 2,
+        bits: &bits,
+    };
+    send_image("TM-T20III", "POS-000003", &image).unwrap();
+    let pbm = std::fs::read(dir.join("TM-T20III.pbm")).unwrap();
+    assert_eq!(&pbm[..7], b"P4\n9 2\n");
+    assert_eq!(&pbm[7..], &bits);
+    let short = ReceiptBitmap {
+        width_dots: 9,
+        height: 3,
+        bits: &bits,
+    };
+    assert_eq!(
+        send_image("TM-T20III", "x", &short),
+        Err(PrintError::InvalidJob)
+    );
     std::fs::remove_dir_all(&dir).unwrap();
 }

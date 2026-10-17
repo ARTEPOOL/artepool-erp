@@ -1,6 +1,6 @@
 # ARTÉPOOL ERP — Product Requirements Document (PRD)
 
-**Version:** 1.11
+**Version:** 1.12
 **Date:** 2026-10-07
 **Owner:** Mohammed Yasser Al Huraidi (partner, ARTÉPOOL)
 **Status:** Scope approved. Owner and accountant decisions applied (see `docs/decisions/`). **Phase 1 plan approved (2026-10-07).**
@@ -436,6 +436,7 @@ Each phase ends with automated tests passing, a security review, an accountant r
 | Version | Date | Change |
 |---|---|---|
 | 1.10 | 2026-10-14 | M4b decisions 0064–0067: print designer with locked tax fields per document type (seller address on every tax invoice, customer address on full tax invoices; a full tax invoice needs the customer's address); company bank accounts with UAE IBAN check; customer PO number on A4 invoices and quotations; no QR code until e-invoicing. |
+| 1.12 | 2026-10-17 | Decision 0070: receipts print on an ESC/POS thermal printer or on any printer through its Windows driver; new receipt look with a separator between items. |
 | 1.11 | 2026-10-17 | Decision 0069: stuck shifts closed from another PC by the owner or the accountant; the drawer moves with a re-enrolled PC; no revoking a PC with an open shift. |
 | 1.9 | 2026-10-13 | Decision 0063: A4 cash taken by a cashier on their open shift goes into the drawer; A4 invoices shown in the shift's sales (POS, A4, total) but never in its expected cash. |
 | 1.0 | 2026-10-06 | Initial approved scope for Phase 1 planning |

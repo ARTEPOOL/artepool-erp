@@ -236,7 +236,8 @@
     "printerProblem": {
       "browser": "Printing works in the Windows app only.",
       "no_printer": "Choose the receipt printer first.",
-      "failed": "The printer did not respond. Check that it is on, connected and has paper."
+      "failed": "The printer did not respond. Check that it is on, connected and has paper.",
+      "no_drawer": "The cash drawer opens only with a thermal receipt printer (ESC/POS)."
     },
     "drawer": "Drawer {drawer}",
     "drawerWithShift": "Drawer {drawer} · open shift {shift} ({name})",
@@ -245,7 +246,16 @@
     "moveDrawerNote": "Drawer {drawer} of the revoked PC “{code}” moves with its history, and its open shift if any, to the POS PC you choose. Use it when the same PC was enrolled again.",
     "moveDrawerTo": "Move to",
     "noPosTarget": "There is no active point-of-sale PC to move it to.",
-    "drawerMoved": "Drawer {drawer} moved."
+    "drawerMoved": "Drawer {drawer} moved.",
+    "printerMode": "How this printer prints",
+    "printerModes": {
+      "escpos": "Thermal receipt printer (ESC/POS)",
+      "driver": "Any printer (Windows driver)"
+    },
+    "printerModeHelp": {
+      "escpos": "For 80 mm or 58 mm receipt printers such as Epson TM-T20III. Fast, cuts the paper and opens the cash drawer wired to the printer. If the test prints blank or rubbish pages, choose “Any printer”.",
+      "driver": "For an A4 printer, or a receipt printer whose Windows driver does not take ESC/POS. The receipt prints at its real width through the printer’s driver. The cash drawer does not open this way."
+    }
   },
   "audit": {
     "title": "Audit log",
@@ -456,7 +466,8 @@
     "testThermal": {
       "browser": "Test printing on the receipt printer works in the Windows app only.",
       "no_printer": "Choose the receipt printer first in Settings → Devices and printers.",
-      "failed": "The receipt printer did not print. Check that it is on and connected."
+      "failed": "The receipt printer did not print. Check that it is on and connected.",
+      "no_drawer": "The cash drawer opens only with a thermal receipt printer (ESC/POS)."
     },
     "look": "Look",
     "noLogo": "No logo yet: add one in Settings → Company.",

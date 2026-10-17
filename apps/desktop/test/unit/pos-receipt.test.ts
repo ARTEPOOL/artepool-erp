@@ -102,8 +102,16 @@ function receipt(over: Partial<ReceiptData> = {}, doc: Partial<DocumentDetail> =
 
 const t = () => ({ ar: i18n.getFixedT('ar', 'pos'), en: i18n.getFixedT('en', 'pos') });
 const texts = (lines: ReceiptLine[]) =>
-  lines.map((l) =>
-    l.kind === 'text' ? l.text : l.kind === 'pair' ? `${l.label} = ${l.value}` : l.kind,
+  lines.flatMap((l) =>
+    l.kind === 'text'
+      ? [l.text]
+      : l.kind === 'pair'
+        ? [`${l.label} = ${l.value}`]
+        : l.kind === 'item'
+          ? [...l.names, `${l.detail} = ${l.value}`]
+          : l.kind === 'box'
+            ? [`[${l.text}]`]
+            : [l.kind],
   );
 
 describe('ESC/POS', () => {
@@ -158,7 +166,12 @@ describe('receipt content', () => {
     const all = texts(m.lines);
     expect(all).toContain('فاتورة ضريبية مبسطة');
     expect(all).toContain('Simplified Tax Invoice');
-    expect(all).toContain('رقم / No. = POS-000124');
+    expect(all.some((x) => x.startsWith('\u2066#POS-000124\u2069 = '))).toBe(true);
+    expect(all).toContain('العميل / Customer = Cash customer');
+    expect(all).toContain('الصنف / Item = المبلغ / Amount');
+    expect(all).toContain('كلور أقراص');
+    expect(all).toContain('TCCA tablets');
+    expect(all).toContain('[مدفوع / PAID]');
     expect(all).toContain('الإجمالي قبل الضريبة / Total excl. VAT = 240.00');
     expect(all).toContain('ضريبة القيمة المضافة 5% / VAT 5% = 12.00');
     expect(all).toContain('الإجمالي / TOTAL = 252.00 AED');
@@ -167,6 +180,29 @@ describe('receipt content', () => {
     expect(all).toContain('TCCA90-05 · 2 × 126.00 = 252.00');
     expect(all).toContain('عدد القطع / Items = 2');
     expect(all.some((x) => x.includes('COPY'))).toBe(false);
+  });
+
+  it('a separator between items, none before the first; an unpaid credit note has no box', () => {
+    const m = receiptModel(
+      receipt(
+        {},
+        {
+          lines: [line({}), line({ id: '2', itemCode: 'ALG-1L', descriptionEn: 'Algaecide' })],
+          netFils: '48000',
+          vatFils: '2400',
+          totalFils: '50400',
+        },
+      ),
+      'en',
+      t(),
+    );
+    const kinds = m.lines.map((l) => (l.kind === 'rule' ? `rule:${l.style ?? 'dashed'}` : l.kind));
+    const firstItem = kinds.indexOf('item');
+    expect(kinds[firstItem - 1]).toBe('rule:solid');
+    expect(kinds.slice(firstItem, firstItem + 3)).toEqual(['item', 'rule:dotted', 'item']);
+    expect(kinds.filter((k) => k === 'rule:dotted')).toHaveLength(1);
+    // 252.00 paid of 504.00: not marked paid.
+    expect(kinds).not.toContain('box');
   });
 
   it('English only reads left to right; Arabic only uses dirhams', () => {

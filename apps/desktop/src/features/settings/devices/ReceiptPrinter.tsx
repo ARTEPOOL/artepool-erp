@@ -1,21 +1,24 @@
 /**
- * Settings → Devices: the receipt printer of THIS PC (decisions 0008, 0055). Kept on this PC only;
- * the POS prints to it silently and the drawer, wired to the printer, opens through it. A test
+ * Settings → Devices: the receipt printer of THIS PC (decisions 0008, 0055, 0070). Kept on this PC
+ * only; the POS prints to it silently. A thermal receipt printer takes ESC/POS and opens the
+ * drawer wired to it; any other printer prints the receipt through its Windows driver. A test
  * receipt and a drawer test check the wiring. Only the Windows app can reach a printer.
  */
 import { useEffect, useState } from 'react';
 import { Printer, Landmark } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Button, Card, iconClass, Note, useToast } from '../../../ui';
-import { receiptJob } from '../../pos/receipt/escpos';
+import { Alert, Button, Card, iconClass, Note, Segmented, useToast } from '../../../ui';
 import { renderReceipt } from '../../pos/receipt/render';
 import {
   canPrintSilently,
   kickDrawer,
   listPrinters,
+  printImage,
+  savedMode,
   savedPrinter,
+  saveMode,
   savePrinter,
-  sendJob,
+  type PrinterMode,
   type PrintOutcome,
 } from '../../pos/receipt/printer';
 import { CardHead, settingsClasses as styles } from '../parts';
@@ -27,6 +30,7 @@ export function ReceiptPrinterCard({ index }: { index: number }) {
   const native = canPrintSilently();
   const [printers, setPrinters] = useState<string[]>([]);
   const [chosen, setChosen] = useState(savedPrinter() ?? '');
+  const [mode, setMode] = useState<PrinterMode>(savedMode());
   const [problem, setProblem] = useState<string | null>(null);
 
   useEffect(() => {
@@ -72,10 +76,7 @@ export function ReceiptPrinterCard({ index }: { index: number }) {
         { kind: 'rule', heavy: true },
       ],
     });
-    report(
-      await sendJob(receiptJob({ ...image, kickDrawer: false }), 'test'),
-      t('devices.testSent'),
-    );
+    report(await printImage(image, 'test'), t('devices.testSent'));
   };
 
   return (
@@ -103,6 +104,21 @@ export function ReceiptPrinterCard({ index }: { index: number }) {
               </option>
             ))}
           </select>
+          <Segmented<PrinterMode>
+            label={t('devices.printerMode')}
+            value={mode}
+            onChange={(value) => {
+              setMode(value);
+              saveMode(value);
+              setProblem(null);
+              toast(t('devices.printerSaved'));
+            }}
+            options={[
+              { value: 'escpos', label: t('devices.printerModes.escpos') },
+              { value: 'driver', label: t('devices.printerModes.driver') },
+            ]}
+          />
+          <Note>{t(`devices.printerModeHelp.${mode}`)}</Note>
           <div className={styles.savebar}>
             <Button variant="default" isDisabled={!chosen} onPress={() => void testReceipt()}>
               <Printer className={iconClass.sm} aria-hidden="true" />
@@ -110,7 +126,7 @@ export function ReceiptPrinterCard({ index }: { index: number }) {
             </Button>
             <Button
               variant="default"
-              isDisabled={!chosen}
+              isDisabled={!chosen || mode === 'driver'}
               onPress={() => void kickDrawer().then((o) => report(o, t('devices.drawerSent')))}
             >
               <Landmark className={iconClass.sm} aria-hidden="true" />

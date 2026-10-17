@@ -76,6 +76,7 @@ There is one short file per decision, numbered in order.
 | [0067](0067-qr-code-deferred.md) | No QR code on printed documents until e-invoicing | Accepted |
 | [0068](0068-fonts.md) | The app's fonts: GE SS TV for Arabic, Tw Cen MT for English | Accepted |
 | [0069](0069-stuck-shifts.md) | Stuck shifts: close from another PC; the drawer moves with its PC; no revoking a PC with an open shift | Accepted |
+| [0070](0070-receipt-printer-modes-and-layout.md) | Receipt printer: ESC/POS or any printer through its Windows driver; the new receipt look with a separator between items | Accepted |
 
 ## Template
 

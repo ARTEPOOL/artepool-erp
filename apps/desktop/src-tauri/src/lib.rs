@@ -89,6 +89,33 @@ async fn printer_print(
     .map_err(|e| e.to_string())
 }
 
+/// Prints a receipt image (1 bit per dot, base64) through the printer's own Windows driver,
+/// silently: for printers that do not take ESC/POS bytes (decision 0070).
+#[tauri::command]
+async fn printer_print_image(
+    printer: String,
+    document_name: String,
+    width_dots: u32,
+    height: u32,
+    bits_base64: String,
+) -> Result<(), String> {
+    use base64::Engine as _;
+    let bits = base64::engine::general_purpose::STANDARD
+        .decode(bits_base64.as_bytes())
+        .map_err(|_| "The print job is not valid".to_string())?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let image = artepool_printer::ReceiptBitmap {
+            width_dots,
+            height,
+            bits: &bits,
+        };
+        artepool_printer::send_image(&printer, &document_name, &image)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -113,7 +140,8 @@ pub fn run() {
             bridge_enroll,
             bridge_request,
             printer_list,
-            printer_print
+            printer_print,
+            printer_print_image
         ])
         .run(tauri::generate_context!())
         .expect("ARTÉPOOL ERP could not start");

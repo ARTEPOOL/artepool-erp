@@ -25,7 +25,12 @@
     "pricesIncludeVat": "Prices include VAT",
     "thanks": "Thank you",
     "customerAddress": "Customer address",
-    "customerPhone": "Customer phone"
+    "customerPhone": "Customer phone",
+    "phone": "Tel",
+    "item": "Item",
+    "amount": "Amount",
+    "paid": "PAID",
+    "refunded": "REFUNDED"
   },
   "title": "Point of sale",
   "subtitle": "Sell at the counter on your own shift.",

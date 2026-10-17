@@ -79,6 +79,7 @@ It runs client–server on the local network: PostgreSQL and the API service on 
 - **Cart removals** before the invoice is issued need no approval. They are always written to the audit log as events. (0005)
 - **Shift-close recount:** at most one, with supervisor approval. Both counts are kept. (0006)
 - **Hardware:** standard 80 mm ESC/POS printers (Epson TM-T20III / TM-T82 and compatible); the drawer is on the printer's kick port. (0055)
+- **Receipt printer modes:** per PC, ESC/POS thermal (RAW, cut, drawer) or any printer through its Windows driver (image at real width, no drawer). The receipt follows the owner's sample: Item / Amount table, a dotted separator between items, a large total, a Paid box. (0070)
 - **Blind count:** notes 1000–5, coins 1–0.05, plus "other amount"; exact to the fils. (0056)
 - **Cash drop alert** above AED 3,000 (setting). (0057)
 - **Stuck shifts:** owner/accountant close a shift stuck on another PC (reason + count; over/short stays the cashier's); the owner moves a re-enrolled PC's drawer to it; a PC with an open shift cannot be revoked. (0069)
