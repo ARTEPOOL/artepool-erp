@@ -295,6 +295,8 @@ header.center .logo { order: -1; }
 h1, h2, h3, .heading { font-family: 'ARTEPOOL Arabic', 'ARTEPOOL Heading', 'Plex Arabic', sans-serif; }
 .seller h1 { font-size: 1.35em; margin: 0; color: #111; }
 .seller p { margin: 0.5mm 0; }
+/* Every seller line on the same side as the Arabic name (English lines would otherwise start at their own left). */
+header:not(.center) .seller { text-align: ${dir === 'rtl' ? 'right' : 'left'}; }
 .title { text-align: center; margin: 5mm 0 3mm; }
 .title h2 { font-size: 1.55em; margin: 0; color: #111; }
 .welcome { text-align: center; color: #333; }
@@ -315,7 +317,7 @@ tr.deduction td { color: #333; font-style: italic; }
 .after .side { flex: 1; }
 .totals { margin-inline-start: auto; inline-size: 75mm; }
 .totals .row { padding: 1mm 0; border-block-end: 0.5pt solid #ddd; }
-.totals .strong { font-weight: 700; font-size: 1.15em; border-block-end: 1.5pt solid var(--main); color: var(--main); }
+.totals .strong { font-weight: 700; font-size: 1.15em; border-block-end: 1.5pt solid var(--main); color: #111; }
 .words, .bank, .notes { margin-block-start: 3mm; }
 .notes h3, .bank h3 { font-size: 1em; margin: 0 0 1mm; color: #111; }
 .notes p, .bank p { margin: 0.5mm 0; }
