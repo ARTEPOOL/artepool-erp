@@ -210,6 +210,48 @@ beforeAll(async () => {
 afterAll(() => server.close());
 
 describe('the POS PC and its shift (decisions 0004, 0021)', () => {
+  it('a PC enrolled again under the same name gets a drawer of its own', async () => {
+    // The old enrollment made drawer REG-TWIN-PC, then was revoked.
+    const first = await addDevice(server, { code: 'TWIN-PC', kind: 'pos' });
+    const oldCashier = await addUser(server, {
+      username: 'cash.twin0',
+      roles: ['cashier'],
+      pin: '4829',
+    });
+    await open(
+      asActor(
+        first,
+        oldCashier,
+        (await openSession(server, { userId: oldCashier, deviceId: first.id })).token,
+      ),
+      '0',
+    );
+    await withBusinessTx(
+      server.db,
+      { userId: owner.id, deviceId: owner.pc.id, requestId: randomUUID() },
+      (trx) =>
+        trx
+          .updateTable('auth.devices')
+          .set({ status: 'revoked', revoke_reason: 'Enrolled again' })
+          .where('id', '=', first.id)
+          .execute(),
+    );
+    // The same PC enrolled again: opening a shift there works, on a drawer of its own.
+    const again = await addDevice(server, { code: 'TWIN-PC', kind: 'pos' });
+    const id = await addUser(server, { username: 'cash.twin', roles: ['cashier'], pin: '4829' });
+    await open(
+      asActor(again, id, (await openSession(server, { userId: id, deviceId: again.id })).token),
+      '0',
+    );
+    const codes = await server.db
+      .selectFrom('cash.registers')
+      .select('code')
+      .where('device_id', 'in', [first.id, again.id])
+      .orderBy('id')
+      .execute();
+    expect(codes.map((r) => r.code)).toEqual(['REG-TWIN-PC', 'REG-TWIN-PC-2']);
+  });
+
   it('shifts open only on a POS PC; one open shift per drawer; only its cashier sells on it', async () => {
     const office = await signedIn('cash.office', ['cashier'], 'office');
     expect(

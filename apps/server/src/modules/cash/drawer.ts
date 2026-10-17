@@ -38,10 +38,23 @@ export async function ensureRegister(trx: Transaction<DB>, device: DeviceInfo): 
     if (!existing.is_active) throw ruleError('REGISTER_INACTIVE', 'This register is not active');
     return existing.id;
   }
-  const code = `REG-${device.code}`
+  const base = `REG-${device.code}`
     .toUpperCase()
     .replace(/[^A-Z0-9._-]/g, '-')
     .slice(0, 32);
+  // A PC enrolled again under the same name: the old enrollment keeps its drawer (and its
+  // history), so the new drawer takes the next free code (REG-POS-01-2, -3, …).
+  const taken = new Set(
+    (
+      await trx
+        .selectFrom('cash.registers')
+        .select('code')
+        .where('code', 'like', `${base.slice(0, 28)}%`)
+        .execute()
+    ).map((r) => r.code),
+  );
+  let code = base;
+  for (let n = 2; taken.has(code); n += 1) code = `${base.slice(0, 31 - String(n).length)}-${n}`;
   const series = await trx
     .selectFrom('sys.document_series')
     .select(['id', 'doc_type', 'channel'])
