@@ -150,9 +150,9 @@ export function DraftEditor({ doc }: { doc: DocumentDetail | null }) {
 
   // The cash customer types their real name on the full tax invoice (decision 0071).
   const isWalkIn = Boolean(customer?.isWalkIn || (walkIn && customer?.id === walkIn.id));
-  useEffect(() => {
-    if (walkIn && isWalkIn && state.billToName === walkIn.name) patch({ billToName: '' });
-  }, [walkIn, isWalkIn, state.billToName]);
+  // "Cash customer" itself is not a name: the field shows empty until the real name is typed.
+  // (Only shown so: the saved draft and the state stay the same, so it is not "changed".)
+  const shownName = isWalkIn && walkIn && state.billToName === walkIn.name ? '' : state.billToName;
 
   const preview = useLinesPreview(state.lines, state.docDiscount);
   const discount = readDocDiscount(state.docDiscount);
@@ -215,7 +215,7 @@ export function DraftEditor({ doc }: { doc: DocumentDetail | null }) {
       return setProblem(t('form.problems.discount'));
     const notes = state.notes.trim();
     const customerPo = state.customerPo.trim();
-    const billToName = isWalkIn ? state.billToName.trim() : '';
+    const billToName = isWalkIn ? shownName.trim() : '';
     const billToAddress = state.billToAddress.trim();
     save.mutate({
       customerId: customer.id,
@@ -267,7 +267,7 @@ export function DraftEditor({ doc }: { doc: DocumentDetail | null }) {
           {customer && isWalkIn && (
             <TextField
               label={t('sales:fields.billToName')}
-              value={state.billToName}
+              value={shownName}
               onChange={(billToName) => patch({ billToName })}
               maxLength={200}
               hint={t('sales:fields.billToNameHint')}
@@ -412,7 +412,19 @@ export function DraftEditor({ doc }: { doc: DocumentDetail | null }) {
               {t('form.save')}
             </Button>
             {can('invoices.issue') && (
-              <Button variant="primary" isDisabled={!doc || dirty} onPress={() => setIssuing(true)}>
+              <Button
+                variant="primary"
+                isDisabled={!doc || dirty}
+                onPress={() => {
+                  // A full tax invoice for the cash customer needs their real name and address.
+                  if (isWalkIn && !shownName.trim())
+                    return setProblem(t('common:errors.rules.FULL_INVOICE_NAME'));
+                  if (isWalkIn && !state.billToAddress.trim())
+                    return setProblem(t('common:errors.rules.FULL_INVOICE_ADDRESS'));
+                  setProblem(null);
+                  setIssuing(true);
+                }}
+              >
                 <Send className={iconClass.sm} aria-hidden="true" />
                 {t('form.issue')}
               </Button>

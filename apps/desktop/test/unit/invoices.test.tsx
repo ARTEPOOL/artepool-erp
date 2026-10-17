@@ -608,6 +608,38 @@ describe('Invoices (A4): a new invoice', () => {
     });
   });
 
+  it('a saved draft for the cash customer can be issued; the real name and address are asked first (0071)', async () => {
+    const WALK_IN: CustomerListItem = {
+      ...CUSTOMER,
+      id: '1',
+      code: 'C-0001',
+      customerType: 'individual',
+      name: 'عميل نقدي',
+      phone: null,
+      isVatRegistered: false,
+      trn: null,
+      isWalkIn: true,
+    };
+    const saved = { ...DRAFT, customerId: '1', billToName: 'عميل نقدي', billToAddress: null };
+    const bridge = bridgeFor(OFFICE, '/invoices/300')
+      .on('GET', '/api/v1/sales/documents/300', ok(saved))
+      .on(
+        'GET',
+        '/api/v1/customers',
+        ok({ customers: [WALK_IN], total: 1, counts: { active: 1, vatRegistered: 0 } }),
+      );
+    await signIn(bridge, 'Invoice draft');
+    // Saved as it is: not "changed", so it can be issued (the name field only shows empty).
+    const name = await screen.findByLabelText('Customer name on the invoice');
+    await waitFor(() => expect((name as HTMLInputElement).value).toBe(''));
+    expect(screen.queryByText('Save the draft before issuing it.')).toBeNull();
+    const issueButton = screen.getByRole('button', { name: 'Issue invoice' });
+    expect(issueButton.hasAttribute('data-disabled')).toBe(false);
+    fireEvent.click(issueButton);
+    expect(await screen.findByText(/needs the customer's name/)).toBeTruthy();
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
   it('discarding a draft asks first, then sends its row version', async () => {
     const bridge = bridgeFor(OFFICE, '/invoices/300')
       .on('GET', '/api/v1/sales/documents/300', ok(DRAFT))
