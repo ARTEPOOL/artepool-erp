@@ -30,7 +30,8 @@
     "item": "Item",
     "amount": "Amount",
     "paid": "PAID",
-    "refunded": "REFUNDED"
+    "refunded": "REFUNDED",
+    "email": "Email"
   },
   "title": "Point of sale",
   "subtitle": "Sell at the counter on your own shift.",

@@ -215,6 +215,22 @@ describe('receipt content', () => {
     expect(texts(ar.lines)).not.toContain('Simplified Tax Invoice');
   });
 
+  it('seller lines in both languages: Arabic label right, English left, value between', () => {
+    const m = receiptModel(
+      receipt({ seller: { ...receipt().seller, email: 'info@artepool.com' } }),
+      'both',
+      t(),
+    );
+    const all = m.lines.flatMap((l) => (l.kind === 'text' ? [l.text] : []));
+    expect(all).toContain('هاتف: \u2066Tel: +971 3 000 0000\u2069');
+    expect(all).toContain('البريد: \u2066Email: info@artepool.com\u2069');
+    expect(all).toContain('الرقم الضريبي: \u2066TRN: 100987654300003\u2069');
+    const en = receiptModel(receipt(), 'en', t()).lines.flatMap((l) =>
+      l.kind === 'text' ? [l.text] : [],
+    );
+    expect(en).toContain('TRN: 100987654300003');
+  });
+
   it('a VAT-registered customer: full tax invoice with their name and TRN (0010, 0062)', () => {
     const m = receiptModel(
       receipt({}, { invoiceFormat: 'full', billToName: 'Pool LLC', billToTrn: '100111222333003' }),

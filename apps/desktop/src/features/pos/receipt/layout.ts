@@ -83,11 +83,21 @@ export function receiptModel(
   );
   const address = pick(data.seller.addressAr, data.seller.addressEn).join(' · ');
   if (address) text(address);
+  /**
+   * A labelled seller line. In both languages the Arabic label stays on the right and the English
+   * one on the left, with the value between them: "Tel: +971… :هاتف" (as on the A4 invoice).
+   */
+  const sellerLine = (key: string, value: string) =>
+    text(
+      both
+        ? `${t.ar(key).trim()}: ${`\u2066${t.en(key).trim()}: ${value}\u2069`}`
+        : `${label(key)}: ${iso(value)}`,
+    );
   if (on('sellerContact')) {
-    if (data.seller.phone) text(`${label('receipt.phone')}: ${iso(data.seller.phone)}`);
-    if (data.seller.email) text(iso(data.seller.email));
+    if (data.seller.phone) sellerLine('receipt.phone', data.seller.phone);
+    if (data.seller.email) sellerLine('receipt.email', data.seller.email);
   }
-  if (data.seller.trn) text(`${label('receipt.trn')}: ${iso(data.seller.trn)}`);
+  if (data.seller.trn) sellerLine('receipt.trn', data.seller.trn);
   if (on('welcome'))
     for (const w of pick(template.texts.welcomeAr, template.texts.welcomeEn)) if (w) text(w);
   lines.push({ kind: 'rule' });

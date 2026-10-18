@@ -1,5 +1,9 @@
 # Changelog
 
+## Thermal receipt: phone, email and TRN lines (2026-10-18)
+
+**In plain words:** on the thermal receipt in both languages, the phone, email and TRN lines now read like the A4 invoice: the Arabic label on the right, the English label on the left, the value between them ("Tel: +971… :هاتف"). The email line now has its label too.
+
 ## Company details order in the A4 header (2026-10-18)
 
 **In plain words:** the company name in the A4 header stands alone; the lines under it carry labels: address, phone, email, then the TRN (Arabic labels on the Arabic side, English on the English side). With the logo on the side in both languages, the earlier block without labels stays (names, addresses, TRN, phone · email); on the TRN line the Arabic label sits on the right and "TRN:" on the left.
