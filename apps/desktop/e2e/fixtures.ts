@@ -186,7 +186,19 @@ export async function signInAsOwner(page: Page, t: (key: string) => string): Pro
   await page.getByLabel(t('auth:signIn.password'), { exact: true }).fill(owner.password);
   await page.getByRole('button', { name: t('auth:signIn.submit') }).click();
   await expect(page.getByRole('heading', { name: t('auth:secondFactor.title') })).toBeVisible();
+  await dontRememberThisPc(page, t);
   await typeCode(page, await control.ownerCode());
   await page.getByRole('button', { name: t('auth:secondFactor.confirm') }).click();
   await expect(page.getByRole('button', { name: t('settings:user.menu') })).toBeVisible();
+}
+
+/**
+ * Unticks "Remember this PC" (ticked by default, decision 0077), so the tests that sign the owner
+ * in keep seeing the phone code on the shared test PCs.
+ */
+export async function dontRememberThisPc(page: Page, t: (key: string) => string): Promise<void> {
+  const box = page.getByRole('checkbox', { name: t('auth:secondFactor.remember') });
+  if ((await box.count()) === 0) return; // not offered here (a POS PC)
+  if (await box.isChecked()) await page.getByText(t('auth:secondFactor.remember')).click();
+  await expect(box).not.toBeChecked();
 }
