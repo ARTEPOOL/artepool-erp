@@ -1,5 +1,11 @@
 # Changelog
 
+## The owner remembered on the cashier PC too (2026-10-18)
+
+**In plain words:** on a cashier (POS) PC, the owner now sees "Remember this PC" under the phone code too. After the code once there, the password is enough on that PC until the password changes. Everyone else still types the code on cashier PCs every time.
+
+- Decision 0078; migration 0031 (`ops_backup` moves to 0032).
+
 ## The phone code once per PC (2026-10-18)
 
 **In plain words:** the first time you sign in on a PC you type the phone code, with "Remember this PC" already ticked. After that, on that PC, the username and password are enough until your password changes. On another PC the code is asked once there too.

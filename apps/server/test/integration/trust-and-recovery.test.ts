@@ -184,7 +184,7 @@ describe('"Trust this PC" for the 2-step code (decision 0027)', () => {
     );
   });
 
-  it('never trusts a POS PC, and never with a recovery code', async () => {
+  it('never trusts a POS PC for anyone but the owner, and never with a recovery code', async () => {
     const omar = await twoStepPerson('omar.trust', { recoveryCodes: ['ABCDE-FGHJK'] });
     const counter = await pc('OMAR-POS', 'pos');
     await fullSignIn(counter, omar, true);
@@ -228,6 +228,22 @@ describe('"Trust this PC" for the 2-step code (decision 0027)', () => {
     const owner = await twoStepPerson('mohammed', { owner: true });
     const ownerPc = await pc('OWNER-PC');
     const ownerSession = await fullSignIn(ownerPc, owner);
+
+    // The owner, and only the owner, may have a POS PC remember the code (decision 0078).
+    const counter = await pc('OWNER-POS', 'pos');
+    const onPos = (await signIn(counter, owner)).json<SignInResponse>();
+    remember(onPos.token);
+    expect(onPos.trustDays).toBe(3650);
+    const ticked = await call(server, 'POST', '/api/v1/auth/second-factor', {
+      device: counter,
+      token: onPos.token,
+      body: { code: await freshCode(owner), trustDevice: true },
+    });
+    expect(ticked.statusCode).toBe(200);
+    remember(ticked.json<SignInResponse>().token);
+    const backOnPos = (await signIn(counter, owner)).json<SignInResponse>();
+    remember(backOnPos.token);
+    expect(backOnPos.session).toMatchObject({ stage: 'full', authMethod: 'trusted_device' });
     const nour = await twoStepPerson('nour.trust');
     const nourPc = await pc('NOUR-PC');
     const nourSession = await fullSignIn(nourPc, nour, true);

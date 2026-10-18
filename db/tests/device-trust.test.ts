@@ -114,11 +114,12 @@ describe('trusting a PC (decision 0027)', () => {
     await expect(trust(owner, other, owner, null)).rejects.toMatchObject({ code: 'AP010' });
   });
 
-  it('needs an active 2-step code, and never on a POS or revoked PC', async () => {
+  it('needs an active 2-step code, never on a revoked PC, and on a POS PC only for the owner', async () => {
     const plain = await createUser(api, { username: 'plain.user' });
     const spare = await createDevice(api, { code: 'SPARE-PC' });
     await expect(trust(plain, spare)).rejects.toMatchObject({ code: 'AP010' });
-    await expect(trust(owner, pos)).rejects.toMatchObject({ code: 'AP010' });
+    const clerk = await twoStepUser('clerk.twostep', ['accountant']);
+    await expect(trust(clerk, pos)).rejects.toMatchObject({ code: 'AP010' });
     await commit(
       `UPDATE auth.devices SET status = 'revoked', revoke_reason = 'Old PC' WHERE id = $1`,
       [spare],
@@ -279,7 +280,9 @@ describe('trust ends by itself (decision 0027)', () => {
   it('when the PC is revoked or becomes a POS PC; other changes keep it', async () => {
     const pcA = await createDevice(api, { code: 'TRUST-A' });
     const pcB = await createDevice(api, { code: 'TRUST-B' });
-    const a = await trust(owner, pcA);
+    // Not the owner: the owner's trust survives a PC turned POS (decision 0078).
+    const lea = await twoStepUser('lea.office', ['accountant']);
+    const a = await trust(lea, pcA);
     const b = await trust(owner, pcB);
     await commit(`UPDATE auth.devices SET name = 'Back office' WHERE id = $1`, [pcA], owner);
     await commit(`UPDATE auth.devices SET device_kind = 'warehouse' WHERE id = $1`, [pcA], owner);
@@ -298,5 +301,25 @@ describe('trust ends by itself (decision 0027)', () => {
       [b.toString()],
     );
     expect(rows[0]!.n).toBe('1');
+  });
+});
+
+describe('the owner on a POS PC (decision 0078)', () => {
+  it('may trust it and sign in there with the password alone; others may not', async () => {
+    const counter = await createDevice(api, { code: 'COUNTER-OWNER', kind: 'pos' });
+    await trust(owner, counter);
+    await signIn(owner, counter);
+    const clerk = await twoStepUser('clerk.counter', ['accountant']);
+    await expect(signIn(clerk, counter)).rejects.toMatchObject({ code: 'AP010' });
+  });
+
+  it("turning a PC into a POS PC keeps only the owner's trust", async () => {
+    const pc = await createDevice(api, { code: 'TURNS-POS' });
+    const sam = await twoStepUser('sam.office', ['accountant']);
+    const ownerTrust = await trust(owner, pc);
+    const samTrust = await trust(sam, pc);
+    await commit(`UPDATE auth.devices SET device_kind = 'pos' WHERE id = $1`, [pc], owner);
+    expect(await endReason(samTrust)).toBe('device_kind_changed');
+    expect(await endReason(ownerTrust)).toBeNull();
   });
 });

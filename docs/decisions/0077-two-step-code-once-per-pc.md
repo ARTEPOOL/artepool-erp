@@ -13,7 +13,7 @@
 - After that, on **that PC only**, the password alone signs the person in, with no time limit.
 - On any other PC, the phone code is still asked the first time.
 - Every ending of decision 0027 still applies: the trust ends when the password changes (changed, reset or recovered), the 2-step setup changes, the person is deactivated, or the PC is revoked or becomes a POS PC. The owner can still end it in **Settings → Devices**.
-- Never on POS PCs.
+- Never on POS PCs (except for the owner since [0078](0078-owner-remembered-on-pos-pcs.md)).
 
 ## How it works
 - Migration 0030: the setting `security.trusted_device_days` goes from 30 to **3650** (10 years, in practice "until the password changes"); its allowed range becomes 0–3650, and 0 still turns the feature off.

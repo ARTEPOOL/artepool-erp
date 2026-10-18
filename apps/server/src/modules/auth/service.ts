@@ -169,9 +169,20 @@ async function serverResetNotice(
   return { at: reset.occurred_at.toISOString(), reason: reset.reason ?? '' };
 }
 
-/** Days "Trust this PC" lasts here now: 0 on POS PCs or when turned off (decision 0027). */
-async function trustDaysHere(db: Kysely<DB>, device: DeviceInfo): Promise<number> {
-  if (device.kind === 'pos') return 0;
+/** Whether this user is the owner: the only one a POS PC may remember (decision 0078). */
+async function isOwner(db: Kysely<DB>, userId: bigint): Promise<boolean> {
+  const { rows } = await sql<{ owner: boolean }>`SELECT auth.is_owner(${userId}) AS owner`.execute(
+    db,
+  );
+  return rows[0]?.owner === true;
+}
+
+/**
+ * Days "Trust this PC" lasts here now: 0 when turned off, and on POS PCs for anyone but the owner
+ * (decisions 0027, 0078).
+ */
+async function trustDaysHere(db: Kysely<DB>, device: DeviceInfo, userId: bigint): Promise<number> {
+  if (device.kind === 'pos' && !(await isOwner(db, userId))) return 0;
   const { rows } = await sql<{ days: number }>`SELECT auth.trusted_device_days() AS days`.execute(
     db,
   );
@@ -180,7 +191,7 @@ async function trustDaysHere(db: Kysely<DB>, device: DeviceInfo): Promise<number
 
 /** Whether this person may sign in here with the password alone: the database's own rule. */
 async function isTrustedHere(db: Kysely<DB>, userId: bigint, device: DeviceInfo): Promise<boolean> {
-  if (device.kind === 'pos') return false;
+  if (device.kind === 'pos' && !(await isOwner(db, userId))) return false;
   const trust = await db
     .selectFrom('auth.device_trust')
     .select('id')
@@ -288,7 +299,8 @@ export async function signInWithPassword(
       ...userEntity(user.id),
       data: { method, stage, sessionId: opened.id },
     });
-    const trustDays = stage === 'second_factor' ? await trustDaysHere(trx, request.device!) : 0;
+    const trustDays =
+      stage === 'second_factor' ? await trustDaysHere(trx, request.device!, user.id) : 0;
     const serverReset = await serverResetNotice(trx, user);
     return {
       token: opened.token,
@@ -457,7 +469,7 @@ export async function verifySecondFactor(
     if (
       result.method === 'password_totp' &&
       result.trust &&
-      (await trustDaysHere(trx, request.device!)) > 0
+      (await trustDaysHere(trx, request.device!, user.id)) > 0
     ) {
       await trx
         .updateTable('auth.device_trust')

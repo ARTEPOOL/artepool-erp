@@ -84,6 +84,7 @@ There is one short file per decision, numbered in order.
 | [0075](0075-separate-receipt-logo.md) | The thermal receipt can have its own logo (Print designer → Thermal receipt); empty = the company logo; A4 keeps the company logo | Accepted |
 | [0076](0076-centre-logo-letterhead.md) | Logo in the middle (A4, both languages): Arabic details on the right, English on the left | Accepted |
 | [0077](0077-two-step-code-once-per-pc.md) | The 2-step code once per PC: the PC is remembered (ticked by default) until the password changes; never on POS PCs | Accepted |
+| [0078](0078-owner-remembered-on-pos-pcs.md) | The owner (only) may be remembered on POS PCs too, until the password changes | Accepted |
 
 ## Template
 
