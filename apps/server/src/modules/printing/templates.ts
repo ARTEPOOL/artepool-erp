@@ -250,8 +250,9 @@ export function renderHtml(doc: PrintDocument, seller: Seller, options: RenderOp
     on('logo') && doc.logoDataUri
       ? `<img class="logo" src="${doc.logoDataUri}" alt="" style="max-block-size:${settings.logoSizeMm}mm">`
       : '';
+  // Seller lines in the owner's order: name, address, email, phone, then the TRN.
   const contact = on('sellerContact')
-    ? [seller.phone, seller.email].filter(Boolean).map((v) => escapeHtml(v!))
+    ? [seller.email, seller.phone].filter(Boolean).map((v) => escapeHtml(v!))
     : [];
 
   const lineRows = doc.lines
@@ -342,23 +343,23 @@ ${
   <div class="seller seller-en">
     <h1>${escapeHtml(seller.legal_name_en)}</h1>
     ${sellerAddress && seller.address_en ? `<p>${escapeHtml(seller.address_en)}</p>` : ''}
-    ${sellerTrn && seller.trn ? `<p>TRN <span class="ltr">${escapeHtml(seller.trn)}</span></p>` : ''}
     ${contact.map((c) => `<p class="ltr">${c}</p>`).join('')}
+    ${sellerTrn && seller.trn ? `<p>TRN <span class="ltr">${escapeHtml(seller.trn)}</span></p>` : ''}
   </div>
   ${logo || '<div></div>'}
   <div class="seller seller-ar">
     <h1>${escapeHtml(seller.legal_name_ar)}</h1>
     ${sellerAddress && seller.address_ar ? `<p>${escapeHtml(seller.address_ar)}</p>` : ''}
-    ${sellerTrn && seller.trn ? `<p>الرقم الضريبي <span class="ltr">${escapeHtml(seller.trn)}</span></p>` : ''}
     ${contact.map((c) => `<p><span class="ltr">${c}</span></p>`).join('')}
+    ${sellerTrn && seller.trn ? `<p>الرقم الضريبي <span class="ltr">${escapeHtml(seller.trn)}</span></p>` : ''}
   </div>
 </header>`
     : `<header class="${settings.logoPosition}">
   <div class="seller">
     <h1>${lang !== 'en' ? escapeHtml(seller.legal_name_ar) : ''}${lang !== 'ar' ? `<span class="en">${escapeHtml(seller.legal_name_en)}</span>` : ''}</h1>
     ${sellerAddress ? text(seller.address_ar, seller.address_en) : ''}
-    ${sellerTrn && seller.trn ? `<p>${trnLine(seller.trn)}</p>` : ''}
     ${contact.length > 0 ? `<p><span class="ltr">${contact.join(' · ')}</span></p>` : ''}
+    ${sellerTrn && seller.trn ? `<p>${trnLine(seller.trn)}</p>` : ''}
   </div>
   ${logo}
 </header>`

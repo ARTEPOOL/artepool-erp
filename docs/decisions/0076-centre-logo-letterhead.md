@@ -9,10 +9,11 @@
 
 ## Decision
 - On A4 documents printed in **both languages** with the logo position **"middle"**, the header is a letterhead in three columns:
-  - the Arabic company details on the right (name, address, TRN, phone and email when shown);
+  - the Arabic company details on the right, in this order: name, address, email, phone (when shown), then the TRN;
   - the logo in the middle;
   - the English details on the left.
 - In one language only, "middle" keeps the logo above the details, centred.
+- The same order (name, address, email, phone, TRN) is used in every header layout.
 - The locked tax fields (seller address and TRN on tax documents) print in both columns as before.
 
 ## Why

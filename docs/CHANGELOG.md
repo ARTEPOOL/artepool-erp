@@ -1,5 +1,11 @@
 # Changelog
 
+## Company details order in the A4 header (2026-10-18)
+
+**In plain words:** the company details in the A4 header now read name, address, email, phone, then the TRN, in Arabic and in English.
+
+- Decision 0076 updated; no database change.
+
 ## The owner remembered on the cashier PC too (2026-10-18)
 
 **In plain words:** on a cashier (POS) PC, the owner now sees "Remember this PC" under the phone code too. After the code once there, the password is enough on that PC until the password changes. Everyone else still types the code on cashier PCs every time.

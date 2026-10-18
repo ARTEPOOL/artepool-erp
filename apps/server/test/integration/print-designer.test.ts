@@ -115,6 +115,7 @@ beforeAll(async () => {
       addressAr: 'العين، أبوظبي',
       addressEn: 'Al Ain, Abu Dhabi',
       phone: '03 000 0000',
+      email: 'office@artepool.test',
     }),
   );
   const { rows } = await sql<{ kind: string; id: string }>`
@@ -268,6 +269,34 @@ describe('the print designer (decisions 0020, 0064)', () => {
     expect(header.slice(en, ar)).toContain('ARTEPOOL Swimming Pools');
     expect(header.slice(en, ar)).toContain('Al Ain, Abu Dhabi');
     expect(header.slice(ar)).toContain('الرقم الضريبي');
+    // Name, address, email, phone, then the TRN, in both columns.
+    const withContact = (
+      await ok<PreviewTemplateResponse>(
+        owner('POST', '/api/v1/print-templates/tax_invoice_a4/preview', {
+          settings: {
+            ...current.settings,
+            language: 'both',
+            logoPosition: 'center',
+            fields: { ...current.settings.fields, sellerContact: true },
+          },
+        }),
+      )
+    ).html!;
+    const split = withContact.slice(
+      withContact.indexOf('<header'),
+      withContact.indexOf('</header>'),
+    );
+    const middle = split.indexOf('seller-ar');
+    for (const [side, address] of [
+      [split.slice(0, middle), 'Al Ain, Abu Dhabi'],
+      [split.slice(middle), 'العين، أبوظبي'],
+    ] as const) {
+      const order = [address, 'office@artepool.test', '+97130000000', '100123456789012'].map(
+        (text) => side.indexOf(text),
+      );
+      expect(order.every((at) => at > 0)).toBe(true);
+      expect([...order].sort((x, y) => x - y)).toEqual(order);
+    }
     expect(header.slice(ar)).toContain('100123456789012');
     // One language only: the logo stays above the details, centred.
     const single = await ok<PreviewTemplateResponse>(
