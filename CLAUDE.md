@@ -98,6 +98,7 @@ It runs client–server on the local network: PostgreSQL and the API service on 
 **Security and access**
 - **Sign-in:** cashiers use a 4-digit PIN **only on PCs enrolled as POS** (weak PINs refused; 5 wrong → blocked until the owner unblocks). Office PCs always need a password. (0021)
 - **Approvals:** every supervisor approval is given with the one-time 6-digit code from the approver's 2-step app (accepted once); only 2-step users approve; 5 wrong codes block that person's approvals (not their sign-in) until the owner unblocks. (0074)
+- **Screen lock:** per kind of PC, off or after 1–240 idle minutes, in Settings → Devices (owner only); off on every PC at the owner's request; the session still ends after its maximum length. (0079)
 - **Owner 2-step:** TOTP, 10 one-time recovery codes, and an audited emergency reset that works only on the server PC. (0022)
 - **Passwords:** 10+ characters, common ones refused, no forced symbols or expiry; a change ends the user's other sessions. (0023)
 - **Devices:** a 10-minute one-time enrollment code that also proves the server is genuine; the PC then trusts only the ARTÉPOOL CA. (0024)

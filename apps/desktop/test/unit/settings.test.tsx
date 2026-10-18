@@ -368,6 +368,26 @@ describe('Settings → Devices', () => {
         ok({ code: 'K7Q-4MX-92P', expiresAt: new Date(Date.now() + 600_000).toISOString() }, 201),
       );
 
+  it('the owner turns the screen lock back on for office PCs (decision 0079)', async () => {
+    const bridge = signedInBridge([...OWNER_PERMISSIONS, 'system.settings.edit'])
+      .on('GET', '/api/v1/devices', ok({ devices: [device({})], openCode: null }))
+      .on('GET', '/api/v1/settings/screen-lock', ok({ officeMinutes: 0, posMinutes: 0 }))
+      .on('PUT', '/api/v1/settings/screen-lock', ok({ officeMinutes: 15, posMinutes: 0 }));
+    await signIn(bridge);
+    await openSettings('الأجهزة والطابعات');
+    const office = await screen.findByRole('switch', { name: 'قفل أجهزة المكتب' });
+    expect((office as HTMLInputElement).checked).toBe(false);
+    fireEvent.click(office);
+    expect(screen.getByLabelText('بعد كم دقيقة بدون استخدام (1–240)')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'حفظ' }));
+    await waitFor(() =>
+      expect(bridge.callsTo('PUT', '/api/v1/settings/screen-lock')[0]?.body).toEqual({
+        officeMinutes: 15,
+        posMinutes: 0,
+      }),
+    );
+  });
+
   it('revokes another PC with a reason; this PC cannot be revoked from itself', async () => {
     const bridge = devicesBridge();
     await signIn(bridge);

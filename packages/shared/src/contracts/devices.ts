@@ -85,3 +85,11 @@ export type MoveDrawerRequest = z.infer<typeof MoveDrawerRequest>;
 
 export const RevokeDeviceRequest = z.object({ reason: z.string().trim().min(3).max(500) });
 export type RevokeDeviceRequest = z.infer<typeof RevokeDeviceRequest>;
+
+/**
+ * The idle screen lock per kind of PC (decision 0079): minutes without use before the screen
+ * locks, or 0 for never (the session still ends after its maximum length). Owner only.
+ */
+const LockMinutes = z.number().int().min(0).max(240);
+export const ScreenLockSettings = z.object({ officeMinutes: LockMinutes, posMinutes: LockMinutes });
+export type ScreenLockSettings = z.infer<typeof ScreenLockSettings>;

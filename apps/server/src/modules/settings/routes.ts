@@ -1,6 +1,11 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { IdText, UpdateSeriesRequest, UpdateVatRateRequest } from '@artepool/shared/contracts';
+import {
+  IdText,
+  ScreenLockSettings,
+  UpdateSeriesRequest,
+  UpdateVatRateRequest,
+} from '@artepool/shared/contracts';
 import { defineRoute, defineWrite } from '../../platform/http/route';
 import * as settings from './service';
 
@@ -45,5 +50,24 @@ export function registerSettingsRoutes(app: FastifyInstance): void {
     handler: async ({ trx, params, body }) => ({
       body: await settings.updateSeries(trx, BigInt(params.id), body),
     }),
+  });
+
+  // The idle screen lock (decision 0079), owner only like every system setting.
+  defineRoute(app, {
+    method: 'GET',
+    url: '/api/v1/settings/screen-lock',
+    access: vatRates,
+    handler: () => settings.getScreenLock(db),
+  });
+  defineWrite(app, {
+    method: 'PUT',
+    url: '/api/v1/settings/screen-lock',
+    access: vatRates,
+    body: ScreenLockSettings,
+    handler: async ({ trx, body }) => {
+      const saved = await settings.saveScreenLock(trx, body);
+      app.deps.settings.invalidate();
+      return { body: saved };
+    },
   });
 }

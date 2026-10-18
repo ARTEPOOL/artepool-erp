@@ -61,11 +61,16 @@ export function pendingFor(user: UserRow, method: AuthMethod): PendingStep {
   return pendingStep({ ...user, auth_method: method });
 }
 
-/** Idle lock: 5 minutes on POS PCs, 15 on the others (settings). */
+/**
+ * Idle lock, per kind of PC (settings). 0 turns it off (decision 0079): the idle limit is then
+ * the session's whole length, so the screen never locks before the session ends.
+ */
 export async function idleSecondsFor(deps: AppDeps, device: DeviceInfo): Promise<number> {
   const key =
     device.kind === 'pos' ? 'security.idle_lock_minutes.pos' : 'security.idle_lock_minutes.office';
-  return (await deps.settings.number(key)) * 60;
+  const minutes = await deps.settings.number(key);
+  if (minutes === 0) return (await deps.settings.number('security.session_max_hours')) * 3600;
+  return minutes * 60;
 }
 
 /**

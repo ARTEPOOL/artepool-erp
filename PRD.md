@@ -437,6 +437,7 @@ Each phase ends with automated tests passing, a security review, an accountant r
 | Version | Date | Change |
 |---|---|---|
 | 1.10 | 2026-10-14 | M4b decisions 0064–0067: print designer with locked tax fields per document type (seller address on every tax invoice, customer address on full tax invoices; a full tax invoice needs the customer's address); company bank accounts with UAE IBAN check; customer PO number on A4 invoices and quotations; no QR code until e-invoicing. |
+| 1.21 | 2026-10-18 | Decision 0079: the idle screen lock can be turned off per kind of PC; off on every PC. |
 | 1.20 | 2026-10-18 | Decision 0078: the owner (only) may be remembered on POS PCs too. |
 | 1.19 | 2026-10-18 | Decision 0077: the 2-step code once per PC; the PC is remembered until the password changes. |
 | 1.18 | 2026-10-18 | Decision 0076: logo in the middle on bilingual A4 documents gives a letterhead (Arabic right, logo centre, English left). |

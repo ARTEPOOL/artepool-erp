@@ -1,5 +1,11 @@
 # Changelog
 
+## Screen lock can be turned off (2026-10-18)
+
+**In plain words:** the "locked" screen no longer appears when a PC sits unused. In Settings → Devices → Screen lock you can turn it back on for office PCs or cashier PCs and choose the minutes.
+
+- Decision 0079; migration 0032 (`ops_backup` moves to 0033).
+
 ## Thermal receipt: phone, email and TRN lines (2026-10-18)
 
 **In plain words:** on the thermal receipt in both languages, the phone, email and TRN lines now read like the A4 invoice: the Arabic label on the right, the English label on the left, the value between them ("Tel: +971… :هاتف"). The email line now has its label too.

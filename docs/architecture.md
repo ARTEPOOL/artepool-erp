@@ -311,7 +311,7 @@ App (POS section)                     API                                       
   - Users are deactivated with a reason, never deleted ([0026](decisions/0026-users-and-devices-never-deleted.md)).
 - **Sessions:**
   - Random 256-bit tokens; only their SHA-256 is stored.
-  - Server-side idle lock and absolute expiry; instant revoke.
+  - Server-side idle lock (per kind of PC, can be off: [0079](decisions/0079-screen-lock-optional.md)) and absolute expiry; instant revoke.
   - A password change, user deactivation or device revoke ends the affected sessions. Sessions are ended with a reason, never deleted.
   - A password + TOTP sign-in first gets a short "second factor" session; after the code it is replaced by a new full session with a new token.
 - **Permissions:**

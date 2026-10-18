@@ -104,7 +104,7 @@ describe('password sign-in (decision 0023)', () => {
       authMethod: 'password',
       pending: null,
       locked: false,
-      idleTimeoutSeconds: 900,
+      idleTimeoutSeconds: 12 * 3600, // no screen lock by default (decision 0079)
     });
     expect(body.user).toMatchObject({ id: userId.toString(), username: 'khaled.acc' });
     const [event] = await events('auth.signed_in', userId);
@@ -472,7 +472,7 @@ describe('PIN sign-in only on POS PCs (decision 0021)', () => {
     expect(body.session).toMatchObject({
       authMethod: 'pin',
       pending: 'credential_change',
-      idleTimeoutSeconds: 300,
+      idleTimeoutSeconds: 12 * 3600, // no screen lock by default (decision 0079)
     });
     const weak = await call(server, 'POST', '/api/v1/auth/change-pin', {
       device: pos,

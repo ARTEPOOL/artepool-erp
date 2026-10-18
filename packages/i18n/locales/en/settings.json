@@ -256,7 +256,18 @@
       "escpos": "For 80 mm or 58 mm receipt printers such as Epson TM-T20III. Fast, cuts the paper and opens the cash drawer wired to the printer. If the test prints blank or rubbish pages, choose “Any printer”.",
       "driver": "For an A4 printer, or a receipt printer whose Windows driver does not take ESC/POS. The receipt prints at its real width through the printer’s driver. The cash drawer does not open this way."
     },
-    "trustedUntilPasswordChange": "No phone code here for {name} until their password changes"
+    "trustedUntilPasswordChange": "No phone code here for {name} until their password changes",
+    "screenLock": {
+      "title": "Screen lock",
+      "help": "The screen locks after a time without use, and the person signs in again. Choose per kind of PC.",
+      "officeMinutes": "Lock office PCs",
+      "posMinutes": "Lock POS PCs",
+      "minutes": "After how many idle minutes (1–240)",
+      "note": "Without a lock, anyone who finds a PC open works under its owner's name. The session still ends after its maximum length. Changes apply to new sign-ins.",
+      "save": "Save",
+      "saved": "Screen lock saved.",
+      "invalid": "Enter a number of minutes from 1 to 240."
+    }
   },
   "audit": {
     "title": "Audit log",

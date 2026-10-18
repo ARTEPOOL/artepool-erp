@@ -48,6 +48,7 @@ import { CardHead, NoAccess, PanelHeader, settingsClasses as styles } from '../p
 import { ReasonDialog } from '../users/dialogs';
 import deviceStyles from './devices.module.css';
 import { ReceiptPrinterCard } from './ReceiptPrinter';
+import { ScreenLockCard } from './ScreenLock';
 
 const KIND_ICON: Record<DeviceKind, ReactNode> = {
   pos: <ShoppingCart aria-hidden="true" />,
@@ -311,6 +312,7 @@ export function DevicesPanel() {
         </Card>
       </div>
       <ReceiptPrinterCard index={3} />
+      <ScreenLockCard index={4} />
       {revoking && <RevokeDialog device={revoking} onClose={() => setRevoking(null)} />}
       {moving && (
         <MoveDrawerDialog device={moving} devices={list} onClose={() => setMoving(null)} />
