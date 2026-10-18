@@ -33,7 +33,7 @@ There is one short file per decision, numbered in order.
 | [0024](0024-device-enrollment-proves-the-server.md) | Device enrollment: 10-minute one-time code that also proves the server | Accepted |
 | [0025](0025-first-owner-and-pc-from-server-commands.md) | First owner and first PC created by server commands | Accepted |
 | [0026](0026-users-and-devices-never-deleted.md) | Users and devices never deleted: deactivate or revoke with a reason | Accepted |
-| [0027](0027-trust-this-pc-for-the-2-step-code.md) | "Trust this PC" for the 2-step code (30 days, never on POS PCs) | Accepted |
+| [0027](0027-trust-this-pc-for-the-2-step-code.md) | "Trust this PC" for the 2-step code (30 days, never on POS PCs) | Changed by 0077 |
 | [0028](0028-forgot-password-with-phone-and-recovery-code.md) | Forgot password: recover it in the app with the phone code and one recovery code | Accepted |
 | [0029](0029-owner-password-reset-on-the-server-pc.md) | Emergency owner password reset on the server PC (`pnpm owner:reset-password`) | Accepted |
 | [0030](0030-company-details-owner-only.md) | Company details owner-only; the accountant keeps the audit log | Accepted |
@@ -83,6 +83,7 @@ There is one short file per decision, numbered in order.
 | [0074](0074-approvals-with-the-phone-code.md) | Supervisor approvals with the one-time code from the approver's 2-step app; approval PINs removed | Accepted |
 | [0075](0075-separate-receipt-logo.md) | The thermal receipt can have its own logo (Print designer → Thermal receipt); empty = the company logo; A4 keeps the company logo | Accepted |
 | [0076](0076-centre-logo-letterhead.md) | Logo in the middle (A4, both languages): Arabic details on the right, English on the left | Accepted |
+| [0077](0077-two-step-code-once-per-pc.md) | The 2-step code once per PC: the PC is remembered (ticked by default) until the password changes; never on POS PCs | Accepted |
 
 ## Template
 

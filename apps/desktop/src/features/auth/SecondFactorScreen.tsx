@@ -2,6 +2,7 @@ import { useState, type CSSProperties, type FormEvent } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { Button as AriaButton } from 'react-aria-components';
 import { useTranslation } from 'react-i18next';
+import { TRUST_UNTIL_PASSWORD_CHANGE_DAYS } from '@artepool/shared/contracts';
 import { ApiError } from '../../api/client';
 import { Alert, Button, Checkbox, cx, iconClass, TextField } from '../../ui';
 import styles from './auth.module.css';
@@ -11,8 +12,8 @@ import { AuthFrame, Hello, ServerChip, ServerDown } from './parts';
 
 /**
  * Design 01 "owner code": the 6-digit code, or one recovery code (decision 0022). With the code,
- * the person may trust this PC for a while (decision 0027; offered by the server, never on POS
- * PCs). A recovery code never trusts the PC.
+ * this PC is remembered until the password changes (decisions 0027, 0077; ticked by default,
+ * offered by the server, never on POS PCs). A recovery code never trusts the PC.
  */
 export function SecondFactorScreen() {
   const { t } = useTranslation('auth');
@@ -21,7 +22,7 @@ export function SecondFactorScreen() {
   const errorText = useErrorText();
   const [mode, setMode] = useState<'app' | 'recovery'>('app');
   const [code, setCode] = useState('');
-  const [trust, setTrust] = useState(false);
+  const [trust, setTrust] = useState(true);
   const [recoveryCode, setRecoveryCode] = useState('');
   const [error, setError] = useState<{ text: string; attempt: number } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -95,9 +96,15 @@ export function SecondFactorScreen() {
         {mode === 'app' && trustDays !== null && (
           <div className={styles.trust}>
             <Checkbox isSelected={trust} onChange={setTrust}>
-              {t('secondFactor.trust', { days: trustDays })}
+              {trustDays >= TRUST_UNTIL_PASSWORD_CHANGE_DAYS
+                ? t('secondFactor.remember')
+                : t('secondFactor.trust', { days: trustDays })}
             </Checkbox>
-            <p className={styles.trustHint}>{t('secondFactor.trustHint')}</p>
+            <p className={styles.trustHint}>
+              {trustDays >= TRUST_UNTIL_PASSWORD_CHANGE_DAYS
+                ? t('secondFactor.rememberHint')
+                : t('secondFactor.trustHint')}
+            </p>
           </div>
         )}
         {error && (

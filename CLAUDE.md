@@ -103,7 +103,7 @@ It runs client–server on the local network: PostgreSQL and the API service on 
 - **Devices:** a 10-minute one-time enrollment code that also proves the server is genuine; the PC then trusts only the ARTÉPOOL CA. (0024)
 - **First owner / first PC:** `pnpm owner:create` and `pnpm device:code` on the server PC. (0025)
 - **Never deleted:** users are deactivated and devices revoked, always with a reason; revoking a device is final. (0026)
-- **Trust this PC:** after the phone code, a 2-step user may trust that PC for 30 days (password alone there); never on POS PCs; ends on a password/2-step change, deactivation, revoke; the owner can end it in Settings → Devices. Enforced in the database. (0027)
+- **Trust this PC:** after the phone code, that PC is remembered (box ticked by default) until the password changes (password alone there; setting 3650 days); never on POS PCs; ends on a password/2-step change, deactivation, revoke; the owner can end it in Settings → Devices. Enforced in the database. (0027, 0077)
 - **Forgot password:** 2-step users recover it in the app with the phone code + one recovery code; ends all their sessions and trusted PCs. (0028)
 - **Last resort:** `pnpm owner:reset-password` on the server PC only — reason required, temporary password shown once, optional 2-step reset if the phone is lost, audited; the owner sees a notice when choosing their own password. (0029)
 - **Company details** (name, TRN, address, logo) are edited by the owner only (`system.company.edit` is owner-only); the accountant keeps viewing/verifying/exporting the audit log. (0030)

@@ -6,6 +6,12 @@
 import { z } from 'zod';
 
 /** Database ids travel as decimal text (they are bigint). */
+/**
+ * A trust this long means "until the password changes" (decision 0077): the PC is remembered after
+ * the phone code there and forgets it when the password, the 2-step setup, the user or the PC changes.
+ */
+export const TRUST_UNTIL_PASSWORD_CHANGE_DAYS = 3650;
+
 export const IdText = z.string().regex(/^[1-9][0-9]{0,18}$/);
 
 export const SignInRequest = z.object({

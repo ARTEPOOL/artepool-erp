@@ -57,6 +57,10 @@ const KIND_ICON: Record<DeviceKind, ReactNode> = {
 };
 
 /** Minutes:seconds left until `expiresAt`, ticking every second; null once expired. */
+/** A trust that ends more than 5 years from now lasts until the password changes (decision 0077). */
+const untilPasswordChange = (expiresAt: string): boolean =>
+  new Date(expiresAt).getTime() - Date.now() > 5 * 365 * 24 * 3600 * 1000;
+
 function useCountdown(expiresAt: string | null): string | null {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
@@ -175,10 +179,12 @@ export function DevicesPanel() {
                               className={cx(tableClasses.sub, styles.trusted)}
                             >
                               <ShieldCheck className={iconClass.sm} aria-hidden="true" />
-                              {t('devices.trustedUntil', {
-                                name: nameOf(person),
-                                date: formatDate(person.expiresAt),
-                              })}
+                              {untilPasswordChange(person.expiresAt)
+                                ? t('devices.trustedUntilPasswordChange', { name: nameOf(person) })
+                                : t('devices.trustedUntil', {
+                                    name: nameOf(person),
+                                    date: formatDate(person.expiresAt),
+                                  })}
                             </span>
                           ))}
                         </span>

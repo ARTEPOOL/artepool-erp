@@ -95,9 +95,11 @@ beforeAll(async () => {
 afterAll(() => db.drop());
 
 describe('trusting a PC (decision 0027)', () => {
-  it('lasts the set number of days from server time, and is audited', async () => {
+  it('lasts until the password changes (3650 days, decision 0077) from server time, and is audited', async () => {
     const id = await trust(owner, office);
-    expect(await openTrust(owner, office)).toEqual([{ id: id.toString(), days: 30, recent: true }]);
+    expect(await openTrust(owner, office)).toEqual([
+      { id: id.toString(), days: 3650, recent: true },
+    ]);
     const { rows } = await api.query<{ action: string; new_values: { user_id: number } }>(
       `SELECT action, new_values FROM audit.log WHERE entity_type = 'auth.device_trust' AND entity_id = $1`,
       [id.toString()],
@@ -132,9 +134,9 @@ describe('trusting a PC (decision 0027)', () => {
     try {
       await expect(trust(owner, laptop)).rejects.toMatchObject({ code: 'AP010' });
     } finally {
-      await setDays(30);
+      await setDays(3650);
     }
-    await expect(setDays(91)).rejects.toMatchObject({ code: '23514' });
+    await expect(setDays(3651)).rejects.toMatchObject({ code: '23514' });
   });
 
   it('ends once, with a reason and server time; nothing else changes and it is never deleted', async () => {
@@ -193,13 +195,14 @@ describe('signing in on a trusted PC (decision 0027)', () => {
     try {
       await expect(signIn(owner, office)).rejects.toMatchObject({ code: 'AP010' });
     } finally {
-      await setDays(30);
+      await setDays(3650);
     }
     const [open] = await openTrust(owner, office);
     await admin.query('BEGIN');
     await admin.query('SET LOCAL session_replication_role = replica');
     await admin.query(
-      `UPDATE auth.device_trust SET created_at = now() - interval '10 days' WHERE id = $1`,
+      `UPDATE auth.device_trust SET created_at = created_at - interval '10 days',
+              expires_at = expires_at - interval '10 days' WHERE id = $1`,
       [open!.id],
     );
     await admin.query('COMMIT');
@@ -208,7 +211,7 @@ describe('signing in on a trusted PC (decision 0027)', () => {
     try {
       await expect(signIn(owner, office)).rejects.toMatchObject({ code: 'AP010' });
     } finally {
-      await setDays(30);
+      await setDays(3650);
     }
   });
 

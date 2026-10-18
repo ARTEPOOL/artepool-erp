@@ -316,7 +316,35 @@ describe('owner 2-step code (decision 0022)', () => {
 });
 
 describe('"Trust this PC" (decision 0027)', () => {
-  it('is offered when the server offers it, and sent only when ticked', async () => {
+  it('remembers the PC by default until the password changes (decision 0077)', async () => {
+    const bridge = new FakeBridge()
+      .on(
+        'POST',
+        '/api/v1/auth/sign-in',
+        ok({ ...signInAnswer({ stage: 'second_factor' }), trustDays: 3650 }),
+      )
+      .on('POST', '/api/v1/auth/second-factor', ok(signInAnswer({}, {}, 'token-2')))
+      .on('GET', '/api/v1/auth/me', me());
+    await startApp(bridge);
+    type('اسم المستخدم', 'owner');
+    type('كلمة المرور', 'long-owner-password');
+    fireEvent.click(screen.getByRole('button', { name: 'دخول' }));
+    await screen.findByRole('heading', { name: 'تأكيد هوية المالك' });
+    const box = screen.getByRole('checkbox', {
+      name: 'تذكّر هذا الجهاز: بدون رمز الهاتف هنا حتى أغيّر كلمة السر',
+    });
+    expect((box as HTMLInputElement).checked).toBe(true);
+    expect(screen.getByText(/ألغِ التحديد لو الجهاز يستخدمه غيرك/)).toBeTruthy();
+    fireEvent.paste(screen.getByLabelText('رقم 1'), { clipboardData: { getData: () => '123456' } });
+    fireEvent.click(screen.getByRole('button', { name: 'تأكيد' }));
+    await screen.findByRole('heading', { name: 'أهلًا، سارة علي' });
+    expect(bridge.callsTo('POST', '/api/v1/auth/second-factor')[0]?.body).toEqual({
+      code: '123456',
+      trustDevice: true,
+    });
+  });
+
+  it('is not sent when unticked (a shorter setting shows its days)', async () => {
     const bridge = new FakeBridge()
       .on(
         'POST',
@@ -330,16 +358,12 @@ describe('"Trust this PC" (decision 0027)', () => {
     type('كلمة المرور', 'long-owner-password');
     fireEvent.click(screen.getByRole('button', { name: 'دخول' }));
     await screen.findByRole('heading', { name: 'تأكيد هوية المالك' });
-    const box = screen.getByRole('checkbox', { name: 'ثق في هذا الجهاز لمدة 30 يومًا' });
-    expect((box as HTMLInputElement).checked).toBe(false);
-    expect(screen.getByText(/لا تفعّلها على جهاز يستخدمه غيرك/)).toBeTruthy();
-    fireEvent.click(box);
+    fireEvent.click(screen.getByRole('checkbox', { name: 'ثق في هذا الجهاز لمدة 30 يومًا' }));
     fireEvent.paste(screen.getByLabelText('رقم 1'), { clipboardData: { getData: () => '123456' } });
     fireEvent.click(screen.getByRole('button', { name: 'تأكيد' }));
     await screen.findByRole('heading', { name: 'أهلًا، سارة علي' });
     expect(bridge.callsTo('POST', '/api/v1/auth/second-factor')[0]?.body).toEqual({
       code: '123456',
-      trustDevice: true,
     });
   });
 

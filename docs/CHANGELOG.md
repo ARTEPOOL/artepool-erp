@@ -1,5 +1,11 @@
 # Changelog
 
+## The phone code once per PC (2026-10-18)
+
+**In plain words:** the first time you sign in on a PC you type the phone code, with "Remember this PC" already ticked. After that, on that PC, the username and password are enough until your password changes. On another PC the code is asked once there too.
+
+- Decision 0077 (changes 0027); migration 0030 (`ops_backup` moves to 0031).
+
 ## Logo in the middle: a letterhead (2026-10-18)
 
 **In plain words:** in Settings → Print designer, choosing the logo in the middle for an A4 document in both languages now prints the Arabic company details on the right, the logo in the middle and the English details on the left, like the company letterhead.

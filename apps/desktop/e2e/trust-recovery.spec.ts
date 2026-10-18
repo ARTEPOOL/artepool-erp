@@ -36,10 +36,8 @@ test('trust this PC: the phone code once, then the password alone; the owner can
   await open('office');
   await signIn(page, t, username, password);
   await expect(page.getByRole('heading', { name: t('auth:secondFactor.title') })).toBeVisible();
-  const label = t('auth:secondFactor.trust', { days: 30 });
-  const trust = page.getByRole('checkbox', { name: label });
-  await expect(trust).not.toBeChecked();
-  await page.getByText(label).click();
+  // Ticked by default: this PC is remembered until the password changes (decision 0077).
+  const trust = page.getByRole('checkbox', { name: t('auth:secondFactor.remember') });
   await expect(trust).toBeChecked();
   await page.getByLabel(t('auth:secondFactor.digit', { n: 1 }), { exact: true }).click();
   await page.keyboard.type(await control.codeFor(id));
@@ -59,7 +57,9 @@ test('trust this PC: the phone code once, then the password alone; the owner can
   await page.getByRole('link', { name: t('settings:hub.devices') }).click();
   const name = lang === 'ar' ? 'سارة الموثوقة' : 'Sara Trusted';
   const row = page.getByRole('row', { name: /OFFICE-01/ });
-  await expect(row.getByText(new RegExp(name))).toBeVisible();
+  await expect(
+    row.getByText(t('settings:devices.trustedUntilPasswordChange', { name })),
+  ).toBeVisible();
   await snap(page, '31-trusted-pc');
   await row.getByRole('button', { name: t('settings:devices.endTrust') }).click();
   await page

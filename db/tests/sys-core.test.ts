@@ -54,7 +54,7 @@ describe('settings', () => {
       'print.pos_receipt_auto': true,
       'einvoice.mandatory_from': null,
       'security.max_failed_logins': 5,
-      'security.trusted_device_days': 30,
+      'security.trusted_device_days': 3650, // decision 0077
     });
     // 22 from 0004 + 6 security settings from 0005 + 1 from 0006 + 1 from 0015 + 3 from 0022
     expect(rows).toHaveLength(33);

@@ -145,7 +145,7 @@ describe('"Trust this PC" for the 2-step code (decision 0027)', () => {
     const first = (await signIn(office, sara)).json<SignInResponse>();
     remember(first.token);
     expect(first.session.stage).toBe('second_factor');
-    expect(first.trustDays).toBe(30);
+    expect(first.trustDays).toBe(3650);
     const onPos = (await signIn(counter, sara)).json<SignInResponse>();
     remember(onPos.token);
     expect(onPos.session.stage).toBe('second_factor');
@@ -287,7 +287,7 @@ describe('"Trust this PC" for the 2-step code (decision 0027)', () => {
       expect(off.session.stage).toBe('second_factor');
       expect(off.trustDays).toBeUndefined();
     } finally {
-      await setTrustDays(30);
+      await setTrustDays(3650);
     }
   });
 });
