@@ -268,6 +268,27 @@ export function renderHtml(doc: PrintDocument, seller: Seller, options: RenderOp
       sellerTrn ? row(['الرقم الضريبي', 'TRN'], seller.trn, true) : '',
     ].join('');
   };
+  /** Both languages on the same line: "العنوان · Address: العين · AL AIN". */
+  const sellerRowsBoth = (): string => {
+    const label = (pair: [string, string]) =>
+      `<span class="label">${escapeHtml(pair[0])} · <bdi>${escapeHtml(pair[1])}</bdi>:</span>`;
+    const both = (ar: string, en: string) =>
+      [ar, en]
+        .filter(Boolean)
+        .map((v) => `<bdi>${escapeHtml(v)}</bdi>`)
+        .join(' <span class="sep">·</span> ');
+    const row = (pair: [string, string], value: string) =>
+      value ? `<p>${label(pair)} ${value}</p>` : '';
+    const ltr = (v: string | null | undefined) =>
+      v ? `<span class="ltr">${escapeHtml(v)}</span>` : '';
+    return [
+      `<h1>${label(['اسم الشركة', 'Company'])} ${both(seller.legal_name_ar, seller.legal_name_en)}</h1>`,
+      sellerAddress ? row(['العنوان', 'Address'], both(seller.address_ar, seller.address_en)) : '',
+      showContact ? row(['رقم الهاتف', 'Phone'], ltr(seller.phone)) : '',
+      showContact ? row(['البريد', 'Email'], ltr(seller.email)) : '',
+      sellerTrn ? row(['الرقم الضريبي', 'TRN'], ltr(seller.trn)) : '',
+    ].join('');
+  };
 
   const lineRows = doc.lines
     .map(
@@ -364,8 +385,7 @@ ${
 </header>`
     : `<header class="${settings.logoPosition}">
   <div class="seller">
-    ${lang !== 'en' ? `<div class="seller-ar">${sellerRows('ar')}</div>` : ''}
-    ${lang !== 'ar' ? `<div class="seller-en">${sellerRows('en')}</div>` : ''}
+    ${lang === 'both' ? sellerRowsBoth() : sellerRows(lang)}
   </div>
   ${logo}
 </header>`

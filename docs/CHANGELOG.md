@@ -2,7 +2,7 @@
 
 ## Company details order in the A4 header (2026-10-18)
 
-**In plain words:** each company line in the A4 header now has its label: company name, address, phone, email, then the TRN (Arabic labels on the Arabic side, English on the English side).
+**In plain words:** each company line in the A4 header now has its label: company name, address, phone, email, then the TRN (Arabic labels on the Arabic side, English on the English side). With the logo on the side, each line shows Arabic and English together.
 
 - Decision 0076 updated; no database change.
 

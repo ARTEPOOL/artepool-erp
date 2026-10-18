@@ -308,6 +308,17 @@ describe('the print designer (decisions 0020, 0064)', () => {
       }),
     );
     expect(single.html).toContain('<header class="center">');
+    // Logo beside, both languages: Arabic and English on the same line.
+    const beside = (
+      await ok<PreviewTemplateResponse>(
+        owner('POST', '/api/v1/print-templates/tax_invoice_a4/preview', {
+          settings: { ...current.settings, language: 'both', logoPosition: 'beside' },
+        }),
+      )
+    ).html!;
+    expect(beside).toMatch(
+      /<p><span class="label">العنوان · <bdi>Address<\/bdi>:<\/span> <bdi>العين، أبوظبي<\/bdi> <span class="sep">·<\/span> <bdi>Al Ain, Abu Dhabi<\/bdi><\/p>/,
+    );
   });
 
   it('optional fields print when on: PO, item code, amount in words, the chosen bank account', async () => {

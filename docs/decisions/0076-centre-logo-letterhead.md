@@ -13,6 +13,7 @@
   - the logo in the middle;
   - the English details on the left.
 - In one language only, "middle" keeps the logo above the details, centred.
+- With the logo beside (or opposite) in both languages, each line holds both languages: "العنوان · Address: العين · AL AIN".
 - The same labelled lines and order (اسم الشركة / Company, العنوان / Address, رقم الهاتف / Phone, البريد / Email, الرقم الضريبي / TRN) are used in every header layout; Arabic lines carry Arabic labels, English lines English labels.
 - The locked tax fields (seller address and TRN on tax documents) print in both columns as before.
 
