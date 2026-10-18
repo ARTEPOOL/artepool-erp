@@ -268,25 +268,19 @@ export function renderHtml(doc: PrintDocument, seller: Seller, options: RenderOp
       sellerTrn ? row(['الرقم الضريبي', 'TRN'], seller.trn, true) : '',
     ].join('');
   };
-  /** Both languages on the same line: "العنوان · Address: العين · AL AIN". */
-  const sellerRowsBoth = (): string => {
-    const label = (pair: [string, string]) =>
-      `<span class="label">${escapeHtml(pair[0])} · <bdi>${escapeHtml(pair[1])}</bdi>:</span>`;
-    const both = (ar: string, en: string) =>
-      [ar, en]
-        .filter(Boolean)
-        .map((v) => `<bdi>${escapeHtml(v)}</bdi>`)
-        .join(' <span class="sep">·</span> ');
-    const row = (pair: [string, string], value: string) =>
-      value ? `<p>${label(pair)} ${value}</p>` : '';
-    const ltr = (v: string | null | undefined) =>
-      v ? `<span class="ltr">${escapeHtml(v)}</span>` : '';
+  /**
+   * Logo beside, both languages: the owner's earlier block (names, addresses, "الرقم الضريبي ·
+   * TRN", phone · email), without labels.
+   */
+  const sellerBlockBoth = (): string => {
+    const contact = showContact
+      ? [seller.phone, seller.email].filter(Boolean).map((v) => escapeHtml(v!))
+      : [];
     return [
-      `<h1>${label(['اسم الشركة', 'Company'])} ${both(seller.legal_name_ar, seller.legal_name_en)}</h1>`,
-      sellerAddress ? row(['العنوان', 'Address'], both(seller.address_ar, seller.address_en)) : '',
-      showContact ? row(['رقم الهاتف', 'Phone'], ltr(seller.phone)) : '',
-      showContact ? row(['البريد', 'Email'], ltr(seller.email)) : '',
-      sellerTrn ? row(['الرقم الضريبي', 'TRN'], ltr(seller.trn)) : '',
+      `<h1>${escapeHtml(seller.legal_name_ar)}<span class="en">${escapeHtml(seller.legal_name_en)}</span></h1>`,
+      sellerAddress ? text(seller.address_ar, seller.address_en) : '',
+      sellerTrn && seller.trn ? `<p>${trnLine(seller.trn)}</p>` : '',
+      contact.length > 0 ? `<p><span class="ltr">${contact.join(' · ')}</span></p>` : '',
     ].join('');
   };
 
@@ -385,7 +379,7 @@ ${
 </header>`
     : `<header class="${settings.logoPosition}">
   <div class="seller">
-    ${lang === 'both' ? sellerRowsBoth() : sellerRows(lang)}
+    ${lang === 'both' ? sellerBlockBoth() : sellerRows(lang)}
   </div>
   ${logo}
 </header>`

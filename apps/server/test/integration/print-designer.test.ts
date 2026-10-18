@@ -308,7 +308,7 @@ describe('the print designer (decisions 0020, 0064)', () => {
       }),
     );
     expect(single.html).toContain('<header class="center">');
-    // Logo beside, both languages: Arabic and English on the same line.
+    // Logo beside, both languages: the earlier block without labels (the owner's sample).
     const beside = (
       await ok<PreviewTemplateResponse>(
         owner('POST', '/api/v1/print-templates/tax_invoice_a4/preview', {
@@ -316,9 +316,10 @@ describe('the print designer (decisions 0020, 0064)', () => {
         }),
       )
     ).html!;
-    expect(beside).toMatch(
-      /<p><span class="label">العنوان · <bdi>Address<\/bdi>:<\/span> <bdi>العين، أبوظبي<\/bdi> <span class="sep">·<\/span> <bdi>Al Ain, Abu Dhabi<\/bdi><\/p>/,
-    );
+    const block = beside.slice(beside.indexOf('<header'), beside.indexOf('</header>'));
+    expect(block).not.toContain('class="label"');
+    expect(block).toContain('<p>العين، أبوظبي</p><p>Al Ain, Abu Dhabi</p>');
+    expect(block).toContain('الرقم الضريبي · TRN');
   });
 
   it('optional fields print when on: PO, item code, amount in words, the chosen bank account', async () => {
