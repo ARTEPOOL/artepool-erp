@@ -86,6 +86,7 @@ There is one short file per decision, numbered in order.
 | [0077](0077-two-step-code-once-per-pc.md) | The 2-step code once per PC: the PC is remembered (ticked by default) until the password changes; never on POS PCs | Accepted |
 | [0078](0078-owner-remembered-on-pos-pcs.md) | The owner (only) may be remembered on POS PCs too, until the password changes | Accepted |
 | [0079](0079-screen-lock-optional.md) | The idle screen lock can be turned off per kind of PC (Settings → Devices); off on every PC at the owner's request | Accepted |
+| [0080](0080-owner-sees-expected-cash.md) | The owner sees the expected cash on "My shift" (others count blind); drop alerts clear themselves once no longer true | Accepted |
 
 ## Template
 

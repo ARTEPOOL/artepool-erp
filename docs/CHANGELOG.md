@@ -1,5 +1,11 @@
 # Changelog
 
+## Expected cash for the owner; drop alerts clear themselves (2026-10-18)
+
+**In plain words:** on "My shift" the owner now sees the cash the drawer should hold, all the time; cashiers still count blind. The "transfer to the safe" alert disappears by itself once the drawer is back under AED 3,000 or the shift is closed, so old alerts for small amounts no longer stay on the list.
+
+- Decision 0080; no database change.
+
 ## Screen lock can be turned off (2026-10-18)
 
 **In plain words:** the "locked" screen no longer appears when a PC sits unused. In Settings → Devices → Screen lock you can turn it back on for office PCs or cashier PCs and choose the minutes.

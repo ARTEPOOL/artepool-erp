@@ -763,7 +763,38 @@ describe('the shift (decisions 0004, 0006, 0056–0058)', () => {
       201,
     );
     expect(r.dropDue).toBe(true);
-    expect((await ok<PosState>(cashier('GET', '/api/v1/pos/state'))).dropDue).toBe(true);
+    const state = await ok<PosState>(cashier('GET', '/api/v1/pos/state'));
+    expect(state.dropDue).toBe(true);
+    // The cashier counts blind: no expected cash on "My shift" (0006, 0080).
+    expect(state.expectedCashFils).toBeNull();
+    const dueFor = async (shiftId: string) =>
+      (
+        await ok<{ alertType: string; params: Record<string, string> }[]>(
+          accountant('GET', '/api/v1/shifts/alerts'),
+        )
+      ).some((x) => x.alertType === 'cash_drop_due' && x.params.shiftId === shiftId);
+    expect(await dueFor(state.shift!.id)).toBe(true);
+    // A transfer to the safe below the limit: the alert disappears by itself (0080).
+    await ok(
+      cashier('POST', '/api/v1/shifts/current/movements', {
+        movementType: 'cash_drop',
+        amountFils: '100000',
+      }),
+      201,
+    );
+    expect(await dueFor(state.shift!.id)).toBe(false);
+  });
+
+  it('the owner sees the expected cash on "My shift" (0080)', async () => {
+    const pc = await addDevice(server, { code: 'OWNER-COUNTER', kind: 'pos' });
+    const me = asActor(
+      pc,
+      owner.id,
+      (await openSession(server, { userId: owner.id, deviceId: pc.id, method: 'password_totp' }))
+        .token,
+    );
+    await open(me, '12345');
+    expect((await ok<PosState>(me('GET', '/api/v1/pos/state'))).expectedCashFils).toBe('12345');
   });
 });
 

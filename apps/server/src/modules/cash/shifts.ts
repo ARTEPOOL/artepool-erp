@@ -770,7 +770,11 @@ export async function acceptVariance(
   return shiftReport(trx, shiftId, { reveal: auth?.permissions.has('shifts.view_all') ?? true });
 }
 
-/** Open cash alerts (drops due, repeated variances), for whoever sees all shifts. */
+/**
+ * Open cash alerts (drops due, repeated variances), for whoever sees all shifts. A "drop due"
+ * alert shows only while it is still true: its shift is open and the drawer still holds more than
+ * the alert amount (after a transfer to the safe or the shift's close it disappears by itself).
+ */
 export async function cashAlerts(db: Db): Promise<CashAlert[]> {
   const rows = await db
     .selectFrom('sys.alerts')
@@ -780,7 +784,26 @@ export async function cashAlerts(db: Db): Promise<CashAlert[]> {
     .orderBy('id', 'desc')
     .limit(100)
     .execute();
-  return rows.map((r) => ({
+  const limit = await settingBigint(db, 'cash.drop_alert_fils');
+  const stillDue = async (shiftId: unknown): Promise<boolean> => {
+    if (limit === null || typeof shiftId !== 'string') return false;
+    const open = await db
+      .selectFrom('cash.shifts')
+      .select('id')
+      .where('id', '=', BigInt(shiftId))
+      .where('status', '=', 'open')
+      .executeTakeFirst();
+    return open !== undefined && (await expectedCash(db, open.id)) > limit;
+  };
+  const shown = [];
+  for (const r of rows) {
+    if (r.alert_type === 'cash_drop_due') {
+      const params = r.params as Record<string, unknown>;
+      if (!(await stillDue(params.shiftId))) continue;
+    }
+    shown.push(r);
+  }
+  return shown.map((r) => ({
     id: r.id.toString(),
     alertType: r.alert_type as CashAlert['alertType'],
     createdAt: r.created_at.toISOString(),

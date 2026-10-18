@@ -103,6 +103,7 @@ const STATE: PosState = {
   ],
   receiptLanguage: 'both',
   dropDue: false,
+  expectedCashFils: null,
 };
 
 const TABLETS: ItemListItem = {
@@ -130,6 +131,7 @@ const SOLD = {
   opensDrawer: true,
   oversellAdjustmentNumber: null,
   dropDue: false,
+  expectedCashFils: null,
 } as unknown as PosSaleResponse;
 
 const CASHIER = [

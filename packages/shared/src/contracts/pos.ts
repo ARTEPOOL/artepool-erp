@@ -67,6 +67,11 @@ export interface PosState {
   receiptLanguage: 'ar' | 'en' | 'both';
   /** The drawer holds more than the cash-drop alert amount (0057); the amount is never shown. */
   dropDue: boolean;
+  /**
+   * The cash the drawer should hold now, shown on "My shift" to the owner only (decision 0080);
+   * null for everyone else, whose count stays blind (0006).
+   */
+  expectedCashFils: string | null;
 }
 
 // ---------------------------------------------------------------------------------------------

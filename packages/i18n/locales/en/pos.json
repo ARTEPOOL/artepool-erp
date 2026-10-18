@@ -208,7 +208,8 @@
     "xReport": "X report",
     "close": "Close the shift",
     "closeHelp": "Count the cash without seeing the expected amount. The difference shows after counting.",
-    "zTitle": "Z report"
+    "zTitle": "Z report",
+    "expected": "Cash expected in the drawer now"
   },
   "movement": {
     "paid_in": "Paid-in",

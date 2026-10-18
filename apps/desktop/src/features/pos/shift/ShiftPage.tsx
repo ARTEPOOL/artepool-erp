@@ -18,6 +18,7 @@ import { useTranslation } from 'react-i18next';
 import type { ShiftReport } from '@artepool/shared/contracts';
 import { Alert, Button, Card, CardHeader, iconClass, Note, PageHeader } from '../../../ui';
 import { useCan, useErrorText } from '../../auth/context';
+import { money } from '../../masterdata/format';
 import { usePosState, useXReport } from '../api';
 import { CloseShiftDialog } from './CloseShiftDialog';
 import { MovementDialog, type MovementKind } from './MovementDialog';
@@ -68,6 +69,14 @@ export function ShiftPage() {
       {shift && (
         <>
           {state.data?.dropDue && <Alert tone="warn">{t('dropDueLong')}</Alert>}
+          {state.data?.expectedCashFils != null && (
+            <div className={styles.change} data-testid="expected-cash">
+              <span>{t('shiftPage.expected')}</span>
+              <b>
+                <bdi>{money(BigInt(state.data.expectedCashFils))}</bdi>
+              </b>
+            </div>
+          )}
           <div className={styles.actionsGrid}>
             <Card>
               <CardHeader title={t('shiftPage.cash')} />

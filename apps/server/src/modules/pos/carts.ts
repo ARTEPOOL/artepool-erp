@@ -12,6 +12,7 @@ import { AppError } from '../../platform/errors/app-error';
 import { expectedCash, openShiftOnDevice, registerOf, settingBigint } from '../cash/drawer';
 import { shiftSummary } from '../cash/shifts';
 import { closeHeldCart, walkInCustomer } from './sales';
+import { isOwner } from '../auth/owner';
 
 type Db = Kysely<DB> | Transaction<DB>;
 
@@ -38,7 +39,10 @@ export async function posState(db: Db, request: FastifyRequest): Promise<PosStat
   // The receipt's language is part of its template (decision 0064).
   const { language } = await settingsOf(db, null, 'receipt_thermal');
   const limit = await settingBigint(db, 'cash.drop_alert_fils');
-  const dropDue = mine && limit !== null ? (await expectedCash(db, mine.id)) > limit : false;
+  const cash = mine ? await expectedCash(db, mine.id) : null;
+  const dropDue = cash !== null && limit !== null ? cash > limit : false;
+  // The owner sees the expected cash on "My shift"; everyone else counts blind (0006, 0080).
+  const owner = cash !== null && (await isOwner(db, userId));
   return {
     isPosDevice: isPos,
     registerId: register?.id.toString() ?? null,
@@ -64,6 +68,7 @@ export async function posState(db: Db, request: FastifyRequest): Promise<PosStat
     })),
     receiptLanguage: language,
     dropDue,
+    expectedCashFils: owner && cash !== null ? cash.toString() : null,
   };
 }
 

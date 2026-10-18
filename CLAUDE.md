@@ -82,7 +82,7 @@ It runs client–server on the local network: PostgreSQL and the API service on 
 - **Hardware:** standard 80 mm ESC/POS printers (Epson TM-T20III / TM-T82 and compatible); the drawer is on the printer's kick port. (0055)
 - **Receipt printer modes:** per PC, ESC/POS thermal (RAW, cut, drawer) or any printer through its Windows driver (image at real width, no drawer). The receipt follows the owner's sample: Item / Amount table, a dotted separator between items, a large total, a Paid box. (0070)
 - **Blind count:** notes 1000–5, coins 1–0.05, plus "other amount"; exact to the fils. (0056)
-- **Cash drop alert** above AED 3,000 (setting). (0057)
+- **Cash drop alert** above AED 3,000 (setting); it clears itself once the drawer is back under the limit or the shift is closed. The owner sees the expected cash on "My shift"; everyone else counts blind. (0057, 0080)
 - **Stuck shifts:** owner/accountant close a shift stuck on another PC (reason + count; over/short stays the cashier's); the owner moves a re-enrolled PC's drawer to it; a PC with an open shift cannot be revoked. (0069)
 - **Over/short** accepted by owner or accountant (posts to 6910); alert after 3 differences above AED 20 within 30 days (settings). (0058)
 - **POS discounts/prices** as A4: cashier limit 5% by default, above it a supervisor; any unit-price change needs a supervisor; oversell stays supervisor-approved. (0059)
