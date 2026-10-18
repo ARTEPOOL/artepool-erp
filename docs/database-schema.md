@@ -1731,9 +1731,10 @@ Migrations are written **in build order** (milestones in [`phase-1-plan.md`](pha
 | 0030 | `trust_until_password_change` | M1 fix | `security.trusted_device_days` 3650 (until the password changes), range 0–3650; trust expiry check up to 3650 days (0077) | — |
 | 0031 | `owner_trust_on_pos` | M1 fix | `auth.is_owner()`; the owner may trust a POS PC; a PC turned POS keeps only the owner's trust (0078) | — |
 | 0032 | `screen_lock_optional` | M1 fix | `security.idle_lock_minutes.office/pos` may be 0 (never lock) and are set to 0 (0079) | — |
-| 0033 | `ops_backup` | M6 | `ops.backup_runs`, `ops.integrity_runs` + backup role grants | — |
+| 0033 | `owner_dashboard` | Reports | `reports.owner_dashboard` (owner only), index on issued documents by day (0081) | — |
+| 0034 | `ops_backup` | M6 | `ops.backup_runs`, `ops.integrity_runs` + backup role grants | — |
 
-After 0033, a final check asserts that every business table has the audit trigger, the no-delete guard and the expected grants. The same check runs as an automated test.
+After 0034, a final check asserts that every business table has the audit trigger, the no-delete guard and the expected grants. The same check runs as an automated test.
 
 ---
 

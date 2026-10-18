@@ -1,0 +1,106 @@
+/* The owner dashboard (decision 0081), after design 12 (reports): tiles, a daily chart, tables. */
+.tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: end;
+}
+
+.change {
+  display: block;
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+}
+
+.up {
+  color: var(--color-success);
+}
+
+.down {
+  color: var(--color-danger);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  align-items: start;
+  margin-block-start: var(--space-4);
+}
+
+@media (max-width: 1200px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.chart {
+  display: flex;
+  gap: var(--space-2);
+  align-items: end;
+  block-size: 12rem;
+  padding-block-start: var(--space-4);
+  overflow-x: auto;
+}
+
+.col {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  justify-items: center;
+  gap: var(--space-1);
+  block-size: 100%;
+  min-inline-size: 2rem;
+  flex: 1;
+}
+
+.bar {
+  align-self: end;
+  inline-size: min(100%, 2.5rem);
+  block-size: var(--h);
+  min-block-size: 2px;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  background: var(--color-primary-soft);
+  border: 1px solid var(--color-primary);
+  border-block-end: none;
+}
+
+.barNegative {
+  background: var(--color-danger-soft);
+  border-color: var(--color-danger);
+}
+
+.day {
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.rows {
+  display: grid;
+}
+
+.rows > div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-block: var(--space-2);
+  border-block-end: 1px solid var(--color-border);
+  font-size: var(--text-label);
+}
+
+.rows > div:last-child {
+  border-block-end: none;
+}
+
+.muted {
+  color: var(--color-text-secondary);
+  font-size: var(--text-caption);
+}
+
+.negative {
+  color: var(--color-danger);
+}
+
+.section {
+  margin-block-start: var(--space-4);
+}

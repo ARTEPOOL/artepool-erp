@@ -1,5 +1,11 @@
 # Changelog
 
+## The owner dashboard (2026-10-18)
+
+**In plain words:** "Reports" in the side menu now opens your dashboard (owner only): total sales, sales without VAT, VAT due and profit for today, this week, this month, this year or any dates, each compared with the period before; sales day by day; POS vs A4, money per payment method and what is still unpaid; sales per employee; the top 10 items and customers; and right now: cash in the drawers and the safe, what customers owe and how much is late, the stock value and what needs reordering.
+
+- Decision 0081; migration 0033 (`ops_backup` moves to 0034).
+
 ## Expected cash for the owner; drop alerts clear themselves (2026-10-18)
 
 **In plain words:** on "My shift" the owner now sees the cash the drawer should hold, all the time; cashiers still count blind. The "transfer to the safe" alert disappears by itself once the drawer is back under AED 3,000 or the shift is closed, so old alerts for small amounts no longer stay on the list.

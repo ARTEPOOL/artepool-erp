@@ -34,6 +34,7 @@ import { UsersPanel } from '../features/settings/users/UsersPanel';
 import { PosPage } from '../features/pos/PosPage';
 import { ShiftPage } from '../features/pos/shift/ShiftPage';
 import { ShiftsPage } from '../features/pos/shift/ShiftsPage';
+import { OwnerDashboard } from '../features/reports/OwnerDashboard';
 import { Shell } from './Shell';
 
 const root = createRootRoute({ component: Shell });
@@ -81,6 +82,11 @@ const posShift = createRoute({
   component: ShiftPage,
 });
 const shifts = createRoute({ getParentRoute: () => root, path: 'shifts', component: ShiftsPage });
+const reports = createRoute({
+  getParentRoute: () => root,
+  path: 'reports',
+  component: OwnerDashboard,
+});
 const items = createRoute({ getParentRoute: () => root, path: 'items', component: ItemsPage });
 // Stock pages reached from Items & stock (design 07) and the dashboard alerts.
 const openingStock = createRoute({
@@ -149,6 +155,7 @@ const print = createRoute({
 });
 
 const routeTree = root.addChildren([
+  reports,
   home,
   pos,
   posShift,

@@ -437,6 +437,7 @@ Each phase ends with automated tests passing, a security review, an accountant r
 | Version | Date | Change |
 |---|---|---|
 | 1.10 | 2026-10-14 | M4b decisions 0064–0067: print designer with locked tax fields per document type (seller address on every tax invoice, customer address on full tax invoices; a full tax invoice needs the customer's address); company bank accounts with UAE IBAN check; customer PO number on A4 invoices and quotations; no QR code until e-invoicing. |
+| 1.23 | 2026-10-18 | Decision 0081: the owner dashboard (sales, VAT, profit, cash, receivables, stock). |
 | 1.22 | 2026-10-18 | Decision 0080: the owner sees the expected cash on "My shift"; drop alerts clear themselves. |
 | 1.21 | 2026-10-18 | Decision 0079: the idle screen lock can be turned off per kind of PC; off on every PC. |
 | 1.20 | 2026-10-18 | Decision 0078: the owner (only) may be remembered on POS PCs too. |

@@ -8,10 +8,12 @@
  * with approval, the close (Z) and the variance accepted by the accountant (0006, 0056–0058).
  */
 import { randomUUID } from 'node:crypto';
+import { periodRange } from '../../src/modules/reports/dashboard';
 import { sql } from 'kysely';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type {
   CashMovementItem,
+  DashboardResponse,
   CountResult,
   CustomerDetail,
   DocumentDetail,
@@ -584,6 +586,110 @@ describe('returns at the POS (decision 0060)', () => {
       expect.objectContaining({ methodKind: 'card', amountFils: '10500' }),
     ]);
     expect(cardBack.opensDrawer).toBe(false);
+  });
+});
+
+describe('the owner dashboard (decisions 0039, 0081)', () => {
+  const dashboard = (who: Actor = owner, query = 'period=today') =>
+    ok<DashboardResponse>(who('GET', `/api/v1/reports/owner-dashboard?${query}`));
+  const minus = (a: string, b: string) => (BigInt(a) - BigInt(b)).toString();
+
+  it('counts sales after returns, with VAT, cost and profit, per item, cashier and method', async () => {
+    expect((await accountant('GET', '/api/v1/reports/owner-dashboard')).statusCode).toBe(403);
+    const before = await dashboard();
+    const cashier = await signedIn('cash.dash', ['cashier']);
+    const shift = await open(cashier, '0');
+    const a = await item('DASH-1', '1050000', '9000'); // 105.00 incl. VAT, cost 5.00
+    const sold = await ok<PosSaleResponse>(
+      sale(cashier, {
+        lines: [{ itemId: a, quantityMilli: '3000' }],
+        payments: [cashPart('31500')],
+      }),
+      201,
+    );
+    await ok(
+      cashier('POST', '/api/v1/pos/returns', {
+        originalDocumentId: sold.document.id,
+        reasonCodeId: ids.cnReturn,
+        reasonText: 'Returned one',
+        lines: [
+          {
+            originalLineId: sold.document.lines[0]!.id,
+            quantityMilli: '1000',
+            returnStockStatus: 'available',
+          },
+        ],
+        approvalId: await approval(cashier, 'credit_notes.issue'),
+      }),
+      201,
+    );
+    const after = await dashboard();
+    // 3 sold − 1 returned = 2 × 105.00: net 200.00, VAT 10.00, cost 10.00, profit 190.00.
+    expect({
+      total: minus(after.current.totalFils, before.current.totalFils),
+      net: minus(after.current.netFils, before.current.netFils),
+      vat: minus(after.current.vatFils, before.current.vatFils),
+      cost: minus(after.current.costFils, before.current.costFils),
+      profit: minus(after.current.profitFils, before.current.profitFils),
+      documents: after.current.documents - before.current.documents,
+    }).toEqual({
+      total: '21000',
+      net: '20000',
+      vat: '1000',
+      cost: '1000',
+      profit: '19000',
+      documents: 1,
+    });
+    expect(minus(after.byChannel.posFils, before.byChannel.posFils)).toBe('21000');
+    const cashOf = (d: DashboardResponse) =>
+      d.byMethod.find((m) => m.kind === 'cash')?.amountFils ?? '0';
+    expect(minus(cashOf(after), cashOf(before))).toBe('21000');
+    expect(after.topItems.find((i) => i.code === 'DASH-1')).toMatchObject({
+      quantityMilli: '2000',
+      netFils: '20000',
+      profitFils: '19000',
+    });
+    expect(after.byCashier.find((c) => c.userId === cashier.id.toString())).toMatchObject({
+      totalFils: '21000',
+      documents: 1,
+    });
+    expect(after.cash.openShifts.find((x) => x.shiftId === shift.id)?.expectedFils).toBe('21000');
+    expect(after.from).toBe(after.to);
+    expect(after.previousTo < after.from).toBe(true);
+  });
+
+  it('periods: weeks start on Monday; a custom range must be in order', async () => {
+    expect(periodRange({ period: 'week' }, '2026-10-18')).toEqual({
+      from: '2026-10-12',
+      to: '2026-10-18',
+    });
+    expect(periodRange({ period: 'week' }, '2026-10-12')).toEqual({
+      from: '2026-10-12',
+      to: '2026-10-12',
+    });
+    expect(periodRange({ period: 'month' }, '2026-10-18')).toEqual({
+      from: '2026-10-01',
+      to: '2026-10-18',
+    });
+    expect(periodRange({ period: 'year' }, '2026-10-18')).toEqual({
+      from: '2026-01-01',
+      to: '2026-10-18',
+    });
+    const custom = await dashboard(owner, 'period=custom&from=2026-09-01&to=2026-09-30');
+    expect(custom).toMatchObject({
+      from: '2026-09-01',
+      to: '2026-09-30',
+      previousFrom: '2026-08-02',
+      previousTo: '2026-08-31',
+    });
+    expect(
+      (
+        await owner(
+          'GET',
+          '/api/v1/reports/owner-dashboard?period=custom&from=2026-10-02&to=2026-10-01',
+        )
+      ).statusCode,
+    ).toBe(422);
   });
 });
 

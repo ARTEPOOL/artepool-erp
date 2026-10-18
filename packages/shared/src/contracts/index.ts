@@ -15,3 +15,4 @@ export * from './inventory';
 export * from './sales';
 export * from './pos';
 export * from './printing';
+export * from './reports';

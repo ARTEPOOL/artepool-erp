@@ -129,6 +129,9 @@ It runs client–server on the local network: PostgreSQL and the API service on 
 - **Customer opening balances:** once at go-live, owner only (`customers.opening`). (0051)
 - **Payments** without chosen invoices settle the oldest first; the rest is an advance with its own tax invoice. (0052)
 
+**Reports**
+- **Owner dashboard** (side menu → Reports, owner only): total sales, sales without VAT, VAT due (no input VAT until purchases exist), gross profit from the cost stored on each line; period with comparison; daily chart; POS/A4, payment methods, unpaid, per employee; top items/customers; cash in drawers and safe, receivables and overdue, stock value and reorder. (0039, 0081)
+
 **Accounting**
 - **Defective returns** are held at cost in "Inventory – defective" until written off. (0015)
 - **Periods** are monthly and are locked after close. Nothing is ever deleted. (0016)

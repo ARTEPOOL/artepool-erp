@@ -11,6 +11,7 @@ import { sql } from 'kysely';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { computeLine } from '@artepool/shared';
 import type {
+  DashboardResponse,
   CancelInvoiceResponse,
   CustomerBalance,
   CustomerDetail,
@@ -412,6 +413,9 @@ describe('invoices (decisions 0010, 0011, 0046)', () => {
 
 describe('the advance and progress payments example (decision 0013)', () => {
   it('quotation 100,000 + VAT → receive 31,500 → 42,000 → final invoice: 31,500 due, VAT 1,500', async () => {
+    const dash = () =>
+      ok<DashboardResponse>(owner('GET', '/api/v1/reports/owner-dashboard?period=today'));
+    const before = await dash();
     const cust = await customer('Villa owner', { credit: '100000000' });
     const pool = await item('POOL-01', 'service', '1000000000'); // 100,000.00 + VAT
     const q = await ok<QuotationDetail>(
@@ -515,6 +519,11 @@ describe('the advance and progress payments example (decision 0013)', () => {
     expect((await documentHtml(server.db, BigInt(final.id))).html).toContain('COPY');
     const balance = await ok<CustomerBalance>(owner('GET', `/api/v1/customers/${cust}/balance`));
     expect(balance).toMatchObject({ balanceFils: '3150000', advancesFils: '0' });
+    // The owner dashboard counts the project once: two advances + the final invoice = 100,000 + VAT.
+    const after = await dash();
+    expect(BigInt(after.current.netFils) - BigInt(before.current.netFils)).toBe(10000000n);
+    expect(BigInt(after.current.vatFils) - BigInt(before.current.vatFils)).toBe(500000n);
+    expect(BigInt(after.current.totalFils) - BigInt(before.current.totalFils)).toBe(10500000n);
   });
 });
 
