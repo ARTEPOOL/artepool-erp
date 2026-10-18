@@ -269,7 +269,7 @@ describe('the print designer (decisions 0020, 0064)', () => {
     expect(header.slice(en, ar)).toContain('ARTEPOOL Swimming Pools');
     expect(header.slice(en, ar)).toContain('Al Ain, Abu Dhabi');
     expect(header.slice(ar)).toContain('الرقم الضريبي');
-    // Name, address, email, phone, then the TRN, in both columns.
+    // Name, address, phone, email, then the TRN, each labelled, in both columns.
     const withContact = (
       await ok<PreviewTemplateResponse>(
         owner('POST', '/api/v1/print-templates/tax_invoice_a4/preview', {
@@ -291,12 +291,15 @@ describe('the print designer (decisions 0020, 0064)', () => {
       [split.slice(0, middle), 'Al Ain, Abu Dhabi'],
       [split.slice(middle), 'العين، أبوظبي'],
     ] as const) {
-      const order = [address, 'office@artepool.test', '+97130000000', '100123456789012'].map(
+      const order = [address, '+97130000000', 'office@artepool.test', '100123456789012'].map(
         (text) => side.indexOf(text),
       );
       expect(order.every((at) => at > 0)).toBe(true);
       expect([...order].sort((x, y) => x - y)).toEqual(order);
     }
+    expect(split).toContain('<span class="label">Phone:</span>');
+    expect(split).toContain('<span class="label">رقم الهاتف:</span>');
+    expect(split).toContain('<span class="label">اسم الشركة:</span>');
     expect(header.slice(ar)).toContain('100123456789012');
     // One language only: the logo stays above the details, centred.
     const single = await ok<PreviewTemplateResponse>(
