@@ -453,6 +453,24 @@ A milestone is done only when its tests pass in CI.
 
 **Needs:** the hardware models (printer, drawer, scanner, label printer).
 
+#### M5c — POS kiosk mode (proposed: decisions 0082, 0083, 0087)
+
+**Delivers:**
+- The app reads its PC's kind at start: POS → kiosk mode (full screen, no window controls, closing refused); Office → normal app.
+- Unlock: Settings → Devices → **Unlock POS** (owner, 2-step confirmed) and **Unlock with owner code** on the lock screen (one-time code, 5 tries / 15 minutes); 15-minute unlock, then kiosk mode returns.
+- A migration for kiosk unlocks and the new alert types; audit and owner alerts for exit attempts and unlocks.
+- Two cashiers on one POS PC: sign out → the other cashier's PIN; the open shift must be closed first (existing rule 0004).
+
+**Key tests:**
+- Only the owner can unlock; a supervisor's code or the owner's used code is refused; 5 wrong codes lock the fallback.
+- The unlock ends by itself after its time and is audited from start to end.
+- An exit attempt writes the audit entry and the alert.
+- A second cashier cannot open a shift on a drawer with an open shift.
+
+**Check by hand:**
+- On the POS PC press Alt+F4 → nothing closes, and the owner sees an alert.
+- Unlock from the laptop → the POS leaves full screen → after 15 minutes it returns.
+
 ### M6 — Operations
 
 **Delivers:**
@@ -460,6 +478,9 @@ A milestone is done only when its tests pass in CI.
 - The backup agent: WAL archive, hourly dump, nightly base backup, `age`-encrypted daily off-site upload, external-drive reminders.
 - The restore test into `artepool_restore_test`, the nightly integrity checks and the system-health screen.
 - The server installer (PostgreSQL configuration, roles, CA and certificates, firewall, services) and the client installer (CA trust, offline WebView2).
+- **Server on the POS PC (proposed, 0085):** PostgreSQL and the API as services under their own accounts; ACLs on the database, `.secrets`, backups and logs; the cashier as a standard Windows user with auto sign-in and the kiosk policies (Task Manager, Run, command prompt, registry editor off); the kiosk watchdog task; an owner-only administrator account; BitLocker; the UPS reminder in the health screen.
+- **Backups (proposed, 0086):** hourly local + WAL; daily `age`-encrypted upload to Google Drive (public key on the server, private key offline); weekly external-drive reminder; restore test.
+- **Remote access (proposed, 0084):** the VPN runbook (`docs/runbooks/remote-access.md`), the server certificate naming the VPN address, the LAN ranges setting, and "trust this PC" refused outside the LAN in the database.
 - Runbooks.
 
 **Key tests:**
@@ -467,11 +488,15 @@ A milestone is done only when its tests pass in CI.
 - An off-site file decrypts only with the private key.
 - Simulated power loss (process killed mid-sale) → no partial data, and integrity is OK after restart.
 - A server clock that goes backwards → writes are refused.
+- The cashier's Windows account cannot read the database folder or `.secrets`, or stop the services.
+- A sign-in from outside the LAN ranges never uses a trusted PC: the phone code is always asked.
 
 **Check by hand:**
 - Install on the real server PC and two client PCs.
 - Run "Restore test" from the admin screen → green.
 - Pull the network cable during a backup → an alert appears.
+- From outside the shop, connect the laptop through the VPN and sign in → the phone code is asked.
+- Open the off-site file in Google Drive → it cannot be read without the private key.
 
 ### M7 — Acceptance
 

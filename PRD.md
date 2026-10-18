@@ -83,6 +83,8 @@ Full detail: [`docs/architecture.md`](docs/architecture.md).
   Showroom POS   Showroom POS    Office PC     Warehouse PC   … (unlimited)
 ```
 
+- **ARTÉPOOL now (proposed, [0085](docs/decisions/0085-server-on-the-pos-pc.md)):** the POS PC is also the Main Server (PostgreSQL + API as Windows services); the owner's laptop is the only Office PC and reaches the server from outside the shop only through a private VPN ([0084](docs/decisions/0084-remote-access-through-private-vpn.md)). One cashier now; two cashiers on the same POS PC or a second POS PC later without redesign ([0087](docs/decisions/0087-cashiers-and-drawers-growth.md)).
+- **One app for every PC:** the kind a PC is enrolled as decides the mode. POS PCs start in an app-level kiosk mode that only the owner can unlock, for a limited time ([0082](docs/decisions/0082-app-mode-by-device-kind-and-pos-kiosk.md), [0083](docs/decisions/0083-exiting-kiosk-mode-owner-only.md)).
 - The Main Server PC can also be used as a normal workstation.
 - Clients find the server through a configured address, with optional auto-discovery on the LAN.
 - If a client loses the connection, it shows a clear "server unreachable" state and never saves partial data.
@@ -92,6 +94,7 @@ Full detail: [`docs/architecture.md`](docs/architecture.md).
 - **Standby server:** a second PC can hold a near-real-time replica and be promoted if the main one fails.
 - **Multi-warehouse / branch:** the schema is ready now; the UI comes later.
 - **E-invoicing (UAE):** see section 10.4. Invoices are stored in a structured, transmittable form, and an outbox queues them for later sync.
+- **Mobile dashboard (Phase 2):** no cloud database in Phase 1; summary figures go through an outbox to a read-only mobile dashboard later, nothing flows back ([0088](docs/decisions/0088-no-cloud-database-outbox-for-mobile.md)).
 
 ---
 
@@ -133,6 +136,8 @@ These rules apply to every table and every feature.
 | Audit | Every sensitive action is logged (see rule 7) and viewable by the owner |
 | App integrity | Signed updates (the app refuses unsigned or tampered updates) and no secrets in client code. **No installer code-signing certificate for now**; revisit later ([0007](docs/decisions/0007-no-code-signing-certificate-for-now.md)). |
 | Ransomware resilience | At least one backup copy that is not continuously connected to the network |
+| POS kiosk (proposed) | POS PCs run the app full screen in kiosk mode: closing refused, restarted by a watchdog; the cashier's Windows account is a standard user that cannot stop the services or read the database or keys; every exit attempt and unlock is audited and alerts the owner; only the owner unlocks, for 15 minutes ([0082](docs/decisions/0082-app-mode-by-device-kind-and-pos-kiosk.md), [0083](docs/decisions/0083-exiting-kiosk-mode-owner-only.md), [0085](docs/decisions/0085-server-on-the-pos-pc.md)) |
+| Remote access (proposed) | Never an internet-facing port. The owner's laptop uses a private mesh VPN (Tailscale/WireGuard) to the server only; outside the shop LAN every sign-in needs password + 2-step, and the device can be revoked at once ([0084](docs/decisions/0084-remote-access-through-private-vpn.md)) |
 | Data export | Exports (CSV/PDF/Excel) are permission-controlled and logged |
 
 ---
@@ -143,11 +148,12 @@ These rules apply to every table and every feature.
 |---|---|
 | 3-2-1 rule | 3 copies, 2 different media, 1 off-site |
 | Local automatic backup | Hourly to a second PC or external drive |
-| Off-site backup | Daily, **encrypted before upload**, to Google Drive or OneDrive when internet is available |
+| Off-site backup | Daily, **encrypted with `age` before upload**, to **Google Drive** when internet is available; the private key stays offline with the owner ([0086](docs/decisions/0086-backups-local-and-google-drive.md), proposed) |
+| External drive | Weekly reminder to plug in the backup drive for a copy that is then unplugged |
 | Point-in-time recovery | WAL archiving, so data can be restored to a specific minute |
 | Restore tool | Built-in restore to a test database, plus a monthly restore-test reminder |
 | Backup health | A dashboard shows the last successful backup. An alert fires if a backup fails or is older than the threshold. |
-| Hardware | UPS on the Main Server (documented requirement) |
+| Hardware | UPS on the Main Server (documented requirement); the health screen reminds the owner until a UPS is confirmed ([0085](docs/decisions/0085-server-on-the-pos-pc.md)) |
 
 ---
 
@@ -437,6 +443,7 @@ Each phase ends with automated tests passing, a security review, an accountant r
 | Version | Date | Change |
 |---|---|---|
 | 1.10 | 2026-10-14 | M4b decisions 0064–0067: print designer with locked tax fields per document type (seller address on every tax invoice, customer address on full tax invoices; a full tax invoice needs the customer's address); company bank accounts with UAE IBAN check; customer PO number on A4 invoices and quotations; no QR code until e-invoicing. |
+| 1.24 | 2026-10-18 | Proposed decisions 0082–0088: app mode by device kind and POS kiosk mode; owner-only kiosk unlock; remote access through a private VPN only; server on the POS PC; backups to Google Drive encrypted with age; growth to more cashiers and drawers; no cloud database in Phase 1, outbox for a Phase 2 mobile dashboard. |
 | 1.23 | 2026-10-18 | Decision 0081: the owner dashboard (sales, VAT, profit, cash, receivables, stock). |
 | 1.22 | 2026-10-18 | Decision 0080: the owner sees the expected cash on "My shift"; drop alerts clear themselves. |
 | 1.21 | 2026-10-18 | Decision 0079: the idle screen lock can be turned off per kind of PC; off on every PC. |
