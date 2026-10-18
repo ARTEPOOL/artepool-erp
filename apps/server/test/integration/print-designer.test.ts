@@ -299,7 +299,9 @@ describe('the print designer (decisions 0020, 0064)', () => {
     }
     expect(split).toContain('<span class="label">Phone:</span>');
     expect(split).toContain('<span class="label">رقم الهاتف:</span>');
-    expect(split).toContain('<span class="label">اسم الشركة:</span>');
+    // The name stands alone, without a label.
+    expect(split).not.toContain('اسم الشركة');
+    expect(split).toContain('<h1>ARTEPOOL Swimming Pools</h1>');
     expect(header.slice(ar)).toContain('100123456789012');
     // One language only: the logo stays above the details, centred.
     const single = await ok<PreviewTemplateResponse>(

@@ -256,7 +256,7 @@ export function renderHtml(doc: PrintDocument, seller: Seller, options: RenderOp
     on('logo') && doc.logoDataUri
       ? `<img class="logo" src="${doc.logoDataUri}" alt="" style="max-block-size:${settings.logoSizeMm}mm">`
       : '';
-  // Seller lines in the owner's order, each with its label: name, address, phone, email, TRN.
+  // Seller lines in the owner's order: the name alone, then labelled address, phone, email, TRN.
   const showContact = on('sellerContact');
   const sellerRows = (side: 'ar' | 'en'): string => {
     const pick = (pair: [string, string]) => (side === 'ar' ? pair[0] : pair[1]);
@@ -265,7 +265,8 @@ export function renderHtml(doc: PrintDocument, seller: Seller, options: RenderOp
         ? `<p><span class="label">${escapeHtml(pick(label))}:</span> ${ltr ? `<span class="ltr">${escapeHtml(value)}</span>` : escapeHtml(value)}</p>`
         : '';
     return [
-      `<h1><span class="label">${escapeHtml(pick(['اسم الشركة', 'Company']))}:</span> ${escapeHtml(side === 'ar' ? seller.legal_name_ar : seller.legal_name_en)}</h1>`,
+      // The name stands alone, without a label, so it stands out.
+      `<h1>${escapeHtml(side === 'ar' ? seller.legal_name_ar : seller.legal_name_en)}</h1>`,
       sellerAddress
         ? row(['العنوان', 'Address'], side === 'ar' ? seller.address_ar : seller.address_en)
         : '',
@@ -338,7 +339,6 @@ h1, h2, h3, .heading { font-family: 'ARTEPOOL Arabic', 'ARTEPOOL Heading', 'Plex
 .seller h1 { font-size: 1.35em; margin: 0; color: #111; }
 .seller p { margin: 0.5mm 0; }
 .seller .label { color: #555; font-weight: 400; font-size: 0.85em; }
-.seller h1 .label { font-size: 0.6em; }
 .seller .seller-en { direction: ltr; margin-block-start: 1.5mm; }
 header:not(.center):not(.split) .seller .seller-en { text-align: ${dir === 'rtl' ? 'right' : 'left'}; }
 /* Every seller line on the same side as the Arabic name (English lines would otherwise start at their own left). */
