@@ -1,5 +1,11 @@
 # Changelog
 
+## Logo in the middle: a letterhead (2026-10-18)
+
+**In plain words:** in Settings → Print designer, choosing the logo in the middle for an A4 document in both languages now prints the Arabic company details on the right, the logo in the middle and the English details on the left, like the company letterhead.
+
+- Decision 0076; no database change.
+
 ## The thermal receipt's own logo (2026-10-17)
 
 **In plain words:** in Settings → Print designer → Thermal receipt you can now upload a logo used only on the thermal receipt (a simple black-and-white logo prints best). Without it, the receipt prints the company logo as before. A4 documents keep the company logo.

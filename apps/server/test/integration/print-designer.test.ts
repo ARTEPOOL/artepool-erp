@@ -253,6 +253,31 @@ describe('the print designer (decisions 0020, 0064)', () => {
     expect(html).not.toContain('only'); // amount in words
   });
 
+  it('logo in the middle, both languages: Arabic details on the right, English on the left', async () => {
+    const current = await template('tax_invoice_a4');
+    const { html } = await ok<PreviewTemplateResponse>(
+      owner('POST', '/api/v1/print-templates/tax_invoice_a4/preview', {
+        settings: { ...current.settings, language: 'both', logoPosition: 'center' },
+      }),
+    );
+    const header = html!.slice(html!.indexOf('<header class="split">'), html!.indexOf('</header>'));
+    const en = header.indexOf('seller-en');
+    const ar = header.indexOf('seller-ar');
+    expect(en).toBeGreaterThan(0);
+    expect(ar).toBeGreaterThan(en);
+    expect(header.slice(en, ar)).toContain('ARTEPOOL Swimming Pools');
+    expect(header.slice(en, ar)).toContain('Al Ain, Abu Dhabi');
+    expect(header.slice(ar)).toContain('الرقم الضريبي');
+    expect(header.slice(ar)).toContain('100123456789012');
+    // One language only: the logo stays above the details, centred.
+    const single = await ok<PreviewTemplateResponse>(
+      owner('POST', '/api/v1/print-templates/tax_invoice_a4/preview', {
+        settings: { ...current.settings, language: 'en', logoPosition: 'center' },
+      }),
+    );
+    expect(single.html).toContain('<header class="center">');
+  });
+
   it('optional fields print when on: PO, item code, amount in words, the chosen bank account', async () => {
     const current = await template('tax_invoice_a4');
     const settings: TemplateSettings = {

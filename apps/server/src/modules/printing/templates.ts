@@ -291,12 +291,18 @@ header { display: flex; justify-content: space-between; align-items: flex-start;
 header.opposite { flex-direction: row-reverse; }
 header.center { flex-direction: column; align-items: center; text-align: center; }
 header.center .logo { order: -1; }
+/* Logo in the middle, both languages: Arabic details on the right, English on the left, like a letterhead. */
+header.split { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; direction: ltr; }
+header.split .seller-en { text-align: left; direction: ltr; }
+header.split .seller-ar { text-align: right; direction: rtl; }
+header.split .seller-en h1 { font-family: 'ARTEPOOL Heading', 'Plex Arabic', sans-serif; }
+header.split .logo { justify-self: center; }
 .logo { max-inline-size: 60mm; }
 h1, h2, h3, .heading { font-family: 'ARTEPOOL Arabic', 'ARTEPOOL Heading', 'Plex Arabic', sans-serif; }
 .seller h1 { font-size: 1.35em; margin: 0; color: #111; }
 .seller p { margin: 0.5mm 0; }
 /* Every seller line on the same side as the Arabic name (English lines would otherwise start at their own left). */
-header:not(.center) .seller { text-align: ${dir === 'rtl' ? 'right' : 'left'}; }
+header:not(.center):not(.split) .seller { text-align: ${dir === 'rtl' ? 'right' : 'left'}; }
 .title { text-align: center; margin: 5mm 0 3mm; }
 .title h2 { font-size: 1.55em; margin: 0; color: #111; }
 .welcome { text-align: center; color: #333; }
@@ -330,7 +336,24 @@ footer { margin-block-start: 8mm; text-align: center; color: #555; font-size: 0.
 </style></head>
 <body>
 ${doc.status === 'draft' ? `<div class="stamp">${t(['مسودة', 'DRAFT'])}</div>` : doc.copy ? `<div class="stamp">${t(['نسخة', 'COPY'])}</div>` : ''}
-<header class="${settings.logoPosition}">
+${
+  settings.logoPosition === 'center' && lang === 'both'
+    ? `<header class="split">
+  <div class="seller seller-en">
+    <h1>${escapeHtml(seller.legal_name_en)}</h1>
+    ${sellerAddress && seller.address_en ? `<p>${escapeHtml(seller.address_en)}</p>` : ''}
+    ${sellerTrn && seller.trn ? `<p>TRN <span class="ltr">${escapeHtml(seller.trn)}</span></p>` : ''}
+    ${contact.map((c) => `<p class="ltr">${c}</p>`).join('')}
+  </div>
+  ${logo || '<div></div>'}
+  <div class="seller seller-ar">
+    <h1>${escapeHtml(seller.legal_name_ar)}</h1>
+    ${sellerAddress && seller.address_ar ? `<p>${escapeHtml(seller.address_ar)}</p>` : ''}
+    ${sellerTrn && seller.trn ? `<p>الرقم الضريبي <span class="ltr">${escapeHtml(seller.trn)}</span></p>` : ''}
+    ${contact.map((c) => `<p><span class="ltr">${c}</span></p>`).join('')}
+  </div>
+</header>`
+    : `<header class="${settings.logoPosition}">
   <div class="seller">
     <h1>${lang !== 'en' ? escapeHtml(seller.legal_name_ar) : ''}${lang !== 'ar' ? `<span class="en">${escapeHtml(seller.legal_name_en)}</span>` : ''}</h1>
     ${sellerAddress ? text(seller.address_ar, seller.address_en) : ''}
@@ -338,7 +361,8 @@ ${doc.status === 'draft' ? `<div class="stamp">${t(['مسودة', 'DRAFT'])}</di
     ${contact.length > 0 ? `<p><span class="ltr">${contact.join(' · ')}</span></p>` : ''}
   </div>
   ${logo}
-</header>
+</header>`
+}
 <div class="title"><h2>${heading(title)}</h2>${doc.copy && doc.status === 'final' ? `<div>${t(['نسخة', 'Copy'])}</div>` : ''}</div>
 ${on('welcome') ? `<div class="welcome">${text(settings.texts.welcomeAr, settings.texts.welcomeEn)}</div>` : ''}
 <section class="meta">

@@ -437,6 +437,7 @@ Each phase ends with automated tests passing, a security review, an accountant r
 | Version | Date | Change |
 |---|---|---|
 | 1.10 | 2026-10-14 | M4b decisions 0064–0067: print designer with locked tax fields per document type (seller address on every tax invoice, customer address on full tax invoices; a full tax invoice needs the customer's address); company bank accounts with UAE IBAN check; customer PO number on A4 invoices and quotations; no QR code until e-invoicing. |
+| 1.18 | 2026-10-18 | Decision 0076: logo in the middle on bilingual A4 documents gives a letterhead (Arabic right, logo centre, English left). |
 | 1.17 | 2026-10-17 | Decision 0075: the thermal receipt can have its own logo, separate from the company logo on A4 documents. |
 | 1.16 | 2026-10-17 | Decision 0074: supervisor approvals with the approver's one-time 2-step code instead of a PIN. |
 | 1.15 | 2026-10-17 | Decision 0071 revised: no name/address fields on A4 invoices; full when the customer is registered or has an address on file, else simplified. |
