@@ -136,7 +136,7 @@ These rules apply to every table and every feature.
 | Audit | Every sensitive action is logged (see rule 7) and viewable by the owner |
 | App integrity | Signed updates (the app refuses unsigned or tampered updates) and no secrets in client code. **No installer code-signing certificate for now**; revisit later ([0007](docs/decisions/0007-no-code-signing-certificate-for-now.md)). |
 | Ransomware resilience | At least one backup copy that is not continuously connected to the network |
-| POS kiosk (proposed) | POS PCs run the app full screen in kiosk mode: closing refused, restarted by a watchdog; the cashier's Windows account is a standard user that cannot stop the services or read the database or keys; every exit attempt and unlock is audited and alerts the owner; only the owner unlocks, for 15 minutes ([0082](docs/decisions/0082-app-mode-by-device-kind-and-pos-kiosk.md), [0083](docs/decisions/0083-exiting-kiosk-mode-owner-only.md), [0085](docs/decisions/0085-server-on-the-pos-pc.md)) |
+| POS kiosk (proposed) | POS PCs run the app full screen in kiosk mode: closing refused, restarted by a watchdog; the cashier's Windows account is a standard user that cannot stop the services or read the database or keys; every exit attempt and unlock is audited and alerts the owner; a per-PC "Kiosk lock" switch kept on the server (default on; owner only with 2-step and a reason; off for 15 min / 1 hour / until turned back on; a banner and an alert while off; PIN, shifts and permissions unchanged, [0089](docs/decisions/0089-kiosk-lock-switch-per-pos-device.md)); only the owner unlocks ([0082](docs/decisions/0082-app-mode-by-device-kind-and-pos-kiosk.md), [0083](docs/decisions/0083-exiting-kiosk-mode-owner-only.md), [0085](docs/decisions/0085-server-on-the-pos-pc.md)) |
 | Remote access (proposed) | Never an internet-facing port. The owner's laptop uses a private mesh VPN (Tailscale/WireGuard) to the server only; outside the shop LAN every sign-in needs password + 2-step, and the device can be revoked at once ([0084](docs/decisions/0084-remote-access-through-private-vpn.md)) |
 | Data export | Exports (CSV/PDF/Excel) are permission-controlled and logged |
 
@@ -443,6 +443,7 @@ Each phase ends with automated tests passing, a security review, an accountant r
 | Version | Date | Change |
 |---|---|---|
 | 1.10 | 2026-10-14 | M4b decisions 0064–0067: print designer with locked tax fields per document type (seller address on every tax invoice, customer address on full tax invoices; a full tax invoice needs the customer's address); company bank accounts with UAE IBAN check; customer PO number on A4 invoices and quotations; no QR code until e-invoicing. |
+| 1.25 | 2026-10-18 | Proposed decision 0089: a per-PC "Kiosk lock" switch, owner only, stored on the server. |
 | 1.24 | 2026-10-18 | Proposed decisions 0082–0088: app mode by device kind and POS kiosk mode; owner-only kiosk unlock; remote access through a private VPN only; server on the POS PC; backups to Google Drive encrypted with age; growth to more cashiers and drawers; no cloud database in Phase 1, outbox for a Phase 2 mobile dashboard. |
 | 1.23 | 2026-10-18 | Decision 0081: the owner dashboard (sales, VAT, profit, cash, receivables, stock). |
 | 1.22 | 2026-10-18 | Decision 0080: the owner sees the expected cash on "My shift"; drop alerts clear themselves. |

@@ -95,6 +95,7 @@ There is one short file per decision, numbered in order.
 | [0086](0086-backups-local-and-google-drive.md) | Backups: hourly local, daily age-encrypted to Google Drive (private key offline), weekly external drive, restore test | Proposed |
 | [0087](0087-cashiers-and-drawers-growth.md) | One cashier now; two cashiers on one PC and a second POS PC later, without redesign | Proposed |
 | [0088](0088-no-cloud-database-outbox-for-mobile.md) | No cloud database in Phase 1; an outbox for a read-only mobile dashboard in Phase 2 | Proposed |
+| [0089](0089-kiosk-lock-switch-per-pos-device.md) | A "Kiosk lock" switch per POS PC (default on), owner only with 2-step and a reason; off for 15 min / 1 hour / until turned on; banner and alerts; kept on the server | Proposed |
 
 ## Template
 

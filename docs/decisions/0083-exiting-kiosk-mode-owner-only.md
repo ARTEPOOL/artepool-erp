@@ -6,6 +6,8 @@
 | **Date** | 2026-10-18 |
 | **Decided by** | Owner (requirements); details proposed |
 
+> Proposed update: the Office-PC unlock and the owner-code unlock are the per-PC "Kiosk lock" switch of [0089](0089-kiosk-lock-switch-per-pos-device.md) turned off for 15 minutes.
+
 ## Decision
 - **Only the owner** unlocks a POS PC out of kiosk mode. The unlock lasts **15 minutes** (setting `kiosk.unlock_minutes`, 5–60), then kiosk mode returns by itself (the app goes back to full screen and the watchdog is armed again). The owner can also end it early.
 - **Primary: from the owner's Office PC.** Settings → Devices → that POS PC → **Unlock POS**. The owner's session must have the 2-step code (a trusted-PC sign-in is not enough: the owner types the current 6-digit code to confirm). The POS PC sees the unlock within seconds.

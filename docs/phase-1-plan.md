@@ -453,18 +453,20 @@ A milestone is done only when its tests pass in CI.
 
 **Needs:** the hardware models (printer, drawer, scanner, label printer).
 
-#### M5c — POS kiosk mode (proposed: decisions 0082, 0083, 0087)
+#### M5c — POS kiosk mode (proposed: decisions 0082, 0083, 0087, 0089)
 
 **Delivers:**
 - The app reads its PC's kind at start: POS → kiosk mode (full screen, no window controls, closing refused); Office → normal app.
 - Unlock: Settings → Devices → **Unlock POS** (owner, 2-step confirmed) and **Unlock with owner code** on the lock screen (one-time code, 5 tries / 15 minutes); 15-minute unlock, then kiosk mode returns.
-- A migration for kiosk unlocks and the new alert types; audit and owner alerts for exit attempts and unlocks.
+- The **Kiosk lock** switch per POS PC in Settings → Devices (default on; owner only, 2-step step-up and a reason; off for 15 min / 1 hour / until turned on; automatic return to on). The state lives on the server; the POS app stays locked when it cannot reach it. A "Kiosk lock is off" banner on the POS while off.
+- A migration for the kiosk lock state and its history and the new alert types; audit and owner alerts for exit attempts, unlocks and switch changes.
 - Two cashiers on one POS PC: sign out → the other cashier's PIN; the open shift must be closed first (existing rule 0004).
 
 **Key tests:**
 - Only the owner can unlock; a supervisor's code or the owner's used code is refused; 5 wrong codes lock the fallback.
 - The unlock ends by itself after its time and is audited from start to end.
 - An exit attempt writes the audit entry and the alert.
+- The switch: refused without the owner's fresh 2-step code or a reason; a timed "off" turns back on by itself; PIN sign-in, shifts and permissions behave the same with the lock off.
 - A second cashier cannot open a shift on a drawer with an open shift.
 
 **Check by hand:**
