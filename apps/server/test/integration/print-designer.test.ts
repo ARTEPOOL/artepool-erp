@@ -319,7 +319,10 @@ describe('the print designer (decisions 0020, 0064)', () => {
     const block = beside.slice(beside.indexOf('<header'), beside.indexOf('</header>'));
     expect(block).not.toContain('class="label"');
     expect(block).toContain('<p>العين، أبوظبي</p><p>Al Ain, Abu Dhabi</p>');
-    expect(block).toContain('الرقم الضريبي · TRN');
+    // Arabic label on the right, "TRN:" on the left, the number between them.
+    expect(block).toContain(
+      '<span class="pair">الرقم الضريبي:</span> <span class="ltr">TRN: 100123456789012</span>',
+    );
   });
 
   it('optional fields print when on: PO, item code, amount in words, the chosen bank account', async () => {

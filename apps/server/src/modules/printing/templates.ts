@@ -233,9 +233,15 @@ export function renderHtml(doc: PrintDocument, seller: Seller, options: RenderOp
       : lang === 'en'
         ? escapeHtml(pair[1])
         : `${escapeHtml(pair[0])} <span class="sep">•</span> <bdi>${escapeHtml(pair[1])}</bdi>`;
-  /** "الرقم الضريبي · TRN 100…": the label isolated, so the number never jumps around it. */
+  /**
+   * The TRN line. In both languages the Arabic label stays on the right and "TRN:" on the left,
+   * with the number between them: "TRN: 100… :الرقم الضريبي". The parts are isolated, so the
+   * number never jumps around them.
+   */
   const trnLine = (trn: string): string =>
-    `<span class="pair">${inline(['الرقم الضريبي', 'TRN'])}</span> <span class="ltr">${escapeHtml(trn)}</span>`;
+    lang === 'both'
+      ? `<span class="pair">الرقم الضريبي:</span> <span class="ltr">TRN: ${escapeHtml(trn)}</span>`
+      : `<span class="pair">${inline(['الرقم الضريبي', 'TRN'])}</span> <span class="ltr">${escapeHtml(trn)}</span>`;
   const title = TITLES[doc.format ? `${doc.kind}:${doc.format}` : doc.kind] ?? TITLES[doc.kind]!;
   const dir = lang === 'en' ? 'ltr' : 'rtl';
   const text = (ar?: string, en?: string) =>
