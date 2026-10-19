@@ -1,5 +1,12 @@
 # Changelog
 
+## Backups and System health (2026-10-19)
+
+**In plain words:** the system now protects your data by itself. Every hour it makes a full copy on the server PC; every day it encrypts the newest copy with your backup key and puts it on the dedicated Google Drive account (Google only sees a locked file); every night it checks the books, the stock, the numbering and the audit log. Settings → Backup (owner only) shows all of it: what needs attention, "Back up now", "Restore test" (proves a copy really brings everything back), the external-drive copy (weekly reminder), the backup key (shown once: print it and save it on a USB stick) and the Google Drive connection. Problems also appear on your dashboard.
+
+- Decision 0086 (owner's choices recorded); migration 0036; new backup service `apps/backup` (`pnpm backup:run`, `backup:once`, `backup:restore-test`, `backup:check`, `backup:offline`); runbook `docs/runbooks/backup-and-restore.md`.
+- The accountant no longer has the health / restore test / integrity permissions (owner only).
+
 ## M6 plan approved (2026-10-19)
 
 **In plain words:** the last building stage before the shop trial is split into five parts, done in this order: backups; the installers with a one-time setup wizard (no console needed); adding the cashier; locking down the cashier's Windows account; the owner's laptop on the shop network. Remote access from outside the shop is not part of Phase 1.

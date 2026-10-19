@@ -199,6 +199,7 @@ Run from the repository root. Setup on a new PC: [`docs/runbooks/dev-setup-windo
 | Unit tests / integration tests (real PostgreSQL) / all | `pnpm test:unit` / `pnpm test:integration` / `pnpm test` |
 | Screen tests in a real browser (Playwright, Arabic + English, light + dark; real API on a throwaway database) | `pnpm test:e2e` (once: `pnpm --filter @artepool/desktop exec playwright install chromium`) |
 | Verify the audit hash chain | `pnpm audit:verify` |
+| Backups (decision 0086): the service / one local copy now / restore test / integrity checks / external-drive copy | `pnpm backup:run` / `pnpm backup:once` / `pnpm backup:restore-test` / `pnpm backup:check` / `pnpm backup:offline <folder>` |
 | Tamper demonstration (throwaway database) | `pnpm demo:audit-tamper` |
 | Create the development master key (`.secrets/`, once per dev PC) | `pnpm dev:secrets` |
 | Create the ARTÉPOOL CA + server certificate (HTTPS, TLS 1.3); `--renew-server` for a new server certificate | `pnpm tls:init [--name host] [--ip address]` |
@@ -208,7 +209,7 @@ Run from the repository root. Setup on a new PC: [`docs/runbooks/dev-setup-windo
 | Rust tests (the PC's secure side: enrollment, TLS rules, device key; the RAW receipt printer) | `pnpm test:rust` |
 | Server console (emergency tools since 0092): first owner / enrollment code / emergency owner 2-step reset / emergency owner password reset (decisions 0022, 0025, 0029) | `pnpm owner:create` / `pnpm device:code` / `pnpm owner:reset-2fa` / `pnpm owner:reset-password` |
 
-Not yet available: `pnpm build:server` (M6), `pnpm backup:run` / `pnpm backup:restore-test` (M6).
+Not yet available: `pnpm build:server` (M6.2).
 
 Rules for migrations: one file per change in `db/migrations/NNNN_name.sql`; no `BEGIN`/`COMMIT` inside (the runner wraps each file); every new table gets `sys.add_touch`/`sys.add_stamp`, `audit.enable_for`, `sys.forbid_delete` and explicit grants — `db/tests/privileges.test.ts` fails otherwise; run `pnpm db:codegen` and commit the regenerated types.
 

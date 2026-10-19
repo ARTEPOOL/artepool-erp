@@ -367,4 +367,6 @@ App (POS section)                     API                                       
 | Restore test | Restore into `artepool_restore_test`, then run all integrity checks | Monthly reminder + before every upgrade | Server |
 | Health | `ops.backup_runs` / `ops.integrity_runs` → "System health" screen + alerts | Continuous | — |
 
+Built in M6.1 (decision [0086](decisions/0086-backups-local-and-google-drive.md)): the hourly logical backup, the daily age-encrypted Google Drive copy (`drive.file` only, refresh token sealed in `.secrets`), the external-drive copy, the restore test and the nightly checks, run by `apps/backup`; WAL archiving and the nightly base backup come with the installer (M6.2). Runbook: [backup-and-restore.md](runbooks/backup-and-restore.md).
+
 **Upgrades:** backup → rehearse the migrations on a restored copy → stop the API → migrate → start → clients update themselves.

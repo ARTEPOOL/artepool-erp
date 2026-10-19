@@ -48,7 +48,7 @@ Phase 1 has **68 tables in 9 schemas**, plus reporting views and the functions a
 | `artepool_owner` | no | Owns every object | — |
 | `artepool_migrator` | yes (server only) | Migration runner | Member of `artepool_owner` |
 | `artepool_api` | yes (server only) | API service | See below |
-| `artepool_backup` | yes (server only) | Backup agent | `pg_read_all_data`, `REPLICATION`; write `ops.backup_runs`, `ops.integrity_runs`; `audit.add_anchor()` |
+| `artepool_backup` | yes (server only) | Backup service | `pg_read_all_data`, `REPLICATION`, `CREATEDB` (only for the throwaway restore-test database); write `ops.backup_runs`, `ops.integrity_runs`, move `ops.backup_requests` forward; `audit.add_anchor()`, `audit.verify_chain()`; never changes business data |
 | `artepool_maint` | yes (server only) | Nightly maintenance | `DELETE` only on `sys.idempotency_keys` older than 30 days (a trigger enforces both the role and the age). Sessions are never deleted ([0026](decisions/0026-users-and-devices-never-deleted.md)). |
 
 **`artepool_api` privileges:**
@@ -110,7 +110,7 @@ Phase 1 has **68 tables in 9 schemas**, plus reporting views and the functions a
         │                               cash.drawer_events                                  (incl. oversell, pending review)
         └── every financial event ─► gl.journal_entries ─► gl.journal_lines ─► gl.accounts      gl.periods (monthly)
 
- audit.log (hash-chained) ◄─ every table + explicit events         ops.outbox · ops.backup_runs · ops.integrity_runs
+ audit.log (hash-chained) ◄─ every table + explicit events         ops.outbox · ops.backup_runs · ops.integrity_runs · ops.backup_requests
 ```
 
 ---
@@ -230,7 +230,7 @@ Written in the same transaction as the operation. Insert-only (a trigger stamps 
 | Column | Type | Rules |
 |---|---|---|
 | id | bigint PK | |
-| alert_type | text | `CHECK IN ('low_stock','oversell_review','cash_drop_due','cash_variance','repeated_variance','drawer_left_open','backup_failed','backup_stale','restore_test_due','integrity_issue','audit_chain_broken','clock_skew','clock_backwards','period_missing','kiosk_lock_off','kiosk_lock_on','kiosk_exit_attempt','kiosk_code_blocked')` (the last four: migration 0034) |
+| alert_type | text | `CHECK IN ('low_stock','oversell_review','cash_drop_due','cash_variance','repeated_variance','drawer_left_open','backup_failed','backup_stale','restore_test_due','integrity_issue','audit_chain_broken','clock_skew','clock_backwards','period_missing','kiosk_lock_off','kiosk_lock_on','kiosk_exit_attempt','kiosk_code_blocked','offline_copy_due')` (kiosk types: migration 0034; `offline_copy_due`: 0036) |
 | severity | text | `CHECK IN ('info','warning','critical')` |
 | entity_type, entity_id | text? | |
 | params | jsonb | Values for the translated message |
@@ -1514,35 +1514,51 @@ See the one-page [posting map](accounting/posting-map.md) (**pending accountant 
 
 **P1:** a row is written for every issued tax document: `not_required` before `einvoice.mandatory_from`, `pending` after it ([0019](decisions/0019-einvoicing-via-accredited-provider.md)).
 
-### 12.2 `ops.backup_runs`
+### 12.2 `ops.backup_runs` (migration 0036)
+
+Every local copy, off-site upload, external-drive copy and restore test ([0086](decisions/0086-backups-local-and-google-drive.md)). Written by the backup service as the SYSTEM user; final once finished; audited; never deleted.
 
 | Column | Type | Rules |
 |---|---|---|
 | id | bigint PK | |
 | kind | text | `CHECK IN ('wal_archive','base_backup','logical_dump','offsite_upload','offline_copy','restore_test')` |
-| status | text | `CHECK IN ('running','success','failed')` |
-| started_at | timestamptz | |
-| finished_at | timestamptz? | |
-| target, file_name | text? | Never credentials |
+| status | text | `CHECK IN ('running','success','failed')`; `finished_at` set exactly when not running; a failure needs `error_message` |
+| request_id | bigint? → ops.backup_requests | When the owner asked for it |
+| started_at, finished_at | timestamptz | |
+| target, file_name | text? | A folder, `google_drive` or the restore database; never credentials |
 | size_bytes | bigint? | |
-| sha256 | bytea? | |
-| encrypted | boolean | |
-| audit_chain_seq | bigint? | |
-| audit_chain_hash | bytea? | |
-| details | jsonb? | |
-| error_message | text? | |
+| sha256 | bytea? | 32 bytes |
+| encrypted | boolean | `true` for off-site copies (age) |
+| audit_chain_seq, audit_chain_hash | bigint?, bytea? | The chain head when the copy was taken (also an `audit.anchors` row of kind `backup`) |
+| details | jsonb? | E.g. the Drive file id, the source copy |
+| error_message | text? | ≤ 2000 characters |
+| [upd] | | |
 
-### 12.3 `ops.integrity_runs`
+### 12.3 `ops.integrity_runs` (migration 0036)
 
 | Column | Type | Rules |
 |---|---|---|
 | id | bigint PK | |
-| database_name | text | |
-| triggered_by | bigint → auth.users | |
-| started_at | timestamptz | |
-| finished_at | timestamptz? | |
-| status | text | `CHECK IN ('ok','issues','error')` |
-| results | jsonb | `audit_chain`, `stock_vs_ledger`, `journals_balanced`, `documents_vs_journals`, `numbering_gaps`, `document_totals`, `settlement_totals`, `advance_balances`, `payments_fully_allocated`, `shift_cash`, `period_integrity` |
+| run_kind | text | `CHECK IN ('nightly','restore_test','manual')` |
+| database_name | text | The live database or the throwaway restore database |
+| backup_run_id | bigint? → ops.backup_runs | For a restore test |
+| started_at, finished_at | timestamptz | |
+| status | text | `CHECK IN ('running','ok','issues','error')` |
+| results | jsonb | One entry per check: `{ ok, problems, examples }` for `audit_chain`, `journals_balanced`, `trial_balance`, `stock_vs_ledger`, `numbering_gaps` (more checks may be added) |
+| [upd] | | |
+
+### 12.4 `ops.backup_requests` (migration 0036)
+
+The owner asks the backup service for something now. Inserted by the API (owner only, enforced by a trigger, `AP010`); moved forward by the backup service only: `pending → running → done/failed`; one open request per kind (partial unique index).
+
+| Column | Type | Rules |
+|---|---|---|
+| id | bigint PK | |
+| kind | text | `CHECK IN ('backup_now','offsite_now','restore_test','offline_copy')` |
+| target | text? | The external drive's folder, `offline_copy` only |
+| status | text | `CHECK IN ('pending','running','done','failed')` |
+| error_message | text? | |
+| [upd] | | |
 
 ---
 
@@ -1611,7 +1627,7 @@ See the one-page [posting map](accounting/posting-map.md) (**pending accountant 
 
 | Module | Codes |
 |---|---|
-| system | `system.company.edit`, `system.settings.edit`, `system.series.manage`, `system.devices.manage`, `system.health.view`, `system.backup.restore_test`, `system.integrity.run` |
+| system | `system.company.edit`, `system.settings.edit`, `system.series.manage`, `system.devices.manage`, `system.health.view`, `system.backup.restore_test`, `system.integrity.run`, `system.backup.manage` (the last four owner only, 0036) |
 | users | `users.view`, `users.manage`, `users.reset_credentials`, `roles.manage` |
 | audit | `audit.view`, `audit.verify`, `audit.export` |
 | master data | `items.view`, `items.manage`, `prices.manage`, `customers.view`, `customers.manage`, `customers.credit`*, `suppliers.manage`, `technicians.manage`, `payment_methods.manage`, `warehouses.manage`, `data.import` |
@@ -1706,8 +1722,10 @@ All series use 6 digits and continuous numbering ([0011](decisions/0011-document
 | `cash.drop_alert_fils` | `300000` | A drawer above AED 3,000 raises the cash-drop alert ([0057](decisions/0057-cash-drop-alert.md)) |
 | `sales.quotation_validity_days` | `30` | |
 | `einvoice.mandatory_from` | `null` | **Pending accountant** ([0019](decisions/0019-einvoicing-via-accredited-provider.md)) |
-| `backup.max_age_minutes.local` / `backup.max_age_hours.offsite` | `90` / `30` | |
-| `backup.restore_test_interval_days` | `30` | |
+| `backup.max_age_minutes.local` / `backup.max_age_hours.offsite` | `90` / `30` | Ranges 30–1440 / 24–168 (0036) |
+| `backup.restore_test_interval_days` | `30` | Range 7–90 |
+| `backup.offline_copy_interval_days` | `7` | External-drive reminder, range 1–60 (0036) |
+| `backup.age_recipient` | `null` | The age public key of the off-site copies; only `age1…` accepted (0036). The private key is never stored |
 
 ---
 
@@ -1757,7 +1775,7 @@ Migrations are written **in build order** (milestones in [`phase-1-plan.md`](pha
 | 0033 | `owner_dashboard` | Reports | `reports.owner_dashboard` (owner only), index on issued documents by day (0081) | — |
 | 0034 | `kiosk_lock` | M5c | `auth.kiosk_lock_changes`, `auth.kiosk_code_failures`, `auth.kiosk_state()`, four kiosk alert types (0082, 0083, 0089) | — |
 | 0035 | `kiosk_owner_session` | M5c | `auth.owner_signed_in_on()`, `auth.kiosk_state()` with `owner_signed_in`; owner code at most 15 minutes (0091) | — |
-| 0036 | `ops_backup` | M6 | `ops.backup_runs`, `ops.integrity_runs` + backup role grants | — |
+| 0036 | `ops_backup` | M6.1 | `ops.backup_runs`, `ops.integrity_runs`, `ops.backup_requests`; backup settings; `offline_copy_due` alert; `system.backup.manage` and owner-only health/restore/integrity permissions; backup role grants | — |
 
 After 0036, a final check asserts that every business table has the audit trigger, the no-delete guard and the expected grants. The same check runs as an automated test.
 

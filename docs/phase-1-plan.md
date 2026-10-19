@@ -480,6 +480,8 @@ A milestone is done only when its tests pass in CI.
 
 #### M6.1 — Backups (0086)
 
+**Status (2026-10-19):** built — migration 0036, `apps/backup`, the System health screen and alerts, the runbook. WAL archiving, the nightly base backup and running the backup service at Windows start move to M6.2 with the installer.
+
 **Delivers:** hourly local backup; daily off-site upload to a dedicated Google Drive account (2-step on), `age`-encrypted before upload (public key on the server, private key offline with the owner); weekly external-drive reminder; a "Restore test" button that restores into `artepool_restore_test` and runs the integrity checks; the System health screen with alerts when a backup is late or fails. Migration `ops_backup` (0036).
 
 **Key tests:** dump → restore → all integrity checks pass; an off-site file decrypts only with the private key; a late or failed backup raises the alert; only the owner runs the restore test.

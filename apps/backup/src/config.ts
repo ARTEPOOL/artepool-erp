@@ -49,7 +49,8 @@ export function backupPaths(env: NodeJS.ProcessEnv = process.env): BackupPaths {
     backupDir: env.ARTEPOOL_BACKUP_DIR || join(repoRoot, '.backups'),
     masterKeyFile: env.ARTEPOOL_MASTER_KEY_FILE || join(repoRoot, '.secrets', 'master.key'),
     driveCredentialsFile:
-      env.ARTEPOOL_DRIVE_CREDENTIALS_FILE || join(repoRoot, '.secrets', 'backup', 'google-drive.sealed'),
+      env.ARTEPOOL_DRIVE_CREDENTIALS_FILE ||
+      join(repoRoot, '.secrets', 'backup', 'google-drive.sealed'),
     google: GOOGLE,
   };
 }
