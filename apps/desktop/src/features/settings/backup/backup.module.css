@@ -92,9 +92,10 @@
   list-style: none;
 }
 
-/* Printing the backup key: only the key sheet is printed. */
+/* Printing the backup key: only the key sheet is printed, and only while it is on screen (other
+   printing, such as barcode labels, is never affected). */
 @media print {
-  :global(body *) {
+  :global(body):has(.keySheet) * {
     visibility: hidden;
   }
 
