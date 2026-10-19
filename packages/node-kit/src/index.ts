@@ -95,3 +95,5 @@ export function assertDevOrTestDatabase(name: string): void {
     );
   }
 }
+
+export { SecretBox, SecretBoxError } from './secret-box';

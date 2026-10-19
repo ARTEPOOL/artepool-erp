@@ -14,7 +14,27 @@ export interface BackupConfig {
   connection: PgConnection;
   /** Every copy of the last `hourly` hours, and the first copy of each of the last `daily` days. */
   keep: { hourly: number; daily: number };
+  /** Off-site: the first copy of each of the last `daily` days and `monthly` months. */
+  offsiteKeep: { hourly: number; daily: number; monthly: number };
+  /** The master key that seals the Google Drive credentials (never in the database). */
+  masterKeyFile: string;
+  /** The sealed Google Drive credentials (client, refresh token) of the dedicated account. */
+  driveCredentialsFile: string;
+  /** Google's endpoints; replaced by a fake server in the tests. */
+  google: GoogleEndpoints;
 }
+
+export interface GoogleEndpoints {
+  oauth: string;
+  api: string;
+  upload: string;
+}
+
+export const GOOGLE: GoogleEndpoints = {
+  oauth: 'https://oauth2.googleapis.com',
+  api: 'https://www.googleapis.com/drive/v3',
+  upload: 'https://www.googleapis.com/upload/drive/v3',
+};
 
 export function configFromEnv(database?: string): BackupConfig {
   return {
@@ -22,5 +42,11 @@ export function configFromEnv(database?: string): BackupConfig {
     pgBin: process.env.ARTEPOOL_PG_BIN ?? '',
     connection: connectionFor('backup', database),
     keep: { hourly: 48, daily: 30 },
+    offsiteKeep: { hourly: 0, daily: 30, monthly: 12 },
+    masterKeyFile: process.env.ARTEPOOL_MASTER_KEY_FILE || join(repoRoot, '.secrets', 'master.key'),
+    driveCredentialsFile:
+      process.env.ARTEPOOL_DRIVE_CREDENTIALS_FILE ||
+      join(repoRoot, '.secrets', 'backup', 'google-drive.sealed'),
+    google: GOOGLE,
   };
 }

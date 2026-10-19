@@ -1,9 +1,11 @@
 /**
- * Which local copies to remove (decision 0086): keep every copy of the last `hourly` hours (one
- * an hour), plus the first copy of each of the last `daily` days; everything older goes. Copies are named
- * `artepool-YYYYMMDD-HHMMSSZ.dump` (UTC), so the name gives the time.
+ * Which copies to remove (decision 0086). Local: every copy of the last `hourly` hours (one an
+ * hour), plus the first copy of each of the last `daily` days. Off-site: the first copy of each
+ * of the last `daily` days and of each of the last `monthly` months. Everything older goes.
+ * Copies are named `artepool-YYYYMMDD-HHMMSSZ.dump` (`.dump.age` off-site, UTC), so the name
+ * gives the time.
  */
-const NAME = /^artepool-(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})Z\.dump$/;
+const NAME = /^artepool-(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})Z\.dump(\.age)?$/;
 
 export function backupFileName(at: Date): string {
   const p = (n: number) => String(n).padStart(2, '0');
@@ -16,7 +18,7 @@ export function backupFileName(at: Date): string {
 export function timeOf(name: string): Date | null {
   const m = NAME.exec(name);
   if (!m) return null;
-  const [, y, mo, d, h, mi, s] = m.map(Number) as [
+  const [, y, mo, d, h, mi, s] = m.slice(0, 7).map(Number) as [
     number,
     number,
     number,
@@ -31,7 +33,7 @@ export function timeOf(name: string): Date | null {
 export function filesToRemove(
   names: string[],
   now: Date,
-  keep: { hourly: number; daily: number },
+  keep: { hourly: number; daily: number; monthly?: number },
 ): string[] {
   const copies = names
     .map((name) => ({ name, at: timeOf(name) }))
@@ -47,5 +49,16 @@ export function filesToRemove(
     firstOfDay.set(c.at.toISOString().slice(0, 10), c.name);
   }
   for (const name of firstOfDay.values()) kept.add(name);
+  if (keep.monthly) {
+    const oldestMonth = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - keep.monthly + 1, 1),
+    );
+    const firstOfMonth = new Map<string, string>();
+    for (const c of copies) {
+      if (c.at < oldestMonth) continue;
+      firstOfMonth.set(c.at.toISOString().slice(0, 7), c.name);
+    }
+    for (const name of firstOfMonth.values()) kept.add(name);
+  }
   return copies.filter((c) => !kept.has(c.name)).map((c) => c.name);
 }

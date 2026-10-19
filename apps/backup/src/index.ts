@@ -5,3 +5,5 @@ export * from './retention';
 export * from './runs';
 export * from './integrity';
 export * from './restore';
+export * from './google';
+export * from './offsite';
