@@ -103,7 +103,7 @@ describe('roles and permissions', () => {
     const { rows } = await api.query<{ code: string; approvable: boolean }>(
       'SELECT code, approvable FROM auth.permissions ORDER BY code',
     );
-    expect(rows).toHaveLength(73); // 64 + customers.credit (0036) + items.cost (0038) + stock.opening (0042) + customers.opening (0051) + print_templates.manage (0020) + stock.new_item_quantity (0053) + shifts.force_close (0069) + invoices.cancel (0072) + reports.owner_dashboard (0081)
+    expect(rows).toHaveLength(74); // 64 + system.backup.manage (0086) + customers.credit (0036) + items.cost (0038) + stock.opening (0042) + customers.opening (0051) + print_templates.manage (0020) + stock.new_item_quantity (0053) + shifts.force_close (0069) + invoices.cancel (0072) + reports.owner_dashboard (0081)
     expect(rows.filter((r) => r.approvable).map((r) => r.code)).toEqual([
       'cash.paid_out',
       'cash.variance_accept',
@@ -132,7 +132,7 @@ describe('roles and permissions', () => {
          FROM auth.roles r JOIN auth.role_permissions rp ON rp.role_id = r.id GROUP BY r.code`,
     );
     const perms = Object.fromEntries(rows.map((r) => [r.role, r.perms]));
-    expect(perms.owner).toHaveLength(73);
+    expect(perms.owner).toHaveLength(74);
     expect(perms.accountant).toContain('shifts.force_close'); // decision 0069
     expect(perms.cashier).toEqual([
       'cash.drop',
@@ -159,6 +159,9 @@ describe('roles and permissions', () => {
       expect.arrayContaining(['audit.view', 'audit.verify', 'audit.export']),
     );
     expect(perms.accountant).not.toContain('system.company.edit');
+    // M6.1: the health screen, restore test and integrity checks are the owner's alone.
+    expect(perms.accountant).not.toContain('system.health.view');
+    expect(perms.accountant).not.toContain('system.backup.restore_test');
     // Decision 0036: credit is given by the owner and the accountant, never by the cashier.
     expect(perms.accountant).toContain('customers.credit');
     expect(perms.cashier).not.toContain('customers.credit');

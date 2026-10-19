@@ -892,6 +892,58 @@ export interface MdWarehouses {
   warehouse_type: string;
 }
 
+export interface OpsBackupRequests {
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  error_message: string | null;
+  id: Generated<bigint>;
+  kind: string;
+  row_version: Generated<number>;
+  status: Generated<string>;
+  target: string | null;
+  updated_at: Generated<Timestamp>;
+  updated_by: bigint;
+}
+
+export interface OpsBackupRuns {
+  audit_chain_hash: Buffer | null;
+  audit_chain_seq: bigint | null;
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  details: Json | null;
+  encrypted: Generated<boolean>;
+  error_message: string | null;
+  file_name: string | null;
+  finished_at: Timestamp | null;
+  id: Generated<bigint>;
+  kind: string;
+  request_id: bigint | null;
+  row_version: Generated<number>;
+  sha256: Buffer | null;
+  size_bytes: bigint | null;
+  started_at: Generated<Timestamp>;
+  status: Generated<string>;
+  target: string | null;
+  updated_at: Generated<Timestamp>;
+  updated_by: bigint;
+}
+
+export interface OpsIntegrityRuns {
+  backup_run_id: bigint | null;
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  database_name: string;
+  finished_at: Timestamp | null;
+  id: Generated<bigint>;
+  results: Generated<Json>;
+  row_version: Generated<number>;
+  run_kind: string;
+  started_at: Generated<Timestamp>;
+  status: Generated<string>;
+  updated_at: Generated<Timestamp>;
+  updated_by: bigint;
+}
+
 export interface OpsOutbox {
   attempts: Generated<number>;
   channel: string;
@@ -1404,6 +1456,9 @@ export interface DB {
   "md.units": MdUnits;
   "md.vat_categories": MdVatCategories;
   "md.warehouses": MdWarehouses;
+  "ops.backup_requests": OpsBackupRequests;
+  "ops.backup_runs": OpsBackupRuns;
+  "ops.integrity_runs": OpsIntegrityRuns;
   "ops.outbox": OpsOutbox;
   "sales.credit_allocations": SalesCreditAllocations;
   "sales.document_lines": SalesDocumentLines;
