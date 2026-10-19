@@ -543,6 +543,90 @@ describe('Settings → Devices', () => {
   });
 });
 
+describe('Settings → System health (decision 0086)', () => {
+  const run = (patch: Record<string, unknown> = {}) => ({
+    id: '1',
+    status: 'success',
+    startedAt: new Date().toISOString(),
+    finishedAt: new Date().toISOString(),
+    fileName: 'artepool-20261019-100000Z.dump',
+    sizeBytes: 1_234_567,
+    errorMessage: null,
+    ...patch,
+  });
+  const health = (patch: Record<string, unknown> = {}) => ({
+    problems: ['offsite_not_set_up', 'offline_due'],
+    local: { last: run(), lastFailure: null, maxAgeMinutes: 90, folder: 'D:\\ARTEPOOL\\backups' },
+    offsite: {
+      last: null,
+      lastFailure: null,
+      maxAgeHours: 30,
+      keySet: false,
+      driveConnected: false,
+    },
+    offline: { last: null, intervalDays: 7 },
+    restoreTest: { last: null, intervalDays: 30 },
+    integrity: { last: { status: 'ok', finishedAt: new Date().toISOString(), checks: {} } },
+    disk: { freeBytes: 100 * 1024 ** 3, totalBytes: 500 * 1024 ** 3 },
+    requests: [],
+    ...patch,
+  });
+  const identity = `AGE-SECRET-KEY-1${'Q'.repeat(52)}ABCDEF`;
+  const recipient = `age1${'q'.repeat(58)}`;
+
+  it('the owner sees what needs attention, backs up now and creates the backup key', async () => {
+    const bridge = signedInBridge([
+      ...OWNER_PERMISSIONS,
+      'system.health.view',
+      'system.backup.manage',
+      'system.backup.restore_test',
+    ])
+      .on('GET', '/api/v1/health/system', ok(health()))
+      .on('POST', '/api/v1/backup/requests', ok({ id: '5' }, 201))
+      .on('POST', '/api/v1/backup/key', ok({ identity, recipient }))
+      .on('POST', '/api/v1/backup/key/confirm', ok({ ok: true }));
+    await signIn(bridge);
+    await openSettings();
+    fireEvent.click(screen.getByRole('link', { name: 'النسخ الاحتياطي' }));
+    await screen.findByRole('heading', { name: 'صحة النظام والنسخ الاحتياطي', level: 2 });
+    expect(await screen.findByText(/النسخة الخارجية لسه متظبطتش/)).toBeTruthy();
+    expect(screen.getByText(/جه وقت النسخة الأسبوعية/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'نسخة الآن' }));
+    await waitFor(() =>
+      expect(bridge.callsTo('POST', '/api/v1/backup/requests')[0]?.body).toEqual({
+        kind: 'backup_now',
+      }),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'إنشاء مفتاح النسخ' }));
+    let dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'إنشاء مفتاح النسخ' }));
+    expect(await screen.findByText(identity)).toBeTruthy();
+    dialog = screen.getByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText('اكتب آخر 6 حروف في المفتاح'), {
+      target: { value: 'XXXXXX' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'أنا احتفظت بالمفتاح' }));
+    expect(await within(dialog).findByText('دول مش آخر 6 حروف في المفتاح.')).toBeTruthy();
+    expect(bridge.callsTo('POST', '/api/v1/backup/key/confirm')).toHaveLength(0);
+    fireEvent.change(within(dialog).getByLabelText('اكتب آخر 6 حروف في المفتاح'), {
+      target: { value: 'abcdef' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'أنا احتفظت بالمفتاح' }));
+    await waitFor(() =>
+      expect(bridge.callsTo('POST', '/api/v1/backup/key/confirm')[0]?.body).toEqual({ recipient }),
+    );
+  });
+
+  it('is not offered to anyone else (the server refuses it anyway)', async () => {
+    await signIn(signedInBridge(OWNER_PERMISSIONS));
+    await openSettings();
+    const hub = screen.getByRole('navigation', { name: 'الإعدادات' });
+    expect(within(hub).queryByRole('link', { name: /النسخ الاحتياطي/ })).toBeNull();
+  });
+});
+
 describe('Settings → Audit log', () => {
   const auditBridge = () =>
     signedInBridge(OWNER_PERMISSIONS)

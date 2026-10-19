@@ -30,6 +30,7 @@ import {
 } from '../../ui';
 import { useCan, useErrorText } from '../auth/context';
 import { DateField } from '../invoices/parts';
+import { BackupHealthCard } from '../settings/backup/BackupHealthCard';
 import { KioskAlertsCard } from '../settings/devices/KioskLock';
 import { money } from '../masterdata/format';
 import styles from './dashboard.module.css';
@@ -446,7 +447,8 @@ export function OwnerDashboard() {
               </div>
             </Card>
 
-            <KioskAlertsCard index={17} limit={5} hideWhenEmpty />
+            <BackupHealthCard index={17} />
+            <KioskAlertsCard index={18} limit={5} hideWhenEmpty />
           </div>
         </>
       )}
