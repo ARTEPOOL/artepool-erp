@@ -781,15 +781,19 @@
     "keyLast6": "Type the last 6 characters of the key",
     "keyDone": "I kept the key",
     "driveConnectedToast": "Google Drive is connected.",
-    "driveExplain": "Enter the Google client of the backup account (made once in Google Cloud, see the runbook). Then you type a short code at google.com/device on any phone or PC, signed in with the backup account.",
-    "clientId": "Client ID",
-    "clientSecret": "Client secret",
     "driveRunbook": "The app can only see and change the files it uploads itself.",
-    "next": "Next",
     "driveStep": "Open {url} on your phone or a PC, sign in with the backup account, and type this code:",
     "driveWaiting": "Waiting for your approval (until {time})…",
     "open": "Open",
     "driveExample": "E:\\",
-    "keySheetTitle": "ARTEPOOL ERP — مفتاح النسخ الاحتياطي / backup key"
+    "keySheetTitle": "ARTEPOOL ERP — مفتاح النسخ الاحتياطي / backup key",
+    "chooseExplain": "The browser opens Google's page: choose the shop's Google account (the one for backups) and press Allow. Then come back here.",
+    "chooseAccount": "Choose account",
+    "inBrowser": "Finish in the browser: choose the account and press Allow. This window closes by itself.",
+    "useCode": "Connect with a code instead",
+    "codeExplain": "You will see a short code. Type it at google.com/device on any phone or PC, signed in with the shop's Google account.",
+    "showCode": "Show the code",
+    "googleCancelled": "Google sign-in did not finish. Try again.",
+    "googleMissing": "This installation has no Google registration yet. The installer adds it; ask the person who installed the system."
   }
 }

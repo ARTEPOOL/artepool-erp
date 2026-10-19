@@ -1,5 +1,11 @@
 # Changelog
 
+## Google Drive in one step (2026-10-19)
+
+**In plain words:** connecting Google Drive is now like any "Sign in with Google": Settings → Backup → Connect Google Drive → Choose account; choose the shop's Google account and press Allow. No IDs or codes to type. The app's registration at Google is built into the installation, so any shop that installs the system just chooses its own account. If the browser does not open, "Connect with a code instead" still works.
+
+- Decision 0095; no database change.
+
 ## Backups and System health (2026-10-19)
 
 **In plain words:** the system now protects your data by itself. Every hour it makes a full copy on the server PC; every day it encrypts the newest copy with your backup key and puts it on the dedicated Google Drive account (Google only sees a locked file); every night it checks the books, the stock, the numbering and the audit log. Settings → Backup (owner only) shows all of it: what needs attention, "Back up now", "Restore test" (proves a copy really brings everything back), the external-drive copy (weekly reminder), the backup key (shown once: print it and save it on a USB stick) and the Google Drive connection. Problems also appear on your dashboard.

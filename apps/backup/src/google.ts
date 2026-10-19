@@ -5,10 +5,11 @@
  * google.com/device on any phone or PC); the refresh token is kept sealed with the master key in
  * a file on the server, never in the database or a log.
  */
+import { createHash, randomBytes } from 'node:crypto';
 import { chmod, mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { SecretBox } from '@artepool/node-kit';
-import type { GoogleEndpoints } from './config';
+import type { GoogleClient, GoogleEndpoints } from './config';
 
 export const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 const SEAL_AAD = 'backup.google_drive';
@@ -95,6 +96,72 @@ const form = (fields: Record<string, string>): RequestInit => ({
   headers: { 'content-type': 'application/x-www-form-urlencoded' },
   body: new URLSearchParams(fields).toString(),
 });
+
+// --------------------------------------------------------------------------- choose the account
+
+/**
+ * The recommended sign-in for desktop apps (decision 0095): the browser opens Google's page, the
+ * person chooses the account and allows, and Google sends a one-time code to a short-lived
+ * address on that same PC (127.0.0.1). PKCE ties the code to this request, so a code caught by
+ * anyone else is useless.
+ */
+export interface AccountChoice {
+  authUrl: string;
+  state: string;
+  codeVerifier: string;
+}
+
+const base64url = (bytes: Buffer) => bytes.toString('base64url');
+
+/** Only an address on the same PC may receive the code. */
+export const LOOPBACK_REDIRECT = /^http:\/\/127\.0\.0\.1:(\d{2,5})\/callback$/;
+
+export function startAccountChoice(
+  google: GoogleEndpoints,
+  client: GoogleClient,
+  redirectUri: string,
+): AccountChoice {
+  if (!LOOPBACK_REDIRECT.test(redirectUri))
+    throw new GoogleError('Connect Google Drive: bad return address');
+  const state = base64url(randomBytes(24));
+  const codeVerifier = base64url(randomBytes(48));
+  const challenge = base64url(createHash('sha256').update(codeVerifier).digest());
+  const params = new URLSearchParams({
+    client_id: client.clientId,
+    redirect_uri: redirectUri,
+    response_type: 'code',
+    scope: DRIVE_SCOPE,
+    access_type: 'offline',
+    prompt: 'select_account consent',
+    code_challenge: challenge,
+    code_challenge_method: 'S256',
+    state,
+  });
+  return { authUrl: `${google.auth}?${params.toString()}`, state, codeVerifier };
+}
+
+/** Exchanges the one-time code for the lasting permission (refresh token). */
+export async function finishAccountChoice(
+  google: GoogleEndpoints,
+  client: GoogleClient,
+  input: { code: string; codeVerifier: string; redirectUri: string },
+): Promise<string> {
+  const r = await call<{ refresh_token?: string }>(
+    `${google.oauth}/token`,
+    form({
+      client_id: client.clientId,
+      client_secret: client.clientSecret,
+      code: input.code,
+      code_verifier: input.codeVerifier,
+      redirect_uri: input.redirectUri,
+      grant_type: 'authorization_code',
+    }),
+    'Connect Google Drive',
+  );
+  if (!r.refresh_token)
+    throw new GoogleError('Connect Google Drive: Google gave no lasting permission');
+  return r.refresh_token;
+}
 
 // --------------------------------------------------------------------------- device sign-in
 

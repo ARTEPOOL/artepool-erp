@@ -32,32 +32,30 @@
 > ⚠️ لو المفتاح ضاع، النسخ اللي على Google Drive **مش هتتفتح أبدًا**. ساعتها اعمل مفتاح جديد
 > (النسخ الجاية بس هتتشفّر بيه)، واحتفظ بالقديم لو لقيته.
 
-## 2) أول مرة: حساب Google المخصص
+## 2) أول مرة: ربط Google Drive
 
 ### أ) الحساب
 1. اعمل حساب Google **جديد مخصص للنسخ بس** (مثلًا `artepool.backups@gmail.com`).
 2. فعّل عليه **التحقق بخطوتين** (Google Account → Security → 2-Step Verification).
 
-### ب) «عميل Google» للبرنامج (مرة واحدة)
-وإنت داخل بالحساب المخصص:
-1. افتح <https://console.cloud.google.com> واعمل مشروع جديد باسم `ARTEPOOL Backups`.
-2. **APIs & Services → Library**: دوّر على **Google Drive API** ودوس **Enable**.
-3. **APIs & Services → OAuth consent screen**: اختار **External**، اكتب اسم التطبيق `ARTEPOOL Backups` وبريد الحساب، واحفظ. في **Test users** ضيف بريد الحساب المخصص نفسه. بعدها دوس **Publish app** عشان الربط ميخلصش بعد 7 أيام.
-4. **APIs & Services → Credentials → Create credentials → OAuth client ID**، واختار النوع **TVs and Limited Input devices**، والاسم `ARTEPOOL backup service`.
-5. انسخ **Client ID** و **Client secret**.
-
-### ج) الربط في البرنامج
-1. **الإعدادات ← النسخ الاحتياطي ← «ربط Google Drive»**.
-2. الصق **Client ID** و **Client secret** ودوس **«التالي»**.
-3. هيظهر **كود قصير**. افتح **google.com/device** من موبايلك أو أي جهاز، ادخل **بالحساب المخصص**، واكتب الكود، ووافق.
-   - ✅ الشاشة تقول «Google Drive اتربط».
+### ب) الربط (ضغطة واحدة)
+1. من برنامج آرتيبول على الويندوز: **الإعدادات ← النسخ الاحتياطي ← «ربط Google Drive» ← «اختار الحساب»**.
+2. المتصفح هيفتح صفحة جوجل: اختار **الحساب المخصص** ودوس **«سماح» (Allow)**.
+3. ارجع للبرنامج:
+   - ✅ تظهر «Google Drive اتربط».
 4. البرنامج بياخد صلاحية **ملفاته بس** (`drive.file`): ميقدرش يشوف أي ملف تاني على الحساب.
 5. جرّب **«ارفع الآن»**، واستنى دقيقة، وافتح Google Drive من الموبايل:
    - ✅ تلاقي ملف اسمه زي `artepool-20261019-100000Z.dump.age`؛
    - ✅ لو حاولت تفتحه، مش هيتقري (مشفّر).
 
+لو المتصفح ماتفتحش: في نفس الشاشة دوس **«اربط بكود بدل كده» ← «اعرض الكود»**، وافتح
+**google.com/device** من الموبايل، وادخل بالحساب المخصص، واكتب الكود.
+
 لفك الربط: **«فك الربط»** في نفس الشاشة. ولو الحساب نفسه اتسرق: غيّر كلمة سره، ومن
-<https://myaccount.google.com/permissions> شيل صلاحية `ARTEPOOL Backups`، وبعدين اربط تاني.
+<https://myaccount.google.com/permissions> شيل صلاحية **ARTEPOOL ERP**، وبعدين اربط تاني.
+
+> لو ظهرت رسالة «التركيبة دي لسه مفيهاش تسجيل البرنامج عند جوجل»: برنامج التثبيت ماحطّش تسجيل
+> البرنامج؛ كلّم اللي ركّب السيستم (القسم 8 تحت).
 
 ## 3) كل أسبوع: الهارد الخارجي
 
@@ -118,3 +116,16 @@ To be rehearsed on the real server PC with the installer (M6.2); until then this
 6. **Start** the services; sign in as the owner; make a new local backup and a restore test.
 7. Re-create the backup key if the old private key is lost, and reconnect Google Drive if the
    sealed credentials were not restored (`.secrets` is never inside a database copy).
+
+## 8) For the software publisher: the app's registration at Google (once, for every installation)
+
+Decision [0095](../decisions/0095-google-drive-connect-by-choosing-the-account.md). Done **once** by whoever publishes ARTÉPOOL ERP, with a Google account that belongs to the software (for example `artepool.software@gmail.com`), **not** a shop's backup account. Shops never do this.
+
+1. <https://console.cloud.google.com> → new project `ARTEPOOL ERP`.
+2. **APIs & Services → Library → Google Drive API → Enable.**
+3. **OAuth consent screen:** External; app name `ARTEPOOL ERP`; support email; scope `.../auth/drive.file` only; then **Publish app** (otherwise Google ends the connection after 7 days). `drive.file` is a non-sensitive scope: no security review; Google may ask to verify the name and logo once many shops use it.
+4. **Credentials → Create credentials → OAuth client ID** twice:
+   - type **Desktop app**, name `ARTEPOOL ERP desktop` → `ARTEPOOL_GOOGLE_CLIENT_ID` / `ARTEPOOL_GOOGLE_CLIENT_SECRET`;
+   - type **TVs and Limited Input devices**, name `ARTEPOOL ERP code` → `ARTEPOOL_GOOGLE_DEVICE_CLIENT_ID` / `ARTEPOOL_GOOGLE_DEVICE_CLIENT_SECRET`.
+5. Give the four values to the installer build (M6.2); in development put them in `.env`. Google treats them as not secret for desktop apps; they never give access to any shop's Drive.
+

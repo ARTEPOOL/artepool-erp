@@ -563,6 +563,7 @@ describe('Settings → System health (decision 0086)', () => {
       maxAgeHours: 30,
       keySet: false,
       driveConnected: false,
+      google: { chooseAccount: true, code: true },
     },
     offline: { last: null, intervalDays: 7 },
     restoreTest: { last: null, intervalDays: 30 },
@@ -617,6 +618,34 @@ describe('Settings → System health (decision 0086)', () => {
     await waitFor(() =>
       expect(bridge.callsTo('POST', '/api/v1/backup/key/confirm')[0]?.body).toEqual({ recipient }),
     );
+  });
+
+  it('connects Google Drive without typing any ID (the code way, in a browser)', async () => {
+    const bridge = signedInBridge([
+      ...OWNER_PERMISSIONS,
+      'system.health.view',
+      'system.backup.manage',
+    ])
+      .on('GET', '/api/v1/health/system', ok(health()))
+      .on(
+        'POST',
+        '/api/v1/backup/drive/connect',
+        ok({
+          userCode: 'ABCD-EFGH',
+          verificationUrl: 'https://www.google.com/device',
+          expiresAt: new Date(Date.now() + 1_800_000).toISOString(),
+          intervalSeconds: 5,
+        }),
+      );
+    await signIn(bridge);
+    await openSettings();
+    fireEvent.click(screen.getByRole('link', { name: 'النسخ الاحتياطي' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'ربط Google Drive' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).queryByLabelText(/Client ID/)).toBeNull();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'اعرض الكود' }));
+    expect(await within(dialog).findByText('ABCD-EFGH')).toBeTruthy();
+    expect(bridge.callsTo('POST', '/api/v1/backup/drive/connect')[0]?.body ?? {}).toEqual({});
   });
 
   it('is not offered to anyone else (the server refuses it anyway)', async () => {

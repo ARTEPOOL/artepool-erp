@@ -25,12 +25,15 @@ export interface BackupConfig {
 }
 
 export interface GoogleEndpoints {
+  /** The page where the person chooses the Google account (opened in the browser). */
+  auth: string;
   oauth: string;
   api: string;
   upload: string;
 }
 
 export const GOOGLE: GoogleEndpoints = {
+  auth: 'https://accounts.google.com/o/oauth2/v2/auth',
   oauth: 'https://oauth2.googleapis.com',
   api: 'https://www.googleapis.com/drive/v3',
   upload: 'https://www.googleapis.com/upload/drive/v3',
@@ -42,7 +45,28 @@ export interface BackupPaths {
   masterKeyFile: string;
   driveCredentialsFile: string;
   google: GoogleEndpoints;
+  /**
+   * The app's own registration at Google ("ARTEPOOL ERP", decision 0095), the same in every
+   * installation and set by the installer: each shop then just chooses its own Google account.
+   * Google treats these as not secret for desktop apps; they never give access to any account.
+   */
+  googleClients: GoogleClients;
 }
+
+export interface GoogleClient {
+  clientId: string;
+  clientSecret: string;
+}
+
+export interface GoogleClients {
+  /** "Desktop app" client: the account is chosen in the browser. */
+  desktop: GoogleClient | null;
+  /** "TVs and limited input" client: the code typed at google.com/device (fallback). */
+  device: GoogleClient | null;
+}
+
+const client = (id: string | undefined, secret: string | undefined): GoogleClient | null =>
+  id && secret ? { clientId: id, clientSecret: secret } : null;
 
 export function backupPaths(env: NodeJS.ProcessEnv = process.env): BackupPaths {
   return {
@@ -52,6 +76,13 @@ export function backupPaths(env: NodeJS.ProcessEnv = process.env): BackupPaths {
       env.ARTEPOOL_DRIVE_CREDENTIALS_FILE ||
       join(repoRoot, '.secrets', 'backup', 'google-drive.sealed'),
     google: GOOGLE,
+    googleClients: {
+      desktop: client(env.ARTEPOOL_GOOGLE_CLIENT_ID, env.ARTEPOOL_GOOGLE_CLIENT_SECRET),
+      device: client(
+        env.ARTEPOOL_GOOGLE_DEVICE_CLIENT_ID,
+        env.ARTEPOOL_GOOGLE_DEVICE_CLIENT_SECRET,
+      ),
+    },
   };
 }
 

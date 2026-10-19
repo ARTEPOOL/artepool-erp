@@ -8,6 +8,7 @@
 
 pub mod connection;
 pub mod enroll;
+pub mod loopback;
 pub mod rules;
 pub mod store;
 pub mod tls;

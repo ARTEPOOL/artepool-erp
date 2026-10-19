@@ -165,6 +165,7 @@
     },
     "KIOSK_CODE_BLOCKED": "Too many wrong owner codes on this PC. Try again in 15 minutes; the owner has been alerted.",
     "BACKUP_REQUEST_OPEN": "This is already waiting or running. Wait for it to finish.",
-    "GOOGLE_FAILED": "Google did not accept the request. Check the client ID and secret, then try again."
+    "GOOGLE_FAILED": "Google did not accept the connection. Try again, and choose the shop's Google account.",
+    "GOOGLE_NOT_CONFIGURED": "This installation has no Google registration yet. The installer adds it; ask the person who installed the system."
   }
 }

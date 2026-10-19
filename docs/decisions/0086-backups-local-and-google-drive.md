@@ -16,7 +16,7 @@
 
 ## Owner's choices (M6.1 plan, 2026-10-19)
 - **The key is created in the app once:** Settings → Backup → Create backup key; the private key is shown once (print / save to a USB stick / copy), confirmed by typing its last 6 characters, and never stored by the server; only the public key is kept (setting `backup.age_recipient`). X25519 keys, readable by the standard `age` tool.
-- **Google Drive permission: the app's own files only** (`drive.file`); old copies go to the Drive trash by the retention rule. Connected once with Google's device sign-in (a code typed at google.com/device).
+- **Google Drive permission: the app's own files only** (`drive.file`); old copies go to the Drive trash by the retention rule. Connected by choosing the account in the browser, with a code at google.com/device as fallback; the app's Google registration is built into the installation ([0095](0095-google-drive-connect-by-choosing-the-account.md)).
 - **The external-drive copy is not encrypted** (owner's choice): the drive must be kept locked away.
 - **System health and the backup alerts are for the owner only** (health view, restore test, integrity checks and the new `system.backup.manage` are owner-only permissions).
 

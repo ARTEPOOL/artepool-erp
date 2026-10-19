@@ -2,7 +2,8 @@ import type { FastifyInstance } from 'fastify';
 import {
   BackupRequestBody,
   ConfirmBackupKeyBody,
-  DriveConnectBody,
+  DriveAuthorizeBody,
+  DriveCallbackBody,
 } from '@artepool/shared/contracts';
 import { AppError } from '../../platform/errors/app-error';
 import { defineRoute, defineWrite } from '../../platform/http/route';
@@ -53,23 +54,42 @@ export function registerBackupRoutes(app: FastifyInstance): void {
     reason: () => 'new backup key (public part); the private key stays offline with the owner',
     handler: async ({ trx, body }) => ({ body: await backup.confirmBackupKey(deps, trx, body) }),
   });
+  const context = (request: {
+    auth?: { userId: bigint; sessionId: bigint } | null;
+    device?: { id: bigint } | null;
+  }) => ({
+    userId: request.auth!.userId,
+    deviceId: request.device!.id,
+    sessionId: request.auth!.sessionId,
+  });
+  // Choose the account in the browser (decision 0095).
+  defineRoute(app, {
+    method: 'POST',
+    url: '/api/v1/backup/drive/authorize',
+    access: manage,
+    body: DriveAuthorizeBody,
+    handler: ({ request, body }) =>
+      Promise.resolve(backup.authorizeDrive(deps, request.auth!.userId, body)),
+  });
+  defineRoute(app, {
+    method: 'POST',
+    url: '/api/v1/backup/drive/callback',
+    access: manage,
+    body: DriveCallbackBody,
+    handler: ({ request, body }) => backup.driveCallback(deps, context(request), body),
+  });
+  // The fallback: a code typed at google.com/device.
   defineRoute(app, {
     method: 'POST',
     url: '/api/v1/backup/drive/connect',
     access: manage,
-    body: DriveConnectBody,
-    handler: ({ request, body }) => backup.startDriveConnect(deps, request.auth!.userId, body),
+    handler: ({ request }) => backup.startDriveConnect(deps, request.auth!.userId),
   });
   defineRoute(app, {
     method: 'POST',
     url: '/api/v1/backup/drive/finish',
     access: manage,
-    handler: ({ request }) =>
-      backup.finishDriveConnect(deps, {
-        userId: request.auth!.userId,
-        deviceId: request.device!.id,
-        sessionId: request.auth!.sessionId,
-      }),
+    handler: ({ request }) => backup.finishDriveConnect(deps, context(request)),
   });
   defineWrite(app, {
     method: 'POST',

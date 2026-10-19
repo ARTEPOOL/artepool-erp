@@ -63,6 +63,8 @@ export interface HealthResponse {
     maxAgeHours: number;
     keySet: boolean;
     driveConnected: boolean;
+    /** Whether this installation carries the app's Google registration (decision 0095). */
+    google: { chooseAccount: boolean; code: boolean };
   };
   offline: { last: BackupRunInfo | null; intervalDays: number };
   restoreTest: { last: BackupRunInfo | null; intervalDays: number };
@@ -100,25 +102,28 @@ export const ConfirmBackupKeyBody = z
   .strict();
 export type ConfirmBackupKeyBody = z.infer<typeof ConfirmBackupKeyBody>;
 
-/** Connecting the dedicated Google account (device sign-in, decision 0086). */
-export const DriveConnectBody = z
+/**
+ * Connecting the shop's Google account (decision 0095): the app opens Google's page in the
+ * browser; Google sends the one-time code back to a short-lived address on that same PC.
+ */
+export const DriveAuthorizeBody = z
+  .object({ redirectUri: z.string().regex(/^http:\/\/127\.0\.0\.1:\d{2,5}\/callback$/) })
+  .strict();
+export type DriveAuthorizeBody = z.infer<typeof DriveAuthorizeBody>;
+
+export interface DriveAuthorizeResponse {
+  authUrl: string;
+}
+
+export const DriveCallbackBody = z
   .object({
-    clientId: z
-      .string()
-      .trim()
-      .min(10)
-      .max(200)
-      .regex(/^[\w.-]+$/),
-    clientSecret: z
-      .string()
-      .trim()
-      .min(10)
-      .max(200)
-      .regex(/^[\w.-]+$/),
+    code: z.string().min(4).max(1000),
+    state: z.string().min(16).max(200),
   })
   .strict();
-export type DriveConnectBody = z.infer<typeof DriveConnectBody>;
+export type DriveCallbackBody = z.infer<typeof DriveCallbackBody>;
 
+/** The fallback: a short code typed at google.com/device (decision 0086). */
 export interface DriveConnectResponse {
   userCode: string;
   verificationUrl: string;

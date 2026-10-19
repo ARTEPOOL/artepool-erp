@@ -7,18 +7,24 @@ import { randomUUID } from 'node:crypto';
 import { stat, statfs, unlink } from 'node:fs/promises';
 import { generateX25519Identity, identityToRecipient } from 'age-encryption';
 import { sql, type Transaction } from 'kysely';
+import { timingSafeEqual } from 'node:crypto';
 import {
+  finishAccountChoice,
   finishDeviceSignIn,
   GoogleError,
   saveDriveCredentials,
+  startAccountChoice,
   startDeviceSignIn,
+  type GoogleClient,
 } from '@artepool/backup';
 import type {
   BackupKeyResponse,
   BackupRequestBody,
   BackupRunInfo,
   ConfirmBackupKeyBody,
-  DriveConnectBody,
+  DriveAuthorizeBody,
+  DriveAuthorizeResponse,
+  DriveCallbackBody,
   DriveConnectResponse,
   DriveFinishResponse,
   HealthProblem,
@@ -155,6 +161,10 @@ export async function healthStatus(deps: AppDeps, now = Date.now()): Promise<Hea
       maxAgeHours: maxOffsite,
       keySet: key !== null,
       driveConnected,
+      google: {
+        chooseAccount: deps.backup.googleClients.desktop !== null,
+        code: deps.backup.googleClients.device !== null,
+      },
     },
     offline: { last: offline, intervalDays: offlineDays },
     restoreTest: { last: restoreOk ?? restoreFail, intervalDays: restoreDays },
@@ -223,29 +233,135 @@ export async function confirmBackupKey(
 
 // ------------------------------------------------------------------------------- Google Drive
 
-interface PendingSignIn {
-  clientId: string;
-  clientSecret: string;
+/**
+ * Connecting the shop's own Google account (decisions 0086, 0095). The app's registration at
+ * Google is built into the installation; the owner only chooses the account and allows. Sign-ins
+ * in progress are kept in memory for 10 minutes, per user; the code verifier never leaves the
+ * server.
+ */
+interface PendingChoice {
+  kind: 'account';
+  state: string;
+  codeVerifier: string;
+  redirectUri: string;
+  expiresAt: number;
+}
+interface PendingCode {
+  kind: 'code';
   deviceCode: string;
   expiresAt: number;
 }
-/** Sign-ins waiting for the owner's approval at google.com/device, per user (memory only). */
-const pending = new Map<string, PendingSignIn>();
+const pending = new Map<string, PendingChoice | PendingCode>();
 
 const googleError = (error: unknown) =>
   error instanceof GoogleError
     ? new AppError('GOOGLE_FAILED', error.message, { google: error.code })
     : error;
 
+function clientOf(deps: AppDeps, kind: 'desktop' | 'device'): GoogleClient {
+  const client = deps.backup.googleClients[kind];
+  if (!client)
+    throw new AppError('GOOGLE_NOT_CONFIGURED', 'This installation has no Google registration');
+  return client;
+}
+
+async function connected(
+  deps: AppDeps,
+  context: { userId: bigint; deviceId: bigint; sessionId: bigint },
+  client: GoogleClient,
+  refreshToken: string,
+  how: 'account' | 'code',
+): Promise<DriveFinishResponse> {
+  await saveDriveCredentials(deps.backup.driveCredentialsFile, deps.secretBox, {
+    ...client,
+    refreshToken,
+    connectedAt: new Date().toISOString(),
+  });
+  await withBusinessTx(
+    deps.db,
+    {
+      ...context,
+      requestId: randomUUID(),
+      reason: 'Google Drive connected for the off-site backups',
+    },
+    (trx) => recordEvent(trx, 'backup.drive_connected', { data: { how } }),
+  );
+  return { status: 'connected' };
+}
+
+/** Step 1 (choose the account): Google's page to open in the browser. */
+export function authorizeDrive(
+  deps: AppDeps,
+  userId: bigint,
+  body: DriveAuthorizeBody,
+): DriveAuthorizeResponse {
+  try {
+    const choice = startAccountChoice(
+      deps.backup.google,
+      clientOf(deps, 'desktop'),
+      body.redirectUri,
+    );
+    pending.set(userId.toString(), {
+      kind: 'account',
+      state: choice.state,
+      codeVerifier: choice.codeVerifier,
+      redirectUri: body.redirectUri,
+      expiresAt: Date.now() + 10 * 60_000,
+    });
+    return { authUrl: choice.authUrl };
+  } catch (error) {
+    throw googleError(error);
+  }
+}
+
+const sameText = (a: string, b: string) =>
+  a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
+
+/** Step 2 (choose the account): the code Google sent back to this PC. */
+export async function driveCallback(
+  deps: AppDeps,
+  context: { userId: bigint; deviceId: bigint; sessionId: bigint },
+  body: DriveCallbackBody,
+): Promise<DriveFinishResponse> {
+  const key = context.userId.toString();
+  const choice = pending.get(key);
+  pending.delete(key);
+  if (
+    !choice ||
+    choice.kind !== 'account' ||
+    choice.expiresAt < Date.now() ||
+    !sameText(choice.state, body.state)
+  ) {
+    throw new AppError(
+      'GOOGLE_FAILED',
+      'The Google sign-in does not match or expired: start again',
+      {
+        google: 'state_mismatch',
+      },
+    );
+  }
+  const client = clientOf(deps, 'desktop');
+  try {
+    const refreshToken = await finishAccountChoice(deps.backup.google, client, {
+      code: body.code,
+      codeVerifier: choice.codeVerifier,
+      redirectUri: choice.redirectUri,
+    });
+    return await connected(deps, context, client, refreshToken, 'account');
+  } catch (error) {
+    throw googleError(error);
+  }
+}
+
+/** The fallback, step 1: a short code to type at google.com/device. */
 export async function startDriveConnect(
   deps: AppDeps,
   userId: bigint,
-  body: DriveConnectBody,
 ): Promise<DriveConnectResponse> {
   try {
-    const code = await startDeviceSignIn(deps.backup.google, body.clientId);
+    const code = await startDeviceSignIn(deps.backup.google, clientOf(deps, 'device').clientId);
     const expiresAt = Date.now() + code.expiresIn * 1000;
-    pending.set(userId.toString(), { ...body, deviceCode: code.deviceCode, expiresAt });
+    pending.set(userId.toString(), { kind: 'code', deviceCode: code.deviceCode, expiresAt });
     return {
       userCode: code.userCode,
       verificationUrl: code.verificationUrl,
@@ -257,43 +373,30 @@ export async function startDriveConnect(
   }
 }
 
+/** The fallback, step 2, asked every few seconds until the owner approved. */
 export async function finishDriveConnect(
   deps: AppDeps,
   context: { userId: bigint; deviceId: bigint; sessionId: bigint },
 ): Promise<DriveFinishResponse> {
   const key = context.userId.toString();
   const sign = pending.get(key);
-  if (!sign || sign.expiresAt < Date.now()) {
+  if (!sign || sign.kind !== 'code' || sign.expiresAt < Date.now()) {
     pending.delete(key);
     throw new AppError('GOOGLE_FAILED', 'The Google sign-in expired: start again', {
       google: 'expired_token',
     });
   }
+  const client = clientOf(deps, 'device');
   let refreshToken: string | null;
   try {
-    refreshToken = await finishDeviceSignIn(deps.backup.google, sign, sign.deviceCode);
+    refreshToken = await finishDeviceSignIn(deps.backup.google, client, sign.deviceCode);
   } catch (error) {
     pending.delete(key);
     throw googleError(error);
   }
   if (refreshToken === null) return { status: 'pending' };
   pending.delete(key);
-  await saveDriveCredentials(deps.backup.driveCredentialsFile, deps.secretBox, {
-    clientId: sign.clientId,
-    clientSecret: sign.clientSecret,
-    refreshToken,
-    connectedAt: new Date().toISOString(),
-  });
-  await withBusinessTx(
-    deps.db,
-    {
-      ...context,
-      requestId: randomUUID(),
-      reason: 'Google Drive connected for the off-site backups',
-    },
-    (trx) => recordEvent(trx, 'backup.drive_connected'),
-  );
-  return { status: 'connected' };
+  return connected(deps, context, client, refreshToken, 'code');
 }
 
 export async function disconnectDrive(deps: AppDeps, trx: Transaction<DB>): Promise<{ ok: true }> {

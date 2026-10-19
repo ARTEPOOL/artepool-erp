@@ -3,8 +3,10 @@
 //! only the pinned ARTÉPOOL CA, and the device key kept in Windows Credential Manager. The
 //! screens never see the key and cannot open a connection themselves (see tauri.conf.json CSP).
 
+use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
 
+use artepool_bridge::loopback::{Callback, Loopback, is_google_sign_in};
 use artepool_bridge::rules::{KioskView, kiosk_view};
 use artepool_bridge::{
     Bridge, BridgeRequest, BridgeResponse, EnrollInput, EnrollOutcome, LocalDevice,
@@ -20,6 +22,9 @@ struct AppBridge(Bridge<Store>);
 
 /// Whether this window is held in POS kiosk mode now (decisions 0082, 0089).
 struct Kiosk(AtomicBool);
+
+/// The listener waiting for Google's answer while the owner connects Google Drive (0095).
+struct GoogleSignIn(Mutex<Option<Loopback>>);
 
 /// The Windows computer name, suggested as the device code when enrolling.
 fn computer_name() -> String {
@@ -119,6 +124,61 @@ async fn kiosk_refresh(app: tauri::AppHandle) -> Result<KioskView, String> {
     refresh_kiosk(&app).await
 }
 
+/// Connecting Google Drive (decision 0095), step 1: a one-time listener on this PC; its port
+/// goes into the address Google sends the answer to.
+#[tauri::command]
+fn google_signin_start(state: tauri::State<'_, GoogleSignIn>) -> Result<u16, String> {
+    let loopback = Loopback::bind().map_err(|e| e.to_string())?;
+    let port = loopback.port();
+    *state.0.lock().map_err(|_| "busy".to_string())? = Some(loopback);
+    Ok(port)
+}
+
+/// Step 2: Google's page in the PC's own browser (only Google's sign-in page may be opened).
+#[tauri::command]
+fn google_signin_open(url: String) -> Result<(), String> {
+    if !is_google_sign_in(&url) {
+        return Err("Only Google's sign-in page can be opened".into());
+    }
+    #[cfg(windows)]
+    let mut command = {
+        let mut c = std::process::Command::new("rundll32");
+        c.args(["url.dll,FileProtocolHandler", &url]);
+        c
+    };
+    #[cfg(target_os = "macos")]
+    let mut command = {
+        let mut c = std::process::Command::new("open");
+        c.arg(&url);
+        c
+    };
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let mut command = {
+        let mut c = std::process::Command::new("xdg-open");
+        c.arg(&url);
+        c
+    };
+    command.spawn().map(|_| ()).map_err(|e| e.to_string())
+}
+
+/// Step 3: waits (at most 5 minutes) for Google's one-time code and returns it to the screens,
+/// which pass it to the server; the listener then closes.
+#[tauri::command]
+async fn google_signin_wait(state: tauri::State<'_, GoogleSignIn>) -> Result<Callback, String> {
+    let loopback = state
+        .0
+        .lock()
+        .map_err(|_| "busy".to_string())?
+        .take()
+        .ok_or_else(|| "No Google sign-in in progress".to_string())?;
+    tauri::async_runtime::spawn_blocking(move || {
+        loopback.wait(std::time::Duration::from_secs(5 * 60))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())
+}
+
 /// The printers of this PC, for choosing the receipt printer (Settings → Devices).
 #[tauri::command]
 async fn printer_list() -> Result<Vec<String>, String> {
@@ -199,6 +259,7 @@ pub fn run() {
                 .is_some_and(|d| d.kind == "pos");
             app.manage(AppBridge(bridge));
             app.manage(Kiosk(AtomicBool::new(false)));
+            app.manage(GoogleSignIn(Mutex::new(None)));
             apply_kiosk(app.handle(), pos);
             // Checked here every few seconds as well, whatever the screens do: a timed "off"
             // ends on time even if the screens stop asking.
@@ -234,6 +295,9 @@ pub fn run() {
             bridge_enroll,
             bridge_request,
             kiosk_refresh,
+            google_signin_start,
+            google_signin_open,
+            google_signin_wait,
             printer_list,
             printer_print,
             printer_print_image

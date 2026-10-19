@@ -445,6 +445,7 @@ Each phase ends with automated tests passing, a security review, an accountant r
 | Version | Date | Change |
 |---|---|---|
 | 1.10 | 2026-10-14 | M4b decisions 0064–0067: print designer with locked tax fields per document type (seller address on every tax invoice, customer address on full tax invoices; a full tax invoice needs the customer's address); company bank accounts with UAE IBAN check; customer PO number on A4 invoices and quotations; no QR code until e-invoicing. |
+| 1.29 | 2026-10-19 | Decision 0095: Google Drive connected by choosing the account; one built-in registration of the app for every installation. Noted: the owner may offer the system to other companies later (a separate decision; scope unchanged). |
 | 1.28 | 2026-10-19 | M6 approved in five parts: backups, installer + first-run setup wizard (0092), adding the cashier (0094), cashier Windows account hardening, owner's laptop on the LAN (0094); remote access dropped for Phase 1 (0093, 0084 deferred). |
 | 1.27 | 2026-10-19 | Decision 0091: the kiosk lock is off while the owner is signed in on the POS PC; the owner code on the lock screen lifts it for 15 minutes. |
 | 1.26 | 2026-10-19 | Decisions 0082–0089 accepted with the owner's answers (no shell replacement; owner code unlock at most 5 minutes; Tailscale with ACLs; dedicated Google account; banner "القفل متوقف"); decision 0090: POS idle behaviour. |

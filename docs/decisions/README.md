@@ -101,6 +101,7 @@ There is one short file per decision, numbered in order.
 | [0092](0092-first-run-setup-wizard.md) | First-run setup wizard on the server PC: company, owner, 2-step, recovery codes, enroll this PC; once only, locked in the database | Accepted |
 | [0093](0093-no-remote-access-in-phase-1.md) | No remote access in Phase 1 (no VPN, no open ports, no remote-desktop tools); VPN-agnostic design; laptop on the shop LAN | Accepted |
 | [0094](0094-adding-the-cashier-and-the-owner-laptop.md) | Adding the cashier (Settings → Users, PIN; kind decides the mode, no separate icon) and the owner's laptop (enrollment code, LAN only) | Accepted |
+| [0095](0095-google-drive-connect-by-choosing-the-account.md) | Google Drive connected by choosing the account in the browser (PKCE + loopback); one built-in registration of the app for every installation; code at google.com/device as fallback | Accepted |
 
 ## Template
 

@@ -410,7 +410,9 @@ export function BackupPanel() {
         </Dialog>
       )}
       {keying && h && <KeyDialog replacing={h.offsite.keySet} onClose={() => setKeying(false)} />}
-      {connecting && <DriveDialog onClose={() => setConnecting(false)} />}
+      {connecting && h && (
+        <DriveDialog google={h.offsite.google} onClose={() => setConnecting(false)} />
+      )}
     </>
   );
 }
