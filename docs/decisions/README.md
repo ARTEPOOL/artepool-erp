@@ -31,7 +31,7 @@ There is one short file per decision, numbered in order.
 | [0022](0022-owner-2-step-recovery.md) | Owner 2-step code: recovery codes and server-only emergency reset | Accepted |
 | [0023](0023-password-rules.md) | Password rules (10+ characters, common ones refused, no expiry) | Accepted |
 | [0024](0024-device-enrollment-proves-the-server.md) | Device enrollment: 10-minute one-time code that also proves the server | Accepted |
-| [0025](0025-first-owner-and-pc-from-server-commands.md) | First owner and first PC created by server commands | Accepted |
+| [0025](0025-first-owner-and-pc-from-server-commands.md) | First owner and first PC created by server commands (emergency tools since 0092) | Accepted |
 | [0026](0026-users-and-devices-never-deleted.md) | Users and devices never deleted: deactivate or revoke with a reason | Accepted |
 | [0027](0027-trust-this-pc-for-the-2-step-code.md) | "Trust this PC" for the 2-step code (30 days, never on POS PCs) | Changed by 0077 |
 | [0028](0028-forgot-password-with-phone-and-recovery-code.md) | Forgot password: recover it in the app with the phone code and one recovery code | Accepted |
@@ -90,7 +90,7 @@ There is one short file per decision, numbered in order.
 | [0081](0081-owner-dashboard.md) | Owner dashboard: sales, VAT, profit with comparison; daily chart; splits; top items/customers; cash, receivables and stock now | Accepted (VAT/profit pending accountant) |
 | [0082](0082-app-mode-by-device-kind-and-pos-kiosk.md) | One app; the device kind decides the mode; POS PCs start in app-level kiosk mode (no closing, watchdog restart, exits audited and alerted) | Accepted |
 | [0083](0083-exiting-kiosk-mode-owner-only.md) | Leaving kiosk mode: owner only; from the owner's Office PC with 2-step, or the owner's code on the lock screen (at most 5 minutes) | Accepted |
-| [0084](0084-remote-access-through-private-vpn.md) | Remote access only through Tailscale (WireGuard), ACL: owner's laptop → API port only; never an open port; outside the LAN always password + 2-step | Accepted |
+| [0084](0084-remote-access-through-private-vpn.md) | Remote access only through Tailscale (WireGuard), ACL: owner's laptop → API port only; never an open port; outside the LAN always password + 2-step | Deferred (0093) |
 | [0085](0085-server-on-the-pos-pc.md) | The server runs on the POS PC: services under their own accounts, restrictive permissions, standard cashier account, UPS reminder | Accepted |
 | [0086](0086-backups-local-and-google-drive.md) | Backups: hourly local, daily age-encrypted to Google Drive (private key offline), weekly external drive, restore test | Accepted |
 | [0087](0087-cashiers-and-drawers-growth.md) | One cashier now; two cashiers on one PC and a second POS PC later, without redesign | Accepted |
@@ -98,6 +98,9 @@ There is one short file per decision, numbered in order.
 | [0089](0089-kiosk-lock-switch-per-pos-device.md) | A "Kiosk lock" switch per POS PC (default on), owner only with 2-step and a reason; off for 15 min / 1 hour / until turned on; banner and alerts; kept on the server | Accepted |
 | [0090](0090-pos-idle-behaviour.md) | POS idle: no automatic return to the PIN screen; a "Lock screen" button for the cashier; owner-only auto-lock after N minutes, off by default | Accepted |
 | [0091](0091-kiosk-lock-off-while-the-owner-is-signed-in.md) | The kiosk lock is off while the owner is signed in on the POS PC (back on at sign-out or screen lock); owner code on the lock screen 15 minutes | Accepted |
+| [0092](0092-first-run-setup-wizard.md) | First-run setup wizard on the server PC: company, owner, 2-step, recovery codes, enroll this PC; once only, locked in the database | Accepted |
+| [0093](0093-no-remote-access-in-phase-1.md) | No remote access in Phase 1 (no VPN, no open ports, no remote-desktop tools); VPN-agnostic design; laptop on the shop LAN | Accepted |
+| [0094](0094-adding-the-cashier-and-the-owner-laptop.md) | Adding the cashier (Settings → Users, PIN; kind decides the mode, no separate icon) and the owner's laptop (enrollment code, LAN only) | Accepted |
 
 ## Template
 

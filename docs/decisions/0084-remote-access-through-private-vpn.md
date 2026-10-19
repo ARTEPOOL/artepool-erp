@@ -2,9 +2,11 @@
 
 | | |
 |---|---|
-| **Status** | Accepted (2026-10-19) |
+| **Status** | Deferred (2026-10-19): not in Phase 1, see [0093](0093-no-remote-access-in-phase-1.md) |
 | **Date** | 2026-10-18 |
 | **Decided by** | Owner |
+
+> **Deferred by [0093](0093-no-remote-access-in-phase-1.md):** no remote access in Phase 1; the laptop works on the shop LAN. This decision is the plan for when remote access is added later.
 
 ## Decision
 - **The API port is never opened to the internet** (no port forwarding on the router, no public address, no cloud relay of the API).

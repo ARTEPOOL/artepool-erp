@@ -101,7 +101,8 @@ It runs client–server on the local network: PostgreSQL and the API service on 
 **Security and access**
 - **Sign-in:** cashiers use a 4-digit PIN **only on PCs enrolled as POS** (weak PINs refused; 5 wrong → blocked until the owner unblocks). Office PCs always need a password. (0021)
 - **Approvals:** every supervisor approval is given with the one-time 6-digit code from the approver's 2-step app (accepted once); only 2-step users approve; 5 wrong codes block that person's approvals (not their sign-in) until the owner unblocks. (0074)
-- **Server and remote:** the POS PC is also the server (services under own accounts, ACLs, standard cashier Windows account, UPS reminder). Remote access only through Tailscale (2-step, ACL laptop → API port, no port forwarding); outside the LAN every sign-in needs password + 2-step. No cloud database in Phase 1; outbox for a Phase 2 read-only mobile dashboard. (0084, 0085, 0088)
+- **Server and remote:** the POS PC is also the server (services under own accounts, ACLs, standard cashier Windows account whose Windows restrictions stay when the kiosk lock is off, UPS reminder). **No remote access in Phase 1:** no VPN, no open router ports, no remote-desktop tools; the laptop works on the shop LAN; keep the design VPN-agnostic (0084 deferred). No cloud database in Phase 1; outbox for a Phase 2 read-only mobile dashboard. (0085, 0088, 0093)
+- **First-run setup:** a one-time wizard on the server PC after install (company, owner, 2-step, recovery codes, enroll this PC as POS), locked in the database; console commands are emergency tools. Cashier added in Settings → Users; the laptop enrolled with a code; the PC kind decides the mode. (0092, 0094)
 - **Backups:** hourly local + WAL; daily age-encrypted to a dedicated Google Drive account (private key offline); weekly external drive; restore test. (0086)
 - **Screen lock:** per kind of PC, off or after 1–240 idle minutes, in Settings → Devices (owner only); off on every PC at the owner's request; the session still ends after its maximum length. (0079)
 - **Owner 2-step:** TOTP, 10 one-time recovery codes, and an audited emergency reset that works only on the server PC. (0022)
@@ -205,7 +206,7 @@ Run from the repository root. Setup on a new PC: [`docs/runbooks/dev-setup-windo
 | Run the screens in a browser (`http://localhost:1420`; the dev server plays the PC's secure side, device file `.secrets/dev-device.json`) | `pnpm dev:desktop:web` |
 | Run the Windows app (Tauri; Rust + Microsoft C++ Build Tools needed) / build its installer | `pnpm dev:desktop` / `pnpm build:desktop` |
 | Rust tests (the PC's secure side: enrollment, TLS rules, device key; the RAW receipt printer) | `pnpm test:rust` |
-| Server console: first owner / enrollment code / emergency owner 2-step reset / emergency owner password reset (decisions 0022, 0025, 0029) | `pnpm owner:create` / `pnpm device:code` / `pnpm owner:reset-2fa` / `pnpm owner:reset-password` |
+| Server console (emergency tools since 0092): first owner / enrollment code / emergency owner 2-step reset / emergency owner password reset (decisions 0022, 0025, 0029) | `pnpm owner:create` / `pnpm device:code` / `pnpm owner:reset-2fa` / `pnpm owner:reset-password` |
 
 Not yet available: `pnpm build:server` (M6), `pnpm backup:run` / `pnpm backup:restore-test` (M6).
 

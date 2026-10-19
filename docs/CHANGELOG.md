@@ -1,5 +1,11 @@
 # Changelog
 
+## M6 plan approved (2026-10-19)
+
+**In plain words:** the last building stage before the shop trial is split into five parts, done in this order: backups; the installers with a one-time setup wizard (no console needed); adding the cashier; locking down the cashier's Windows account; the owner's laptop on the shop network. Remote access from outside the shop is not part of Phase 1.
+
+- Decisions 0092 (setup wizard), 0093 (no remote access in Phase 1; 0084 deferred), 0094 (adding the cashier and the laptop); 0025 and 0085 updated; PRD 1.28.
+
 ## The owner on the cashier PC lifts the kiosk lock (2026-10-19)
 
 **In plain words:** when you sign in on the cashier PC, its lock lifts by itself; the top of the screen says "القفل متوقف · طول ما المالك داخل". When you sign out or press "Lock screen", the lock is back. The "Unlock with owner code" button (for when you are away and read the code over the phone) now lifts it for 15 minutes instead of 5.
