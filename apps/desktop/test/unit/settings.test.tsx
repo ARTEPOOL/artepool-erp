@@ -395,10 +395,28 @@ describe('Settings → Devices', () => {
       .on(
         'GET',
         '/api/v1/devices',
-        ok({ devices: [device({ kioskLock: { locked: true, offUntil: null } })], openCode: null }),
-        ok({ devices: [device({ kioskLock: { locked: false, offUntil } })], openCode: null }),
+        ok({
+          devices: [
+            device({
+              kioskLock: { locked: true, switchedOff: false, offUntil: null, ownerSignedIn: false },
+            }),
+          ],
+          openCode: null,
+        }),
+        ok({
+          devices: [
+            device({
+              kioskLock: { locked: false, switchedOff: true, offUntil, ownerSignedIn: false },
+            }),
+          ],
+          openCode: null,
+        }),
       )
-      .on('POST', '/api/v1/devices/3/kiosk-lock', ok({ locked: false, offUntil }))
+      .on(
+        'POST',
+        '/api/v1/devices/3/kiosk-lock',
+        ok({ locked: false, switchedOff: true, offUntil, ownerSignedIn: false }),
+      )
       .on(
         'GET',
         '/api/v1/kiosk/alerts',

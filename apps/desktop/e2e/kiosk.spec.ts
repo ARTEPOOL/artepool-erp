@@ -1,13 +1,13 @@
 /**
  * The POS kiosk lock (decisions 0082, 0083, 0089, 0090) against the real server, in Arabic and
- * English. On the locked POS PC, the owner's current code lifts the lock for 5 minutes and the
+ * English. On the locked POS PC, the owner's current code lifts the lock for 15 minutes and the
  * banner "Kiosk lock is off · until …" shows. On the office PC, the owner sees the POS PC's lock
  * off, turns it back on with a reason and the code, then off for 15 minutes and on again; the
  * alerts card lists the changes. A cashier locks the POS screen with the "Lock screen" button and
- * resumes with the PIN.
+ * resumes with the PIN. While the owner is signed in on the POS PC, the lock is off (0091).
  */
 import type { Locator, Page } from '@playwright/test';
-import { control, expect, signInAsOwner, snap, test, unique } from './fixtures';
+import { accountMenu, control, expect, signInAsOwner, snap, test, unique } from './fixtures';
 
 test.describe.configure({ mode: 'serial' });
 test.setTimeout(180_000);
@@ -118,4 +118,23 @@ test('the cashier locks the POS screen and resumes with the PIN (0090)', async (
   await expect(close.getByTestId('variance')).toHaveText('0.00');
   await close.getByRole('button', { name: t('pos:closeShift.close') }).click();
   await expect(page.getByTestId('shift-report')).toBeVisible();
+});
+
+test('the owner signs in on the POS PC: the lock is off until they sign out (0091)', async ({
+  page,
+  open,
+  t,
+}) => {
+  await open('pos');
+  await expect(page.getByTestId('kiosk-off')).toHaveCount(0);
+  await page
+    .getByRole('group', { name: t('auth:signIn.method') })
+    .getByRole('button', { name: t('auth:signIn.password') })
+    .click();
+  await signInAsOwner(page, t);
+  const banner = page.getByTestId('kiosk-off');
+  await expect(banner).toContainText(t('auth:kiosk.ownerIn'));
+  await snap(page, '92-kiosk-owner-signed-in');
+  await accountMenu(page, t, 'signOut');
+  await expect(page.getByTestId('kiosk-off')).toHaveCount(0);
 });

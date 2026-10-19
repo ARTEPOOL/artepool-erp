@@ -1,5 +1,11 @@
 # Changelog
 
+## The owner on the cashier PC lifts the kiosk lock (2026-10-19)
+
+**In plain words:** when you sign in on the cashier PC, its lock lifts by itself; the top of the screen says "القفل متوقف · طول ما المالك داخل". When you sign out or press "Lock screen", the lock is back. The "Unlock with owner code" button (for when you are away and read the code over the phone) now lifts it for 15 minutes instead of 5.
+
+- Decision 0091; migration 0035 (`ops_backup` moves to 0036).
+
 ## POS kiosk lock, "Lock screen" button (2026-10-19)
 
 **In plain words:** a cashier PC now stays inside the ARTÉPOOL app. In the Windows app it opens full screen with no close button, and Alt+F4 does nothing (you get an alert). Only you can lift that lock:

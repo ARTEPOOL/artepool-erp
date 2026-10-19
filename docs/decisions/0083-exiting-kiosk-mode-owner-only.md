@@ -6,6 +6,8 @@
 | **Date** | 2026-10-18 |
 | **Decided by** | Owner |
 
+> **Updated by [0091](0091-kiosk-lock-off-while-the-owner-is-signed-in.md):** the owner signed in on the POS PC lifts the lock until sign-out or screen lock; the owner code on the lock screen lifts it for **15 minutes** (not 5).
+
 > The Office-PC unlock and the owner-code unlock are the per-PC "Kiosk lock" switch of [0089](0089-kiosk-lock-switch-per-pos-device.md) turned off: from the Office PC for 15 minutes, 1 hour or until turned back on; with the owner code for at most 5 minutes.
 
 ## Decision

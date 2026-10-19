@@ -1,7 +1,8 @@
 /**
  * The POS kiosk lock (decisions 0082, 0083, 0089): kept on the server, on unless the owner turned
  * it off; only the owner, with a reason and a fresh 2-step code; the lock screen's owner code
- * lifts it for at most 5 minutes with limited tries; every change and exit attempt is audited
+ * lifts it for 15 minutes with limited tries (0091); while the owner is signed in on the PC the
+ * lock is off; every change and exit attempt is audited
  * and alerts the owner.
  */
 import { randomUUID } from 'node:crypto';
@@ -91,8 +92,20 @@ async function lockOn(): Promise<void> {
 
 describe('kiosk lock', () => {
   it('is on by default on a POS PC; other PCs have none', async () => {
-    expect(await state(pos)).toEqual({ isPos: true, locked: true, offUntil: null });
-    expect(await state(office)).toEqual({ isPos: false, locked: false, offUntil: null });
+    expect(await state(pos)).toEqual({
+      isPos: true,
+      locked: true,
+      switchedOff: false,
+      offUntil: null,
+      ownerSignedIn: false,
+    });
+    expect(await state(office)).toEqual({
+      isPos: false,
+      locked: false,
+      switchedOff: false,
+      offUntil: null,
+      ownerSignedIn: false,
+    });
   });
 
   it('is turned off by the owner only, with a reason and a fresh 2-step code', async () => {
@@ -146,19 +159,32 @@ describe('kiosk lock', () => {
     });
 
     await lockOn();
-    expect(await state(pos)).toEqual({ isPos: true, locked: true, offUntil: null });
+    expect(await state(pos)).toEqual({
+      isPos: true,
+      locked: true,
+      switchedOff: false,
+      offUntil: null,
+      ownerSignedIn: false,
+    });
     expect((await alerts('kiosk_lock_on')).length).toBeGreaterThan(0);
   });
 
   it('can stay off until the owner turns it back on', async () => {
     const off = await setLock(pos.id, { on: false, reason: 'Windows update', code: await code() });
-    expect(off.json<KioskLock>()).toEqual({ locked: false, offUntil: null });
+    expect(off.json<KioskLock>()).toEqual({
+      locked: false,
+      switchedOff: true,
+      offUntil: null,
+      ownerSignedIn: false,
+    });
     const listed = (
       await call(server, 'GET', '/api/v1/devices', { device: office, token: ownerToken })
     ).json<DevicesResponse>();
     expect(listed.devices.find((d) => d.code === 'COUNTER-01')!.kioskLock).toEqual({
       locked: false,
+      switchedOff: true,
       offUntil: null,
+      ownerSignedIn: false,
     });
     expect(listed.devices.find((d) => d.code === 'OFFICE-01')!.kioskLock).toBeNull();
     await lockOn();
@@ -173,7 +199,13 @@ describe('kiosk lock', () => {
         WHERE id = (SELECT max(id) FROM auth.kiosk_lock_changes)`,
       [],
     );
-    expect(await state(pos)).toEqual({ isPos: true, locked: true, offUntil: null });
+    expect(await state(pos)).toEqual({
+      isPos: true,
+      locked: true,
+      switchedOff: false,
+      offUntil: null,
+      ownerSignedIn: false,
+    });
     await state(pos);
     const after = await alerts('kiosk_lock_on');
     expect(after.length).toBe(before + 1);
@@ -188,13 +220,15 @@ describe('kiosk lock', () => {
     expect(await alerts('kiosk_lock_on')).toHaveLength(after.length);
   });
 
-  it('lifts for at most 5 minutes with the owner code on the lock screen, once per code', async () => {
+  it('lifts for 15 minutes with the owner code on the lock screen, once per code', async () => {
     const now = await code();
     const response = await unlockWithCode(now);
     expect(response.statusCode).toBe(200);
     const lock = response.json<KioskLock>();
     expect(lock.locked).toBe(false);
-    expect((Date.parse(lock.offUntil!) - Date.now()) / 60_000).toBeLessThanOrEqual(5);
+    const left = (Date.parse(lock.offUntil!) - Date.now()) / 60_000;
+    expect(left).toBeGreaterThan(14.5);
+    expect(left).toBeLessThanOrEqual(15);
     const row = await server.db
       .selectFrom('auth.kiosk_lock_changes')
       .select(['via', 'created_by', 'reason'])
@@ -280,7 +314,51 @@ describe('kiosk lock', () => {
     ).toBe('PERMISSION_DENIED');
   });
 
-  it('is enforced by the database: owner only, at most 5 minutes by code, never deleted', async () => {
+  it('is off while the owner is signed in on the POS PC, and back on after sign-out or lock (0091)', async () => {
+    const cashier = await addUser(server, {
+      username: 'sara.cashier',
+      method: 'pin',
+      roles: ['cashier'],
+    });
+    await openSession(server, { userId: cashier, deviceId: pos.id, method: 'pin' });
+    expect((await state(pos)).locked).toBe(true);
+
+    const session = await openSession(server, {
+      userId: owner,
+      deviceId: pos.id,
+      method: 'password_totp',
+    });
+    expect(await state(pos)).toEqual({
+      isPos: true,
+      locked: false,
+      switchedOff: false,
+      offUntil: null,
+      ownerSignedIn: true,
+    });
+    // The owner locks the screen: the kiosk lock is back.
+    const lockRes = await call(server, 'POST', '/api/v1/auth/lock', {
+      device: pos,
+      token: session.token,
+    });
+    expect(lockRes.statusCode).toBe(200);
+    expect((await state(pos)).locked).toBe(true);
+    // Unlocked again, then signed out: back on.
+    await ageRow(server, `UPDATE auth.sessions SET locked_at = NULL WHERE id = $1`, [session.id]);
+    expect((await state(pos)).locked).toBe(false);
+    await call(server, 'POST', '/api/v1/auth/sign-out', { device: pos, token: session.token });
+    expect(await state(pos)).toEqual({
+      isPos: true,
+      locked: true,
+      switchedOff: false,
+      offUntil: null,
+      ownerSignedIn: false,
+    });
+    // The owner signed in on another PC (the office one, in beforeAll) changes nothing here.
+    expect((await state(office)).locked).toBe(false);
+    expect((await state(pos)).locked).toBe(true);
+  });
+
+  it('is enforced by the database: owner only, at most 15 minutes by code, never deleted', async () => {
     const accountant = await addUser(server, { username: 'other.acc', roles: ['accountant'] });
     const insert = (userId: bigint, via: string, offUntil: string) =>
       withBusinessTx(server.db, { userId, requestId: randomUUID(), reason: 'test' }, (trx) =>
@@ -296,7 +374,7 @@ describe('kiosk lock', () => {
           .execute(),
       );
     await expect(insert(accountant, 'settings', '10')).rejects.toThrow(/Only the owner/);
-    await expect(insert(owner, 'owner_code', '30')).rejects.toThrow(/at most 5 minutes/);
+    await expect(insert(owner, 'owner_code', '30')).rejects.toThrow(/at most 15 minutes/);
     await expect(
       withBusinessTx(server.db, { userId: owner, requestId: randomUUID(), reason: 'test' }, (trx) =>
         trx.deleteFrom('auth.kiosk_lock_changes').execute(),

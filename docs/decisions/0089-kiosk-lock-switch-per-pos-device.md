@@ -7,6 +7,8 @@
 | **Decided by** | Owner |
 | **Related** | [0082](0082-app-mode-by-device-kind-and-pos-kiosk.md), [0083](0083-exiting-kiosk-mode-owner-only.md) |
 
+> **Updated by [0091](0091-kiosk-lock-off-while-the-owner-is-signed-in.md):** the owner signed in on the POS PC lifts the lock until sign-out or screen lock; the owner code on the lock screen lifts it for **15 minutes** (not 5).
+
 ## Decision
 - **Settings → Devices:** every POS PC has a **Kiosk lock** switch. **Default ON** for every POS PC (new and existing).
 - **Only the owner changes it**, with a **2-step step-up** (the current 6-digit code, even on a trusted PC) and a **reason**. Every change is audited (who, which PC, on/off, until when, reason).

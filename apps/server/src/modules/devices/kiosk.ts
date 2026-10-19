@@ -1,10 +1,11 @@
 /**
- * The POS kiosk lock (decisions 0082, 0083, 0089). The state lives here on the server, never on
- * the POS PC: on unless the owner turned it off, for 15 minutes, 1 hour or until turned back on.
- * The owner changes it from Settings with a reason and a fresh 2-step code, or by typing the
- * current code on the PC's lock screen (at most 5 minutes; 5 wrong codes in 15 minutes close
- * that door for 15 minutes). Every change and every attempt to leave the app is audited and
- * alerts the owner. PIN sign-in, shifts and permissions never depend on the lock.
+ * The POS kiosk lock (decisions 0082, 0083, 0089, 0091). The state lives here on the server,
+ * never on the POS PC: on unless the owner turned it off (15 minutes, 1 hour or until turned back
+ * on) or the owner is signed in on that PC (until they sign out or lock the screen). The owner
+ * changes it from Settings with a reason and a fresh 2-step code, or by typing the current code
+ * on the PC's lock screen (15 minutes; 5 wrong codes in 15 minutes close that door for 15
+ * minutes). Every change and every attempt to leave the app is audited and alerts the owner. PIN
+ * sign-in, shifts and permissions never depend on the lock.
  */
 import type { FastifyRequest } from 'fastify';
 import { sql, type Kysely, type Transaction } from 'kysely';
@@ -31,22 +32,43 @@ import { rateCheck, totpAad } from '../auth/service';
 
 type Db = Kysely<DB> | Transaction<DB>;
 
-const CODE_MINUTES = 5;
+const CODE_MINUTES = 15;
 const MAX_CODE_FAILURES = 5;
 
-/** A PC's lock now (the database's own rule). */
+/** A PC's lock now (the database's own rule, `auth.kiosk_state`). */
 export async function kioskLockOf(
   db: Db,
   deviceId: bigint,
 ): Promise<KioskLock & { changeId: bigint | null }> {
-  const { rows } = await sql<{ locked: boolean; off_until: Date | null; change_id: string | null }>`
-    SELECT locked, off_until, change_id::text FROM auth.kiosk_state(${deviceId})`.execute(db);
+  const { rows } = await sql<{
+    locked: boolean;
+    owner_signed_in: boolean;
+    change_id: string | null;
+    switched_off: boolean | null;
+    off_until: Date | null;
+  }>`
+    SELECT s.locked, s.owner_signed_in, s.change_id::text,
+           NOT k.lock_on AND (k.off_until IS NULL OR k.off_until > now()) AS switched_off,
+           k.off_until
+      FROM auth.kiosk_state(${deviceId}) s
+      LEFT JOIN auth.kiosk_lock_changes k ON k.id = s.change_id`.execute(db);
   const r = rows[0]!;
+  const switchedOff = r.switched_off === true;
   return {
     locked: r.locked,
-    offUntil: r.off_until?.toISOString() ?? null,
+    switchedOff,
+    offUntil: switchedOff ? (r.off_until?.toISOString() ?? null) : null,
+    ownerSignedIn: r.owner_signed_in,
     changeId: r.change_id === null ? null : BigInt(r.change_id),
   };
+}
+
+/** The lock as the screens see it (without the internal change id). */
+export function publicLock({
+  changeId: _changeId,
+  ...lock
+}: KioskLock & { changeId: bigint | null }): KioskLock {
+  return lock;
 }
 
 async function alert(
@@ -72,7 +94,15 @@ export async function kioskState(
   request: FastifyRequest,
 ): Promise<KioskStateResponse> {
   const device = request.device!;
-  if (device.kind !== 'pos') return { isPos: false, locked: false, offUntil: null };
+  if (device.kind !== 'pos') {
+    return {
+      isPos: false,
+      locked: false,
+      switchedOff: false,
+      offUntil: null,
+      ownerSignedIn: false,
+    };
+  }
   const lock = await kioskLockOf(deps.db, device.id);
   if (lock.locked && lock.changeId !== null) {
     const last = await deps.db
@@ -96,7 +126,7 @@ export async function kioskState(
       );
     }
   }
-  return { isPos: true, locked: lock.locked, offUntil: lock.offUntil };
+  return { isPos: true, ...publicLock(lock) };
 }
 
 /** The current code of this person, claimed so it is never used twice (shared with sign-in). */
@@ -186,11 +216,10 @@ export async function setKioskLock(
     `kiosk_lock_${body.on ? 'on' : 'off'}:${row.id}`,
     { code: device.code, minutes: body.minutes, via: 'settings' },
   );
-  const lock = await kioskLockOf(trx, device.id);
-  return { locked: lock.locked, offUntil: lock.offUntil };
+  return publicLock(await kioskLockOf(trx, device.id));
 }
 
-/** The lock screen's fallback: the owner's current code, 5 minutes, limited tries (0083). */
+/** The lock screen's fallback: the owner's current code, 15 minutes, limited tries (0083, 0091). */
 export async function unlockWithOwnerCode(
   deps: AppDeps,
   request: FastifyRequest,
@@ -270,8 +299,7 @@ export async function unlockWithOwnerCode(
     });
     throw new AppError('INVALID_TWO_STEP_CODE', 'Wrong or used owner code');
   }
-  const lock = await kioskLockOf(deps.db, device.id);
-  return { locked: lock.locked, offUntil: lock.offUntil };
+  return publicLock(await kioskLockOf(deps.db, device.id));
 }
 
 /** Someone tried to leave the POS app (decision 0082): audited, and the owner is alerted. */

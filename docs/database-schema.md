@@ -520,13 +520,13 @@ The "Kiosk lock" of each POS PC ([0082](decisions/0082-app-mode-by-device-kind-a
 | device_id | bigint → auth.devices | An active `pos` PC |
 | lock_on | boolean | |
 | off_until | timestamptz? | Off: until when (empty = until turned back on); on: always empty (`kiosk_lock_on_ck`) |
-| via | text | `CHECK IN ('settings','owner_code')`; `owner_code` is always off with an end time (`kiosk_lock_code_ck`) |
+| via | text | `CHECK IN ('settings','owner_code')`; `owner_code` is always off with an end time (`kiosk_lock_code_ck`), at most 15 minutes ahead (0091) |
 | reason | text? | 3–500 characters; required from Settings |
 | created_at, created_by | timestamptz, bigint → auth.users | Stamped |
 
-**Insert rules** (trigger): the user in the request context is the owner (`auth.is_owner`, `AP010`); the PC is an active POS PC; a reason when `via = 'settings'`; `off_until` later than now; by owner code at most 5 minutes ahead. The API also checks the owner's fresh 2-step code (claimed once, shared with sign-in and approvals).
+**Insert rules** (trigger): the user in the request context is the owner (`auth.is_owner`, `AP010`); the PC is an active POS PC; a reason when `via = 'settings'`; `off_until` later than now; by owner code at most 15 minutes ahead (5 in migration 0034, 15 from 0035). The API also checks the owner's fresh 2-step code (claimed once, shared with sign-in and approvals).
 
-`auth.kiosk_state(device_id) → (locked, off_until, change_id)`: locked unless the latest change is "off" and its time has not passed.
+`auth.kiosk_state(device_id) → (locked, off_until, change_id, owner_signed_in)`: locked unless the latest change is "off" and its time has not passed, or the owner is signed in on that PC (`auth.owner_signed_in_on`: an open, full, unlocked, unexpired owner session there; migration 0035, [0091](decisions/0091-kiosk-lock-off-while-the-owner-is-signed-in.md)).
 
 ### 5.12 `auth.kiosk_code_failures` (migration 0034, append-only)
 
@@ -1756,9 +1756,10 @@ Migrations are written **in build order** (milestones in [`phase-1-plan.md`](pha
 | 0032 | `screen_lock_optional` | M1 fix | `security.idle_lock_minutes.office/pos` may be 0 (never lock) and are set to 0 (0079) | — |
 | 0033 | `owner_dashboard` | Reports | `reports.owner_dashboard` (owner only), index on issued documents by day (0081) | — |
 | 0034 | `kiosk_lock` | M5c | `auth.kiosk_lock_changes`, `auth.kiosk_code_failures`, `auth.kiosk_state()`, four kiosk alert types (0082, 0083, 0089) | — |
-| 0035 | `ops_backup` | M6 | `ops.backup_runs`, `ops.integrity_runs` + backup role grants | — |
+| 0035 | `kiosk_owner_session` | M5c | `auth.owner_signed_in_on()`, `auth.kiosk_state()` with `owner_signed_in`; owner code at most 15 minutes (0091) | — |
+| 0036 | `ops_backup` | M6 | `ops.backup_runs`, `ops.integrity_runs` + backup role grants | — |
 
-After 0035, a final check asserts that every business table has the audit trigger, the no-delete guard and the expected grants. The same check runs as an automated test.
+After 0036, a final check asserts that every business table has the audit trigger, the no-delete guard and the expected grants. The same check runs as an automated test.
 
 ---
 

@@ -97,6 +97,7 @@ There is one short file per decision, numbered in order.
 | [0088](0088-no-cloud-database-outbox-for-mobile.md) | No cloud database in Phase 1; an outbox for a read-only mobile dashboard in Phase 2 | Accepted |
 | [0089](0089-kiosk-lock-switch-per-pos-device.md) | A "Kiosk lock" switch per POS PC (default on), owner only with 2-step and a reason; off for 15 min / 1 hour / until turned on; banner and alerts; kept on the server | Accepted |
 | [0090](0090-pos-idle-behaviour.md) | POS idle: no automatic return to the PIN screen; a "Lock screen" button for the cashier; owner-only auto-lock after N minutes, off by default | Accepted |
+| [0091](0091-kiosk-lock-off-while-the-owner-is-signed-in.md) | The kiosk lock is off while the owner is signed in on the POS PC (back on at sign-out or screen lock); owner code on the lock screen 15 minutes | Accepted |
 
 ## Template
 

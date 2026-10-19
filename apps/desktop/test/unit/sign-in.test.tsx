@@ -193,19 +193,19 @@ describe('PIN sign-in, only on POS PCs (decision 0021)', () => {
   };
 
   it('a locked POS PC offers "Unlock with owner code"; the banner shows once it is off (0083, 0089)', async () => {
-    const offUntil = new Date(Date.now() + 5 * 60_000).toISOString();
+    const offUntil = new Date(Date.now() + 15 * 60_000).toISOString();
     const bridge = posBridge()
       .on(
         'GET',
         '/api/v1/kiosk/state',
-        ok({ isPos: true, locked: true, offUntil: null }),
-        ok({ isPos: true, locked: false, offUntil }),
+        ok({ isPos: true, locked: true, switchedOff: false, offUntil: null, ownerSignedIn: false }),
+        ok({ isPos: true, locked: false, switchedOff: true, offUntil, ownerSignedIn: false }),
       )
       .on(
         'POST',
         '/api/v1/kiosk/unlock-with-code',
         failure(401, 'INVALID_TWO_STEP_CODE'),
-        ok({ locked: false, offUntil }),
+        ok({ locked: false, switchedOff: true, offUntil, ownerSignedIn: false }),
       );
     await startApp(bridge);
     expect(screen.queryByTestId('kiosk-off')).toBeNull();
@@ -230,6 +230,18 @@ describe('PIN sign-in, only on POS PCs (decision 0021)', () => {
       code: '222222',
     });
     // Once the lock is off, the button is gone.
+    expect(screen.queryByRole('button', { name: 'فتح بكود المالك' })).toBeNull();
+  });
+
+  it('while the owner is signed in on the POS PC, the banner says so (0091)', async () => {
+    const bridge = posBridge().on(
+      'GET',
+      '/api/v1/kiosk/state',
+      ok({ isPos: true, locked: false, switchedOff: false, offUntil: null, ownerSignedIn: true }),
+    );
+    await startApp(bridge);
+    const banner = await screen.findByTestId('kiosk-off');
+    expect(banner.textContent).toMatch(/القفل متوقف · طول ما المالك داخل/);
     expect(screen.queryByRole('button', { name: 'فتح بكود المالك' })).toBeNull();
   });
 

@@ -97,12 +97,18 @@ export const ScreenLockSettings = z.object({ officeMinutes: LockMinutes, posMinu
 export type ScreenLockSettings = z.infer<typeof ScreenLockSettings>;
 
 /**
- * A POS PC's kiosk lock (decisions 0082, 0089): on unless the owner turned it off, until a time
- * (null = until turned back on). Kept on the server, never on the PC.
+ * A POS PC's kiosk lock (decisions 0082, 0089, 0091): on unless the owner turned it off (until a
+ * time, null = until turned back on) or the owner is signed in on that PC. Kept on the server,
+ * never on the PC.
  */
 export interface KioskLock {
   locked: boolean;
+  /** The owner turned the switch off (from Settings or with the owner code). */
+  switchedOff: boolean;
+  /** Until when the switch is off; null = until turned back on (or not switched off). */
   offUntil: string | null;
+  /** The owner is signed in on that PC: the lock is off until they sign out or lock the screen. */
+  ownerSignedIn: boolean;
 }
 
 /** This PC's mode and kiosk lock, read by the app at start and every few seconds. */

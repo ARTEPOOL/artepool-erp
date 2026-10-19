@@ -184,7 +184,7 @@ export async function signInAsOwner(page: Page, t: (key: string) => string): Pro
   const owner = await control.owner();
   await page.getByLabel(t('auth:signIn.username'), { exact: true }).fill(owner.username);
   await page.getByLabel(t('auth:signIn.password'), { exact: true }).fill(owner.password);
-  await page.getByRole('button', { name: t('auth:signIn.submit') }).click();
+  await page.getByRole('button', { name: t('auth:signIn.submit'), exact: true }).click();
   await expect(page.getByRole('heading', { name: t('auth:secondFactor.title') })).toBeVisible();
   await dontRememberThisPc(page, t);
   await typeCode(page, await control.ownerCode());

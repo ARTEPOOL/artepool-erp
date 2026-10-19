@@ -1,6 +1,6 @@
 /**
- * Settings → Devices: the "Kiosk lock" of each POS PC (decisions 0082, 0083, 0089). On by
- * default. Only the owner turns it off — for 15 minutes, 1 hour or until turned back on — or on
+ * Settings → Devices: the "Kiosk lock" of each POS PC (decisions 0082, 0083, 0089, 0091). On by
+ * default, and off by itself while the owner is signed in on that PC. Only the owner turns it off — for 15 minutes, 1 hour or until turned back on — or on
  * again, every time with a reason and the current 2-step code. Off lifts only the screen lock: PIN
  * sign-in, shifts and permissions stay the same. The kiosk alerts card lists the latest changes
  * and attempts to leave the app.
@@ -41,22 +41,30 @@ export function KioskLockCell({ device }: { device: DeviceListItem }) {
   if (!lock) return null;
   return (
     <span className={deviceStyles.kiosk}>
-      {lock.locked ? (
-        <Chip tone="ok" icon={<Lock aria-hidden="true" />}>
-          {t('devices.kiosk.on')}
-        </Chip>
-      ) : (
+      {lock.switchedOff ? (
         <Chip tone="warn" icon={<LockOpen aria-hidden="true" />}>
           {lock.offUntil
             ? t('devices.kiosk.offUntil', { time: formatTime(lock.offUntil) })
             : t('devices.kiosk.off')}
         </Chip>
+      ) : lock.ownerSignedIn ? (
+        <Chip tone="warn" icon={<LockOpen aria-hidden="true" />}>
+          {t('devices.kiosk.ownerIn')}
+        </Chip>
+      ) : (
+        <Chip tone="ok" icon={<Lock aria-hidden="true" />}>
+          {t('devices.kiosk.on')}
+        </Chip>
       )}
       <Button variant="ghost" onPress={() => setChanging(true)}>
-        {lock.locked ? t('devices.kiosk.turnOff') : t('devices.kiosk.turnOn')}
+        {lock.switchedOff ? t('devices.kiosk.turnOn') : t('devices.kiosk.turnOff')}
       </Button>
       {changing && (
-        <KioskLockDialog device={device} turnOn={!lock.locked} onClose={() => setChanging(false)} />
+        <KioskLockDialog
+          device={device}
+          turnOn={lock.switchedOff}
+          onClose={() => setChanging(false)}
+        />
       )}
     </span>
   );
@@ -80,7 +88,7 @@ function KioskLockDialog(props: { device: DeviceListItem; turnOn: boolean; onClo
       invalidate: [KEYS.devices, [...ALERTS_KEY]],
       onSuccess: (lock) => {
         toast(
-          lock.locked
+          !lock.switchedOff
             ? t('devices.kiosk.turnedOn', { code: device.code })
             : t('devices.kiosk.turnedOff', { code: device.code }),
         );
