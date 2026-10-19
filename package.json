@@ -28,6 +28,7 @@
     "tls:init": "tsx tools/tls/src/cli.ts",
     "audit:verify": "tsx tools/audit-verify/src/cli.ts",
     "demo:audit-tamper": "tsx tools/audit-verify/src/demo-tamper.ts",
+    "backup:once": "tsx apps/backup/src/cli.ts once",
     "dev:server": "tsx watch apps/server/src/main.ts",
     "dev:desktop:web": "pnpm --filter @artepool/desktop dev",
     "dev:desktop": "pnpm --filter @artepool/desktop dev:app",
