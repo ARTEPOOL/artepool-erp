@@ -33,6 +33,7 @@ const device = (patch: Partial<DeviceListItem>): DeviceListItem => ({
   defaultWarehouseId: null,
   trustedFor: [],
   drawer: null,
+  kioskLock: null,
   ...patch,
 });
 

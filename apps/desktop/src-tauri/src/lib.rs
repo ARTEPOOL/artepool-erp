@@ -3,10 +3,13 @@
 //! only the pinned ARTÉPOOL CA, and the device key kept in Windows Credential Manager. The
 //! screens never see the key and cannot open a connection themselves (see tauri.conf.json CSP).
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
+use artepool_bridge::rules::{KioskView, kiosk_view};
 use artepool_bridge::{
     Bridge, BridgeRequest, BridgeResponse, EnrollInput, EnrollOutcome, LocalDevice,
 };
-use tauri::Manager as _;
+use tauri::{Emitter as _, Manager as _};
 
 #[cfg(windows)]
 type Store = artepool_bridge::store::CredentialStore;
@@ -14,6 +17,9 @@ type Store = artepool_bridge::store::CredentialStore;
 type Store = artepool_bridge::store::FileStore;
 
 struct AppBridge(Bridge<Store>);
+
+/// Whether this window is held in POS kiosk mode now (decisions 0082, 0089).
+struct Kiosk(AtomicBool);
 
 /// The Windows computer name, suggested as the device code when enrolling.
 fn computer_name() -> String {
@@ -58,6 +64,59 @@ async fn bridge_request(
     request: BridgeRequest,
 ) -> Result<BridgeResponse, String> {
     state.0.request(request).await.map_err(|e| e.to_string())
+}
+
+/// Kiosk mode: full screen, no title bar or window buttons, and closing is refused (see
+/// `run`). Lifted, the window is a normal window that may be minimised or closed.
+fn apply_kiosk(app: &tauri::AppHandle, locked: bool) {
+    app.state::<Kiosk>().0.store(locked, Ordering::SeqCst);
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.set_decorations(!locked);
+        let _ = window.set_fullscreen(locked);
+        let _ = window.set_closable(!locked);
+        let _ = window.set_minimizable(!locked);
+        if locked {
+            let _ = window.unminimize();
+            let _ = window.set_focus();
+        }
+    }
+}
+
+/// How often this PC asks the server for its kiosk lock on its own (decision 0089).
+const KIOSK_POLL: std::time::Duration = std::time::Duration::from_secs(5);
+
+/// Asks the server for this PC's kiosk lock and applies it. The answer is read here, never
+/// taken from the screens, and it fails closed: a POS PC that cannot reach the server stays
+/// locked (decision 0089).
+async fn refresh_kiosk(app: &tauri::AppHandle) -> Result<KioskView, String> {
+    let state = app.state::<AppBridge>();
+    let local = state.0.local_device().map_err(|e| e.to_string())?;
+    let kind = local.device.as_ref().map(|d| d.kind.as_str());
+    let answer = state
+        .0
+        .request(BridgeRequest {
+            method: "GET".into(),
+            path: "/api/v1/kiosk/state".into(),
+            body: None,
+            token: None,
+            idempotency_key: None,
+            background: Some(true),
+        })
+        .await;
+    let view = match &answer {
+        Ok(BridgeResponse::Response { status, body, .. }) => {
+            kiosk_view(kind, Some(*status), Some(body))
+        }
+        _ => kiosk_view(kind, None, None),
+    };
+    apply_kiosk(app, view.locked);
+    Ok(view)
+}
+
+/// The screens ask right after an owner-code unlock, so the window changes at once.
+#[tauri::command]
+async fn kiosk_refresh(app: tauri::AppHandle) -> Result<KioskView, String> {
+    refresh_kiosk(&app).await
 }
 
 /// The printers of this PC, for choosing the receipt printer (Settings → Devices).
@@ -132,13 +191,49 @@ pub fn run() {
         .setup(|app| {
             let store = open_store(app.handle())?;
             let bridge = Bridge::new(store, env!("CARGO_PKG_VERSION"), computer_name());
+            // A PC enrolled as POS starts locked, before the server has even answered.
+            let pos = bridge
+                .local_device()
+                .ok()
+                .and_then(|d| d.device)
+                .is_some_and(|d| d.kind == "pos");
             app.manage(AppBridge(bridge));
+            app.manage(Kiosk(AtomicBool::new(false)));
+            apply_kiosk(app.handle(), pos);
+            // Checked here every few seconds as well, whatever the screens do: a timed "off"
+            // ends on time even if the screens stop asking.
+            // Office PCs are not asked (the screens ask when the server says the PC is a POS).
+            if pos {
+                let handle = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    loop {
+                        let _ = refresh_kiosk(&handle).await;
+                        tokio::time::sleep(KIOSK_POLL).await;
+                    }
+                });
+            }
             Ok(())
+        })
+        // Closing from inside the app (Alt+F4, the close message) is refused while locked; the
+        // screens report it to the server, which alerts the owner (decision 0082).
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if window
+                    .app_handle()
+                    .state::<Kiosk>()
+                    .0
+                    .load(Ordering::SeqCst)
+                {
+                    api.prevent_close();
+                    let _ = window.emit("kiosk-close-refused", ());
+                }
+            }
         })
         .invoke_handler(tauri::generate_handler![
             bridge_local_device,
             bridge_enroll,
             bridge_request,
+            kiosk_refresh,
             printer_list,
             printer_print,
             printer_print_image

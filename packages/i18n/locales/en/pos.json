@@ -335,5 +335,6 @@
   "scan": "Scan barcode",
   "products": "Products",
   "productsCount": "{count} items",
-  "lowStock": "{qty} left"
+  "lowStock": "{qty} left",
+  "lockScreen": "Lock screen"
 }

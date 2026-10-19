@@ -455,6 +455,8 @@ A milestone is done only when its tests pass in CI.
 
 #### M5c — POS kiosk mode (decisions 0082, 0083, 0087, 0089, 0090)
 
+**Status (2026-10-19):** built — migration 0034, the kiosk API, the Kiosk lock switch and alerts in Settings → Devices (and on the owner dashboard), the banner, "Unlock with owner code", the POS "Lock screen" button, and the Windows window lock (full screen, closing refused, fails closed when the server cannot be reached). Moved to M6 with the installer: the watchdog and its `restarted` / `not_running` reports, start at Windows sign-in, and the cashier Windows account hardening (0085).
+
 **Delivers:**
 - The app reads its PC's kind at start: POS → kiosk mode (full screen, no window controls, closing refused); Office → normal app.
 - Unlock: the Kiosk lock switch (below) from the owner's Office PC, and **Unlock with owner code** on the lock screen (one-time code, 5 tries / 15 minutes, at most 5 minutes off); then kiosk mode returns.

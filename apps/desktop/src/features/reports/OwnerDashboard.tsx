@@ -30,6 +30,7 @@ import {
 } from '../../ui';
 import { useCan, useErrorText } from '../auth/context';
 import { DateField } from '../invoices/parts';
+import { KioskAlertsCard } from '../settings/devices/KioskLock';
 import { money } from '../masterdata/format';
 import styles from './dashboard.module.css';
 
@@ -444,6 +445,8 @@ export function OwnerDashboard() {
                 {d.stock.items.length === 0 && <Note>{t('dashboard.noReorder')}</Note>}
               </div>
             </Card>
+
+            <KioskAlertsCard index={17} limit={5} hideWhenEmpty />
           </div>
         </>
       )}

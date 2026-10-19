@@ -1,5 +1,16 @@
 # Changelog
 
+## POS kiosk lock, "Lock screen" button (2026-10-19)
+
+**In plain words:** a cashier PC now stays inside the ARTÉPOOL app. In the Windows app it opens full screen with no close button, and Alt+F4 does nothing (you get an alert). Only you can lift that lock:
+- from your office PC: Settings → Devices → the cashier PC → "Turn off…" for 15 minutes, 1 hour or until you turn it back on, with a reason and your phone code;
+- or on the cashier PC itself: "Unlock with owner code" and your current phone code, for 5 minutes only.
+
+While it is off, the cashier PC shows "القفل متوقف · حتى الساعة …" at the top, and it comes back on by itself when the time is up. The cashier keeps the same PIN, shift and permissions either way. Every change and every attempt to close the app is in the audit log and in the "POS PC alerts" list (Settings → Devices and your dashboard). The POS screen also has a "Lock screen" button: the same cashier comes back with their PIN, and the shift stays open.
+
+- Decisions 0082, 0083, 0089, 0090; migration 0034 (`ops_backup` moves to 0035).
+- Still to come in M6 (installer): the watchdog that restarts the app, start at Windows sign-in, and the cashier Windows account settings (0085).
+
 ## The owner dashboard (2026-10-18)
 
 **In plain words:** "Reports" in the side menu now opens your dashboard (owner only): total sales, sales without VAT, VAT due and profit for today, this week, this month, this year or any dates, each compared with the period before; sales day by day; POS vs A4, money per payment method and what is still unpaid; sales per employee; the top 10 items and customers; and right now: cash in the drawers and the safe, what customers owe and how much is late, the stock value and what needs reordering.

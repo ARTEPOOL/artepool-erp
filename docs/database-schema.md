@@ -88,6 +88,7 @@ Phase 1 has **68 tables in 9 schemas**, plus reporting views and the functions a
      ▲     auth.devices (+ device_activity) · auth.enrollment_codes · auth.sessions
      │     auth.approvals (single-use supervisor approvals) · auth.recovery_codes (owner 2-step)
      │     auth.device_trust ("trust this PC" for the 2-step code, 0006)
+     │     auth.kiosk_lock_changes · auth.kiosk_code_failures (POS kiosk lock, 0034)
      │
  sys.company_profile · sys.settings · sys.branches · sys.document_series (POS-, INV-, CN-, …)
 
@@ -229,7 +230,7 @@ Written in the same transaction as the operation. Insert-only (a trigger stamps 
 | Column | Type | Rules |
 |---|---|---|
 | id | bigint PK | |
-| alert_type | text | `CHECK IN ('low_stock','oversell_review','cash_drop_due','cash_variance','repeated_variance','drawer_left_open','backup_failed','backup_stale','restore_test_due','integrity_issue','audit_chain_broken','clock_skew','clock_backwards','period_missing')` |
+| alert_type | text | `CHECK IN ('low_stock','oversell_review','cash_drop_due','cash_variance','repeated_variance','drawer_left_open','backup_failed','backup_stale','restore_test_due','integrity_issue','audit_chain_broken','clock_skew','clock_backwards','period_missing','kiosk_lock_off','kiosk_lock_on','kiosk_exit_attempt','kiosk_code_blocked')` (the last four: migration 0034) |
 | severity | text | `CHECK IN ('info','warning','critical')` |
 | entity_type, entity_id | text? | |
 | params | jsonb | Values for the translated message |
@@ -508,6 +509,28 @@ Also used, together with the 6-digit code, to recover a forgotten password in th
 - **Automatic ending** (triggers):
   - on `auth.users`: a new password (`password_changed_at` changes, or a reset sets `must_change_password` with a new hash), a 2-step change (`totp_enabled` or `totp_secret_enc`), or deactivation;
   - on `auth.devices`: revoke, or the type changing to `pos`.
+
+### 5.11 `auth.kiosk_lock_changes` (migration 0034, append-only)
+
+The "Kiosk lock" of each POS PC ([0082](decisions/0082-app-mode-by-device-kind-and-pos-kiosk.md), [0083](decisions/0083-exiting-kiosk-mode-owner-only.md), [0089](decisions/0089-kiosk-lock-switch-per-pos-device.md)). Every change is a row; the latest row of a PC is its state; no row = on. Row-audited, immutable, never deleted.
+
+| Column | Type | Rules |
+|---|---|---|
+| id | bigint PK | |
+| device_id | bigint → auth.devices | An active `pos` PC |
+| lock_on | boolean | |
+| off_until | timestamptz? | Off: until when (empty = until turned back on); on: always empty (`kiosk_lock_on_ck`) |
+| via | text | `CHECK IN ('settings','owner_code')`; `owner_code` is always off with an end time (`kiosk_lock_code_ck`) |
+| reason | text? | 3–500 characters; required from Settings |
+| created_at, created_by | timestamptz, bigint → auth.users | Stamped |
+
+**Insert rules** (trigger): the user in the request context is the owner (`auth.is_owner`, `AP010`); the PC is an active POS PC; a reason when `via = 'settings'`; `off_until` later than now; by owner code at most 5 minutes ahead. The API also checks the owner's fresh 2-step code (claimed once, shared with sign-in and approvals).
+
+`auth.kiosk_state(device_id) → (locked, off_until, change_id)`: locked unless the latest change is "off" and its time has not passed.
+
+### 5.12 `auth.kiosk_code_failures` (migration 0034, append-only)
+
+Wrong owner codes typed on a POS PC's lock screen: 5 within 15 minutes close the owner-code unlock on that PC for 15 minutes and raise `kiosk_code_blocked`. Columns: id, device_id → auth.devices, created_at, created_by. Row-audited, immutable, never deleted.
 
 ---
 
@@ -1732,9 +1755,10 @@ Migrations are written **in build order** (milestones in [`phase-1-plan.md`](pha
 | 0031 | `owner_trust_on_pos` | M1 fix | `auth.is_owner()`; the owner may trust a POS PC; a PC turned POS keeps only the owner's trust (0078) | — |
 | 0032 | `screen_lock_optional` | M1 fix | `security.idle_lock_minutes.office/pos` may be 0 (never lock) and are set to 0 (0079) | — |
 | 0033 | `owner_dashboard` | Reports | `reports.owner_dashboard` (owner only), index on issued documents by day (0081) | — |
-| 0034 | `ops_backup` | M6 | `ops.backup_runs`, `ops.integrity_runs` + backup role grants | — |
+| 0034 | `kiosk_lock` | M5c | `auth.kiosk_lock_changes`, `auth.kiosk_code_failures`, `auth.kiosk_state()`, four kiosk alert types (0082, 0083, 0089) | — |
+| 0035 | `ops_backup` | M6 | `ops.backup_runs`, `ops.integrity_runs` + backup role grants | — |
 
-After 0034, a final check asserts that every business table has the audit trigger, the no-delete guard and the expected grants. The same check runs as an automated test.
+After 0035, a final check asserts that every business table has the audit trigger, the no-delete guard and the expected grants. The same check runs as an automated test.
 
 ---
 

@@ -22,6 +22,7 @@
 - "Unlock POS" from the owner's Office PC (0083) **is** this switch turned off for 15 minutes; the two are one mechanism.
 - The fallback **Unlock with owner code** on the lock screen (0083) also turns the switch off for **at most 5 minutes**, with the same audit and alert; it cannot choose a longer time.
 
-## How it works (to build, M5c)
-- A per-device setting on the server: `kiosk_lock` (on/off), `off_until` (empty = until turned on), changed only through an owner-only API that checks a fresh 2-step code; history kept (never deleted) and audited.
-- New alert types: `kiosk_lock_off`, `kiosk_lock_on`.
+## How it works (built in M5c, migration 0034)
+- Every change is a row in `auth.kiosk_lock_changes` (PC, on/off, `off_until` — empty = until turned on —, how, reason, who, when); the latest row is the state, none = on. Never deleted, row-audited; the database itself allows only the owner and at most 5 minutes by owner code.
+- `POST /api/v1/devices/:id/kiosk-lock` (owner only, reason and a fresh 2-step code); the POS PC reads `GET /api/v1/kiosk/state` every 5 seconds. In the Windows app the Rust layer makes that call itself and applies the answer to the window, so the screens cannot unlock it; no answer → a POS PC stays locked.
+- Alert types: `kiosk_lock_off`, `kiosk_lock_on` (also once when a timed "off" runs out).

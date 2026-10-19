@@ -34,6 +34,7 @@ import { contextOf } from '../../platform/http/context';
 import type { AppDeps } from '../../platform/http/deps';
 import { endSessions } from '../auth/sessions';
 import { caFingerprint, deriveCodeKey, proof } from './enrollment-crypto';
+import { kioskLockOf } from './kiosk';
 
 /** Keys are renewed when less than this many days are left. */
 const RENEW_WITHIN_DAYS = 30;
@@ -398,7 +399,13 @@ export async function listDevices(
         expiresAt: t.expires_at.toISOString(),
       })),
     drawer: drawerOf(drawers.find((d) => d.device_id === r.id)),
+    kioskLock: null,
   }));
+  for (const d of devices) {
+    if (d.kind !== 'pos' || d.status !== 'active') continue;
+    const lock = await kioskLockOf(deps.db, BigInt(d.id));
+    d.kioskLock = { locked: lock.locked, offUntil: lock.offUntil };
+  }
   return { devices, openCode: open ? { expiresAt: open.expires_at.toISOString() } : null };
 }
 

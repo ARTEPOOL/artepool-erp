@@ -4,12 +4,16 @@ import {
   EnrollCompleteRequest,
   EnrollHelloRequest,
   IdText,
+  KioskCodeUnlockRequest,
+  KioskEventRequest,
   MoveDrawerRequest,
   RenewKeyRequest,
   RevokeDeviceRequest,
+  SetKioskLockRequest,
   UpdateDeviceRequest,
 } from '@artepool/shared/contracts';
 import { defineRoute, defineWrite } from '../../platform/http/route';
+import * as kiosk from './kiosk';
 import * as devices from './service';
 
 const DeviceParams = z.object({ id: IdText });
@@ -109,5 +113,44 @@ export function registerDeviceRoutes(app: FastifyInstance): void {
       await devices.revokeDevice(trx, request, BigInt(params.id), body.reason);
       return { body: { ok: true } };
     },
+  });
+
+  // The POS kiosk lock (decisions 0082, 0083, 0089).
+  defineRoute(app, {
+    method: 'GET',
+    url: '/api/v1/kiosk/state',
+    access: { kind: 'device' },
+    handler: ({ request }) => kiosk.kioskState(deps, request),
+  });
+  defineRoute(app, {
+    method: 'POST',
+    url: '/api/v1/kiosk/unlock-with-code',
+    access: { kind: 'device' },
+    body: KioskCodeUnlockRequest,
+    handler: ({ request, body }) => kiosk.unlockWithOwnerCode(deps, request, body),
+  });
+  defineRoute(app, {
+    method: 'POST',
+    url: '/api/v1/kiosk/events',
+    access: { kind: 'device' },
+    body: KioskEventRequest,
+    handler: ({ request, body }) => kiosk.kioskEvent(deps, request, body),
+  });
+  defineRoute(app, {
+    method: 'GET',
+    url: '/api/v1/kiosk/alerts',
+    access: manage,
+    handler: ({ request }) => kiosk.kioskAlerts(deps.db, request.auth!.userId),
+  });
+  defineWrite(app, {
+    method: 'POST',
+    url: '/api/v1/devices/:id/kiosk-lock',
+    access: manage,
+    params: DeviceParams,
+    body: SetKioskLockRequest,
+    reason: ({ body }) => body.reason,
+    handler: async ({ trx, request, params, body }) => ({
+      body: await kiosk.setKioskLock(deps, trx, request, BigInt(params.id), body),
+    }),
   });
 }

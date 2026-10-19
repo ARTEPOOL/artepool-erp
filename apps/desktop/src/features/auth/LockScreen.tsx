@@ -5,11 +5,13 @@ import { Alert, Avatar, Button, cx, TextField } from '../../ui';
 import styles from './auth.module.css';
 import { useAuthController, useAuthState, useDisplayName, useErrorText } from './context';
 import { toAsciiDigits } from './OtpInput';
+import { OwnerCodeUnlock } from '../kiosk/OwnerCodeUnlock';
 import { AuthFrame, Hello, ServerDown } from './parts';
 
 /**
- * The idle lock (POS 5 minutes, office 15): the same person continues with their own password
- * or PIN; anyone else signs in fresh, which ends this session.
+ * The screen lock: after the idle minutes set in Settings → Devices (decision 0079; off on POS PCs
+ * by default, 0090) or the POS "Lock screen" button. The same person continues with their own
+ * password or PIN; anyone else signs in fresh, which ends this session.
  */
 export function LockScreen() {
   const { t } = useTranslation('auth');
@@ -80,6 +82,7 @@ export function LockScreen() {
           {t('lock.switchUser')}
         </Button>
       </form>
+      <OwnerCodeUnlock />
     </AuthFrame>
   );
 }

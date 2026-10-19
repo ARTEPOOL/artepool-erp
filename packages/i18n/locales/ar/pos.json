@@ -335,5 +335,6 @@
   "scan": "مسح باركود",
   "products": "المنتجات",
   "productsCount": "{count} أصناف",
-  "lowStock": "باقي {qty}"
+  "lowStock": "باقي {qty}",
+  "lockScreen": "قفل الشاشة"
 }

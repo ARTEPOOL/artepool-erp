@@ -22,6 +22,8 @@ export interface DeviceListItem {
   trustedFor: TrustedPerson[];
   /** The POS drawer on this PC, if any, and its open shift (decision 0069). */
   drawer: DeviceDrawer | null;
+  /** POS PCs only: the kiosk lock kept on the server (decision 0089); null on other PCs. */
+  kioskLock: KioskLock | null;
 }
 
 export interface DeviceDrawer {
@@ -93,3 +95,66 @@ export type RevokeDeviceRequest = z.infer<typeof RevokeDeviceRequest>;
 const LockMinutes = z.number().int().min(0).max(240);
 export const ScreenLockSettings = z.object({ officeMinutes: LockMinutes, posMinutes: LockMinutes });
 export type ScreenLockSettings = z.infer<typeof ScreenLockSettings>;
+
+/**
+ * A POS PC's kiosk lock (decisions 0082, 0089): on unless the owner turned it off, until a time
+ * (null = until turned back on). Kept on the server, never on the PC.
+ */
+export interface KioskLock {
+  locked: boolean;
+  offUntil: string | null;
+}
+
+/** This PC's mode and kiosk lock, read by the app at start and every few seconds. */
+export interface KioskStateResponse extends KioskLock {
+  isPos: boolean;
+}
+
+export const KIOSK_OFF_MINUTES = [15, 60] as const;
+
+/**
+ * The owner turns a POS PC's kiosk lock on or off (decision 0089): a reason and the current
+ * 2-step code every time; off for 15 minutes, 1 hour, or until turned back on (minutes null).
+ */
+export const SetKioskLockRequest = z
+  .object({
+    on: z.boolean(),
+    minutes: z.union([z.literal(15), z.literal(60), z.null()]).default(null),
+    reason: z.string().trim().min(3).max(500),
+    code: z.string().regex(/^\d{6}$/),
+  })
+  .strict();
+export type SetKioskLockRequest = z.infer<typeof SetKioskLockRequest>;
+
+/** On the lock screen: the owner's current code lifts the lock for 5 minutes (decision 0083). */
+export const KioskCodeUnlockRequest = z.object({ code: z.string().regex(/^\d{6}$/) }).strict();
+export type KioskCodeUnlockRequest = z.infer<typeof KioskCodeUnlockRequest>;
+
+/** What the POS app reports when someone tries to leave it (decision 0082). */
+export const KIOSK_EVENTS = ['close_refused', 'restarted', 'not_running'] as const;
+export const KioskEventRequest = z.object({ kind: z.enum(KIOSK_EVENTS) }).strict();
+export type KioskEventRequest = z.infer<typeof KioskEventRequest>;
+
+export const KIOSK_ALERT_TYPES = [
+  'kiosk_lock_off',
+  'kiosk_lock_on',
+  'kiosk_exit_attempt',
+  'kiosk_code_blocked',
+] as const;
+export type KioskAlertType = (typeof KIOSK_ALERT_TYPES)[number];
+
+/** A kiosk alert for the owner (Settings → Devices and the owner dashboard, decision 0082). */
+export interface KioskAlert {
+  id: string;
+  alertType: KioskAlertType;
+  createdAt: string;
+  deviceId: string;
+  deviceCode: string;
+  deviceName: string;
+  /** off: minutes (null = until turned back on) and how; exit attempt: what happened. */
+  params: Record<string, unknown>;
+}
+
+export interface KioskAlertsResponse {
+  alerts: KioskAlert[];
+}

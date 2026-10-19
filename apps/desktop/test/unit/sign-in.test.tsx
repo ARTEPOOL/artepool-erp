@@ -192,6 +192,47 @@ describe('PIN sign-in, only on POS PCs (decision 0021)', () => {
     return bridge;
   };
 
+  it('a locked POS PC offers "Unlock with owner code"; the banner shows once it is off (0083, 0089)', async () => {
+    const offUntil = new Date(Date.now() + 5 * 60_000).toISOString();
+    const bridge = posBridge()
+      .on(
+        'GET',
+        '/api/v1/kiosk/state',
+        ok({ isPos: true, locked: true, offUntil: null }),
+        ok({ isPos: true, locked: false, offUntil }),
+      )
+      .on(
+        'POST',
+        '/api/v1/kiosk/unlock-with-code',
+        failure(401, 'INVALID_TWO_STEP_CODE'),
+        ok({ locked: false, offUntil }),
+      );
+    await startApp(bridge);
+    expect(screen.queryByTestId('kiosk-off')).toBeNull();
+    fireEvent.click(await screen.findByRole('button', { name: 'فتح بكود المالك' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.paste(within(dialog).getByLabelText('رقم 1'), {
+      clipboardData: { getData: () => '111111' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'فتح' }));
+    expect(
+      await within(dialog).findByText(
+        'الرمز غير صحيح أو انتهت صلاحيته. أدخل الرمز الجديد من التطبيق.',
+      ),
+    ).toBeTruthy();
+    fireEvent.paste(within(dialog).getByLabelText('رقم 1'), {
+      clipboardData: { getData: () => '222222' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'فتح' }));
+    const banner = await screen.findByTestId('kiosk-off');
+    expect(banner.textContent).toMatch(/القفل متوقف · حتى الساعة/);
+    expect(bridge.callsTo('POST', '/api/v1/kiosk/unlock-with-code')[1]?.body).toEqual({
+      code: '222222',
+    });
+    // Once the lock is off, the button is gone.
+    expect(screen.queryByRole('button', { name: 'فتح بكود المالك' })).toBeNull();
+  });
+
   it('picks a name and takes the PIN from the keypad; a wrong PIN clears the dots', async () => {
     const bridge = posBridge().on('POST', '/api/v1/auth/pin-sign-in', failure(401, 'INVALID_PIN'));
     await startApp(bridge);

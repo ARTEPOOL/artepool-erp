@@ -24,6 +24,7 @@ import {
   Undo2,
   UserRound,
   Landmark,
+  Lock,
   Wrench,
   type LucideIcon,
 } from 'lucide-react';
@@ -44,7 +45,7 @@ import {
   Tile,
   type Tone,
 } from '../../ui';
-import { useDisplayName, useErrorText } from '../auth/context';
+import { useAuthController, useDisplayName, useErrorText } from '../auth/context';
 import { money, rate } from '../masterdata/format';
 import { localName, useCategories } from '../masterdata/refs';
 import { CustomerPicker, useWalkInCustomer } from '../sales/CustomerPicker';
@@ -94,6 +95,7 @@ export function PosPage() {
 
 function Register({ state }: { state: PosState }) {
   const { t, i18n } = useTranslation('pos');
+  const auth = useAuthController();
   const nameOf = useDisplayName();
   const cart = useCart();
   const walkIn = useWalkInCustomer();
@@ -182,6 +184,11 @@ function Register({ state }: { state: PosState }) {
               <Banknote className={iconClass.sm} aria-hidden="true" />
               {t('shift')}
             </Link>
+            {/* Decision 0090: the cashier locks on purpose; the same cashier resumes with the PIN. */}
+            <Button onPress={() => void auth.lock()}>
+              <Lock className={iconClass.sm} aria-hidden="true" />
+              {t('lockScreen')}
+            </Button>
           </div>
         }
       />

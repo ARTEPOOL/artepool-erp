@@ -34,7 +34,7 @@ test('a cashier picks their name and enters the PIN; the lock screen takes them 
   await expect(page.getByRole('heading', { name: t('auth:lock.title') })).toBeVisible();
   await snap(page, '12-locked');
   await page.getByLabel(t('auth:signIn.pin'), { exact: true }).fill('4829');
-  await page.getByRole('button', { name: t('auth:lock.unlock') }).click();
+  await page.getByRole('button', { name: t('auth:lock.unlock'), exact: true }).click();
   await expect(page.getByRole('button', { name: t('settings:user.menu') })).toBeVisible();
   await accountMenu(page, t, 'signOut');
 });

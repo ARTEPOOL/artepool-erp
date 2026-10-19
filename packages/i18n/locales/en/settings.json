@@ -268,6 +268,38 @@
       "save": "Save",
       "saved": "Screen lock saved.",
       "invalid": "Enter a number of minutes from 1 to 240."
+    },
+    "kiosk": {
+      "on": "Kiosk lock on",
+      "off": "Kiosk lock off",
+      "offUntil": "Kiosk lock off until {time}",
+      "turnOff": "Turn off…",
+      "turnOn": "Turn on",
+      "turnOffTitle": "Turn off the kiosk lock",
+      "turnOnTitle": "Turn the kiosk lock back on",
+      "turnOffNote": "Only the screen lock is lifted: the app can be minimised or closed on that PC. PIN sign-in, shifts and permissions stay the same. The PC shows “Kiosk lock is off”.",
+      "turnOnNote": "The app goes back to full screen on that PC and cannot be closed.",
+      "duration": "For how long",
+      "minutes15": "15 minutes",
+      "hour1": "1 hour",
+      "untilOn": "Until I turn it back on",
+      "reason": "Reason",
+      "code": "Your 2-step code",
+      "codeMissing": "Type the 6 digits of your 2-step code.",
+      "turnedOff": "Kiosk lock of {code} turned off.",
+      "turnedOn": "Kiosk lock of {code} is on again.",
+      "alertsTitle": "POS PC alerts",
+      "alertsHelp": "Kiosk lock changes and attempts to leave the POS app, last 30 days.",
+      "noAlerts": "No alerts.",
+      "alert": {
+        "offFor": "Kiosk lock turned off for {minutes} minutes",
+        "offUntilOn": "Kiosk lock turned off until turned back on",
+        "offByCode": "Kiosk lock lifted with the owner code (5 minutes)",
+        "on": "Kiosk lock turned back on",
+        "onExpired": "Kiosk lock came back on by itself",
+        "exitAttempt": "Someone tried to close the POS app",
+        "codeBlocked": "5 wrong owner codes: the owner-code unlock is closed for 15 minutes"
+      }
     }
   },
   "audit": {

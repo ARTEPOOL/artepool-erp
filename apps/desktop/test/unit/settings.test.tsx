@@ -132,6 +132,7 @@ const device = (patch: Partial<DeviceListItem>): DeviceListItem => ({
   defaultWarehouseId: null,
   trustedFor: [],
   drawer: null,
+  kioskLock: null,
   ...patch,
 });
 
@@ -386,6 +387,62 @@ describe('Settings → Devices', () => {
         posMinutes: 0,
       }),
     );
+  });
+
+  it("the owner turns a POS PC's kiosk lock off for 1 hour with a reason and the code (0089)", async () => {
+    const offUntil = new Date(Date.now() + 3_600_000).toISOString();
+    const bridge = signedInBridge(OWNER_PERMISSIONS)
+      .on(
+        'GET',
+        '/api/v1/devices',
+        ok({ devices: [device({ kioskLock: { locked: true, offUntil: null } })], openCode: null }),
+        ok({ devices: [device({ kioskLock: { locked: false, offUntil } })], openCode: null }),
+      )
+      .on('POST', '/api/v1/devices/3/kiosk-lock', ok({ locked: false, offUntil }))
+      .on(
+        'GET',
+        '/api/v1/kiosk/alerts',
+        ok({
+          alerts: [
+            {
+              id: '9',
+              alertType: 'kiosk_exit_attempt',
+              createdAt: new Date().toISOString(),
+              deviceId: '3',
+              deviceCode: 'COUNTER-01',
+              deviceName: 'كاشير المعرض',
+              params: { kind: 'close_refused' },
+            },
+          ],
+        }),
+      );
+    await signIn(bridge);
+    await openSettings('الأجهزة والطابعات');
+    const counter = await row('COUNTER-01');
+    expect(within(counter).getByText('قفل الجهاز شغال')).toBeTruthy();
+    expect(await screen.findByText(/حد حاول يقفل برنامج الكاشير/)).toBeTruthy();
+
+    fireEvent.click(within(counter).getByRole('button', { name: 'إيقاف…' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'ساعة' }));
+    fireEvent.change(within(dialog).getByLabelText('السبب'), {
+      target: { value: 'تعريف الطابعة' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'إيقاف…' }));
+    expect(await within(dialog).findByText('اكتب أرقام كود التحقق الستة.')).toBeTruthy();
+    fireEvent.paste(within(dialog).getByLabelText('رقم 1'), {
+      clipboardData: { getData: () => '654321' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'إيقاف…' }));
+    await waitFor(() =>
+      expect(bridge.callsTo('POST', '/api/v1/devices/3/kiosk-lock')[0]?.body).toEqual({
+        on: false,
+        minutes: 60,
+        reason: 'تعريف الطابعة',
+        code: '654321',
+      }),
+    );
+    expect(await within(await row('COUNTER-01')).findByText(/القفل متوقف حتى الساعة/)).toBeTruthy();
   });
 
   it('revokes another PC with a reason; this PC cannot be revoked from itself', async () => {

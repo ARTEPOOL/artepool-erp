@@ -22,6 +22,8 @@
 ## Why
 The owner may need the PC for maintenance or a printer driver, sometimes while away; nobody else may leave the POS.
 
-## How it works (to build)
-- A table of unlocks (PC, owner, how, from, until, ended_at, end_reason), never deleted, audited; the API grants and ends them, the POS app polls its own state.
-- New alert types: `kiosk_exit_attempt`, `kiosk_unlocked`, `kiosk_code_blocked`.
+## How it works (built in M5c, migration 0034)
+- An unlock is a change of the kiosk lock (0089) in `auth.kiosk_lock_changes`: `via = 'settings'` from the Office PC, `via = 'owner_code'` from the lock screen (at most 5 minutes, enforced by the database). Ending early = the owner turns the lock back on; the expiry is decided by the server clock. Never deleted, audited.
+- `POST /api/v1/kiosk/unlock-with-code` (POS PC only): wrong codes are kept in `auth.kiosk_code_failures` and in the audit log (`kiosk.owner_code_failed`); the 5th within 15 minutes closes the fallback for 15 minutes.
+- `POST /api/v1/kiosk/events`: the app reports a refused close (`kiosk.exit_attempt`); the watchdog's `restarted` / `not_running` reports come with the installer (M6).
+- Alert types: `kiosk_exit_attempt`, `kiosk_lock_off` (in place of `kiosk_unlocked`), `kiosk_lock_on`, `kiosk_code_blocked`.

@@ -47,6 +47,7 @@ import { useWarehouses } from '../lists/queries';
 import { CardHead, NoAccess, PanelHeader, settingsClasses as styles } from '../parts';
 import { ReasonDialog } from '../users/dialogs';
 import deviceStyles from './devices.module.css';
+import { KioskAlertsCard, KioskLockCell } from './KioskLock';
 import { ReceiptPrinterCard } from './ReceiptPrinter';
 import { ScreenLockCard } from './ScreenLock';
 
@@ -206,6 +207,7 @@ export function DevicesPanel() {
                           <bdi>{device.revokeReason}</bdi>
                         </span>
                       )}
+                      {!revoked && <KioskLockCell device={device} />}
                     </td>
                     {showWarehouse && (
                       <td>
@@ -313,6 +315,7 @@ export function DevicesPanel() {
       </div>
       <ReceiptPrinterCard index={3} />
       <ScreenLockCard index={4} />
+      <KioskAlertsCard index={5} />
       {revoking && <RevokeDialog device={revoking} onClose={() => setRevoking(null)} />}
       {moving && (
         <MoveDrawerDialog device={moving} devices={list} onClose={() => setMoving(null)} />

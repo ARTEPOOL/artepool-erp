@@ -1,6 +1,8 @@
 //! What the screens may ask for. The screens are the less trusted side: everything they send is
 //! checked here again (the same rules as `packages/shared/src/contracts/bridge.ts`).
 
+use serde::Serialize;
+
 /// The default API port on the Main Server (architecture §2).
 pub const DEFAULT_SERVER_PORT: u16 = 3100;
 
@@ -109,6 +111,49 @@ pub fn suggested_code(computer_name: &str) -> String {
     }
 }
 
+/// This PC's kiosk lock (decisions 0082, 0089), from the server's answer to
+/// `GET /api/v1/kiosk/state`. Fails closed: a PC enrolled as POS stays locked whenever the
+/// server cannot be reached or answers anything unexpected.
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct KioskView {
+    pub is_pos: bool,
+    pub locked: bool,
+    pub off_until: Option<String>,
+}
+
+pub fn kiosk_view(
+    local_kind: Option<&str>,
+    status: Option<u16>,
+    body: Option<&serde_json::Value>,
+) -> KioskView {
+    let fallback = KioskView {
+        is_pos: local_kind == Some("pos"),
+        locked: local_kind == Some("pos"),
+        off_until: None,
+    };
+    let (Some(200), Some(body)) = (status, body) else {
+        return fallback;
+    };
+    let (Some(is_pos), Some(locked)) = (
+        body.get("isPos").and_then(serde_json::Value::as_bool),
+        body.get("locked").and_then(serde_json::Value::as_bool),
+    ) else {
+        return fallback;
+    };
+    KioskView {
+        is_pos,
+        locked: is_pos && locked,
+        off_until: if is_pos && !locked {
+            body.get("offUntil")
+                .and_then(serde_json::Value::as_str)
+                .map(str::to_owned)
+        } else {
+            None
+        },
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -188,5 +233,35 @@ mod tests {
         assert_eq!(suggested_code("Ahmed’s PC"), "AHMED-S-PC");
         assert_eq!(suggested_code("---"), "PC-01");
         assert_eq!(suggested_code(&"x".repeat(40)).len(), 32);
+    }
+
+    #[test]
+    fn the_kiosk_lock_fails_closed_on_a_pos_pc() {
+        let on = serde_json::json!({ "isPos": true, "locked": true, "offUntil": null });
+        let off = serde_json::json!({ "isPos": true, "locked": false, "offUntil": "2026-10-19T10:15:00.000Z" });
+        let office = serde_json::json!({ "isPos": false, "locked": false, "offUntil": null });
+        assert!(kiosk_view(Some("pos"), Some(200), Some(&on)).locked);
+        let lifted = kiosk_view(Some("pos"), Some(200), Some(&off));
+        assert!(!lifted.locked);
+        assert_eq!(
+            lifted.off_until.as_deref(),
+            Some("2026-10-19T10:15:00.000Z")
+        );
+        assert!(!kiosk_view(Some("office"), Some(200), Some(&office)).locked);
+        // The server made it a POS PC since this PC was enrolled: locked.
+        assert!(kiosk_view(Some("office"), Some(200), Some(&on)).locked);
+        // No answer, an error or an odd answer: a POS PC stays locked, an office PC stays free.
+        assert!(kiosk_view(Some("pos"), None, None).locked);
+        assert!(kiosk_view(Some("pos"), Some(500), Some(&off)).locked);
+        assert!(
+            kiosk_view(
+                Some("pos"),
+                Some(200),
+                Some(&serde_json::json!({ "locked": false }))
+            )
+            .locked
+        );
+        assert!(!kiosk_view(Some("office"), None, None).locked);
+        assert!(!kiosk_view(None, None, None).locked);
     }
 }

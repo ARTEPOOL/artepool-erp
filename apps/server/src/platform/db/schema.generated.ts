@@ -151,6 +151,24 @@ export interface AuthEnrollmentCodes {
   used_device_id: bigint | null;
 }
 
+export interface AuthKioskCodeFailures {
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  device_id: bigint;
+  id: Generated<bigint>;
+}
+
+export interface AuthKioskLockChanges {
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  device_id: bigint;
+  id: Generated<bigint>;
+  lock_on: boolean;
+  off_until: Timestamp | null;
+  reason: string | null;
+  via: string;
+}
+
 export interface AuthPermissions {
   approvable: Generated<boolean>;
   code: string;
@@ -1343,6 +1361,8 @@ export interface DB {
   "auth.device_trust": AuthDeviceTrust;
   "auth.devices": AuthDevices;
   "auth.enrollment_codes": AuthEnrollmentCodes;
+  "auth.kiosk_code_failures": AuthKioskCodeFailures;
+  "auth.kiosk_lock_changes": AuthKioskLockChanges;
   "auth.permissions": AuthPermissions;
   "auth.recovery_codes": AuthRecoveryCodes;
   "auth.role_permissions": AuthRolePermissions;
