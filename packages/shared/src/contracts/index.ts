@@ -16,3 +16,4 @@ export * from './sales';
 export * from './pos';
 export * from './printing';
 export * from './reports';
+export * from './backup';

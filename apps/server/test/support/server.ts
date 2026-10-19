@@ -1,4 +1,5 @@
 /** A real API server on a throwaway test database, with logs captured for inspection. */
+import type { BackupPaths } from '@artepool/backup';
 import { randomUUID } from 'node:crypto';
 import type { FastifyInstance, InjectOptions, LightMyRequestResponse } from 'fastify';
 import { sql } from 'kysely';
@@ -41,7 +42,7 @@ export interface TestServer {
 
 export async function startTestServer(
   register?: (app: FastifyInstance) => void,
-  options: { limits?: RateLimits } = {},
+  options: { limits?: RateLimits; backup?: BackupPaths } = {},
 ): Promise<TestServer> {
   const testDb = await createTestDatabase();
   const db = createDb(createPool(connectionFor('api', testDb.name), 5));
@@ -52,6 +53,7 @@ export async function startTestServer(
     hasher: new SecretHasher(TEST_ARGON2),
     caCertificatePem: TEST_CA_PEM,
     ...(options.limits ? { limits: options.limits } : {}),
+    ...(options.backup ? { backup: options.backup } : {}),
   });
   const app = buildApp({ logLevel: 'info', logStream: { write: (line) => logs.push(line) } }, deps);
   register?.(app);

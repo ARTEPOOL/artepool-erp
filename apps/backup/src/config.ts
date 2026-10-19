@@ -36,17 +36,30 @@ export const GOOGLE: GoogleEndpoints = {
   upload: 'https://www.googleapis.com/upload/drive/v3',
 };
 
+/** The folders and files the API also needs (it never connects as the backup role). */
+export interface BackupPaths {
+  backupDir: string;
+  masterKeyFile: string;
+  driveCredentialsFile: string;
+  google: GoogleEndpoints;
+}
+
+export function backupPaths(env: NodeJS.ProcessEnv = process.env): BackupPaths {
+  return {
+    backupDir: env.ARTEPOOL_BACKUP_DIR || join(repoRoot, '.backups'),
+    masterKeyFile: env.ARTEPOOL_MASTER_KEY_FILE || join(repoRoot, '.secrets', 'master.key'),
+    driveCredentialsFile:
+      env.ARTEPOOL_DRIVE_CREDENTIALS_FILE || join(repoRoot, '.secrets', 'backup', 'google-drive.sealed'),
+    google: GOOGLE,
+  };
+}
+
 export function configFromEnv(database?: string): BackupConfig {
   return {
-    backupDir: process.env.ARTEPOOL_BACKUP_DIR || join(repoRoot, '.backups'),
+    ...backupPaths(),
     pgBin: process.env.ARTEPOOL_PG_BIN ?? '',
     connection: connectionFor('backup', database),
     keep: { hourly: 48, daily: 30 },
     offsiteKeep: { hourly: 0, daily: 30, monthly: 12 },
-    masterKeyFile: process.env.ARTEPOOL_MASTER_KEY_FILE || join(repoRoot, '.secrets', 'master.key'),
-    driveCredentialsFile:
-      process.env.ARTEPOOL_DRIVE_CREDENTIALS_FILE ||
-      join(repoRoot, '.secrets', 'backup', 'google-drive.sealed'),
-    google: GOOGLE,
   };
 }

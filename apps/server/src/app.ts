@@ -7,6 +7,7 @@ import { AppError, toAppError } from './platform/errors/app-error';
 import { registerApprovalRoutes } from './modules/approvals/routes';
 import { registerAuditRoutes } from './modules/audit/routes';
 import { registerAuthRoutes } from './modules/auth/routes';
+import { registerBackupRoutes } from './modules/backup/routes';
 import { registerCompanyRoutes } from './modules/company/routes';
 import { registerPrintingRoutes } from './modules/printing/routes';
 import { registerDeviceRoutes } from './modules/devices/routes';
@@ -102,6 +103,7 @@ export function buildApp(options: AppOptions, deps: AppDeps): FastifyInstance {
   registerCompanyRoutes(app);
   registerPrintingRoutes(app);
   registerSettingsRoutes(app);
+  registerBackupRoutes(app);
   registerReportsRoutes(app);
   registerLedgerRoutes(app);
   registerInventoryRoutes(app);

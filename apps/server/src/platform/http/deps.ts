@@ -1,3 +1,4 @@
+import { backupPaths, type BackupPaths } from '@artepool/backup';
 import { SecretHasher } from '../crypto/hashing';
 import type { SecretBox } from '../crypto/secret-box';
 import type { Db } from '../db/pool';
@@ -16,6 +17,8 @@ export interface AppDeps {
    * Null until the secure connection is set up (`pnpm tls:init`): enrollment is then refused.
    */
   readonly caCertificatePem: string | null;
+  /** The backup folder and the sealed Google Drive credentials (decision 0086). */
+  readonly backup: BackupPaths;
 }
 
 export function createDeps(input: {
@@ -24,6 +27,7 @@ export function createDeps(input: {
   hasher?: SecretHasher;
   limits?: RateLimits;
   caCertificatePem?: string | null;
+  backup?: BackupPaths;
 }): AppDeps {
   return {
     db: input.db,
@@ -32,6 +36,7 @@ export function createDeps(input: {
     hasher: input.hasher ?? new SecretHasher(),
     settings: new SettingsCache(input.db),
     limits: input.limits ?? defaultRateLimits(),
+    backup: input.backup ?? backupPaths(),
   };
 }
 

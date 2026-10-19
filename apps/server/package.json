@@ -11,6 +11,7 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@artepool/backup": "workspace:*",
     "@artepool/node-kit": "workspace:*",
     "@artepool/shared": "workspace:*",
     "@artepool/tls": "workspace:*",

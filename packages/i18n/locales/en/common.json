@@ -163,6 +163,8 @@
       "APPROVAL_INVALID": "This approval is for something else.",
       "NOT_POS_SALE": "Only a POS sale can be returned at the point of sale."
     },
-    "KIOSK_CODE_BLOCKED": "Too many wrong owner codes on this PC. Try again in 15 minutes; the owner has been alerted."
+    "KIOSK_CODE_BLOCKED": "Too many wrong owner codes on this PC. Try again in 15 minutes; the owner has been alerted.",
+    "BACKUP_REQUEST_OPEN": "This is already waiting or running. Wait for it to finish.",
+    "GOOGLE_FAILED": "Google did not accept the request. Check the client ID and secret, then try again."
   }
 }

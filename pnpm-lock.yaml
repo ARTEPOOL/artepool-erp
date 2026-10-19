@@ -151,6 +151,9 @@ importers:
 
   apps/server:
     dependencies:
+      '@artepool/backup':
+        specifier: workspace:*
+        version: link:../backup
       '@artepool/node-kit':
         specifier: workspace:*
         version: link:../../packages/node-kit
