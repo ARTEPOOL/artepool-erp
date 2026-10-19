@@ -4,7 +4,7 @@
  * its movements, the stock adjustment dialog (exact request, supervisor approval, refusals) and
  * the barcode labels dialog.
  */
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type {
   AdjustmentDetail,
@@ -632,6 +632,12 @@ describe('Items & stock: barcode labels', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'طباعة' }));
     await waitFor(() => expect(print).toHaveBeenCalledTimes(1));
     expect(printed).toBe(3);
+    // A print dialog that does not hold the screen: the labels stay until printing is over.
+    expect(screen.getByTestId('label-print').children).toHaveLength(3);
+    expect(document.head.textContent).toContain('@page');
+    act(() => {
+      window.dispatchEvent(new Event('afterprint'));
+    });
     await waitFor(() => expect(screen.queryByTestId('label-print')).toBeNull());
     expect(document.head.textContent).not.toContain('@page');
   });

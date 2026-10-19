@@ -116,15 +116,21 @@ export function LabelsDialog(props: {
   const n = /^\d{1,3}$/.test(count.trim()) ? Number(count.trim()) : 0;
 
   // Printing: the labels are placed in a print-only container, the page size is set for this
-  // print only, and the normal print dialog opens.
+  // print only, and the normal print dialog opens. Both stay until the printing has really
+  // finished ("afterprint"): in some windows the dialog does not hold the screen code, and
+  // removing them at once would print empty pages.
   useEffect(() => {
     if (!printing || !size) return;
     const style = document.createElement('style');
     style.textContent = pageRule(size, sheet);
     document.head.appendChild(style);
+    const done = () => setPrinting(0);
+    window.addEventListener('afterprint', done, { once: true });
     window.print();
-    style.remove();
-    setPrinting(0);
+    return () => {
+      window.removeEventListener('afterprint', done);
+      style.remove();
+    };
   }, [printing, size, sheet]);
 
   const submit = (event: FormEvent) => {
