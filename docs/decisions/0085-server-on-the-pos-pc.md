@@ -2,9 +2,9 @@
 
 | | |
 |---|---|
-| **Status** | Proposed — waiting for the owner's approval |
+| **Status** | Accepted (2026-10-19) |
 | **Date** | 2026-10-18 |
-| **Decided by** | Owner (requirements); details proposed |
+| **Decided by** | Owner |
 
 ## Decision
 - **Topology now:** the POS PC is also the Main Server (PostgreSQL + API as Windows services). The owner's laptop is the only Office PC. A read-only mobile dashboard comes in Phase 2 (0088).

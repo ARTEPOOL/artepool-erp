@@ -83,6 +83,9 @@ It runs client–server on the local network: PostgreSQL and the API service on 
 - **Receipt printer modes:** per PC, ESC/POS thermal (RAW, cut, drawer) or any printer through its Windows driver (image at real width, no drawer). The receipt follows the owner's sample: Item / Amount table, a dotted separator between items, a large total, a Paid box. (0070)
 - **Blind count:** notes 1000–5, coins 1–0.05, plus "other amount"; exact to the fils. (0056)
 - **Cash drop alert** above AED 3,000 (setting); it clears itself once the drawer is back under the limit or the shift is closed. The owner sees the expected cash on "My shift"; everyone else counts blind. (0057, 0080)
+- **POS kiosk:** one app; the device kind decides the mode. POS PCs start full screen in an app-level kiosk lock (no closing, watchdog restart; no shell replacement or Assigned Access); exits and unlocks audited and alerted. Per-PC **Kiosk lock** switch on the server (default on; owner only, 2-step step-up + reason; off 15 min / 1 h / until on; owner code on the lock screen = at most 5 min; banner "القفل متوقف"). PIN, shifts and permissions never change with the lock. (0082, 0083, 0089)
+- **POS idle:** the cashier's session stays open; a "Lock screen" button (same cashier resumes with the PIN); owner-only auto-lock, off by default. (0090)
+- **Growth:** two cashiers on one POS PC (close the open shift first) or a second POS PC with its own drawer, no redesign. (0087)
 - **Stuck shifts:** owner/accountant close a shift stuck on another PC (reason + count; over/short stays the cashier's); the owner moves a re-enrolled PC's drawer to it; a PC with an open shift cannot be revoked. (0069)
 - **Over/short** accepted by owner or accountant (posts to 6910); alert after 3 differences above AED 20 within 30 days (settings). (0058)
 - **POS discounts/prices** as A4: cashier limit 5% by default, above it a supervisor; any unit-price change needs a supervisor; oversell stays supervisor-approved. (0059)
@@ -98,6 +101,8 @@ It runs client–server on the local network: PostgreSQL and the API service on 
 **Security and access**
 - **Sign-in:** cashiers use a 4-digit PIN **only on PCs enrolled as POS** (weak PINs refused; 5 wrong → blocked until the owner unblocks). Office PCs always need a password. (0021)
 - **Approvals:** every supervisor approval is given with the one-time 6-digit code from the approver's 2-step app (accepted once); only 2-step users approve; 5 wrong codes block that person's approvals (not their sign-in) until the owner unblocks. (0074)
+- **Server and remote:** the POS PC is also the server (services under own accounts, ACLs, standard cashier Windows account, UPS reminder). Remote access only through Tailscale (2-step, ACL laptop → API port, no port forwarding); outside the LAN every sign-in needs password + 2-step. No cloud database in Phase 1; outbox for a Phase 2 read-only mobile dashboard. (0084, 0085, 0088)
+- **Backups:** hourly local + WAL; daily age-encrypted to a dedicated Google Drive account (private key offline); weekly external drive; restore test. (0086)
 - **Screen lock:** per kind of PC, off or after 1–240 idle minutes, in Settings → Devices (owner only); off on every PC at the owner's request; the session still ends after its maximum length. (0079)
 - **Owner 2-step:** TOTP, 10 one-time recovery codes, and an audited emergency reset that works only on the server PC. (0022)
 - **Passwords:** 10+ characters, common ones refused, no forced symbols or expiry; a change ends the user's other sessions. (0023)

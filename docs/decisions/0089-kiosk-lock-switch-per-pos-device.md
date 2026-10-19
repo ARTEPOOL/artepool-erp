@@ -2,9 +2,9 @@
 
 | | |
 |---|---|
-| **Status** | Proposed — waiting for the owner's approval |
+| **Status** | Accepted (2026-10-19) |
 | **Date** | 2026-10-18 |
-| **Decided by** | Owner (requirements); details proposed |
+| **Decided by** | Owner |
 | **Related** | [0082](0082-app-mode-by-device-kind-and-pos-kiosk.md), [0083](0083-exiting-kiosk-mode-owner-only.md) |
 
 ## Decision
@@ -15,12 +15,12 @@
   - the app may be minimised or closed, and the watchdog does not restart it;
   - it still starts by itself at Windows sign-in;
   - PIN sign-in, shifts, drawer ownership and every permission stay exactly the same.
-- **While OFF:** the POS screen shows a clear **"Kiosk lock is off"** banner (with "until …" when timed), and the owner gets an alert when it is turned off and again when it comes back on.
+- **While OFF:** the POS screen shows a clear banner **"القفل متوقف" / "Kiosk lock is off"**, plus **"حتى الساعة …" / "until …"** when timed, and the owner gets an alert when it is turned off and again when it comes back on.
 - **Stored on the server, never on the POS PC:** the switch is a row on the server, so the cashier cannot change it locally. The POS app reads it at start and checks it every few seconds; if the server cannot be reached, the app stays **locked**.
 
 ## How it fits with 0083
 - "Unlock POS" from the owner's Office PC (0083) **is** this switch turned off for 15 minutes; the two are one mechanism.
-- The fallback **Unlock with owner code** on the lock screen (0083) also turns the switch off for 15 minutes, with the same audit and alert; it cannot choose a longer time.
+- The fallback **Unlock with owner code** on the lock screen (0083) also turns the switch off for **at most 5 minutes**, with the same audit and alert; it cannot choose a longer time.
 
 ## How it works (to build, M5c)
 - A per-device setting on the server: `kiosk_lock` (on/off), `off_until` (empty = until turned on), changed only through an owner-only API that checks a fresh 2-step code; history kept (never deleted) and audited.

@@ -88,14 +88,15 @@ There is one short file per decision, numbered in order.
 | [0079](0079-screen-lock-optional.md) | The idle screen lock can be turned off per kind of PC (Settings → Devices); off on every PC at the owner's request | Accepted |
 | [0080](0080-owner-sees-expected-cash.md) | The owner sees the expected cash on "My shift" (others count blind); drop alerts clear themselves once no longer true | Accepted |
 | [0081](0081-owner-dashboard.md) | Owner dashboard: sales, VAT, profit with comparison; daily chart; splits; top items/customers; cash, receivables and stock now | Accepted (VAT/profit pending accountant) |
-| [0082](0082-app-mode-by-device-kind-and-pos-kiosk.md) | One app; the device kind decides the mode; POS PCs start in app-level kiosk mode (no closing, watchdog restart, exits audited and alerted) | Proposed |
-| [0083](0083-exiting-kiosk-mode-owner-only.md) | Leaving kiosk mode: owner only, 15 minutes; from the owner's Office PC with 2-step, or the owner's code on the lock screen | Proposed |
-| [0084](0084-remote-access-through-private-vpn.md) | Remote access only through a private VPN (Tailscale/WireGuard); never an open port; outside the LAN always password + 2-step | Proposed |
-| [0085](0085-server-on-the-pos-pc.md) | The server runs on the POS PC: services under their own accounts, restrictive permissions, standard cashier account, UPS reminder | Proposed |
-| [0086](0086-backups-local-and-google-drive.md) | Backups: hourly local, daily age-encrypted to Google Drive (private key offline), weekly external drive, restore test | Proposed |
-| [0087](0087-cashiers-and-drawers-growth.md) | One cashier now; two cashiers on one PC and a second POS PC later, without redesign | Proposed |
-| [0088](0088-no-cloud-database-outbox-for-mobile.md) | No cloud database in Phase 1; an outbox for a read-only mobile dashboard in Phase 2 | Proposed |
-| [0089](0089-kiosk-lock-switch-per-pos-device.md) | A "Kiosk lock" switch per POS PC (default on), owner only with 2-step and a reason; off for 15 min / 1 hour / until turned on; banner and alerts; kept on the server | Proposed |
+| [0082](0082-app-mode-by-device-kind-and-pos-kiosk.md) | One app; the device kind decides the mode; POS PCs start in app-level kiosk mode (no closing, watchdog restart, exits audited and alerted) | Accepted |
+| [0083](0083-exiting-kiosk-mode-owner-only.md) | Leaving kiosk mode: owner only; from the owner's Office PC with 2-step, or the owner's code on the lock screen (at most 5 minutes) | Accepted |
+| [0084](0084-remote-access-through-private-vpn.md) | Remote access only through Tailscale (WireGuard), ACL: owner's laptop → API port only; never an open port; outside the LAN always password + 2-step | Accepted |
+| [0085](0085-server-on-the-pos-pc.md) | The server runs on the POS PC: services under their own accounts, restrictive permissions, standard cashier account, UPS reminder | Accepted |
+| [0086](0086-backups-local-and-google-drive.md) | Backups: hourly local, daily age-encrypted to Google Drive (private key offline), weekly external drive, restore test | Accepted |
+| [0087](0087-cashiers-and-drawers-growth.md) | One cashier now; two cashiers on one PC and a second POS PC later, without redesign | Accepted |
+| [0088](0088-no-cloud-database-outbox-for-mobile.md) | No cloud database in Phase 1; an outbox for a read-only mobile dashboard in Phase 2 | Accepted |
+| [0089](0089-kiosk-lock-switch-per-pos-device.md) | A "Kiosk lock" switch per POS PC (default on), owner only with 2-step and a reason; off for 15 min / 1 hour / until turned on; banner and alerts; kept on the server | Accepted |
+| [0090](0090-pos-idle-behaviour.md) | POS idle: no automatic return to the PIN screen; a "Lock screen" button for the cashier; owner-only auto-lock after N minutes, off by default | Accepted |
 
 ## Template
 

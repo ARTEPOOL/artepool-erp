@@ -453,14 +453,15 @@ A milestone is done only when its tests pass in CI.
 
 **Needs:** the hardware models (printer, drawer, scanner, label printer).
 
-#### M5c — POS kiosk mode (proposed: decisions 0082, 0083, 0087, 0089)
+#### M5c — POS kiosk mode (decisions 0082, 0083, 0087, 0089, 0090)
 
 **Delivers:**
 - The app reads its PC's kind at start: POS → kiosk mode (full screen, no window controls, closing refused); Office → normal app.
-- Unlock: Settings → Devices → **Unlock POS** (owner, 2-step confirmed) and **Unlock with owner code** on the lock screen (one-time code, 5 tries / 15 minutes); 15-minute unlock, then kiosk mode returns.
-- The **Kiosk lock** switch per POS PC in Settings → Devices (default on; owner only, 2-step step-up and a reason; off for 15 min / 1 hour / until turned on; automatic return to on). The state lives on the server; the POS app stays locked when it cannot reach it. A "Kiosk lock is off" banner on the POS while off.
+- Unlock: the Kiosk lock switch (below) from the owner's Office PC, and **Unlock with owner code** on the lock screen (one-time code, 5 tries / 15 minutes, at most 5 minutes off); then kiosk mode returns.
+- The **Kiosk lock** switch per POS PC in Settings → Devices (default on; owner only, 2-step step-up and a reason; off for 15 min / 1 hour / until turned on; automatic return to on). The state lives on the server; the POS app stays locked when it cannot reach it. A "القفل متوقف / Kiosk lock is off" banner ("حتى الساعة … / until …" when timed) on the POS while off.
 - A migration for the kiosk lock state and its history and the new alert types; audit and owner alerts for exit attempts, unlocks and switch changes.
 - Two cashiers on one POS PC: sign out → the other cashier's PIN; the open shift must be closed first (existing rule 0004).
+- A **Lock screen** button on the POS (same cashier resumes with the PIN, shift stays open); no automatic lock on POS by default; the owner's auto-lock setting (0079) stays off (0090).
 
 **Key tests:**
 - Only the owner can unlock; a supervisor's code or the owner's used code is refused; 5 wrong codes lock the fallback.
@@ -480,9 +481,9 @@ A milestone is done only when its tests pass in CI.
 - The backup agent: WAL archive, hourly dump, nightly base backup, `age`-encrypted daily off-site upload, external-drive reminders.
 - The restore test into `artepool_restore_test`, the nightly integrity checks and the system-health screen.
 - The server installer (PostgreSQL configuration, roles, CA and certificates, firewall, services) and the client installer (CA trust, offline WebView2).
-- **Server on the POS PC (proposed, 0085):** PostgreSQL and the API as services under their own accounts; ACLs on the database, `.secrets`, backups and logs; the cashier as a standard Windows user with auto sign-in and the kiosk policies (Task Manager, Run, command prompt, registry editor off); the kiosk watchdog task; an owner-only administrator account; BitLocker; the UPS reminder in the health screen.
-- **Backups (proposed, 0086):** hourly local + WAL; daily `age`-encrypted upload to Google Drive (public key on the server, private key offline); weekly external-drive reminder; restore test.
-- **Remote access (proposed, 0084):** the VPN runbook (`docs/runbooks/remote-access.md`), the server certificate naming the VPN address, the LAN ranges setting, and "trust this PC" refused outside the LAN in the database.
+- **Server on the POS PC (0085):** PostgreSQL and the API as services under their own accounts; ACLs on the database, `.secrets`, backups and logs; the cashier as a standard Windows user with auto sign-in and the kiosk policies (Task Manager, Run, command prompt, registry editor off); the kiosk watchdog task; an owner-only administrator account; BitLocker; the UPS reminder in the health screen.
+- **Backups (0086):** hourly local + WAL; daily `age`-encrypted upload to a dedicated Google Drive account (2-step on) (public key on the server, private key offline); weekly external-drive reminder; restore test.
+- **Remote access (0084):** Tailscale (2-step on the account, ACLs: only the owner's laptop → the API port, no port forwarding), the runbook with setup and device removal (`docs/runbooks/remote-access.md`), the server certificate naming the VPN address, the LAN ranges setting, and "trust this PC" refused outside the LAN in the database.
 - Runbooks.
 
 **Key tests:**

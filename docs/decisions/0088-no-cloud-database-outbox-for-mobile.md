@@ -2,9 +2,9 @@
 
 | | |
 |---|---|
-| **Status** | Proposed — waiting for the owner's approval |
+| **Status** | Accepted (2026-10-19) |
 | **Date** | 2026-10-18 |
-| **Decided by** | Owner (requirements); details proposed |
+| **Decided by** | Owner |
 
 ## Decision
 - **Phase 1:** no Supabase or any cloud database. The server PC in the shop is the only system of record.
