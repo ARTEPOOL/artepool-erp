@@ -7,3 +7,5 @@ export * from './integrity';
 export * from './restore';
 export * from './google';
 export * from './offsite';
+export * from './offline';
+export * from './service';
