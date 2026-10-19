@@ -25,7 +25,8 @@ export async function ensureRoles(admin: Client): Promise<void> {
   const login: [string, string, string][] = [
     [ROLES.migrator, passwords.migrator, 'LOGIN'],
     [ROLES.api, passwords.api, 'LOGIN'],
-    [ROLES.backup, passwords.backup, 'LOGIN REPLICATION'],
+    // CREATEDB: the restore test restores into its own throwaway database (decision 0086).
+    [ROLES.backup, passwords.backup, 'LOGIN REPLICATION CREATEDB'],
     [ROLES.maint, passwords.maint, 'LOGIN'],
   ];
   if (!(await roleExists(admin, ROLES.owner))) {
