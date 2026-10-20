@@ -162,7 +162,8 @@
       "COUNT_ALREADY_DONE": "The closing count is already done; a recount needs a supervisor.",
       "RECOUNT_USED": "The one recount of this shift is already used.",
       "APPROVAL_INVALID": "This approval is for something else.",
-      "NOT_POS_SALE": "Only a POS sale can be returned at the point of sale."
+      "NOT_POS_SALE": "Only a POS sale can be returned at the point of sale.",
+      "LABEL_PRICE_CHANGED": "The item's price changed while printing: print its labels again with the new price."
     },
     "KIOSK_CODE_BLOCKED": "Too many wrong owner codes on this PC. Try again in 15 minutes; the owner has been alerted.",
     "BACKUP_REQUEST_OPEN": "This is already waiting or running. Wait for it to finish.",

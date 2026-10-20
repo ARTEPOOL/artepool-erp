@@ -192,3 +192,103 @@ export const SaveLabelDesignRequest = z.object({
   basedOnVersionId: IdText,
 });
 export type SaveLabelDesignRequest = z.infer<typeof SaveLabelDesignRequest>;
+
+// ---------------------------------------------------------------------------------------------
+// Label prints (decision 0099): labels for many items, the record, "price changed, label is old"
+// ---------------------------------------------------------------------------------------------
+
+/** What a label needs to know about an item, with its quantity on hand for the default count. */
+export interface LabelItem {
+  id: string;
+  code: string;
+  nameAr: string;
+  nameEn: string | null;
+  primaryBarcode: string | null;
+  price: { price4dp: string; includesVat: boolean } | null;
+  /** The rate of the item's VAT category now (basis points). */
+  rateBp: number;
+  packAr: string | null;
+  packEn: string | null;
+  unitId: string;
+  /** 0 = counted in units (one label per unit); more = sold by weight or length (one label). */
+  unitDecimals: number;
+  categoryId: string;
+  isActive: boolean;
+  /** Stock items: the quantity on hand (thousandths), else null. */
+  onHandMilli: string | null;
+}
+
+export const LabelItemsQuery = z.object({
+  /** Comma-separated item ids, at most 500. */
+  ids: z
+    .string()
+    .regex(/^\d{1,18}(,\d{1,18}){0,499}$/)
+    .transform((s) => [...new Set(s.split(','))]),
+});
+
+export interface LabelItemsResponse {
+  items: LabelItem[];
+}
+
+export const PriceChangedQuery = z.object({
+  categoryId: IdText.optional(),
+});
+
+/** An item whose last printed label shows another price than its price today. */
+export interface PriceChangedItem extends LabelItem {
+  printed: {
+    price4dp: string;
+    includesVat: boolean;
+    rateBp: number;
+    grossFils: string;
+    printedAt: string;
+  };
+  /** The price with VAT today, or null when the item has no price now. */
+  nowGrossFils: string | null;
+}
+
+export interface PriceChangedResponse {
+  items: PriceChangedItem[];
+}
+
+export const LABEL_PRINT_SOURCES = ['item', 'list', 'price_changed', 'stock_document'] as const;
+export type LabelPrintSource = (typeof LABEL_PRINT_SOURCES)[number];
+
+/** At most this many labels in one print. */
+export const MAX_LABELS_PER_PRINT = 5000;
+
+export const RecordLabelPrintsRequest = z.object({
+  sizeId: IdText,
+  designVersionId: IdText,
+  source: z.enum(LABEL_PRINT_SOURCES),
+  lines: z
+    .array(
+      z.object({
+        itemId: IdText,
+        copies: z.number().int().min(1).max(MAX_LABELS_PER_PRINT),
+        /** The price printed on the label (null: no price on it). */
+        price: z
+          .object({
+            price4dp: z.string().regex(/^\d{1,15}$/),
+            includesVat: z.boolean(),
+            rateBp: z.number().int().min(0).max(10000),
+          })
+          .nullable(),
+      }),
+    )
+    .min(1)
+    .max(500)
+    .refine((lines) => new Set(lines.map((l) => l.itemId)).size === lines.length, 'each item once')
+    .refine(
+      (lines) => lines.reduce((sum, l) => sum + l.copies, 0) <= MAX_LABELS_PER_PRINT,
+      'too many labels',
+    ),
+});
+export type RecordLabelPrintsRequest = z.infer<typeof RecordLabelPrintsRequest>;
+
+export interface RecordLabelPrintsResponse {
+  /** The items recorded. */
+  recorded: string[];
+  /** Items not recorded: their price changed while printing (print them again). */
+  priceChanged: string[];
+}

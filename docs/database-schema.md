@@ -987,6 +987,27 @@ As built (migration 0011): a count is created straight in `counting` (the snapsh
 | reason_code_id | bigint? → sys.reason_codes | Required when variance ≠ 0 |
 | note | text? | |
 
+### 8.7 `inv.label_prints` (append-only; migration 0041, decision [0099](decisions/0099-batch-labels-and-price-changed-list.md))
+
+Every barcode label print, one row per item, with the price on the label. The "price changed, label is old" list compares each active item's last row (when it had a price) with its price today.
+
+| Column | Type | Rules |
+|---|---|---|
+| id | bigint PK | |
+| item_id | bigint → md.items | Index `(item_id, id DESC)` |
+| label_size_id | bigint → md.label_sizes | |
+| design_version_id | bigint → sys.print_template_versions | The label design used |
+| copies | integer | `1..10000` |
+| source | text | `CHECK IN ('item','list','price_changed','stock_document')` |
+| price_4dp | bigint? | The sale price on the label; all four price columns empty when the label had no price |
+| includes_vat | boolean? | |
+| vat_rate_bp | integer? | `0..10000`: the rate of the item's VAT category at printing |
+| gross_fils | bigint? | The price with VAT on the label (shared rounding helper) |
+| device_id | bigint? → auth.devices | `DEFAULT sys.ctx_device_id()`: the PC that printed |
+| created_at, created_by | | Who and when |
+
+Trigger `b_label_print_rules`: refuses (`AP011`, `LABEL_PRICE_CHANGED`) a row whose price, "includes VAT" or rate is not the item's today. Never changed or deleted; audited. The API may insert only the columns above (never `device_id` or the stamps).
+
 ---
 
 ## 9. Schema `sales`

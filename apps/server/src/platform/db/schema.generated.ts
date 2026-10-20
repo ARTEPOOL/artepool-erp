@@ -587,6 +587,22 @@ export interface InvCounts {
   warehouse_id: bigint;
 }
 
+export interface InvLabelPrints {
+  copies: number;
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  design_version_id: bigint;
+  device_id: Generated<bigint | null>;
+  gross_fils: bigint | null;
+  id: Generated<bigint>;
+  includes_vat: boolean | null;
+  item_id: bigint;
+  label_size_id: bigint;
+  price_4dp: bigint | null;
+  source: string;
+  vat_rate_bp: number | null;
+}
+
 export interface InvMovements {
   adjustment_line_id: bigint | null;
   approval_id: bigint | null;
@@ -1441,6 +1457,7 @@ export interface DB {
   "inv.balances": InvBalances;
   "inv.count_lines": InvCountLines;
   "inv.counts": InvCounts;
+  "inv.label_prints": InvLabelPrints;
   "inv.movements": InvMovements;
   "md.bundle_components": MdBundleComponents;
   "md.business_lines": MdBusinessLines;

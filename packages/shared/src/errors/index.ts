@@ -204,6 +204,7 @@ export const RULE_CODES = [
   'DEVICE_HAS_OPEN_SHIFT',
   'SHIFT_NOT_STUCK',
   'LABEL_TOO_WIDE',
+  'LABEL_PRICE_CHANGED',
 ] as const;
 
 export type RuleCode = (typeof RULE_CODES)[number];

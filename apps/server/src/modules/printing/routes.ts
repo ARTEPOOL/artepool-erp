@@ -3,6 +3,9 @@ import { sql } from 'kysely';
 import { z } from 'zod';
 import {
   DESIGNED_KINDS,
+  LabelItemsQuery,
+  PriceChangedQuery,
+  RecordLabelPrintsRequest,
   PreviewTemplateRequest,
   SaveLabelDesignRequest,
   SaveReceiptLogoRequest,
@@ -16,11 +19,13 @@ import { AppError } from '../../platform/errors/app-error';
 import { defineRoute, defineWrite } from '../../platform/http/route';
 import * as designer from './designer';
 import * as labels from './label-design';
+import * as labelPrints from './label-prints';
 import { renderPdf } from './render';
 
 /** Owner only (decision 0020): `print_templates.manage`, checked again by the database. */
 const manage = { kind: 'permission', permission: 'print_templates.manage' } as const;
 const KindParams = z.object({ kind: z.enum(DESIGNED_KINDS) });
+const printLabels = { kind: 'permission', permission: 'labels.print' } as const;
 
 export function registerPrintingRoutes(app: FastifyInstance): void {
   const db = app.deps.db;
@@ -46,6 +51,34 @@ export function registerPrintingRoutes(app: FastifyInstance): void {
     handler: async ({ trx, body }) => ({
       status: 201,
       body: await labels.saveLabelDesign(trx, body),
+    }),
+  });
+
+  // Label prints (decision 0099): items for labels, the "price changed" list, the print record.
+  defineRoute(app, {
+    method: 'GET',
+    url: '/api/v1/label-items',
+    access: printLabels,
+    query: LabelItemsQuery,
+    handler: async ({ query }) => ({ items: await labelPrints.labelItems(db, query.ids) }),
+  });
+  defineRoute(app, {
+    method: 'GET',
+    url: '/api/v1/label-prints/price-changed',
+    access: printLabels,
+    query: PriceChangedQuery,
+    handler: async ({ query }) => ({
+      items: await labelPrints.priceChanged(db, query.categoryId),
+    }),
+  });
+  defineWrite(app, {
+    method: 'POST',
+    url: '/api/v1/label-prints',
+    access: printLabels,
+    body: RecordLabelPrintsRequest,
+    handler: async ({ trx, body }) => ({
+      status: 201,
+      body: await labelPrints.recordLabelPrints(trx, body),
     }),
   });
 
