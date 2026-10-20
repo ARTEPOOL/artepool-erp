@@ -9,6 +9,7 @@
  * canvas, or a test).
  */
 import {
+  elementLanguage,
   LABEL_BARCODE_MIN_HEIGHT_MM,
   type LabelAlign,
   type LabelDesign,
@@ -34,8 +35,8 @@ export interface LabelContent {
   itemCode: string;
   /** What the barcode holds (the main barcode, else the item code). */
   barcodeData: string;
-  /** The sale pack ("كيس 25 كجم"), else the unit name. */
-  pack: string | null;
+  /** The sale pack ("كيس 25 كجم" / "25 kg bag"), else the unit's name, in each language. */
+  pack: { ar: string | null; en: string | null };
   shopName: { ar: string; en: string } | null;
   /** The price with VAT, "120.00" (Western digits); null = no price. */
   price: { amount: string; includesVat: boolean } | null;
@@ -190,44 +191,56 @@ export function wrapLines(
   return { lines: [...lines.slice(0, keep), `${last}…`], cut };
 }
 
-/** A word in the label's language(s). */
-const say = (words: { ar: string; en: string }, language: LabelLanguage) =>
-  language === 'ar' ? words.ar : language === 'en' ? words.en : `${words.ar} / ${words.en}`;
+/** The languages of a language choice: "both" is Arabic, then English under it (decision 0101). */
+const languagesOf = (language: LabelLanguage): ('ar' | 'en')[] =>
+  language === 'both' ? ['ar', 'en'] : [language];
 
-/** The text of a text element, or null when it has nothing to show. */
-function textOf(
+/**
+ * The texts of a text element, one per language it prints in (Arabic first), or none when it has
+ * nothing to show. Each is a line of its own: two languages never share a line, so neither is cut.
+ */
+function textsOf(
   element: LabelElement,
   content: LabelContent,
   design: LabelDesign,
   words: LabelWords,
-): string | null {
+): string[] {
   const value = (v: string | null | undefined) => (v && v.trim() ? v.trim() : null);
+  const each = (text: (l: 'ar' | 'en') => string | null) =>
+    languagesOf(elementLanguage(design, element))
+      .map(text)
+      .filter((t): t is string => t !== null);
+  const one = (text: string | null) => (text === null ? [] : [text]);
   switch (element) {
     case 'nameAr':
-      return value(content.nameAr);
+      return one(value(content.nameAr));
     case 'nameEn':
-      return value(content.nameEn);
+      return one(value(content.nameEn));
     case 'pack':
-      return value(content.pack);
+      return each((l) => value(content.pack[l]));
     case 'itemCode':
-      return value(content.itemCode);
+      return one(value(content.itemCode));
     case 'vatNote': {
-      if (!content.price || design.vatNote === 'never') return null;
-      if (design.vatNote === 'whenIncluded' && !content.price.includesVat) return null;
-      return say(words.vat, design.language);
+      if (!content.price || design.vatNote === 'never') return [];
+      if (design.vatNote === 'whenIncluded' && !content.price.includesVat) return [];
+      return each((l) => words.vat[l]);
     }
-    case 'expiry':
-      return value(content.expiry) && `${say(words.expiry, design.language)} ${content.expiry}`;
-    case 'batch':
-      return value(content.batch) && `${say(words.batch, design.language)} ${content.batch}`;
+    case 'expiry': {
+      const expiry = value(content.expiry);
+      return expiry ? each((l) => `${words.expiry[l]} ${expiry}`) : [];
+    }
+    case 'batch': {
+      const batch = value(content.batch);
+      return batch ? each((l) => `${words.batch[l]} ${batch}`) : [];
+    }
     case 'printDate':
-      return value(content.printDate);
+      return one(value(content.printDate));
     case 'shopName':
-      return content.shopName ? value(say(content.shopName, design.language)) : null;
+      return content.shopName ? each((l) => value(content.shopName![l])) : [];
     case 'customText':
-      return value(design.customText);
+      return one(value(design.customText));
     default:
-      return null;
+      return [];
   }
 }
 
@@ -316,35 +329,37 @@ export function layoutLabel(
       if (element === 'price') {
         if (!content.price) continue;
         const fontDots = Math.max(minFont, d(PRICE_MM[s.size]) - shrink);
-        const languages: ('ar' | 'en')[] =
-          design.language === 'both' ? ['ar', 'en'] : [design.language];
-        const lines = languages.map((l) => ({
+        const language = elementLanguage(design, 'price');
+        const lines = languagesOf(language).map((l) => ({
           currency: words.currency[l],
           dir: l === 'ar' ? ('rtl' as const) : ('ltr' as const),
         }));
-        const lineH = lineHeight(m, fontDots, design.language === 'en' ? 'latin' : 'arabic');
+        const lineH = lineHeight(m, fontDots, language === 'en' ? 'latin' : 'arabic');
         blocks.push({ kind: 'price', lines, fontDots, lineH, bold: s.bold, align: s.align });
         continue;
       }
-      const text = textOf(element, content, design, words);
-      if (!text) continue;
+      const texts = textsOf(element, content, design, words);
+      if (texts.length === 0) continue;
       const designed = d(TEXT_MM[s.size]);
-      // The Arabic name: 2 lines; 1 once every letter is already as small as it can be.
+      // The Arabic name: 2 lines; 1 once every letter is already as small as it can be. Every
+      // other text: one line per language.
       const maxLines = element === 'nameAr' && shrink <= designed - minFont ? 2 : 1;
-      // The largest letters (from the design's size down) that fit without "…"; at the smallest,
-      // "…" ends the last line.
+      // The largest letters (from the design's size down) at which every language fits without
+      // "…"; at the smallest, "…" ends the line.
+      const wrapAll = (font: number) =>
+        texts.map((text) => wrapLines(m, text, contentW, font, s.bold, maxLines));
       let fontDots = Math.max(minFont, designed - shrink);
-      let wrapped = wrapLines(m, text, contentW, fontDots, s.bold, maxLines);
-      while (wrapped.cut && fontDots > minFont) {
+      let wrapped = wrapAll(fontDots);
+      while (wrapped.some((w) => w.cut) && fontDots > minFont) {
         fontDots -= 1;
-        wrapped = wrapLines(m, text, contentW, fontDots, s.bold, maxLines);
+        wrapped = wrapAll(fontDots);
       }
       blocks.push({
         kind: 'text',
         part: element,
-        lines: wrapped.lines,
+        lines: wrapped.flatMap((w) => w.lines),
         fontDots,
-        lineH: lineHeight(m, fontDots, scriptOf(text)),
+        lineH: Math.max(...texts.map((text) => lineHeight(m, fontDots, scriptOf(text)))),
         bold: s.bold,
         align: s.align,
       });

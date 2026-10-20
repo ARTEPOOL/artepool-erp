@@ -862,6 +862,13 @@
     "moveDown": "Move {element} down",
     "size": "Size of {element}",
     "align": "Alignment of {element}",
+    "lang": "{element} language",
+    "langs": {
+      "design": "As the design",
+      "ar": "Arabic",
+      "en": "English",
+      "both": "Both"
+    },
     "sizes": {
       "s": "Small",
       "m": "Medium",
@@ -885,7 +892,7 @@
     },
     "minimumNote": "So that every label scans, the barcode can never be made smaller than bars of 5 mm, 2 printer dots per line and a blank margin each side.",
     "wordsTitle": "Words and look",
-    "language": "Language of the fixed words (currency, “incl. VAT”, expiry, batch)",
+    "language": "The label's main language (for elements set to \"As the design\")",
     "languages": {
       "ar": "Arabic",
       "en": "English",
@@ -908,6 +915,7 @@
     "overrideNone": "Choose a size",
     "overrideShow": "{element} on this size",
     "overrideSizeOf": "Size of {element} on this size",
+    "overrideLangOf": "{element} language on this size",
     "asBase": "As the design",
     "overrideShowOn": "Show",
     "overrideShowOff": "Hide",

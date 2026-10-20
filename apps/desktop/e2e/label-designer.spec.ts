@@ -6,7 +6,7 @@
  * tests find the default design.
  */
 import type { Locator, Page } from '@playwright/test';
-import { expect, signInAsOwner, snap, test } from './fixtures';
+import { control, expect, signInAsOwner, snap, test } from './fixtures';
 
 test.setTimeout(180_000);
 
@@ -131,6 +131,75 @@ test('the owner designs the label; printing follows it for each size', async ({
   await expect.poll(() => textsOf(preview, 'nameEn')).toEqual([]);
   expect((await textsOf(preview, 'nameAr')).join(' ')).toContain(n);
   await dialog.getByRole('button', { name: t('items:adjust.cancel') }).click();
+
+  // Back to the default design, saved, for the other tests.
+  await openDesigner(page, t);
+  await page.getByRole('button', { name: t('settings:labelDesign.reset') }).click();
+  await saveDesign(page, t);
+});
+
+test('a language for each element: the shop name in both (English under Arabic), the price in English', async ({
+  page,
+  open,
+  t,
+}) => {
+  const n = `${Date.now() % 1_000_000}`.padStart(6, '0');
+  // A stock item with a barcode; the company details (the shop's name) exist from it.
+  await control.addPosItem({
+    code: `LN-${n}`,
+    nameAr: `كلور ${n}`,
+    nameEn: `Chlorine ${n}`,
+    barcode: ean13(`629${n}555`),
+    price4dp: '1200000',
+    quantityMilli: '1000',
+  });
+  await open('office');
+  await signInAsOwner(page, t);
+  await openDesigner(page, t);
+  await page.getByRole('button', { name: t('settings:labelDesign.reset') }).click();
+  if (await page.getByText(t('settings:print.unsaved')).count()) await saveDesign(page, t);
+
+  const element = (name: string) => t(`settings:labelDesign.elements.${name}`);
+  const shop = page.getByTestId('label-element-shopName');
+  await shop.getByText(element('shopName'), { exact: true }).click();
+  await shop
+    .getByRole('group', { name: t('settings:labelDesign.lang', { element: element('shopName') }) })
+    .getByRole('button', { name: t('settings:labelDesign.langs.both') })
+    .click();
+  await page
+    .getByTestId('label-element-price')
+    .getByRole('group', { name: t('settings:labelDesign.lang', { element: element('price') }) })
+    .getByRole('button', { name: t('settings:labelDesign.langs.en') })
+    .click();
+  await snap(page, '92-label-languages');
+  await saveDesign(page, t);
+
+  await page.getByRole('link', { name: t('settings:nav.items') }).click();
+  const search = page.getByRole('searchbox', { name: t('items:search') });
+  await search.fill(`LN-${n}`);
+  await search.press('Enter');
+  await page
+    .getByRole('button', { name: t('items:labels.button') })
+    .first()
+    .click();
+  const preview = page.getByRole('dialog').getByTestId('label-preview');
+  await expect(preview).toBeVisible();
+  const layout = JSON.parse((await preview.getAttribute('data-layout'))!) as {
+    texts: { part: string; text: string }[];
+    prices: { text: string }[][];
+  };
+  // The shop's name: Arabic line, then the English line under it; never "ar / en" on one line.
+  const shopLines = layout.texts.filter((l) => l.part === 'shopName').map((l) => l.text);
+  expect(shopLines).toHaveLength(2);
+  expect(shopLines[0]).toMatch(/[؀-ۿ]/);
+  expect(shopLines[1]).toMatch(/^[\x20-\x7E]+$/);
+  expect(layout.texts.some((l) => l.text.includes(' / '))).toBe(false);
+  // The price in English only.
+  expect(layout.prices.map((runs) => runs.map((r) => r.text))).toEqual([['AED', '120.00']]);
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: t('items:adjust.cancel') })
+    .click();
 
   // Back to the default design, saved, for the other tests.
   await openDesigner(page, t);

@@ -70,7 +70,7 @@ const content = (over: Partial<LabelContent> = {}): LabelContent => ({
   nameEn: 'Chlorine tablets',
   itemCode: 'CHEM-0013',
   barcodeData: '6291041500213',
-  pack: 'كيس 25 كجم',
+  pack: { ar: 'كيس 25 كجم', en: '25 kg bag' },
   shopName: { ar: 'آرتيبول', en: 'ARTEPOOL' },
   price: { amount: '120.00', includesVat: true },
   expiry: '2027-05-31',
@@ -293,6 +293,50 @@ describe('what the design decides', () => {
     }
   });
 
+  it('each element its own language; "both" = Arabic, then English under it (0101)', () => {
+    const design = designShowing(['shopName', 'pack', 'nameEn']);
+    design.language = 'both';
+    design.elements.price = { ...design.elements.price, lang: 'en' };
+    design.elements.pack = { ...design.elements.pack, lang: 'ar' };
+    const layout = layoutLabel(
+      geometry(50, 50),
+      design,
+      content({
+        shopName: { ar: 'ارت لتجارة احواض السباحه', en: 'ARTE SWIMMING POOLS' },
+        expiry: null,
+        batch: null,
+      }),
+      WORDS,
+      measurer,
+    );
+    if (!layout.ok) throw new Error(layout.reason);
+    const lines = (part: string) => layout.texts.filter((l) => l.part === part);
+    // The shop name: two lines, the English one under the Arabic one, never "ar / en" cut short.
+    const shop = lines('shopName');
+    expect(shop.map((l) => l.text)).toEqual(['ارت لتجارة احواض السباحه', 'ARTE SWIMMING POOLS']);
+    expect(shop[1]!.box.y).toBeGreaterThan(shop[0]!.box.y);
+    expect(shop.map((l) => l.dir)).toEqual(['rtl', 'ltr']);
+    expect(layout.texts.some((l) => l.text.includes(' / '))).toBe(false);
+    // The price in English only; the sale pack in Arabic only; "incl. VAT" as the design (both).
+    expect(layout.prices.map((p) => p.runs.map((r) => r.text))).toEqual([['AED', '120.00']]);
+    expect(lines('pack').map((l) => l.text)).toEqual(['كيس 25 كجم']);
+    expect(lines('vatNote').map((l) => l.text)).toEqual(['شامل الضريبة', 'incl. VAT']);
+    expectSound(layout, 48, 203);
+
+    // A size can print another language: Arabic price on 40 × 30.
+    const base = { ...defaultLabelDesign(), language: 'both' as const };
+    base.overrides['40X30'] = { elements: { price: { lang: 'ar' } } };
+    const small = layoutLabel(
+      geometry(40, 30),
+      designForSize(base, '40X30'),
+      content({ expiry: null, batch: null }),
+      WORDS,
+      measurer,
+    );
+    if (!small.ok) throw new Error(small.reason);
+    expect(small.prices.map((p) => p.runs[0]!.text)).toEqual(['درهم']);
+  });
+
   it('"incl. VAT": always, when the price includes it, or never', () => {
     const vatOf = (vatNote: LabelDesign['vatNote'], includesVat: boolean) => {
       const layout = layoutLabel(
@@ -424,12 +468,17 @@ describe('the quiet zones may use the side margin (decision 0098)', () => {
 });
 
 describe('property: any design, any size: never overlapping, never below the minimums', () => {
-  const style = fc.record({
-    show: fc.boolean(),
-    size: fc.constantFrom(...LABEL_SIZES),
-    bold: fc.boolean(),
-    align: fc.constantFrom(...LABEL_ALIGNS),
-  });
+  const style = fc.record(
+    {
+      show: fc.boolean(),
+      size: fc.constantFrom(...LABEL_SIZES),
+      bold: fc.boolean(),
+      align: fc.constantFrom(...LABEL_ALIGNS),
+      // Each element's own language, or the design's (decision 0101).
+      lang: fc.constantFrom(...LABEL_LANGUAGES),
+    },
+    { requiredKeys: ['show', 'size', 'bold', 'align'] },
+  );
   const design: fc.Arbitrary<LabelDesign> = fc
     .record({
       order: fc.shuffledSubarray([...LABEL_ELEMENTS], {

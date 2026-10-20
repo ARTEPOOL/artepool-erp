@@ -150,4 +150,46 @@ describe('Settings → Print designer → Barcode label', () => {
     expect(screen.queryByText('غير محفوظ')).toBeNull();
     expect(screen.getByRole('button', { name: 'حفظ' }).hasAttribute('disabled')).toBe(true);
   });
+  it('a language for each element: price in English only, shop name in both, Arabic price on 40 × 30', async () => {
+    const fake = bridge();
+    await openDesigner(fake);
+    const price = screen.getByTestId('label-element-price');
+    fireEvent.click(
+      within(within(price).getByRole('group', { name: 'لغة السعر' })).getByRole('button', {
+        name: 'إنجليزي',
+      }),
+    );
+    const shop = screen.getByTestId('label-element-shopName');
+    fireEvent.click(within(shop).getByRole('switch', { name: 'اسم المحل' }));
+    fireEvent.click(
+      within(within(shop).getByRole('group', { name: 'لغة اسم المحل' })).getByRole('button', {
+        name: 'الاتنين',
+      }),
+    );
+    // Elements in one language only have no language choice.
+    expect(
+      within(screen.getByTestId('label-element-nameAr')).queryByRole('group', {
+        name: /^لغة/,
+      }),
+    ).toBeNull();
+    fireEvent.change(screen.getByLabelText('المقاس'), { target: { value: '40x30' } });
+    fireEvent.change(screen.getByLabelText('لغة السعر في المقاس ده'), { target: { value: 'ar' } });
+    fireEvent.click(screen.getByRole('button', { name: 'حفظ' }));
+    await waitFor(() =>
+      expect(fake.callsTo('POST', '/api/v1/label-design/versions')).toHaveLength(1),
+    );
+    const base = defaultLabelDesign();
+    expect(fake.callsTo('POST', '/api/v1/label-design/versions')[0]!.body).toEqual({
+      basedOnVersionId: '9',
+      design: {
+        ...base,
+        elements: {
+          ...base.elements,
+          price: { ...base.elements.price, lang: 'en' },
+          shopName: { ...base.elements.shopName, show: true, lang: 'both' },
+        },
+        overrides: { '40x30': { elements: { price: { lang: 'ar' } } } },
+      },
+    });
+  });
 });

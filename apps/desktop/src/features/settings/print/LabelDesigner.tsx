@@ -16,6 +16,7 @@ import {
   LABEL_ALIGNS,
   LABEL_BARCODE_MAX_HEIGHT_MM,
   LABEL_BARCODE_MIN_HEIGHT_MM,
+  LABEL_BILINGUAL_ELEMENTS,
   LABEL_LANGUAGES,
   LABEL_SIZES,
   LabelDesign,
@@ -23,6 +24,7 @@ import {
   type ItemsResponse,
   type LabelDesignResponse,
   type LabelElement,
+  type LabelLanguage,
   type LabelSizeOverride,
   type SaveLabelDesignRequest,
 } from '@artepool/shared/contracts';
@@ -70,6 +72,10 @@ const SAMPLE: Pick<
   packEn: '5 kg bucket',
   unitId: '',
 };
+
+/** Whether an element can be printed in Arabic, English or both (decision 0101). */
+const bilingual = (element: LabelElement) =>
+  (LABEL_BILINGUAL_ELEMENTS as readonly LabelElement[]).includes(element);
 
 /** Half millimetres from the field, or null. */
 const halfMm = (text: string): number | null => {
@@ -324,6 +330,19 @@ function Editor({ saved }: { saved: LabelDesignResponse }) {
                           label: t(`labelDesign.aligns.${v}`),
                         }))}
                       />
+                      {bilingual(element) && (
+                        <Segmented
+                          label={t('labelDesign.lang', { element: elementName(element) })}
+                          value={s.lang ?? 'design'}
+                          onChange={(lang) =>
+                            setElement(element, { lang: lang === 'design' ? undefined : lang })
+                          }
+                          options={(['design', ...LABEL_LANGUAGES] as const).map((v) => ({
+                            value: v,
+                            label: t(`labelDesign.langs.${v}`),
+                          }))}
+                        />
+                      )}
                       {!always && (
                         <Switch
                           isSelected={s.bold}
@@ -526,6 +545,34 @@ function Editor({ saved }: { saved: LabelDesignResponse }) {
                             </option>
                           ))}
                         </select>
+                        {bilingual(element) ? (
+                          <select
+                            aria-label={t('labelDesign.overrideLangOf', {
+                              element: elementName(element),
+                            })}
+                            value={change.lang ?? 'base'}
+                            onChange={(event) => {
+                              const value = event.target.value;
+                              const next = {
+                                ...change,
+                                lang: value === 'base' ? undefined : (value as LabelLanguage),
+                              };
+                              setOverride(overrideSize, {
+                                ...override,
+                                elements: { ...override.elements, [element]: next },
+                              });
+                            }}
+                          >
+                            <option value="base">{t('labelDesign.asBase')}</option>
+                            {LABEL_LANGUAGES.map((v) => (
+                              <option key={v} value={v}>
+                                {t(`labelDesign.langs.${v}`)}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span />
+                        )}
                       </li>
                     );
                   })}

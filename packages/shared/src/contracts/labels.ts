@@ -41,8 +41,29 @@ export const LabelElementStyle = z.object({
   size: z.enum(LABEL_SIZES),
   bold: z.boolean(),
   align: z.enum(LABEL_ALIGNS),
+  /**
+   * The language of this element (decision 0101): Arabic, English, or both (Arabic line, English
+   * line under it). Not set: the design's language. Only for the elements in two languages.
+   */
+  lang: z.enum(LABEL_LANGUAGES).optional(),
 });
 export type LabelElementStyle = z.infer<typeof LabelElementStyle>;
+
+/** The elements that can be printed in Arabic, English or both (decision 0101). */
+export const LABEL_BILINGUAL_ELEMENTS = [
+  'pack',
+  'price',
+  'vatNote',
+  'expiry',
+  'batch',
+  'shopName',
+] as const satisfies readonly LabelElement[];
+
+/** The language an element prints in: its own, else the design's. */
+export const elementLanguage = (
+  design: Pick<LabelDesign, 'language' | 'elements'>,
+  element: LabelElement,
+): LabelLanguage => design.elements[element].lang ?? design.language;
 
 const ElementStyles = z.object(
   Object.fromEntries(LABEL_ELEMENTS.map((e) => [e, LabelElementStyle])) as Record<
@@ -57,20 +78,25 @@ const BarcodeHeight = z
   .max(LABEL_BARCODE_MAX_HEIGHT_MM)
   .refine((v) => Math.abs(v * 2 - Math.round(v * 2)) < 1e-9, 'half millimetres');
 
-/** What one size changes from the base design: elements shown or hidden, their size, the bars. */
+/** What one size changes from the base design: elements shown or hidden, their size and language, the bars. */
 export const LabelSizeOverride = z.object({
   elements: z
     .object(
       Object.fromEntries(
         LABEL_ELEMENTS.map((e) => [
           e,
-          z.object({ show: z.boolean().optional(), size: z.enum(LABEL_SIZES).optional() }),
+          z.object({
+            show: z.boolean().optional(),
+            size: z.enum(LABEL_SIZES).optional(),
+            lang: z.enum(LABEL_LANGUAGES).optional(),
+          }),
         ]),
       ) as Record<
         LabelElement,
         z.ZodObject<{
           show: z.ZodOptional<z.ZodBoolean>;
           size: z.ZodOptional<z.ZodEnum<{ s: 's'; m: 'm'; l: 'l' }>>;
+          lang: z.ZodOptional<z.ZodEnum<{ ar: 'ar'; en: 'en'; both: 'both' }>>;
         }>
       >,
     )

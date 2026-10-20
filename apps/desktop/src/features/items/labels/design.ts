@@ -65,10 +65,11 @@ export function labelContent(
   },
 ): LabelContent {
   const unit = opts.units.find((u) => u.id === item.unitId);
-  const english = opts.design.language === 'en';
-  const pack = english
-    ? (item.packEn ?? unit?.nameEn ?? null)
-    : (item.packAr ?? unit?.nameAr ?? null);
+  // In both languages: each element prints the one(s) the design asks for (decision 0101).
+  const pack = {
+    ar: item.packAr ?? unit?.nameAr ?? null,
+    en: item.packEn ?? unit?.nameEn ?? null,
+  };
   const gross =
     opts.withPrice && item.price && opts.rateBp !== undefined
       ? priceBoth(BigInt(item.price.price4dp), item.price.includesVat, opts.rateBp).grossFils

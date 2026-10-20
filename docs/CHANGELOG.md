@@ -1,5 +1,12 @@
 # Changelog
 
+## Labels: a language for each element; the English shop name under the Arabic one (2026-10-20)
+
+**In plain words:** when the label was in both languages, the shop's name was written "Arabic / English" on one line, so the English part got cut ("ARTE SWIMMING PO…"). Now "both" always means two lines: the English line under the Arabic one, for the shop name, sale pack, price, "incl. VAT", expiry and batch. And each of these has its own **language** in the label designer: As the design, Arabic, English or Both. For example the price in English only ("AED 120.00") and the shop name in both. A size can have its own choice too (e.g. Arabic price only on 40 × 30). Designs you saved before print exactly as before.
+
+- Decision 0101; no database change.
+- Tests: two lines for "both", Arabic first, never "ar / en"; the price in one language; a per-size language; any design with any languages still never overlaps and keeps the barcode readable; the designer and the real label in a browser in Arabic and English.
+
 ## Labels: direct printing (TSPL) (2026-10-20)
 
 **In plain words:** in Settings → Devices → "Label printer of this PC" there is a new choice, **Printing way**: "Windows driver" (as before) or **"Direct (TSPL)"**. Direct printing sends the label to the printer in its own language, without the Windows driver in between, so nothing is resized or blurred, and the darkness and speed you set are used. For direct printing you also set the **gap between labels** (usually 2 or 3 mm) and, if labels come out upside down, **"Turn the print round"**. Try it first with "Print test label" and "Print quality test". If direct printing fails, the app does not print again through the driver by itself (the printer might have printed part already, and you would get double labels): it tells you to try again or switch back to "Windows driver".
