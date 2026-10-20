@@ -53,6 +53,7 @@ import { quantityText } from './form';
 import { ItemCard } from './ItemCard';
 import { ItemDialog } from './ItemDialog';
 import { LabelsDialog } from './labels/LabelsDialog';
+import { useScanInput } from './scan';
 import { ItemIcon, StatusChip, TypeLabel } from './parts';
 import { canAdjustAny } from './stock';
 import styles from './items.module.css';
@@ -72,13 +73,13 @@ const INACTIVE = 'inactive';
  * Waits until the person stops typing before searching (about a quarter of a second). `now()`
  * searches at once: a barcode scanner ends every scan with Enter.
  */
-function useDebounced(value: string, ms = 250): [string, () => void] {
+function useDebounced(value: string, ms = 250): [string, (now?: string) => void] {
   const [debounced, setDebounced] = useState(value);
   useEffect(() => {
     const timer = setTimeout(() => setDebounced(value), ms);
     return () => clearTimeout(timer);
   }, [value, ms]);
-  return [debounced, () => setDebounced(value)];
+  return [debounced, (now?: string) => setDebounced(now ?? value)];
 }
 
 /** The list's price cell: with VAT in bold, without VAT under it (decision 0032). */
@@ -140,6 +141,11 @@ export function ItemsPage() {
   const searchRef = useRef<HTMLInputElement>(null);
   const [search, setSearch] = useState('');
   const [q, searchNow] = useDebounced(search.trim());
+  // A scan replaces the code scanned before; letters come back in Latin with an Arabic keyboard.
+  const scan = useScanInput((code) => {
+    setSearch(code);
+    searchNow(code);
+  });
   const [segment, setSegment] = useState<string>(ALL);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dialog, setDialog] = useState<Dialog | null>(null);
@@ -315,9 +321,12 @@ export function ItemsPage() {
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             onKeyDown={(event) => {
+              scan.onKeyDown(event);
               if (event.key === 'Enter') {
                 event.preventDefault();
-                searchNow();
+                const typed = scan.read(search.trim());
+                if (typed !== search.trim()) setSearch(typed);
+                searchNow(typed);
               }
             }}
           />

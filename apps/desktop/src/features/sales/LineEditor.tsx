@@ -13,6 +13,7 @@ import { cx, IconButton, iconClass, tableClasses as tbl } from '../../ui';
 import { money, price, rate } from '../masterdata/format';
 import { localName, useUnits, useVat } from '../masterdata/refs';
 import { useSellableItemSearch } from './api';
+import { useScanInput } from '../items/scan';
 import { useSuggest } from './suggest';
 import {
   lineFromItem,
@@ -58,6 +59,8 @@ export function SellableItemPicker(props: { onAdd: (item: ItemListItem) => void 
   const { t, i18n } = useTranslation('sales');
   const name = localName(i18n.language);
   const box = useSuggest();
+  // A scanned code comes back in Latin letters even with the Arabic keyboard.
+  const scan = useScanInput();
   const found = useSellableItemSearch(box.q, box.open || box.q.length > 0);
   const choices = (found.data?.items ?? []).filter((i) => i.isActive);
   const sellable = (i: ItemListItem) => i.isSellable && i.price !== null;
@@ -77,10 +80,11 @@ export function SellableItemPicker(props: { onAdd: (item: ItemListItem) => void 
           aria-expanded={box.open}
           {...box.input}
           onKeyDown={(event) => {
+            scan.onKeyDown(event);
             // A scanned barcode or a full code adds the item at once.
             if (event.key !== 'Enter') return;
             event.preventDefault();
-            const typed = box.text.trim();
+            const typed = scan.read(box.text.trim());
             const exact = choices.find(
               (c) =>
                 sellable(c) &&

@@ -30,6 +30,14 @@
   image-rendering: pixelated;
 }
 
+/* The preview: twice the real size, so small letters can be checked on the screen. */
+.zoomed {
+  inline-size: calc(var(--label-w) * 2);
+  block-size: calc(var(--label-h) * 2);
+  max-inline-size: 100%;
+  object-fit: contain;
+}
+
 /* Print-only containers: hidden on screen. */
 .printSheet,
 .printRoll {

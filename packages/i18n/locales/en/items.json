@@ -219,7 +219,7 @@
     "showPrice": "Show the price incl. VAT",
     "noSizes": "No label sizes are active. Add them in Settings → Lists.",
     "cannotEncode": "This barcode cannot be drawn.",
-    "preview": "Preview at real size",
+    "preview": "Preview at twice the size: exactly the dots that will print",
     "print": "Print",
     "barcodeOf": "Barcode {code}",
     "errors": {

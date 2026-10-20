@@ -45,6 +45,7 @@ import {
   type ItemForm,
 } from './form';
 import { marginOf, percentText } from './margin';
+import { fromArabicKeyboard } from './scan';
 import { ItemIcon, TypeLabel } from './parts';
 import styles from './items.module.css';
 
@@ -255,7 +256,11 @@ function BarcodesEditor(props: {
                 autoComplete="off"
                 aria-label={t('barcodes.barcodeN', { n: index + 1 })}
                 value={row.barcode}
-                onChange={(event) => update(index, { barcode: event.target.value })}
+                // A barcode is never Arabic: letters a scanner typed with the Arabic keyboard on
+                // come back as the keys pressed.
+                onChange={(event) =>
+                  update(index, { barcode: fromArabicKeyboard(event.target.value) })
+                }
               />
               <input
                 className={styles.input}

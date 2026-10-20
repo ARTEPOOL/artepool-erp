@@ -26,7 +26,7 @@ import mdStyles from '../../masterdata/masterdata.module.css';
 import { barcodeFor } from './barcode';
 import { layoutBoxes, layoutLabel, type LayoutResult } from './layout';
 import { canPrintLabelsSilently, printLabels, useLabelPrinter } from './printer';
-import { canvasMeasurer, renderLabel, type LabelImage } from './render';
+import { canvasMeasurer, printedDotsUrl, renderLabel, type LabelImage } from './render';
 import styles from './labels.module.css';
 
 const MAX_LABELS = 500;
@@ -137,7 +137,8 @@ export function LabelsDialog(props: {
     }
   }, [size, barcode, sheet, printer, props.item, addEnglish, priced, gross, language, measurer, t]);
   const layout = drawn?.layout;
-  const imageUrl = useMemo(() => drawn?.image?.canvas.toDataURL('image/png') ?? '', [drawn]);
+  // Exactly the dots the printer gets: the preview and the print dialog show the same thing.
+  const imageUrl = useMemo(() => (drawn?.image ? printedDotsUrl(drawn.image) : ''), [drawn]);
   const refused = layout && !layout.ok ? layout.reason : null;
 
   // The print dialog (no label printer here, or A4 sheets): the drawn labels go into a print-only
@@ -241,7 +242,7 @@ export function LabelsDialog(props: {
               })}
             >
               <img
-                className={styles.label}
+                className={`${styles.label} ${styles.zoomed}`}
                 style={sizeVars(size)}
                 src={imageUrl || undefined}
                 alt={t('labels.barcodeOf', { code: data })}

@@ -65,6 +65,7 @@ import { HeldCartsDialog } from './HeldCartsDialog';
 import { LineDialog } from './LineDialog';
 import { PaymentDialog } from './PaymentDialog';
 import { ReturnDialog } from './ReturnDialog';
+import { useScanInput } from '../items/scan';
 import { OpenShiftCard } from './shift/OpenShiftCard';
 import styles from './pos.module.css';
 
@@ -427,11 +428,14 @@ function Catalog(props: {
   const activeCategories = (categories.data ?? []).filter((c) => c.isActive);
   const categoryOf = (id: string) => activeCategories.find((c) => c.id === id);
 
+  // A scan replaces the code scanned before; letters come back in Latin with an Arabic keyboard.
+  const scan = useScanInput(setText);
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    scan.onKeyDown(event);
     if (event.key !== 'Enter') return;
     event.preventDefault();
     // A scanner types the barcode and Enter: the exact match goes straight to the cart.
-    const typed = text.trim();
+    const typed = scan.read(text.trim());
     const exact =
       items.find(
         (i) => i.primaryBarcode === typed || i.code.toLowerCase() === typed.toLowerCase(),
@@ -443,6 +447,8 @@ function Catalog(props: {
     if (exact) {
       props.onAdd(exact);
       setText('');
+    } else if (typed !== text.trim()) {
+      setText(typed);
     }
   };
 

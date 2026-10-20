@@ -172,3 +172,23 @@ export function renderTestLabel(
     }
   });
 }
+
+/** The dots the printer will print (black or white, nothing in between), as an image to show. */
+export function printedDotsUrl(image: LabelImage): string {
+  const canvas = document.createElement('canvas');
+  canvas.width = image.widthDots;
+  canvas.height = image.height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return '';
+  const pixels = ctx.createImageData(image.widthDots, image.height);
+  for (let y = 0; y < image.height; y += 1) {
+    for (let x = 0; x < image.widthDots; x += 1) {
+      const black = (image.bits[y * image.widthBytes + (x >> 3)]! & (0x80 >> (x & 7))) !== 0;
+      const i = (y * image.widthDots + x) * 4;
+      pixels.data.fill(black ? 0 : 255, i, i + 3);
+      pixels.data[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(pixels, 0, 0);
+  return canvas.toDataURL('image/png');
+}
