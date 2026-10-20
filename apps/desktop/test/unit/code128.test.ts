@@ -1,12 +1,15 @@
-/** M3-T9: the Code 128 (set B) encoder behind the barcode labels (decision 0043). */
+/** The Code 128 encoder behind the barcode labels (decisions 0043, 0096): set B, set C for digits. */
 import { describe, expect, it } from 'vitest';
 import {
   canEncode,
   code128Bars,
   code128Values,
   code128Widths,
+  CODE_B,
+  CODE_C,
   PATTERNS,
   START_B,
+  START_C,
   STOP,
 } from '../../src/features/items/labels/code128';
 
@@ -42,11 +45,49 @@ describe('Code 128 encoder', () => {
     expect(bars.at(-1)).toEqual({ x: modules - 2, w: 2 });
   });
 
-  it('encodes an EAN-style barcode and an item code; refuses text outside set B', () => {
+  it('packs digits two by two in set C: a numeric barcode is about half as wide', () => {
+    // Only digits, odd count: start C, six pairs, Code B, the last digit, check, stop.
     const barcode = code128Values('6291100000012');
-    expect(barcode).toHaveLength(13 + 3);
-    expect(barcode[1]).toBe('6'.charCodeAt(0) - 32);
-    expect(code128Bars('CHEM-0012').modules).toBe(11 * (9 + 2) + 13);
+    expect(barcode.slice(0, 9)).toEqual([
+      START_C,
+      62,
+      91,
+      10,
+      0,
+      0,
+      1,
+      CODE_B,
+      '2'.charCodeAt(0) - 32,
+    ]);
+    expect(barcode).toHaveLength(11);
+    expect(code128Bars('6291100000012').modules).toBe(11 * 10 + 13);
+    expect(code128Values('123456')).toEqual([START_C, 12, 34, 56, expect.any(Number), STOP]);
+  });
+
+  it('switches to set C for long runs of digits, keeping an odd first digit in set B', () => {
+    // Four digits at the end: "CHEM-" in B, then 00 12 in C.
+    expect(code128Values('CHEM-0012').slice(0, 9)).toEqual([
+      START_B,
+      35,
+      40,
+      37,
+      45,
+      13,
+      CODE_C,
+      0,
+      12,
+    ]);
+    // Five digits at the end: the first one stays in B.
+    expect(code128Values('A12345').slice(0, 6)).toEqual([START_B, 33, 17, CODE_C, 23, 45]);
+    // Three digits in the middle are not worth a switch.
+    expect(code128Values('AB123CD')).toHaveLength(7 + 3);
+    // The check symbol counts every symbol after the start, weighted by position.
+    const values = code128Values('CHEM-0012');
+    const check = values.slice(0, -2).reduce((s, v, i) => s + v * Math.max(i, 1), 0) % 103;
+    expect(values.at(-2)).toBe(check);
+  });
+
+  it('refuses text outside printable ASCII', () => {
     expect(canEncode('CHEM-0012')).toBe(true);
     expect(canEncode('كلور')).toBe(false);
     expect(canEncode('')).toBe(false);
