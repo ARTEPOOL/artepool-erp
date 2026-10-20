@@ -295,7 +295,7 @@ function bridgeFor(permissions: string[]) {
     .on('GET', '/api/v1/settings/vat', ok(VAT))
     .on('GET', '/api/v1/business-lines', ok({ businessLines: [] }))
     .on('GET', '/api/v1/reason-codes', ok({ reasonCodes: REASONS }))
-    .on('GET', '/api/v1/label-sizes', ok({ labelSizes: SIZES }))
+    .on('GET', '/api/v1/label-sizes', ok({ labelSizes: SIZES, maxWidthMm: 50 }))
     .on('GET', '/api/v1/stock/summary', ok(summary))
     .on('GET', '/api/v1/items', (request: BridgeRequest) => {
       const toReorder = new URLSearchParams(request.path.split('?')[1]).get('toReorder');
@@ -587,7 +587,17 @@ describe('Items & stock: the stock adjustment dialog', () => {
 });
 
 describe('Items & stock: barcode labels', () => {
-  it('previews one label at the chosen size and prints the requested number', async () => {
+  /** What the label layout put on the preview (decision 0096). */
+  const layoutOf = (preview: HTMLElement) =>
+    JSON.parse(preview.getAttribute('data-layout')!) as {
+      name: string[];
+      english: string | null;
+      price: { text: string; x: number; dir: string }[] | null;
+      vat: string | null;
+      moduleDots: number;
+    };
+
+  it('lays out one label at the chosen size and prints the requested number', async () => {
     const print = vi.spyOn(window, 'print').mockImplementation(() => undefined);
     await openItems(bridgeFor(STOREKEEPER));
     const card = await stockCard();
@@ -602,21 +612,33 @@ describe('Items & stock: barcode labels', () => {
       ]),
     );
     const preview = within(dialog).getByTestId('label-preview');
-    const label = preview.firstElementChild as HTMLElement;
+    const label = within(preview).getByRole('img', { name: 'باركود 6291100000012' });
     expect(label.style.getPropertyValue('--label-w')).toBe('38mm');
     expect(label.style.getPropertyValue('--label-h')).toBe('25mm');
-    expect(within(preview).getByText('كلور حبيبات 10 كجم')).toBeTruthy();
-    expect(within(preview).getByText('6291100000012')).toBeTruthy();
-    // 12.50 excluding VAT → 13.13 with 5% VAT.
-    expect(within(preview).getByText('13.13 درهم')).toBeTruthy();
-    const bars = within(preview).getByRole('img', { name: 'باركود 6291100000012' });
-    expect(bars.getAttribute('data-modules')).toBe(String(11 * 15 + 13));
+    let layout = layoutOf(preview);
+    expect(layout.name).toEqual(['كلور حبيبات 10 كجم']);
+    expect(layout.english).toBeNull();
+    // 12.50 excluding VAT → 13.13 with 5% VAT: "13.13 درهم", the number to the right of "درهم".
+    expect(layout.price?.map((run) => run.text)).toEqual(['درهم', '13.13']);
+    expect(layout.price![1]!.x).toBeGreaterThan(layout.price![0]!.x);
+    // The price excludes VAT on the item: no "شامل الضريبة" line.
+    expect(layout.vat).toBeNull();
+    expect(layout.moduleDots).toBeGreaterThanOrEqual(2);
 
     fireEvent.change(sizeSelect, { target: { value: '2' } });
     expect(label.style.getPropertyValue('--label-w')).toBe('50mm');
     expect(label.style.getPropertyValue('--label-h')).toBe('30mm');
+    fireEvent.click(
+      within(dialog).getByRole('switch', { name: 'أضف الاسم الإنجليزي لو فيه مكان' }),
+    );
+    expect(layoutOf(within(dialog).getByTestId('label-preview')).english).toBe(
+      'Granular chlorine 10 kg',
+    );
     fireEvent.click(within(dialog).getByRole('switch', { name: 'طباعة السعر شامل الضريبة' }));
-    expect(within(preview).queryByText('13.13 درهم')).toBeNull();
+    layout = layoutOf(within(dialog).getByTestId('label-preview'));
+    expect(layout.price).toBeNull();
+    // No label printer on this PC (a browser): the print dialog is the way.
+    expect(within(dialog).getByText(/مفيش طابعة ملصقات مضبوطة/)).toBeTruthy();
 
     fireEvent.change(within(dialog).getByLabelText('عدد الملصقات'), { target: { value: '0' } });
     fireEvent.click(within(dialog).getByRole('button', { name: 'طباعة' }));

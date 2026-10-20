@@ -224,6 +224,21 @@
     "barcodeOf": "Barcode {code}",
     "errors": {
       "count": "Write a number from 1 to {max}."
-    }
+    },
+    "addEnglish": "Add English name if it fits",
+    "inclVat": "incl. VAT",
+    "refused": {
+      "too_small": "This label size is too small for the name, the barcode and the price. Choose a bigger size or turn the price off.",
+      "barcode_too_long": "This code is too long for a barcode on this label size. Choose a wider size."
+    },
+    "sent": "{count} label(s) sent to the label printer.",
+    "problem": {
+      "browser": "Printing works in the Windows app only.",
+      "no_printer": "No label printer is set on this PC (Settings → Devices).",
+      "failed": "The label printer did not respond. Check that it is on, connected and has labels.",
+      "no_drawer": "The label printer has no cash drawer."
+    },
+    "dialogNote": "No label printer is set on this PC: the print dialog opens. Choose the label printer there, size 100%.",
+    "sheetNote": "A4 sheets print through the print dialog, at 100% size."
   }
 }

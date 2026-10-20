@@ -1,5 +1,12 @@
 # Changelog
 
+## Barcode labels, parts 2–5: drawn in millimetres, printed silently (2026-10-20)
+
+**In plain words:** the barcode label is now drawn by the program itself at the label printer's own dots. Every part has its own place: the Arabic name (2 lines, smaller letters if needed, then "…"), the English name if you ask for it and there is room, the barcode (supplier EAN-13 stays EAN-13; bars are whole printer dots), the code, the price ("120.00 درهم" / "AED 120.00") and "شامل الضريبة" when the price includes VAT. Nothing overlaps, and nothing goes outside the printer's 48 mm. The preview is exactly what prints. With the label printer set in Settings → Devices, labels print straight away with no print dialog; "Print test label" helps move the print to the centre if it comes out to one side.
+
+- Decision 0096; migration 0038 (label printer per PC on the server); runbook `docs/runbooks/label-printer.md`.
+- Tests: no overlap for every size and long names (property tests), barcodes read back by a barcode reader at 203 and 300 dpi, price order in a real browser in Arabic and English.
+
 ## Barcode labels, part 1: sizes for the 2-inch printer (2026-10-20)
 
 **In plain words:** the label sizes now match your label printer (2-inch roll). 50 × 30 mm comes first and is the default, then 50 × 25 and 40 × 30. The sizes that cannot print well on it (25 × 15, 30 × 20, 58 × 40, 100 × 50) are switched off (kept, not deleted). A new size can never be wider than the roll (50 mm). The new label drawing and silent printing follow in the next parts.

@@ -347,7 +347,7 @@ App (POS section)                     API                                       
 | **Invoices (A4) section** | A separate area of the app. The server renders a PDF from bilingual templates, and the app opens the **Windows print dialog**. Covers A4 invoices, payment invoices, credit notes, quotations and statements. |
 | **A4 reprint of a POS sale** | Opened from the A4 section and printed in A4: same document, same `POS-` number. `print_count` is incremented and the reprint is logged. Prints after the first are marked "Copy / نسخة" (setting). |
 | **Barcode scanner** | Keyboard wedge: a fast burst of keys + Enter is treated as a scan. Pack barcodes carry their own quantity. |
-| **Label printer** | Raw ZPL/TSPL or raster, decided once the model is known. |
+| **Label printer** | Decision [0096](decisions/0096-barcode-labels-2-inch-printer.md): the label is laid out in mm zones and drawn by the app at the printer's dots (203/300 dpi), then sent silently through the Windows driver with the label's exact paper size, one page per label (Rust `printer_print_label`); per-PC settings (printer, dpi, printable width, X/Y offset) in `auth.devices.printer_config`. RAW TSPL next (the LV-275 speaks TSPL). Print dialog only as a fallback and for A4 sheets. Runbook: [label-printer.md](runbooks/label-printer.md). |
 
 - **Fonts:** a free Arabic + Latin font is bundled until the custom design arrives.
 - **WebView2:** the offline WebView2 installer is bundled.

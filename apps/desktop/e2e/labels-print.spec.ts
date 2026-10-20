@@ -1,43 +1,121 @@
 /**
- * Printing barcode labels (decision 0043) puts real, visible labels on the page: no other print
- * rule of the app (for example the backup key's) may hide them. The print dialog is replaced by a
- * check of what the printer would get, in print mode.
+ * Barcode labels (decisions 0043, 0096) in a real browser with the real fonts, in Arabic and
+ * English: the label drawn for a long name keeps every part apart and inside the printable width,
+ * the price reads "120.00 درهم" / "AED 120.00", the drawn barcode is read back by a barcode reader,
+ * and the labels sent to the print dialog are visible (no other print rule of the app hides them).
  */
+import { readBarcodes } from 'zxing-wasm/reader';
+import type { Page } from '@playwright/test';
 import { expect, signInAsOwner, test } from './fixtures';
 
-test('the printed labels are visible on the page', async ({ page, open, t, lang }) => {
+const LONG_AR = 'كلور حبوب سريع الذوبان للمسابح الكبيرة والصغيرة عبوة خمسة كيلو من إنتاج الشركة';
+
+interface Box {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+interface Layout {
+  widthDots: number;
+  content: Box;
+  boxes: { part: string; box: Box }[];
+  name: string[];
+  english: string | null;
+  price: { text: string; x: number; dir: string }[] | null;
+  vat: string | null;
+  moduleDots: number;
+}
+
+/** A new item with a long Arabic name and a price including VAT; its labels dialog opened. */
+async function openLabels(page: Page, t: (key: string) => string, lang: string) {
   const n = `${Date.now() % 1_000_000}`.padStart(6, '0');
-  await open('office');
-  await signInAsOwner(page, t);
   await page.getByRole('link', { name: t('settings:nav.items') }).click();
   await page.getByRole('button', { name: t('items:newItem') }).click();
-  let dialog = page.getByRole('dialog');
-  await dialog
+  const form = page.getByRole('dialog');
+  await form
     .getByLabel(t('items:fields.category'), { exact: true })
     .selectOption({ label: lang === 'en' ? 'Equipment' : 'معدات' });
-  await dialog.getByLabel(t('items:fields.nameAr'), { exact: true }).fill(`مضخة ${n}`);
-  await dialog.getByLabel(t('items:fields.nameEn'), { exact: true }).fill(`Pump ${n}`);
-  await dialog.getByLabel(t('items:fields.price'), { exact: true }).fill('20');
-  await dialog.getByRole('button', { name: t('items:dialog.save') }).click();
-  await expect(dialog).toHaveCount(0);
-
+  await form.getByLabel(t('items:fields.nameAr'), { exact: true }).fill(`${LONG_AR} ${n}`);
+  await form.getByLabel(t('items:fields.nameEn'), { exact: true }).fill(`Chlorine ${n}`);
+  await form.getByLabel(t('items:fields.price'), { exact: true }).fill('120');
+  await form.getByRole('button', { name: t('items:dialog.save') }).click();
+  await expect(form).toHaveCount(0);
   await page
     .getByRole('button', { name: t('items:labels.button') })
     .first()
     .click();
-  dialog = page.getByRole('dialog');
+  return page.getByRole('dialog');
+}
+
+const overlap = (a: Box, b: Box) =>
+  a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+
+test('a long name, the price and the barcode: apart, inside, readable', async ({
+  page,
+  open,
+  t,
+  lang,
+}) => {
+  await open('office');
+  await signInAsOwner(page, t);
+  const dialog = await openLabels(page, t, lang);
+  const preview = dialog.getByTestId('label-preview');
+  await expect(preview).toBeVisible();
+  const layout = JSON.parse((await preview.getAttribute('data-layout'))!) as Layout;
+
+  // The 50 × 30 default: everything inside the printable width (48 mm at 203 dpi), nothing overlaps.
+  expect(layout.widthDots).toBe(400);
+  expect(layout.content.w).toBeLessThanOrEqual(384);
+  for (const { part, box } of layout.boxes) {
+    expect(box.x, part).toBeGreaterThanOrEqual(layout.content.x);
+    expect(box.x + box.w, part).toBeLessThanOrEqual(layout.content.x + layout.content.w);
+  }
+  layout.boxes.forEach((a, i) =>
+    layout.boxes
+      .slice(i + 1)
+      .forEach((b) => expect(overlap(a.box, b.box), `${a.part}/${b.part}`).toBe(false)),
+  );
+  // The Arabic name in 2 lines at most, cut with "…" when longer.
+  expect(layout.name.length).toBeLessThanOrEqual(2);
+  expect(layout.name.join(' ').length).toBeGreaterThan(10);
+
+  // The price in the screen's language, the number its own run.
+  const [first, second] = layout.price!;
+  if (lang === 'ar') {
+    expect([first!.text, second!.text]).toEqual(['درهم', '120.00']);
+    expect(second!.x).toBeGreaterThan(first!.x); // read from the right: 120.00 then درهم
+  } else {
+    expect([first!.text, second!.text]).toEqual(['AED', '120.00']);
+    expect(second!.x).toBeGreaterThan(first!.x);
+  }
+
+  // The drawn label is read back by a barcode reader (the item code, Code 128).
+  const src = await preview.getByRole('img').getAttribute('src');
+  const png = Buffer.from(src!.replace(/^data:image\/png;base64,/, ''), 'base64');
+  const [found] = await readBarcodes(new Uint8Array(png), { formats: ['Code128'] });
+  expect(found?.text).toMatch(/^[A-Z]+-\d{4}$/);
+
+  // The English name when asked for.
+  await dialog.getByText(t('items:labels.addEnglish'), { exact: true }).click();
+  const withEnglish = JSON.parse((await preview.getAttribute('data-layout'))!) as Layout;
+  expect(withEnglish.english).toMatch(/^Chlorine \d{6}$/);
+});
+
+test('the printed labels are visible on the page', async ({ page, open, t, lang }) => {
+  await open('office');
+  await signInAsOwner(page, t);
+  const dialog = await openLabels(page, t, lang);
   await dialog.getByLabel(t('items:labels.count'), { exact: true }).fill('2');
   await page.emulateMedia({ media: 'print' });
   await page.evaluate(() => {
     window.print = () => {
-      const labels = [...document.querySelectorAll('[data-testid="label-print"] > *')];
-      (window as unknown as { printed: unknown }).printed = labels.map((label) => {
-        const bars = label.querySelector('svg')!;
-        return {
-          visible: getComputedStyle(bars).visibility === 'visible',
-          height: bars.getBoundingClientRect().height,
-        };
-      });
+      const labels = [...document.querySelectorAll('[data-testid="label-print"] > img')];
+      (window as unknown as { printed: unknown }).printed = labels.map((label) => ({
+        visible: getComputedStyle(label).visibility === 'visible',
+        height: label.getBoundingClientRect().height,
+        drawn: (label as HTMLImageElement).naturalWidth,
+      }));
     };
   });
   // In print mode the screen itself is hidden: submit the form as the Print button does.
@@ -47,10 +125,16 @@ test('the printed labels are visible on the page', async ({ page, open, t, lang 
   const printed = await page.waitForFunction(
     () => (window as unknown as { printed?: unknown }).printed,
   );
-  const labels = (await printed.jsonValue()) as { visible: boolean; height: number }[];
+  const labels = (await printed.jsonValue()) as {
+    visible: boolean;
+    height: number;
+    drawn: number;
+  }[];
   expect(labels).toHaveLength(2);
   for (const label of labels) {
     expect(label.visible).toBe(true);
-    expect(label.height).toBeGreaterThan(10);
+    // 30 mm high on paper; drawn at the label printer's 400 dots across (50 mm at 203 dpi).
+    expect(label.height).toBeGreaterThan(100);
+    expect(label.drawn).toBe(400);
   }
 });
