@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { resourcePath } from '@artepool/node-kit';
 
 /** Why a password was refused (decision 0023). The app translates each one. */
 export type PasswordProblem =
@@ -12,7 +12,10 @@ let common: ReadonlySet<string> | undefined;
 /** Common passwords of 10+ characters (bundled list; shorter ones fail the length rule anyway). */
 function commonPasswords(): ReadonlySet<string> {
   common ??= new Set(
-    readFileSync(join(import.meta.dirname, 'common-passwords.txt'), 'utf8')
+    readFileSync(
+      resourcePath('apps', 'server', 'src', 'platform', 'auth', 'common-passwords.txt'),
+      'utf8',
+    )
       .split('\n')
       .map((line) => line.trim())
       .filter((line) => line !== '' && !line.startsWith('#')),

@@ -134,6 +134,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "artepool-svc"
+version = "0.1.0"
+dependencies = [
+ "base64 0.23.1",
+ "getrandom 0.3.4",
+ "thiserror 2.0.21",
+ "zeroize",
+]
+
+[[package]]
 name = "asn1-rs"
 version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"

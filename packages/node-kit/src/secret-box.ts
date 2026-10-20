@@ -30,7 +30,7 @@ export class SecretBox {
 
   /**
    * Reads a master key file (base64 of 32 random bytes, created by `pnpm dev:secrets` in
-   * development; protected by Windows DPAPI in production from M6). On Linux and macOS the
+   * development only; the installed server gets the key from the launcher, see `fromSource`). On Linux and macOS the
    * file must not be readable by other users.
    */
   static async fromFile(path: string): Promise<SecretBox> {
@@ -54,6 +54,11 @@ export class SecretBox {
       throw new SecretBoxError(`The master key file ${path} is not a valid 32-byte key.`);
     }
     return SecretBox.fromKey(key);
+  }
+
+  /** From a file (development) or from the key the launcher gave (installed server). */
+  static async fromSource(source: { file: string } | { key: Buffer }): Promise<SecretBox> {
+    return 'key' in source ? SecretBox.fromKey(source.key) : SecretBox.fromFile(source.file);
   }
 
   seal(plaintext: Buffer, aad: string): Buffer {

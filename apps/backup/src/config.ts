@@ -3,7 +3,13 @@
  * installed server the installer sets these; in development they come from `.env`.
  */
 import { join } from 'node:path';
-import { connectionFor, repoRoot, type PgConnection } from '@artepool/node-kit';
+import {
+  connectionFor,
+  masterKeySource,
+  repoRoot,
+  type MasterKeySource,
+  type PgConnection,
+} from '@artepool/node-kit';
 
 export interface BackupConfig {
   /** The folder for the local copies (a second disk when there is one). */
@@ -17,7 +23,7 @@ export interface BackupConfig {
   /** Off-site: the first copy of each of the last `daily` days and `monthly` months. */
   offsiteKeep: { hourly: number; daily: number; monthly: number };
   /** The master key that seals the Google Drive credentials (never in the database). */
-  masterKeyFile: string;
+  masterKey: MasterKeySource;
   /** The sealed Google Drive credentials (client, refresh token) of the dedicated account. */
   driveCredentialsFile: string;
   /** Google's endpoints; replaced by a fake server in the tests. */
@@ -42,7 +48,7 @@ export const GOOGLE: GoogleEndpoints = {
 /** The folders and files the API also needs (it never connects as the backup role). */
 export interface BackupPaths {
   backupDir: string;
-  masterKeyFile: string;
+  masterKey: MasterKeySource;
   driveCredentialsFile: string;
   google: GoogleEndpoints;
   /**
@@ -71,7 +77,7 @@ const client = (id: string | undefined, secret: string | undefined): GoogleClien
 export function backupPaths(env: NodeJS.ProcessEnv = process.env): BackupPaths {
   return {
     backupDir: env.ARTEPOOL_BACKUP_DIR || join(repoRoot, '.backups'),
-    masterKeyFile: env.ARTEPOOL_MASTER_KEY_FILE || join(repoRoot, '.secrets', 'master.key'),
+    masterKey: masterKeySource(env),
     driveCredentialsFile:
       env.ARTEPOOL_DRIVE_CREDENTIALS_FILE ||
       join(repoRoot, '.secrets', 'backup', 'google-drive.sealed'),

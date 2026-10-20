@@ -1,14 +1,41 @@
 /** Node-only helpers shared by the tools, the tests and the server: paths, .env, DB connections. */
 import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { applyInstalledConfig, installedMasterKey, isInstalled } from './installed';
 
-/** Absolute path of the repository root. */
+/** Absolute path of the repository root (development and tests). */
 export const repoRoot = resolve(import.meta.dirname, '..', '..', '..');
 
-export const migrationsDir = join(repoRoot, 'db', 'migrations');
+/**
+ * A file the programs read at run time (migrations, fonts, the common-passwords list), by its path
+ * in the repository. The packaged server (`pnpm build:server`) keeps the same paths under its
+ * `resources` folder and sets ARTEPOOL_RESOURCES to it.
+ */
+export function resourcePath(...parts: string[]): string {
+  return join(process.env.ARTEPOOL_RESOURCES || repoRoot, ...parts);
+}
 
-/** Loads `.env` from the repository root if present. Variables already set are kept (CI sets its own). */
+export const migrationsDir = resourcePath('db', 'migrations');
+
+/** True inside the packaged server (`pnpm build:server` marks it): it never reads `.env`. */
+export const isPackaged = (): boolean =>
+  (globalThis as { __ARTEPOOL_PACKAGED__?: boolean }).__ARTEPOOL_PACKAGED__ === true;
+
+/**
+ * Loads the settings. Installed server (ARTEPOOL_CONFIG set): the settings file, never `.env`.
+ * Development: `.env` from the repository root if present; variables already set are kept (CI
+ * sets its own).
+ */
 export function loadEnv(): void {
+  if (isPackaged() && !isInstalled()) {
+    throw new Error(
+      'The settings file was not given (ARTEPOOL_CONFIG). The installed server is started by its Windows service.',
+    );
+  }
+  if (isInstalled()) {
+    applyInstalledConfig();
+    return;
+  }
   const file = join(repoRoot, '.env');
   if (existsSync(file)) {
     process.loadEnvFile(file);
@@ -18,9 +45,21 @@ export function loadEnv(): void {
 export function requireEnv(name: string): string {
   const value = process.env[name];
   if (value === undefined || value === '') {
-    throw new Error(`Missing setting ${name}. Copy .env.example to .env and fill it in.`);
+    throw new Error(
+      isInstalled()
+        ? `Missing setting ${name}. The installed server is started by artepool-svc, which gives it the secrets from the protected store.`
+        : `Missing setting ${name}. Copy .env.example to .env and fill it in.`,
+    );
   }
   return value;
+}
+
+/** Where the master key comes from: a file in development, the launcher on the installed server. */
+export type MasterKeySource = { file: string } | { key: Buffer };
+
+export function masterKeySource(env: NodeJS.ProcessEnv = process.env): MasterKeySource {
+  if (isInstalled(env)) return { key: installedMasterKey(env) };
+  return { file: env.ARTEPOOL_MASTER_KEY_FILE || join(repoRoot, '.secrets', 'master.key') };
 }
 
 /** The ARTÉPOOL database roles (docs/database-schema.md §2). */
@@ -97,3 +136,17 @@ export function assertDevOrTestDatabase(name: string): void {
 }
 
 export { SecretBox, SecretBoxError } from './secret-box';
+export {
+  CONFIG_SETTING,
+  InstalledConfigError,
+  MASTER_KEY_SETTING,
+  applyInstalledConfig,
+  childEnv,
+  forgetInstalledMasterKey,
+  installedConfigSchema,
+  installedMasterKey,
+  isInstalled,
+  readInstalledConfig,
+  settingsFromConfig,
+  type InstalledConfig,
+} from './installed';

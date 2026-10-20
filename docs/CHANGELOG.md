@@ -1,5 +1,12 @@
 # Changelog
 
+## Installation, part B: the server packaged for the shop PC (2026-10-20)
+
+**In plain words:** the server programs can now be packed into one folder for installing on the shop PC (`pnpm build:server`): no source code, no development settings. On the shop PC the settings live in one file (`C:\ProgramData\ARTEPOOL\config\server.json`) that may not contain any password. The five secrets (the master key and the four database passwords) are kept by Windows itself (DPAPI): they open only on that PC, in a folder only Windows and administrators can open. A small program, `artepool-svc`, unlocks them in memory when the server starts and never writes them anywhere in clear. If a secret is missing, does not open, or the folder is open to other users, the server refuses to start and says why. Nothing changes for you yet: you see this when the installer comes (part F).
+
+- Decision 0103; no database change.
+- Tests: the packed server, run from a folder outside the project with only the secrets, upgrades an empty database, refuses a common password, creates the owner and answers over TLS 1.3; it refuses to start without its settings file or its master key and never reads a `.env`; the settings file refuses any unknown key; pg_dump and the PDF browser never get a secret; the launcher's secrets (creation, replacement, a missing or swapped file, a folder or file open to others), and on the Windows test machine DPAPI and the folder access rules themselves.
+
 ## Barcode scanner: no need to click the search box first (2026-10-20)
 
 **In plain words:** at the point of sale and in Items & stock, a scan now works wherever the cursor is: you no longer have to click in the search box first. At the point of sale the scanned item goes straight into the cart, even when it is not among the items shown on the screen and whatever category is chosen; in Items & stock its card opens. A scan is told apart from a person typing by its speed, so typing is never caught; a scan while a window is open (for example the payment window) is ignored, and the scanner's Enter never presses a button by mistake.

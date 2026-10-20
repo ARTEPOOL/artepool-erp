@@ -220,8 +220,8 @@ Run from the repository root. Setup on a new PC: [`docs/runbooks/dev-setup-windo
 | Run the Windows app (Tauri; Rust + Microsoft C++ Build Tools needed) / build its installer | `pnpm dev:desktop` / `pnpm build:desktop` |
 | Rust tests (the PC's secure side: enrollment, TLS rules, device key; the RAW receipt printer) | `pnpm test:rust` |
 | Server console (emergency tools since 0092): first owner / enrollment code / emergency owner 2-step reset / emergency owner password reset (decisions 0022, 0025, 0029) | `pnpm owner:create` / `pnpm device:code` / `pnpm owner:reset-2fa` / `pnpm owner:reset-password` |
-
-Not yet available: `pnpm build:server` (M6.2).
+| Package the server PC's programs (bundle + resources + manifest, `dist/server`; `--windows` on Windows) | `pnpm build:server` |
+| On the installed server (elevated prompt): the console tools with the protected secrets / check the secrets | `artepool-svc run owner-reset-password` (etc.) / `artepool-svc secrets check` |
 
 Rules for migrations: one file per change in `db/migrations/NNNN_name.sql`; no `BEGIN`/`COMMIT` inside (the runner wraps each file); every new table gets `sys.add_touch`/`sys.add_stamp`, `audit.enable_for`, `sys.forbid_delete` and explicit grants — `db/tests/privileges.test.ts` fails otherwise; run `pnpm db:codegen` and commit the regenerated types.
 

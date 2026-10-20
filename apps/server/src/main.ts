@@ -10,7 +10,7 @@ import { ensurePeriods } from './modules/ledger/periods';
 
 const config = loadConfig();
 const [secretBox, tls] = await Promise.all([
-  SecretBox.fromFile(config.masterKeyFile),
+  SecretBox.fromSource(config.masterKey),
   readServerTls(config.tlsDir),
 ]);
 const pool = createPool(config.database);

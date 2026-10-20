@@ -41,7 +41,7 @@ beforeAll(async () => {
   server = await startTestServer(undefined, {
     backup: {
       backupDir: dir,
-      masterKeyFile: join(dir, 'unused.key'),
+      masterKey: { file: join(dir, 'unused.key') },
       driveCredentialsFile: join(dir, 'secrets', 'google-drive.sealed'),
       google: google.endpoints,
       googleClients: {

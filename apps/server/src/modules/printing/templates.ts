@@ -9,8 +9,7 @@
  * on a credit note the original invoice and the reason.
  */
 import { readFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
-import { dirname, join } from 'node:path';
+import { resourcePath } from '@artepool/node-kit';
 import { amountInWordsAr, amountInWordsEn, formatIban } from '@artepool/shared';
 import {
   shows,
@@ -100,22 +99,19 @@ const TAX_KINDS = new Set(['invoice', 'advance_invoice', 'credit_note', 'debit_n
 const MARGINS_MM = { narrow: 8, normal: 12, wide: 18 } as const;
 const TEXT_PT = { small: 8.5, normal: 9.5, large: 10.5 } as const;
 
-const fontFile = (name: string): string => {
-  const require = createRequire(import.meta.url);
-  const dir = dirname(require.resolve('@fontsource/ibm-plex-sans-arabic/package.json'));
-  return readFileSync(join(dir, 'files', name)).toString('base64');
-};
+/** The fonts' files are found through `resourcePath`, so the packaged server finds them too. */
+const FONTSOURCE_DIR = ['apps', 'server', 'node_modules', '@fontsource', 'ibm-plex-sans-arabic'];
+
+const fontFile = (name: string): string =>
+  readFileSync(resourcePath(...FONTSOURCE_DIR, 'files', name)).toString('base64');
 
 /** The owner's Arabic font (decision 0068), for Arabic letters only (it draws 0-9 as Arabic-Indic). */
-const ARABIC_FONT = new URL('../../../../../assets/fonts/ge-ss-tv-medium.otf', import.meta.url);
+const ARABIC_FONT = resourcePath('assets', 'fonts', 'ge-ss-tv-medium.otf');
 const ARABIC_LETTERS =
   'U+0600-065F, U+066A-06EF, U+06FA-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF';
 
 /** English headings (decision 0068): Tw Cen MT Condensed Extra Bold, Latin letters and digits only. */
-const HEADING_FONT = new URL(
-  '../../../../../assets/fonts/tw-cen-mt-condensed-extra-bold.ttf',
-  import.meta.url,
-);
+const HEADING_FONT = resourcePath('assets', 'fonts', 'tw-cen-mt-condensed-extra-bold.ttf');
 const LATIN = 'U+0020-007E, U+00A0-00FF, U+2013-2014, U+2018-201E, U+2022, U+2026, U+20AC';
 
 let fontsCss: string | null = null;

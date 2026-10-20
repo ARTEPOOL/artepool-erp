@@ -58,7 +58,7 @@ export async function offsiteUpload(
   try {
     const recipient = await ageRecipient(client);
     if (!recipient) throw new OffsiteNotReady('no_key');
-    const box = await SecretBox.fromFile(config.masterKeyFile);
+    const box = await SecretBox.fromSource(config.masterKey);
     const credentials = await loadDriveCredentials(config.driveCredentialsFile, box);
     if (!credentials) throw new OffsiteNotReady('drive_not_connected');
     const copy = (await latestLocalCopy(config)) ?? (await localBackup(client, config)).path;

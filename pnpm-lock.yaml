@@ -234,7 +234,11 @@ importers:
         specifier: workspace:*
         version: link:../shared
 
-  packages/node-kit: {}
+  packages/node-kit:
+    dependencies:
+      zod:
+        specifier: 4.6.5
+        version: 4.6.5
 
   packages/shared:
     dependencies:
@@ -284,6 +288,28 @@ importers:
         specifier: workspace:*
         version: link:../../packages/testing
       '@types/pg':
+        specifier: 8.23.1
+        version: 8.23.1
+
+  tools/build-server:
+    dependencies:
+      '@artepool/node-kit':
+        specifier: workspace:*
+        version: link:../../packages/node-kit
+      esbuild:
+        specifier: 0.28.2
+        version: 0.28.2
+    devDependencies:
+      '@artepool/testing':
+        specifier: workspace:*
+        version: link:../../packages/testing
+      '@artepool/tls':
+        specifier: workspace:*
+        version: link:../tls
+      '@types/pg':
+        specifier: 8.23.1
+        version: 8.23.1
+      pg:
         specifier: 8.23.1
         version: 8.23.1
 

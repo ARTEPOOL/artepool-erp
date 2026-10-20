@@ -7,18 +7,21 @@
  * Windows PC has — so printing works on a development PC without any extra step.
  */
 import { chromium, type Browser } from 'playwright-core';
+import { childEnv } from '@artepool/node-kit';
 import { ruleError } from '../../platform/errors/app-error';
 
 let browser: Promise<Browser> | null = null;
 
 async function firstThatStarts(): Promise<Browser> {
+  // The browser never needs the database passwords the server was started with.
+  const options = { headless: true, env: childEnv({}) };
   const pinned = process.env.ARTEPOOL_CHROMIUM;
-  if (pinned) return chromium.launch({ headless: true, executablePath: pinned });
+  if (pinned) return chromium.launch({ ...options, executablePath: pinned });
   try {
-    return await chromium.launch({ headless: true });
+    return await chromium.launch(options);
   } catch (error) {
     if (process.platform !== 'win32') throw error;
-    return chromium.launch({ headless: true, channel: 'msedge' });
+    return chromium.launch({ ...options, channel: 'msedge' });
   }
 }
 

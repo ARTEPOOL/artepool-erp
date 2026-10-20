@@ -45,7 +45,7 @@ beforeAll(async () => {
   config = {
     ...configFromEnv(db.name),
     backupDir: join(dir, 'copies'),
-    masterKeyFile,
+    masterKey: { file: masterKeyFile },
     driveCredentialsFile: join(dir, 'secrets', 'google-drive.sealed'),
     google: google.endpoints,
   };
