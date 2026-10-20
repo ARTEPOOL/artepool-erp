@@ -1,20 +1,33 @@
 // @vitest-environment node
 /**
- * The barcode label layout (decision 0096): for every size, short or very long Arabic and English
- * names, with or without the price and "incl. VAT", nothing overlaps, everything stays inside the
- * printable width, the name keeps to 2 lines and the price reads in the right order. Text is measured
- * here with a simple estimate; the real fonts are checked in the browser (Playwright).
+ * The barcode label layout from the owner's design (decisions 0096, 0097): for every size, any design
+ * (order, sizes, alignment, language, border, bar height, per-size overrides), short or very long
+ * names, with or without the price, nothing overlaps, everything stays inside the printable width,
+ * the barcode never goes below its minimum (5 mm bars, 2 dots per module at 203 dpi), and the price
+ * reads in the right order. Text is measured here with an estimate a little larger than the real
+ * fonts; the real fonts are checked in the browser (Playwright).
  */
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { barcodeFor } from '../../src/features/items/labels/barcode';
 import {
-  LABEL_MM,
+  defaultLabelDesign,
+  designForSize,
+  LABEL_ALIGNS,
+  LABEL_ELEMENTS,
+  LABEL_LANGUAGES,
+  LABEL_SIZES,
+  LabelDesign,
+  type LabelElement,
+} from '@artepool/shared/contracts';
+import {
   layoutBoxes,
   layoutLabel,
+  MIN_TEXT_MM,
+  TEXT_MM,
   wrapLines,
+  type LabelContent,
   type LabelLayout,
-  type LabelText,
+  type LabelWords,
   type Measurer,
 } from '../../src/features/items/labels/layout';
 
@@ -25,7 +38,7 @@ import {
 const measurer: Measurer = {
   width: (text, font, bold) =>
     [...text].reduce((sum, c) => {
-      const em = c === ' ' ? 0.28 : c === '…' ? 0.9 : /[\u0600-\u06FF]/.test(c) ? 0.5 : 0.56;
+      const em = c === ' ' ? 0.28 : c === '…' ? 0.9 : /[؀-ۿ]/.test(c) ? 0.5 : 0.56;
       return sum + em * font * (bold ? 1.06 : 1);
     }, 0),
   extent: (font, script) =>
@@ -34,20 +47,33 @@ const measurer: Measurer = {
       : { ascent: font * 0.9, descent: font * 0.24 },
 };
 
+const WORDS: LabelWords = {
+  currency: { ar: 'درهم', en: 'AED' },
+  vat: { ar: 'شامل الضريبة', en: 'incl. VAT' },
+  expiry: { ar: 'انتهاء', en: 'EXP' },
+  batch: { ar: 'تشغيلة', en: 'LOT' },
+};
+
 const PRESETS = [
-  [50, 30],
-  [50, 25],
-  [40, 30],
-  [38, 25],
+  ['50X30', 50, 30],
+  ['50X25', 50, 25],
+  ['40X30', 40, 30],
+  ['38X25', 38, 25],
 ] as const;
 
 const LONG_AR = 'كلور حبوب ٩٠٪ سريع الذوبان للمسابح الكبيرة والصغيرة عبوة ٥ كجم من إنتاج الشركة';
-const LONG_EN = 'Chlorine tablets 90% fast dissolving for large and small pools, 5 kg bucket';
 
-const text = (over: Partial<LabelText> = {}): LabelText => ({
+const content = (over: Partial<LabelContent> = {}): LabelContent => ({
   nameAr: 'كلور أقراص',
-  barcode: barcodeFor('6291041500213')!,
-  price: { language: 'ar', amount: '120.00', currency: 'درهم', vatNote: 'شامل الضريبة' },
+  nameEn: 'Chlorine tablets',
+  itemCode: 'CHEM-0013',
+  barcodeData: '6291041500213',
+  pack: 'كيس 25 كجم',
+  shopName: { ar: 'آرتيبول', en: 'ARTEPOOL' },
+  price: { amount: '120.00', includesVat: true },
+  expiry: '2027-05-31',
+  batch: 'A1234',
+  printDate: '2026-10-20',
   ...over,
 });
 
@@ -58,21 +84,28 @@ const geometry = (widthMm: number, heightMm: number, dpi = 203, printableWidthMm
   printableWidthMm,
 });
 
+/** The default design with these elements shown (and everything else as the default). */
+function designShowing(elements: LabelElement[], patch: Partial<LabelDesign> = {}): LabelDesign {
+  const design = defaultLabelDesign();
+  for (const e of elements) design.elements[e] = { ...design.elements[e], show: true };
+  return { ...design, ...patch };
+}
+
 const overlap = (a: { x: number; y: number; w: number; h: number }, b: typeof a) =>
   a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 
 /** The rules every printed label keeps. */
 function expectSound(layout: LabelLayout, printableWidthMm: number, dpi: number) {
   const boxes = layoutBoxes(layout);
-  const { content } = layout;
+  const { content: area } = layout;
   // Inside the printable width (centred on the label), and inside the label's height.
-  expect(content.w).toBeLessThanOrEqual(Math.round((printableWidthMm * dpi) / 25.4));
-  expect(Math.abs(content.x * 2 + content.w - layout.widthDots)).toBeLessThanOrEqual(1);
+  expect(area.w).toBeLessThanOrEqual(Math.round((printableWidthMm * dpi) / 25.4));
+  expect(Math.abs(area.x * 2 + area.w - layout.widthDots)).toBeLessThanOrEqual(1);
   for (const { part, box } of boxes) {
-    expect(box.x, part).toBeGreaterThanOrEqual(content.x);
-    expect(box.x + box.w, part).toBeLessThanOrEqual(content.x + content.w);
-    expect(box.y, part).toBeGreaterThanOrEqual(content.y);
-    expect(box.y + box.h, part).toBeLessThanOrEqual(content.y + content.h);
+    expect(box.x, part).toBeGreaterThanOrEqual(area.x);
+    expect(box.x + box.w, part).toBeLessThanOrEqual(area.x + area.w);
+    expect(box.y, part).toBeGreaterThanOrEqual(area.y);
+    expect(box.y + box.h, part).toBeLessThanOrEqual(area.y + area.h);
   }
   // Nothing overlaps anything else.
   boxes.forEach((a, i) =>
@@ -80,8 +113,14 @@ function expectSound(layout: LabelLayout, printableWidthMm: number, dpi: number)
       .slice(i + 1)
       .forEach((b) => expect(overlap(a.box, b.box), `${a.part}/${b.part}`).toBe(false)),
   );
-  expect(layout.name.length).toBeLessThanOrEqual(2);
-  expect(layout.bars.h).toBeGreaterThanOrEqual(Math.round((LABEL_MM.bars.min * dpi) / 25.4));
+  // The Arabic name in 2 lines at most; letters never below the readable minimum.
+  expect(layout.texts.filter((l) => l.part === 'nameAr').length).toBeLessThanOrEqual(2);
+  for (const line of layout.texts) {
+    expect(line.fontDots, line.part).toBeGreaterThanOrEqual(Math.round((MIN_TEXT_MM * dpi) / 25.4));
+  }
+  // The barcode never below its minimum: 5 mm bars, whole dots, at least 0.25 mm per module.
+  expect(layout.bars.h).toBeGreaterThanOrEqual(Math.round((5 * dpi) / 25.4));
+  expect(layout.bars.moduleDots).toBeGreaterThanOrEqual(dpi === 203 ? 2 : 3);
   for (const bar of layout.bars.rects) expect(bar.w % layout.bars.moduleDots).toBe(0);
 }
 
@@ -91,8 +130,9 @@ describe('wrapping the name', () => {
     expect(wrapped.cut).toBe(true);
     expect(wrapped.lines).toHaveLength(2);
     expect(wrapped.lines[1]!.endsWith('…')).toBe(true);
-    for (const line of wrapped.lines)
+    for (const line of wrapped.lines) {
       expect(measurer.width(line, 24, true)).toBeLessThanOrEqual(300);
+    }
     expect(wrapLines(measurer, 'كلور', 300, 24, true, 2)).toEqual({ lines: ['كلور'], cut: false });
   });
 
@@ -103,12 +143,14 @@ describe('wrapping the name', () => {
   });
 });
 
-describe('the label sizes', () => {
-  it.each(PRESETS)('%i × %i mm fits a long Arabic name, the price and incl. VAT', (w, h) => {
+describe('the default design', () => {
+  it.each(PRESETS)('%s fits a long Arabic name, the price and incl. VAT', (_code, w, h) => {
     for (const dpi of [203, 300]) {
       const layout = layoutLabel(
         geometry(w, h, dpi),
-        text({ nameAr: LONG_AR, nameEn: LONG_EN }),
+        defaultLabelDesign(),
+        content({ nameAr: LONG_AR, expiry: null, batch: null }),
+        WORDS,
         measurer,
       );
       expect(layout.ok).toBe(true);
@@ -116,130 +158,273 @@ describe('the label sizes', () => {
     }
   });
 
-  it('50 × 30: a short name in one line at the largest size, EAN-13 bars of 3 dots, centred', () => {
-    const layout = layoutLabel(geometry(50, 30), text(), measurer);
-    if (!layout.ok) throw new Error('refused');
-    expect(layout.name).toHaveLength(1);
-    expect(layout.name[0]!.fontDots).toBe(Math.round((LABEL_MM.name.max * 203) / 25.4));
-    expect(layout.bars.moduleDots).toBe(3);
-    // 50 mm label, 48 mm printable: the content starts 1 mm in from the printable edge.
-    expect(layout.content.x).toBe(Math.floor((400 - (384 - 16)) / 2));
+  it('expiry and batch as well: fit the 30 mm high labels, refused on 25 mm (no room)', () => {
+    const all = content({ nameAr: LONG_AR });
+    for (const [, w, h] of PRESETS) {
+      const layout = layoutLabel(geometry(w, h), defaultLabelDesign(), all, WORDS, measurer);
+      if (h >= 30) {
+        expect(layout.ok).toBe(true);
+        if (layout.ok) expectSound(layout, 48, 203);
+      } else {
+        expect(layout).toEqual({ ok: false, reason: 'too_small' });
+      }
+    }
   });
 
-  it('a long name takes 2 smaller lines; the last ends in "…" when still too long', () => {
-    const layout = layoutLabel(geometry(50, 25), text({ nameAr: LONG_AR }), measurer);
-    if (!layout.ok) throw new Error('refused');
-    expect(layout.name).toHaveLength(2);
-    expect(layout.name[1]!.text.endsWith('…')).toBe(true);
-    expect(layout.name[0]!.fontDots).toBeGreaterThanOrEqual(
-      Math.round((LABEL_MM.name.min * 203) / 25.4),
-    );
-  });
-
-  it('adds the English name only when asked and there is room', () => {
-    const roomy = layoutLabel(geometry(50, 30), text({ nameEn: 'Chlorine tablets' }), measurer);
-    expect(roomy.ok && roomy.english?.text).toBe('Chlorine tablets');
-    const none = layoutLabel(geometry(50, 30), text(), measurer);
-    expect(none.ok && none.english).toBe(null);
-  });
-
-  it('refuses a label too small for the name, bars and price, and a barcode too long for it', () => {
-    expect(layoutLabel(geometry(50, 15), text(), measurer)).toEqual({
-      ok: false,
-      reason: 'too_small',
-    });
-    expect(
-      layoutLabel(geometry(25, 30), text({ barcode: barcodeFor('PUMP-HAYWARD-1.5HP')! }), measurer),
-    ).toEqual({
-      ok: false,
-      reason: 'barcode_too_long',
-    });
-  });
-});
-
-describe('the price', () => {
-  it('reads "120.00 درهم" from the right on Arabic labels: the number right of "درهم"', () => {
-    const layout = layoutLabel(geometry(50, 30), text(), measurer);
-    if (!layout.ok || !layout.price) throw new Error('refused');
-    const [currency, amount] = layout.price.runs;
-    expect(currency).toMatchObject({ text: 'درهم', dir: 'rtl' });
-    expect(amount).toMatchObject({ text: '120.00', dir: 'ltr' });
-    expect(amount!.x).toBeGreaterThan(currency!.x);
-  });
-
-  it('reads "AED 120.00" on English labels', () => {
+  it('50 × 30, short name: the design as drawn, EAN-13 bars of 3 dots', () => {
     const layout = layoutLabel(
       geometry(50, 30),
-      text({ price: { language: 'en', amount: '120.00', currency: 'AED', vatNote: 'incl. VAT' } }),
+      defaultLabelDesign(),
+      content({ expiry: null, batch: null }),
+      WORDS,
       measurer,
     );
-    if (!layout.ok || !layout.price) throw new Error('refused');
-    const [currency, amount] = layout.price.runs;
-    expect(currency).toMatchObject({ text: 'AED', dir: 'ltr' });
-    expect(amount!.x).toBeGreaterThan(currency!.x);
-    expect(layout.vat?.text).toBe('incl. VAT');
+    if (!layout.ok) throw new Error('refused');
+    expect(layout.fitted).toBe(false);
+    expect(layout.texts[0]!.fontDots).toBe(Math.round((TEXT_MM.m * 203) / 25.4));
+    expect(layout.bars.moduleDots).toBe(3);
+    expect(layout.bars.h).toBe(Math.round((10 * 203) / 25.4));
+    // The digits under the bars, "incl. VAT" because the price includes it.
+    expect(layout.texts.map((l) => l.part)).toEqual(['nameAr', 'digits', 'vatNote']);
   });
 
-  it('no "incl. VAT" line when the price does not include VAT, no price line when not wanted', () => {
-    const plain = layoutLabel(
-      geometry(50, 30),
-      text({ price: { language: 'ar', amount: '120.00', currency: 'درهم', vatNote: null } }),
+  it('a tight size makes the bars shorter first (never below 5 mm), then the letters', () => {
+    const layout = layoutLabel(
+      geometry(50, 25),
+      defaultLabelDesign(),
+      content({ nameAr: LONG_AR, expiry: null, batch: null }),
+      WORDS,
       measurer,
     );
-    expect(plain.ok && plain.vat).toBe(null);
-    const bare = layoutLabel(geometry(50, 30), text({ price: null }), measurer);
-    expect(bare.ok && bare.price).toBe(null);
+    if (!layout.ok) throw new Error('refused');
+    expect(layout.fitted).toBe(true);
+    expect(layout.bars.h).toBeLessThan(Math.round((10 * 203) / 25.4));
+    expect(layout.bars.h).toBeGreaterThanOrEqual(Math.round((5 * 203) / 25.4));
   });
 });
 
-describe('property: never overlapping, always inside the printable width', () => {
-  const arabicWord = fc.stringMatching(/^[\u0621-\u064A]{1,12}$/);
+describe('what the design decides', () => {
+  it('shows the chosen elements in the chosen order', () => {
+    const design = designShowing(
+      ['nameEn', 'pack', 'itemCode', 'printDate', 'shopName', 'customText'],
+      { customText: '04 123 4567' },
+    );
+    design.order = [
+      'shopName',
+      'nameAr',
+      'nameEn',
+      'pack',
+      'barcode',
+      'itemCode',
+      'price',
+      'vatNote',
+      'expiry',
+      'batch',
+      'printDate',
+      'customText',
+    ];
+    const layout = layoutLabel(geometry(50, 60), design, content(), WORDS, measurer);
+    if (!layout.ok) throw new Error('refused');
+    expect(layout.texts.map((l) => l.part)).toEqual([
+      'shopName',
+      'nameAr',
+      'nameEn',
+      'pack',
+      'digits',
+      'itemCode',
+      'vatNote',
+      'expiry',
+      'batch',
+      'printDate',
+      'customText',
+    ]);
+    const tops = layout.texts.map((l) => l.box.y);
+    expect(tops).toEqual([...tops].sort((a, b) => a - b));
+    expect(layout.texts.find((l) => l.part === 'expiry')?.text).toBe('انتهاء 2027-05-31');
+  });
+
+  it('aligns right, centre or left inside the printable width', () => {
+    const design = defaultLabelDesign();
+    for (const align of LABEL_ALIGNS) {
+      design.elements.nameAr = { ...design.elements.nameAr, align };
+      const layout = layoutLabel(geometry(50, 30), design, content(), WORDS, measurer);
+      if (!layout.ok) throw new Error('refused');
+      const box = layout.texts[0]!.box;
+      const area = layout.content;
+      if (align === 'right') expect(box.x + box.w).toBe(area.x + area.w);
+      if (align === 'left') expect(box.x).toBe(area.x);
+      if (align === 'center') {
+        expect(Math.abs(box.x + box.w / 2 - (area.x + area.w / 2))).toBeLessThanOrEqual(1);
+      }
+    }
+  });
+
+  it('the price in Arabic, English or both, the number always to the right of the currency', () => {
+    for (const language of LABEL_LANGUAGES) {
+      const layout = layoutLabel(
+        geometry(50, 40),
+        { ...defaultLabelDesign(), language },
+        content(),
+        WORDS,
+        measurer,
+      );
+      if (!layout.ok) throw new Error('refused');
+      const currencies = layout.prices.map((p) => p.runs[0]!.text);
+      expect(currencies).toEqual(
+        language === 'ar' ? ['درهم'] : language === 'en' ? ['AED'] : ['درهم', 'AED'],
+      );
+      for (const line of layout.prices) {
+        expect(line.runs[1]).toMatchObject({ text: '120.00', dir: 'ltr' });
+        expect(line.runs[1]!.x).toBeGreaterThan(line.runs[0]!.x);
+      }
+    }
+  });
+
+  it('"incl. VAT": always, when the price includes it, or never', () => {
+    const vatOf = (vatNote: LabelDesign['vatNote'], includesVat: boolean) => {
+      const layout = layoutLabel(
+        geometry(50, 30),
+        { ...defaultLabelDesign(), vatNote },
+        content({ price: { amount: '13.13', includesVat } }),
+        WORDS,
+        measurer,
+      );
+      return layout.ok && layout.texts.some((l) => l.part === 'vatNote');
+    };
+    expect(vatOf('always', false)).toBe(true);
+    expect(vatOf('whenIncluded', false)).toBe(false);
+    expect(vatOf('whenIncluded', true)).toBe(true);
+    expect(vatOf('never', true)).toBe(false);
+  });
+
+  it('the barcode is always printed, never below 5 mm; Code 128 when the design asks for it', () => {
+    const design = defaultLabelDesign();
+    design.elements.barcode = { ...design.elements.barcode, show: false };
+    design.barcode = { heightMm: 5, showDigits: false, symbology: 'code128' };
+    const layout = layoutLabel(geometry(50, 30), design, content(), WORDS, measurer);
+    if (!layout.ok) throw new Error('refused');
+    expect(layout.bars.h).toBe(Math.round((5 * 203) / 25.4));
+    // EAN-13 data printed as Code 128 (start C, pairs of digits): not the 30 bars of an EAN-13.
+    expect(layout.bars.rects.length).not.toBe(30);
+    const tooShort = { ...design, barcode: { ...design.barcode, heightMm: 4 } };
+    expect(LabelDesign.safeParse(tooShort).success).toBe(false);
+  });
+
+  it('a size override hides the English name on 40 × 30 only', () => {
+    const design = designShowing(['nameEn']);
+    const plain = content({ expiry: null, batch: null });
+    design.overrides['40X30'] = { elements: { nameEn: { show: false } } };
+    const on50 = layoutLabel(
+      geometry(50, 30),
+      designForSize(design, '50X30'),
+      plain,
+      WORDS,
+      measurer,
+    );
+    const on40 = layoutLabel(
+      geometry(40, 30),
+      designForSize(design, '40X30'),
+      plain,
+      WORDS,
+      measurer,
+    );
+    expect(on50.ok && on50.texts.some((l) => l.part === 'nameEn')).toBe(true);
+    expect(on40.ok && on40.texts.some((l) => l.part === 'nameEn')).toBe(false);
+  });
+
+  it('refuses a label too small for the design, and a code too long for the width', () => {
+    expect(layoutLabel(geometry(50, 12), defaultLabelDesign(), content(), WORDS, measurer)).toEqual(
+      { ok: false, reason: 'too_small' },
+    );
+    expect(
+      layoutLabel(
+        geometry(25, 30),
+        defaultLabelDesign(),
+        content({ barcodeData: 'PUMP-HAYWARD-1.5HP' }),
+        WORDS,
+        measurer,
+      ),
+    ).toEqual({ ok: false, reason: 'barcode_too_long' });
+  });
+});
+
+describe('property: any design, any size: never overlapping, never below the minimums', () => {
+  const style = fc.record({
+    show: fc.boolean(),
+    size: fc.constantFrom(...LABEL_SIZES),
+    bold: fc.boolean(),
+    align: fc.constantFrom(...LABEL_ALIGNS),
+  });
+  const design: fc.Arbitrary<LabelDesign> = fc
+    .record({
+      order: fc.shuffledSubarray([...LABEL_ELEMENTS], {
+        minLength: LABEL_ELEMENTS.length,
+        maxLength: LABEL_ELEMENTS.length,
+      }),
+      elements: fc.record(
+        Object.fromEntries(LABEL_ELEMENTS.map((e) => [e, style])) as Record<
+          LabelElement,
+          typeof style
+        >,
+      ),
+      heightMm: fc.integer({ min: 10, max: 40 }).map((h) => h / 2),
+      showDigits: fc.boolean(),
+      code128: fc.boolean(),
+      language: fc.constantFrom(...LABEL_LANGUAGES),
+      vatNote: fc.constantFrom('always' as const, 'whenIncluded' as const, 'never' as const),
+      side: fc.integer({ min: 1, max: 8 }).map((v) => v / 2),
+      edge: fc.integer({ min: 1, max: 8 }).map((v) => v / 2),
+      border: fc.boolean(),
+    })
+    .map((r): LabelDesign => ({
+      order: r.order,
+      elements: r.elements,
+      barcode: {
+        heightMm: r.heightMm,
+        showDigits: r.showDigits,
+        symbology: r.code128 ? 'code128' : 'auto',
+      },
+      language: r.language,
+      vatNote: r.vatNote,
+      customText: 'هاتف 04 123 4567',
+      marginsMm: { side: r.side, edge: r.edge },
+      border: r.border,
+      overrides: {},
+    }));
+  const arabicWord = fc.stringMatching(/^[ء-ي]{1,12}$/);
   const latinWord = fc.stringMatching(/^[A-Za-z0-9%.,-]{1,14}$/);
   const words = (word: fc.Arbitrary<string>) =>
     fc.array(word, { minLength: 1, maxLength: 18 }).map((w) => w.join(' '));
-  const barcodeData = fc.oneof(
-    fc.constant('6291041500213'),
-    fc.constant('036000291452'),
-    fc.stringMatching(/^[A-Z]{2,5}-\d{4}$/),
-  );
 
-  it('for any size up to the roll, any names, with or without the price', () => {
+  it('lays out soundly or refuses', () => {
     fc.assert(
       fc.property(
+        design,
         fc.integer({ min: 30, max: 50 }),
         fc.integer({ min: 18, max: 60 }),
         fc.constantFrom(203, 300),
         fc.constantFrom(40, 46, 48, 50.8),
         words(arabicWord),
         fc.option(words(latinWord), { nil: null }),
-        barcodeData,
-        fc.constantFrom<'ar' | 'en' | null>('ar', 'en', null),
+        fc.constantFrom('6291041500213', '036000291452', 'CHEM-0013', 'X001JBWYZV'),
         fc.boolean(),
-        (w, h, dpi, printableWidthMm, nameAr, nameEn, data, language, vat) => {
+        (d, w, h, dpi, printableWidthMm, nameAr, nameEn, barcodeData, priced) => {
           const layout = layoutLabel(
             geometry(w, h, dpi, printableWidthMm),
-            text({
+            d,
+            content({
               nameAr,
               nameEn,
-              barcode: barcodeFor(data)!,
-              price: language
-                ? {
-                    language,
-                    amount: '1,250.75',
-                    currency: language === 'ar' ? 'درهم' : 'AED',
-                    vatNote: vat ? (language === 'ar' ? 'شامل الضريبة' : 'incl. VAT') : null,
-                  }
-                : null,
+              barcodeData,
+              price: priced ? { amount: '1,250.75', includesVat: true } : null,
             }),
+            WORDS,
             measurer,
           );
           if (layout.ok) expectSound(layout, printableWidthMm, dpi);
-          // A long code on a narrow label is refused (the screen says so); a size from 25 mm high
-          // always has room for everything.
-          else if (layout.reason === 'too_small' && h >= 25) throw new Error(`refused ${w}×${h}`);
         },
       ),
-      { numRuns: 400 },
+      { numRuns: 500 },
     );
   });
 });

@@ -74,9 +74,13 @@ function eanWidths(digits: string): number[] {
 
 const total = (widths: number[]) => widths.reduce((a, b) => a + b, 0);
 
-/** The barcode for this text, or null when it cannot be printed (letters outside ASCII). */
-export function barcodeFor(data: string): Barcode | null {
-  if (isValidGtin(data)) {
+/**
+ * The barcode for this text, or null when it cannot be printed (letters outside ASCII). A real
+ * EAN-13 / UPC-A / EAN-8 stays so, unless `code128` asks for Code 128 always.
+ */
+export function barcodeFor(data: string, options: { code128?: boolean } = {}): Barcode | null {
+  // The design may ask for Code 128 always (decision 0097).
+  if (!options.code128 && isValidGtin(data)) {
     if (data.length === 13) {
       const widths = eanWidths(data);
       return {

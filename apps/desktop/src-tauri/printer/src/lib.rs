@@ -235,6 +235,13 @@ mod imp {
     const DM_IN_BUFFER: u32 = 8;
     // DEVMODEW: dmFields at byte 72, then dmOrientation, dmPaperSize, dmPaperLength, dmPaperWidth.
     const DM_FIELDS_AT: usize = 72;
+    const DM_SCALE_AT: usize = 84;
+    const DM_PRINTQUALITY_AT: usize = 90;
+    const DM_YRESOLUTION_AT: usize = 96;
+    const DM_SCALE: u32 = 0x10;
+    const DM_PRINTQUALITY: u32 = 0x400;
+    const DM_YRESOLUTION: u32 = 0x2000;
+    const COLORONCOLOR: i32 = 3;
     const DM_ORIENTATION_AT: usize = 76;
     const DM_PAPERSIZE_AT: usize = 78;
     const DM_PAPERLENGTH_AT: usize = 80;
@@ -267,6 +274,7 @@ mod imp {
         fn StartPage(hdc: isize) -> i32;
         fn EndPage(hdc: isize) -> i32;
         fn GetDeviceCaps(hdc: isize, index: i32) -> i32;
+        fn SetStretchBltMode(hdc: isize, mode: i32) -> i32;
         fn StretchDIBits(
             hdc: isize,
             x_dest: i32,
@@ -436,13 +444,25 @@ mod imp {
                     return Err(last_error());
                 }
                 let fields = dm.add(DM_FIELDS_AT).cast::<u32>();
+                // The label's paper, at the printer's own resolution and 100 %: the driver then has
+                // nothing to scale, and the 1-bit image prints dot for dot.
                 fields.write_unaligned(
                     fields.read_unaligned()
                         | DM_ORIENTATION
                         | DM_PAPERSIZE
                         | DM_PAPERLENGTH
-                        | DM_PAPERWIDTH,
+                        | DM_PAPERWIDTH
+                        | DM_SCALE
+                        | DM_PRINTQUALITY
+                        | DM_YRESOLUTION,
                 );
+                dm.add(DM_SCALE_AT).cast::<i16>().write_unaligned(100);
+                dm.add(DM_PRINTQUALITY_AT)
+                    .cast::<i16>()
+                    .write_unaligned(job.dpi as i16);
+                dm.add(DM_YRESOLUTION_AT)
+                    .cast::<i16>()
+                    .write_unaligned(job.dpi as i16);
                 dm.add(DM_ORIENTATION_AT)
                     .cast::<i16>()
                     .write_unaligned(DMORIENT_PORTRAIT);
@@ -509,6 +529,8 @@ mod imp {
                 if StartDocW(hdc, &info) <= 0 {
                     return Err(last_error());
                 }
+                // Copy dots as they are (no smoothing into grey) if the driver must still scale.
+                SetStretchBltMode(hdc, COLORONCOLOR);
                 let dpi_x = GetDeviceCaps(hdc, LOGPIXELSX).max(1) as f64;
                 let dpi_y = GetDeviceCaps(hdc, LOGPIXELSY).max(1) as f64;
                 let dest_w = (image.width_dots as f64 * dpi_x / job.dpi as f64).round() as i32;

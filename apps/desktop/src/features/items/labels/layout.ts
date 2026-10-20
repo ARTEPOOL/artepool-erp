@@ -1,13 +1,22 @@
 /**
- * The barcode label layout (decision 0096): fixed zones in millimetres, worked out in the printer's
- * own dots, top to bottom: the Arabic name (at most 2 lines, letters shrink to a readable minimum,
- * then "…"), the English name when asked for and there is room (1 line), the bars (whole dots per
- * module, quiet zones blank), the code under the bars, the price ("120.00 درهم" / "AED 120.00",
- * the number always its own left-to-right run) and "incl. VAT". Everything stays inside the
- * printer's printable width, centred on the label; nothing ever overlaps. A label too small for
- * all of it is refused, never squeezed. Pure: text is measured by the caller (a canvas, or a test).
+ * The barcode label layout (decisions 0096, 0097), worked out in the printer's own dots from the
+ * owner's design: the shown elements top to bottom in the design's order, each at its size, bold or
+ * not, aligned right, centre or left. When a size is too small for the design as drawn, the bars get
+ * shorter (never below 5 mm) and then the letters smaller (never below a readable 2 mm); the Arabic
+ * name keeps to 2 lines (1 when squeezed to the end) and ends in "…" if it must. Everything stays
+ * inside the printer's printable width, centred on the label; nothing ever overlaps; a label that
+ * still does not fit is refused, never printed broken. Pure: text is measured by the caller (a
+ * canvas, or a test).
  */
-import { barRects, fullModules, moduleDots, type Barcode } from './barcode';
+import {
+  LABEL_BARCODE_MIN_HEIGHT_MM,
+  type LabelAlign,
+  type LabelDesign,
+  type LabelElement,
+  type LabelLanguage,
+  type LabelTextSize,
+} from '@artepool/shared/contracts';
+import { barcodeFor, barRects, fullModules, moduleDots } from './barcode';
 
 export interface LabelGeometry {
   widthMm: number;
@@ -18,22 +27,29 @@ export interface LabelGeometry {
   printableWidthMm: number;
 }
 
-export interface LabelText {
-  /** The Arabic name, always printed. */
+/** What goes on the label for one item (empty = that element is left out). */
+export interface LabelContent {
   nameAr: string;
-  /** The English name: printed only when given here and there is room. */
-  nameEn?: string | null;
-  barcode: Barcode;
-  /** The price, in the label's language; null = no price. */
-  price?: {
-    language: 'ar' | 'en';
-    /** "120.00" (Western digits, always left to right). */
-    amount: string;
-    /** "درهم" or "AED". */
-    currency: string;
-    /** "شامل الضريبة" / "incl. VAT" when the price includes VAT, else null. */
-    vatNote?: string | null;
-  } | null;
+  nameEn: string | null;
+  itemCode: string;
+  /** What the barcode holds (the main barcode, else the item code). */
+  barcodeData: string;
+  /** The sale pack ("كيس 25 كجم"), else the unit name. */
+  pack: string | null;
+  shopName: { ar: string; en: string } | null;
+  /** The price with VAT, "120.00" (Western digits); null = no price. */
+  price: { amount: string; includesVat: boolean } | null;
+  expiry: string | null;
+  batch: string | null;
+  printDate: string | null;
+}
+
+/** The label's fixed words in both languages (from the translations). */
+export interface LabelWords {
+  currency: { ar: string; en: string };
+  vat: { ar: string; en: string };
+  expiry: { ar: string; en: string };
+  batch: { ar: string; en: string };
 }
 
 /** Measures text the way it will be drawn (a canvas in the app; an estimate in tests). */
@@ -50,57 +66,56 @@ export interface Box {
   h: number;
 }
 
+/** One line of text: drawn at `x` with `align` (canvas textAlign) on `baseline`. */
 export interface TextLine {
+  part: LabelElement | 'digits';
   text: string;
-  /** Centre of the line (x) and its baseline (y), in dots. */
-  cx: number;
+  x: number;
   baseline: number;
   fontDots: number;
   bold: boolean;
   dir: 'rtl' | 'ltr';
-  /** The line's box: its full height and the measured width. */
+  align: LabelAlign;
   box: Box;
 }
 
-export interface PriceRun {
-  text: string;
-  /** Left edge of the run (x) and its baseline (y), in dots. */
-  x: number;
+/** A price line: the currency and the number as separate runs (the number always left to right). */
+export interface PriceLine {
+  runs: { text: string; x: number; dir: 'rtl' | 'ltr' }[];
   baseline: number;
-  dir: 'rtl' | 'ltr';
+  fontDots: number;
+  bold: boolean;
+  box: Box;
 }
 
 export interface LabelLayout {
   ok: true;
   widthDots: number;
   heightDots: number;
-  /** Where content may go: the printable width minus a small margin, centred on the label. */
+  /** Where content may go: the printable width minus the margins, centred on the label. */
   content: Box;
-  name: TextLine[];
-  english: TextLine | null;
+  texts: TextLine[];
   bars: { rects: { x: number; w: number }[]; y: number; h: number; moduleDots: number; box: Box };
-  code: TextLine;
-  price: { runs: PriceRun[]; fontDots: number; box: Box } | null;
-  vat: TextLine | null;
+  prices: PriceLine[];
+  border: Box | null;
+  /** True when the design had to be made smaller to fit this size. */
+  fitted: boolean;
 }
 
-export type LayoutResult = LabelLayout | { ok: false; reason: 'too_small' | 'barcode_too_long' };
+export type LayoutResult =
+  LabelLayout | { ok: false; reason: 'too_small' | 'barcode_too_long' | 'cannot_encode' };
 
-/** The sizes (mm) the layout works with. */
-export const LABEL_MM = {
-  /** Blank margin inside the printable width (each side) and at the top and bottom. */
-  side: 1,
-  edge: 1,
-  name: { max: 3.4, min: 2.2 },
-  english: { max: 2.4, min: 1.9 },
-  code: 1.9,
-  price: 2.8,
-  vat: 1.8,
-  bars: { min: 5, max: 14 },
-  /** Gaps between zones. */
-  gap: 0.6,
-  tightGap: 0.3,
-} as const;
+/** Letter sizes (mm) for small / medium / large, and the smallest a 203 dpi head prints readably. */
+export const TEXT_MM: Record<LabelTextSize, number> = { s: 2, m: 2.6, l: 3.4 };
+export const PRICE_MM: Record<LabelTextSize, number> = { s: 2.4, m: 3, l: 3.8 };
+export const MIN_TEXT_MM = 2;
+const GAP_MM = 0.5;
+const TIGHT_MM = 0.3;
+const BORDER_INSET_MM = 0.6;
+
+const ARABIC = /[؀-ۿ]/;
+const dirOf = (text: string): 'rtl' | 'ltr' => (ARABIC.test(text) ? 'rtl' : 'ltr');
+const scriptOf = (text: string) => (ARABIC.test(text) ? 'arabic' : 'latin');
 
 /** Line height for a font size: room for the letters' own height, never less than 1.25 em. */
 function lineHeight(m: Measurer, fontDots: number, script: 'arabic' | 'latin') {
@@ -161,201 +176,300 @@ export function wrapLines(
   return { lines: [...lines.slice(0, keep), `${last}…`], cut };
 }
 
+/** A word in the label's language(s). */
+const say = (words: { ar: string; en: string }, language: LabelLanguage) =>
+  language === 'ar' ? words.ar : language === 'en' ? words.en : `${words.ar} / ${words.en}`;
+
+/** The text of a text element, or null when it has nothing to show. */
+function textOf(
+  element: LabelElement,
+  content: LabelContent,
+  design: LabelDesign,
+  words: LabelWords,
+): string | null {
+  const value = (v: string | null | undefined) => (v && v.trim() ? v.trim() : null);
+  switch (element) {
+    case 'nameAr':
+      return value(content.nameAr);
+    case 'nameEn':
+      return value(content.nameEn);
+    case 'pack':
+      return value(content.pack);
+    case 'itemCode':
+      return value(content.itemCode);
+    case 'vatNote': {
+      if (!content.price || design.vatNote === 'never') return null;
+      if (design.vatNote === 'whenIncluded' && !content.price.includesVat) return null;
+      return say(words.vat, design.language);
+    }
+    case 'expiry':
+      return value(content.expiry) && `${say(words.expiry, design.language)} ${content.expiry}`;
+    case 'batch':
+      return value(content.batch) && `${say(words.batch, design.language)} ${content.batch}`;
+    case 'printDate':
+      return value(content.printDate);
+    case 'shopName':
+      return content.shopName ? value(say(content.shopName, design.language)) : null;
+    case 'customText':
+      return value(design.customText);
+    default:
+      return null;
+  }
+}
+
+/** One planned block, before it is placed. */
+type Block =
+  | {
+      kind: 'text';
+      part: LabelElement;
+      lines: string[];
+      fontDots: number;
+      lineH: number;
+      bold: boolean;
+      align: LabelAlign;
+    }
+  | { kind: 'bars'; h: number; digitsFont: number; digitsH: number; align: LabelAlign }
+  | {
+      kind: 'price';
+      lines: { currency: string; dir: 'rtl' | 'ltr' }[];
+      fontDots: number;
+      lineH: number;
+      bold: boolean;
+      align: LabelAlign;
+    };
+
 const toDots = (mm: number, dpi: number) => Math.round((mm * dpi) / 25.4);
 
-export function layoutLabel(g: LabelGeometry, t: LabelText, m: Measurer): LayoutResult {
+export function layoutLabel(
+  g: LabelGeometry,
+  design: LabelDesign,
+  content: LabelContent,
+  words: LabelWords,
+  m: Measurer,
+): LayoutResult {
   const d = (mm: number) => toDots(mm, g.dpi);
   const widthDots = d(g.widthMm);
   const heightDots = d(g.heightMm);
+  const inset = design.border ? d(BORDER_INSET_MM) : 0;
   const printable = Math.min(widthDots, d(g.printableWidthMm));
-  const contentW = printable - 2 * d(LABEL_MM.side);
+  const contentW = printable - 2 * (d(design.marginsMm.side) + inset);
   const contentX = Math.floor((widthDots - contentW) / 2);
-  const top = d(LABEL_MM.edge);
+  const top = d(design.marginsMm.edge) + inset;
   const available = heightDots - 2 * top;
-  const cx = contentX + contentW / 2;
+  if (contentW <= 0 || available <= 0) return { ok: false, reason: 'too_small' };
 
-  // The bars: whole dots per module, centred.
-  const dots = moduleDots(t.barcode, contentW, g.dpi);
+  const barcode = barcodeFor(content.barcodeData, {
+    code128: design.barcode.symbology === 'code128',
+  });
+  if (!barcode) return { ok: false, reason: 'cannot_encode' };
+  const dots = moduleDots(barcode, contentW, g.dpi);
   if (dots === null) return { ok: false, reason: 'barcode_too_long' };
 
-  // Fixed parts under the bars.
-  const codeFont = d(LABEL_MM.code);
-  const codeH = lineHeight(m, codeFont, 'latin');
-  const priceFont = d(LABEL_MM.price);
-  const priceH = t.price
-    ? lineHeight(m, priceFont, t.price.language === 'ar' ? 'arabic' : 'latin')
-    : 0;
-  const vatFont = d(LABEL_MM.vat);
-  const vatScript = t.price?.language === 'ar' ? 'arabic' : 'latin';
-  const vatH = t.price?.vatNote ? lineHeight(m, vatFont, vatScript) : 0;
-  const gap = d(LABEL_MM.gap);
-  const tight = d(LABEL_MM.tightGap);
-  const below = tight + codeH + (t.price ? gap + priceH : 0) + (vatH ? tight + vatH : 0);
-  const barsMin = d(LABEL_MM.bars.min);
-  const nameBudget = available - below - gap - barsMin;
+  const minFont = d(MIN_TEXT_MM);
+  const minBars = d(LABEL_BARCODE_MIN_HEIGHT_MM);
+  const gap = d(GAP_MM);
+  const tight = d(TIGHT_MM);
+  const style = design.elements;
+  // The barcode is always on a barcode label (decision 0097), whatever the design says.
+  const shown = design.order.filter((e) => e === 'barcode' || style[e].show);
 
-  // The Arabic name: the largest font (max → min) that fits in 2 lines within its budget.
-  const nameFonts = { max: d(LABEL_MM.name.max), min: d(LABEL_MM.name.min) };
-  let name: { lines: string[]; font: number; lineH: number } | null = null;
-  for (let font = nameFonts.max; font >= nameFonts.min; font -= 1) {
-    const wrapped = wrapLines(m, t.nameAr, contentW, font, true, 2);
-    const lineH = lineHeight(m, font, 'arabic');
-    if (!wrapped.cut && wrapped.lines.length * lineH <= nameBudget) {
-      name = { lines: wrapped.lines, font, lineH };
+  /** The blocks with the bars `barsCut` dots shorter and the letters `shrink` dots smaller. */
+  const plan = (barsCut: number, shrink: number): { blocks: Block[]; height: number } => {
+    const blocks: Block[] = [];
+    for (const element of shown) {
+      const s = style[element];
+      if (element === 'barcode') {
+        const digitsFont = Math.max(minFont, d(TEXT_MM[s.size]) - shrink);
+        blocks.push({
+          kind: 'bars',
+          h: Math.max(minBars, d(design.barcode.heightMm) - barsCut),
+          digitsFont,
+          digitsH: design.barcode.showDigits ? tight + lineHeight(m, digitsFont, 'latin') : 0,
+          align: s.align,
+        });
+        continue;
+      }
+      if (element === 'price') {
+        if (!content.price) continue;
+        const fontDots = Math.max(minFont, d(PRICE_MM[s.size]) - shrink);
+        const languages: ('ar' | 'en')[] =
+          design.language === 'both' ? ['ar', 'en'] : [design.language];
+        const lines = languages.map((l) => ({
+          currency: words.currency[l],
+          dir: l === 'ar' ? ('rtl' as const) : ('ltr' as const),
+        }));
+        const lineH = lineHeight(m, fontDots, design.language === 'en' ? 'latin' : 'arabic');
+        blocks.push({ kind: 'price', lines, fontDots, lineH, bold: s.bold, align: s.align });
+        continue;
+      }
+      const text = textOf(element, content, design, words);
+      if (!text) continue;
+      const designed = d(TEXT_MM[s.size]);
+      // The Arabic name: 2 lines; 1 once every letter is already as small as it can be.
+      const maxLines = element === 'nameAr' && shrink <= designed - minFont ? 2 : 1;
+      // The largest letters (from the design's size down) that fit without "…"; at the smallest,
+      // "…" ends the last line.
+      let fontDots = Math.max(minFont, designed - shrink);
+      let wrapped = wrapLines(m, text, contentW, fontDots, s.bold, maxLines);
+      while (wrapped.cut && fontDots > minFont) {
+        fontDots -= 1;
+        wrapped = wrapLines(m, text, contentW, fontDots, s.bold, maxLines);
+      }
+      blocks.push({
+        kind: 'text',
+        part: element,
+        lines: wrapped.lines,
+        fontDots,
+        lineH: lineHeight(m, fontDots, scriptOf(text)),
+        bold: s.bold,
+        align: s.align,
+      });
+    }
+    const heights = blocks.map((b) =>
+      b.kind === 'bars' ? b.h + b.digitsH : b.lines.length * b.lineH,
+    );
+    const height = heights.reduce((a, b) => a + b, 0) + gap * Math.max(0, blocks.length - 1);
+    return { blocks, height };
+  };
+
+  // Shrink until it fits: first the bars (down to their minimum), then the letters.
+  const barsRoom = Math.max(0, d(design.barcode.heightMm) - minBars);
+  const maxShrink = d(PRICE_MM.l) - minFont + 1;
+  let chosen: { blocks: Block[]; height: number } | null = null;
+  let fitted = false;
+  for (let shrink = 0; shrink <= maxShrink && !chosen; shrink += 1) {
+    const full = plan(0, shrink);
+    if (shrink === 0 && full.height <= available) {
+      chosen = full;
       break;
     }
+    const short = plan(barsRoom, shrink);
+    if (short.height <= available) {
+      // The bars as tall as the design wants, as far as the space left allows.
+      chosen = plan(Math.max(0, barsRoom - (available - short.height)), shrink);
+      fitted = true;
+    }
   }
-  if (!name) {
-    // Even the smallest letters need "…": as many lines as fit (2 at most, 1 at least).
-    const font = nameFonts.min;
-    const lineH = lineHeight(m, font, 'arabic');
-    const max = Math.min(2, Math.floor(nameBudget / lineH));
-    if (max < 1) return { ok: false, reason: 'too_small' };
-    name = { lines: wrapLines(m, t.nameAr, contentW, font, true, max).lines, font, lineH };
-  }
-  const nameH = name.lines.length * name.lineH;
+  if (!chosen || chosen.height > available) return { ok: false, reason: 'too_small' };
 
-  // The English name: one line, only when the bars keep their minimum height.
-  let english: { text: string; font: number; lineH: number } | null = null;
-  const nameEn = t.nameEn?.trim();
-  if (nameEn) {
-    const left = available - below - gap - nameH - barsMin - tight;
-    for (let font = d(LABEL_MM.english.max); font >= d(LABEL_MM.english.min); font -= 1) {
-      const lineH = lineHeight(m, font, 'latin');
-      if (lineH > left) continue;
-      const wrapped = wrapLines(m, nameEn, contentW, font, false, 1);
-      if (!wrapped.cut || font === d(LABEL_MM.english.min)) {
-        english = { text: wrapped.lines[0] ?? '', font, lineH };
-        break;
+  // Place the blocks, top to bottom, centred in the height that is left over.
+  const right = contentX + contentW;
+  const anchor = (align: LabelAlign, width: number) =>
+    align === 'left'
+      ? contentX
+      : align === 'right'
+        ? right - width
+        : Math.round(contentX + (contentW - width) / 2);
+  const drawAt = (align: LabelAlign, x: number, width: number) =>
+    align === 'left' ? x : align === 'right' ? x + width : x + width / 2;
+  const texts: TextLine[] = [];
+  const prices: PriceLine[] = [];
+  let bars: LabelLayout['bars'] | null = null;
+  let y = top + Math.floor((available - chosen.height) / 2);
+  chosen.blocks.forEach((block, i) => {
+    if (i > 0) y += gap;
+    if (block.kind === 'text') {
+      for (const text of block.lines) {
+        const width = Math.min(contentW, Math.ceil(m.width(text, block.fontDots, block.bold)));
+        const x = anchor(block.align, width);
+        texts.push({
+          part: block.part,
+          text,
+          x: drawAt(block.align, x, width),
+          baseline: baselineIn(m, y, block.lineH, block.fontDots, scriptOf(text)),
+          fontDots: block.fontDots,
+          bold: block.bold,
+          dir: dirOf(text),
+          align: block.align,
+          box: { x, y, w: width, h: block.lineH },
+        });
+        y += block.lineH;
+      }
+    } else if (block.kind === 'bars') {
+      const symbolW = fullModules(barcode) * dots;
+      const x = anchor(block.align, symbolW);
+      bars = {
+        rects: barRects(barcode, dots, x),
+        y,
+        h: block.h,
+        moduleDots: dots,
+        box: { x, y, w: symbolW, h: block.h },
+      };
+      y += block.h;
+      if (block.digitsH > 0) {
+        y += tight;
+        const lineH = block.digitsH - tight;
+        const width = Math.min(contentW, Math.ceil(m.width(barcode.data, block.digitsFont, false)));
+        // The digits sit under the bars, centred on them, inside the content area.
+        const x0 = Math.min(
+          right - width,
+          Math.max(contentX, Math.round(x + (symbolW - width) / 2)),
+        );
+        texts.push({
+          part: 'digits',
+          text: barcode.data,
+          x: x0 + width / 2,
+          baseline: baselineIn(m, y, lineH, block.digitsFont, 'latin'),
+          fontDots: block.digitsFont,
+          bold: false,
+          dir: 'ltr',
+          align: 'center',
+          box: { x: x0, y, w: width, h: lineH },
+        });
+        y += lineH;
+      }
+    } else {
+      const amount = content.price!.amount;
+      for (const line of block.lines) {
+        const wAmount = m.width(amount, block.fontDots, block.bold);
+        const wCurrency = m.width(line.currency, block.fontDots, block.bold);
+        const wSpace = m.width(' ', block.fontDots, block.bold);
+        const width = Math.min(contentW, Math.ceil(wAmount + wSpace + wCurrency));
+        const x = anchor(block.align, width);
+        // Seen from the left: the currency, then the number. Arabic reads "120.00 درهم" from the
+        // right; English reads "AED 120.00".
+        prices.push({
+          runs: [
+            { text: line.currency, x, dir: line.dir },
+            { text: amount, x: Math.round(x + wCurrency + wSpace), dir: 'ltr' },
+          ],
+          baseline: baselineIn(
+            m,
+            y,
+            block.lineH,
+            block.fontDots,
+            line.dir === 'rtl' ? 'arabic' : 'latin',
+          ),
+          fontDots: block.fontDots,
+          bold: block.bold,
+          box: { x, y, w: width, h: block.lineH },
+        });
+        y += block.lineH;
       }
     }
-  }
-  const englishH = english ? tight + english.lineH : 0;
-
-  // The bars take what is left (up to their maximum); any space left over centres the label.
-  const barsH = Math.min(d(LABEL_MM.bars.max), available - below - gap - nameH - englishH);
-  if (barsH < barsMin) return { ok: false, reason: 'too_small' };
-  const used = nameH + englishH + gap + barsH + below;
-  let y = top + Math.floor((available - used) / 2);
-
-  const nameLines: TextLine[] = name.lines.map((text) => {
-    const width = Math.min(contentW, Math.ceil(m.width(text, name.font, true)));
-    const line: TextLine = {
-      text,
-      cx,
-      baseline: baselineIn(m, y, name.lineH, name.font, 'arabic'),
-      fontDots: name.font,
-      bold: true,
-      dir: 'rtl',
-      box: { x: Math.round(cx - width / 2), y, w: width, h: name.lineH },
-    };
-    y += name.lineH;
-    return line;
   });
 
-  let englishLine: TextLine | null = null;
-  if (english) {
-    y += tight;
-    const width = Math.min(contentW, Math.ceil(m.width(english.text, english.font, false)));
-    englishLine = {
-      text: english.text,
-      cx,
-      baseline: baselineIn(m, y, english.lineH, english.font, 'latin'),
-      fontDots: english.font,
-      bold: false,
-      dir: 'ltr',
-      box: { x: Math.round(cx - width / 2), y, w: width, h: english.lineH },
-    };
-    y += english.lineH;
-  }
-
-  y += gap;
-  const symbolW = fullModules(t.barcode) * dots;
-  const barsX = Math.round(cx - symbolW / 2);
-  const bars = {
-    rects: barRects(t.barcode, dots, barsX),
-    y,
-    h: barsH,
-    moduleDots: dots,
-    box: { x: barsX, y, w: symbolW, h: barsH },
-  };
-  y += barsH + tight;
-
-  const codeW = Math.min(contentW, Math.ceil(m.width(t.barcode.data, codeFont, false)));
-  const code: TextLine = {
-    text: t.barcode.data,
-    cx,
-    baseline: baselineIn(m, y, codeH, codeFont, 'latin'),
-    fontDots: codeFont,
-    bold: false,
-    dir: 'ltr',
-    box: { x: Math.round(cx - codeW / 2), y, w: codeW, h: codeH },
-  };
-  y += codeH;
-
-  let price: LabelLayout['price'] = null;
-  let vat: TextLine | null = null;
-  if (t.price) {
-    y += gap;
-    const p = t.price;
-    const script = p.language === 'ar' ? 'arabic' : 'latin';
-    const wAmount = m.width(p.amount, priceFont, true);
-    const wCurrency = m.width(p.currency, priceFont, true);
-    const wSpace = m.width(' ', priceFont, true);
-    const total = Math.ceil(wAmount + wSpace + wCurrency);
-    const left = Math.round(cx - total / 2);
-    const baseline = baselineIn(m, y, priceH, priceFont, script);
-    // Arabic reads right to left: the number on the right, "درهم" to its left. English: "AED 120.00".
-    const runs: PriceRun[] =
-      p.language === 'ar'
-        ? [
-            { text: p.currency, x: left, baseline, dir: 'rtl' },
-            { text: p.amount, x: Math.round(left + wCurrency + wSpace), baseline, dir: 'ltr' },
-          ]
-        : [
-            { text: p.currency, x: left, baseline, dir: 'ltr' },
-            { text: p.amount, x: Math.round(left + wCurrency + wSpace), baseline, dir: 'ltr' },
-          ];
-    price = { runs, fontDots: priceFont, box: { x: left, y, w: total, h: priceH } };
-    y += priceH;
-    if (p.vatNote) {
-      y += tight;
-      const width = Math.min(contentW, Math.ceil(m.width(p.vatNote, vatFont, false)));
-      vat = {
-        text: p.vatNote,
-        cx,
-        baseline: baselineIn(m, y, vatH, vatFont, vatScript),
-        fontDots: vatFont,
-        bold: false,
-        dir: p.language === 'ar' ? 'rtl' : 'ltr',
-        box: { x: Math.round(cx - width / 2), y, w: width, h: vatH },
-      };
-      y += vatH;
-    }
-  }
-
+  const border = design.border
+    ? { x: contentX - inset, y: top - inset, w: contentW + 2 * inset, h: available + 2 * inset }
+    : null;
   return {
     ok: true,
     widthDots,
     heightDots,
     content: { x: contentX, y: top, w: contentW, h: available },
-    name: nameLines,
-    english: englishLine,
-    bars,
-    code,
-    price,
-    vat,
+    texts,
+    bars: bars!,
+    prices,
+    border,
+    fitted,
   };
 }
 
 /** Every box on the label, for checks (nothing overlaps, everything inside the content area). */
 export function layoutBoxes(layout: LabelLayout): { part: string; box: Box }[] {
   return [
-    ...layout.name.map((line, i) => ({ part: `name${i + 1}`, box: line.box })),
-    ...(layout.english ? [{ part: 'english', box: layout.english.box }] : []),
+    ...layout.texts.map((line, i) => ({ part: `${line.part}#${i}`, box: line.box })),
     { part: 'bars', box: layout.bars.box },
-    { part: 'code', box: layout.code.box },
-    ...(layout.price ? [{ part: 'price', box: layout.price.box }] : []),
-    ...(layout.vat ? [{ part: 'vat', box: layout.vat.box }] : []),
+    ...layout.prices.map((line, i) => ({ part: `price#${i}`, box: line.box })),
   ];
 }

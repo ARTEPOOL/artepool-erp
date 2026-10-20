@@ -22,7 +22,12 @@ import {
   THIS_DEVICE_KEY,
   useLabelPrinter,
 } from '../../items/labels/printer';
-import { renderTestLabel } from '../../items/labels/render';
+import {
+  printedDotsUrl,
+  renderQualityLabel,
+  renderTestLabel,
+  type LabelImage,
+} from '../../items/labels/render';
 import { localName, useLabelSizes } from '../../masterdata/refs';
 import mdStyles from '../../masterdata/masterdata.module.css';
 import { canPrintSilently, listPrinters } from '../../pos/receipt/printer';
@@ -35,6 +40,10 @@ interface Form {
   printableWidthMm: string;
   offsetXMm: string;
   offsetYMm: string;
+  darkness: string;
+  speed: string;
+  /** Kept as saved: chosen in the RAW printing step (decision 0097). */
+  mode: LabelPrinterValues['mode'];
 }
 
 const toForm = (c: LabelPrinterValues): Form => ({
@@ -43,7 +52,14 @@ const toForm = (c: LabelPrinterValues): Form => ({
   printableWidthMm: String(c.printableWidthMm),
   offsetXMm: String(c.offsetXMm),
   offsetYMm: String(c.offsetYMm),
+  darkness: String(c.darkness),
+  speed: String(c.speed),
+  mode: c.mode,
 });
+
+/** A whole number, or null. */
+const whole = (text: string): number | null =>
+  /^\d{1,2}$/.test(text.trim()) ? Number(text.trim()) : null;
 
 /** A number of millimetres with at most one decimal ("1.5", "-0.5"), or null. */
 const mm = (text: string): number | null =>
@@ -57,6 +73,9 @@ function toConfig(form: Form): LabelPrinterValues | null {
     printableWidthMm: mm(form.printableWidthMm),
     offsetXMm: mm(form.offsetXMm),
     offsetYMm: mm(form.offsetYMm),
+    darkness: whole(form.darkness),
+    speed: whole(form.speed),
+    mode: form.mode,
   });
   return parsed.success ? parsed.data : null;
 }
@@ -123,6 +142,22 @@ export function LabelPrinterCard({ index }: { index: number }) {
     }
   }, [config, size, t]);
 
+  const quality = useMemo(() => {
+    if (!config || !size) return null;
+    try {
+      return renderQualityLabel(
+        { ...size, dpi: config.dpi, printableWidthMm: config.printableWidthMm },
+        { x: config.offsetXMm, y: config.offsetYMm },
+        {
+          arabic: i18n.getFixedT('ar', 'settings')('devices.labelQualitySample'),
+          english: i18n.getFixedT('en', 'settings')('devices.labelQualitySample'),
+        },
+      );
+    } catch {
+      return null;
+    }
+  }, [config, size, i18n]);
+
   if (!form) return null;
   const set = (patch: Partial<Form>) => setForm({ ...form, ...patch });
   const bad = (text: string, min: number, max: number) => {
@@ -132,9 +167,16 @@ export function LabelPrinterCard({ index }: { index: number }) {
       : undefined;
   };
 
-  const printTest = async () => {
-    if (!config || !size || !test) return;
-    const outcome = await printLabels(test, size, config, 1, 'test-label');
+  const badWhole = (text: string, min: number, max: number) => {
+    const value = whole(text);
+    return value === null || value < min || value > max
+      ? t('devices.labelWholeRule', { min, max })
+      : undefined;
+  };
+
+  const printTest = async (image: LabelImage | null, name: string) => {
+    if (!config || !size || !image) return;
+    const outcome = await printLabels(image, size, config, 1, name);
     if (outcome.printed) {
       setProblem(null);
       toast(t('devices.testSent'));
@@ -205,6 +247,29 @@ export function LabelPrinterCard({ index }: { index: number }) {
           error={bad(form.offsetYMm, -10, 10)}
         />
       </div>
+      <div className={mdStyles.grid2}>
+        <TextField
+          label={t('devices.labelDarkness')}
+          value={form.darkness}
+          onChange={(darkness) => set({ darkness })}
+          ltr
+          inputMode="numeric"
+          maxLength={2}
+          hint={t('devices.labelDarknessHint')}
+          error={badWhole(form.darkness, 0, 15)}
+        />
+        <TextField
+          label={t('devices.labelSpeed')}
+          value={form.speed}
+          onChange={(speed) => set({ speed })}
+          ltr
+          inputMode="numeric"
+          maxLength={1}
+          hint={t('devices.labelSpeedHint')}
+          error={badWhole(form.speed, 1, 6)}
+        />
+      </div>
+      <Note>{t('devices.labelDriverTips')}</Note>
       <div className={styles.savebar}>
         <Button
           variant="primary"
@@ -231,14 +296,38 @@ export function LabelPrinterCard({ index }: { index: number }) {
               </option>
             ))}
           </select>
-          <Button
-            variant="default"
-            isDisabled={!test || !canPrintLabelsSilently(config ?? undefined)}
-            onPress={() => void printTest()}
-          >
-            <Printer className={iconClass.sm} aria-hidden="true" />
-            {t('devices.labelTestPrint')}
-          </Button>
+          <div className={styles.savebar}>
+            <Button
+              variant="default"
+              isDisabled={!test || !canPrintLabelsSilently(config ?? undefined)}
+              onPress={() => void printTest(test, 'test-label')}
+            >
+              <Printer className={iconClass.sm} aria-hidden="true" />
+              {t('devices.labelTestPrint')}
+            </Button>
+            <Button
+              variant="default"
+              isDisabled={!quality || !canPrintLabelsSilently(config ?? undefined)}
+              onPress={() => void printTest(quality, 'quality-test-label')}
+            >
+              <Printer className={iconClass.sm} aria-hidden="true" />
+              {t('devices.labelQualityPrint')}
+            </Button>
+          </div>
+          {quality && size && (
+            <img
+              className={deviceStyles.labelPreview}
+              style={
+                {
+                  '--label-w': `${size.widthMm}mm`,
+                  '--label-h': `${size.heightMm}mm`,
+                } as CSSProperties
+              }
+              src={printedDotsUrl(quality)}
+              alt={t('devices.labelQualityPreview')}
+              data-testid="label-quality-preview"
+            />
+          )}
           {test && size && (
             <img
               className={deviceStyles.labelPreview}
@@ -248,7 +337,7 @@ export function LabelPrinterCard({ index }: { index: number }) {
                   '--label-h': `${size.heightMm}mm`,
                 } as CSSProperties
               }
-              src={test.canvas.toDataURL('image/png')}
+              src={printedDotsUrl(test)}
               alt={t('devices.labelTestPreview')}
               data-testid="label-test-preview"
             />

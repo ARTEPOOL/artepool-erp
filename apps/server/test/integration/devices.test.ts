@@ -298,6 +298,9 @@ describe("this PC's label printer (decision 0096)", () => {
       printableWidthMm: 48,
       offsetXMm: 0,
       offsetYMm: 0,
+      darkness: 8,
+      speed: 3,
+      mode: 'driver',
     });
     const config = {
       printer: 'LV-275 Label',
@@ -317,13 +320,23 @@ describe("this PC's label printer (decision 0096)", () => {
     const after = (
       await call(server, 'GET', '/api/v1/devices/me', { device: office })
     ).json<ThisDeviceResponse>();
-    expect(after.labelPrinter).toEqual(config);
+    // Darkness, speed and mode not sent: their defaults (decision 0097).
+    expect(after.labelPrinter).toEqual({ ...config, darkness: 8, speed: 3, mode: 'driver' });
+    expect((await put({ ...config, darkness: 12, speed: 2, mode: 'tspl' })).statusCode).toBe(200);
+    expect(
+      (
+        await call(server, 'GET', '/api/v1/devices/me', { device: office })
+      ).json<ThisDeviceResponse>().labelPrinter,
+    ).toMatchObject({ darkness: 12, speed: 2, mode: 'tspl' });
     // Out of range, wrong dpi, more than one decimal: refused.
     for (const bad of [
       { ...config, offsetXMm: 12 },
       { ...config, dpi: 600 },
       { ...config, printableWidthMm: 48.25 },
       { ...config, printer: '../x' },
+      { ...config, darkness: 16 },
+      { ...config, speed: 0 },
+      { ...config, mode: 'zpl' },
     ]) {
       expect(errorCode(await put(bad))).toBe('VALIDATION_FAILED');
     }

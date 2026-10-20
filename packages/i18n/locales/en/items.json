@@ -239,6 +239,8 @@
       "no_drawer": "The label printer has no cash drawer."
     },
     "dialogNote": "No label printer is set on this PC: the print dialog opens. Choose the label printer there, size 100%.",
-    "sheetNote": "A4 sheets print through the print dialog, at 100% size."
+    "sheetNote": "A4 sheets print through the print dialog, at 100% size.",
+    "expiryWord": "EXP",
+    "batchWord": "LOT"
   }
 }

@@ -16,6 +16,9 @@ const SAVED: LabelPrinterConfig = {
   printableWidthMm: 48,
   offsetXMm: 0,
   offsetYMm: 0,
+  darkness: 8,
+  speed: 3,
+  mode: 'driver',
 };
 
 function bridge() {

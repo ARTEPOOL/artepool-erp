@@ -5,7 +5,7 @@
  * and the labels sent to the print dialog are visible (no other print rule of the app hides them).
  */
 import { readBarcodes } from 'zxing-wasm/reader';
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { expect, signInAsOwner, test } from './fixtures';
 
 const LONG_AR = 'كلور حبوب سريع الذوبان للمسابح الكبيرة والصغيرة عبوة خمسة كيلو من إنتاج الشركة';
@@ -20,12 +20,13 @@ interface Layout {
   widthDots: number;
   content: Box;
   boxes: { part: string; box: Box }[];
-  name: string[];
-  english: string | null;
-  price: { text: string; x: number; dir: string }[] | null;
-  vat: string | null;
+  texts: { part: string; text: string }[];
+  prices: { text: string; x: number; dir: string }[][];
   moduleDots: number;
 }
+
+const textsOf = (layout: Layout, part: string) =>
+  layout.texts.filter((l) => l.part === part).map((l) => l.text);
 
 /** A new item with a long Arabic name and a price including VAT; its labels dialog opened. */
 async function openLabels(page: Page, t: (key: string) => string, lang: string) {
@@ -46,6 +47,27 @@ async function openLabels(page: Page, t: (key: string) => string, lang: string) 
     .first()
     .click();
   return page.getByRole('dialog');
+}
+
+/**
+ * Every pixel of an image shown on the page, read back: true when each one is pure black (0) or
+ * pure white (255), as the 1-bit image the printer gets must be (decision 0097).
+ */
+async function onlyBlackAndWhite(image: Locator): Promise<{ pixels: number; grey: number }> {
+  return image.evaluate(async (img: HTMLImageElement) => {
+    await img.decode();
+    const canvas = document.createElement('canvas');
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    const ctx = canvas.getContext('2d')!;
+    ctx.drawImage(img, 0, 0);
+    const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    let grey = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      for (let c = 0; c < 3; c += 1) if (data[i + c] !== 0 && data[i + c] !== 255) grey += 1;
+    }
+    return { pixels: data.length / 4, grey };
+  });
 }
 
 const overlap = (a: Box, b: Box) =>
@@ -77,18 +99,17 @@ test('a long name, the price and the barcode: apart, inside, readable', async ({
       .forEach((b) => expect(overlap(a.box, b.box), `${a.part}/${b.part}`).toBe(false)),
   );
   // The Arabic name in 2 lines at most, cut with "…" when longer.
-  expect(layout.name.length).toBeLessThanOrEqual(2);
-  expect(layout.name.join(' ').length).toBeGreaterThan(10);
+  expect(textsOf(layout, 'nameAr').length).toBeLessThanOrEqual(2);
+  expect(textsOf(layout, 'nameAr').join(' ').length).toBeGreaterThan(10);
 
-  // The price in the screen's language, the number its own run.
-  const [first, second] = layout.price!;
-  if (lang === 'ar') {
-    expect([first!.text, second!.text]).toEqual(['درهم', '120.00']);
-    expect(second!.x).toBeGreaterThan(first!.x); // read from the right: 120.00 then درهم
-  } else {
-    expect([first!.text, second!.text]).toEqual(['AED', '120.00']);
-    expect(second!.x).toBeGreaterThan(first!.x);
-  }
+  // The price in the design's language (Arabic by default), the number its own run, to the right
+  // of the currency: read from the right, "120.00 درهم".
+  const [first, second] = layout.prices[0]!;
+  expect([first!.text, second!.text]).toEqual(['درهم', '120.00']);
+  expect(second!.x).toBeGreaterThan(first!.x);
+
+  // Pure 1-bit: every pixel black or white, at the printer's 400 × 240 dots (50 × 30 mm, 203 dpi).
+  expect(await onlyBlackAndWhite(preview.getByRole('img'))).toEqual({ pixels: 400 * 240, grey: 0 });
 
   // The drawn label is read back by a barcode reader (the item code, Code 128).
   const src = await preview.getByRole('img').getAttribute('src');
@@ -99,7 +120,7 @@ test('a long name, the price and the barcode: apart, inside, readable', async ({
   // The English name when asked for.
   await dialog.getByText(t('items:labels.addEnglish'), { exact: true }).click();
   const withEnglish = JSON.parse((await preview.getAttribute('data-layout'))!) as Layout;
-  expect(withEnglish.english).toMatch(/^Chlorine \d{6}$/);
+  expect(textsOf(withEnglish, 'nameEn')[0]).toMatch(/^Chlorine \d{6}$/);
 });
 
 test('the printed labels are visible on the page', async ({ page, open, t, lang }) => {
@@ -136,5 +157,24 @@ test('the printed labels are visible on the page', async ({ page, open, t, lang 
     // 30 mm high on paper; drawn at the label printer's 400 dots across (50 mm at 203 dpi).
     expect(label.height).toBeGreaterThan(100);
     expect(label.drawn).toBe(400);
+  }
+});
+
+test('label printer: the test and quality labels are pure black and white', async ({
+  page,
+  open,
+  t,
+}) => {
+  await open('office');
+  await signInAsOwner(page, t);
+  await page.getByRole('link', { name: t('settings:nav.settings') }).click();
+  await page.getByRole('link', { name: t('settings:hub.devices') }).click();
+  await expect(
+    page.getByRole('heading', { name: t('settings:devices.labelPrinter') }),
+  ).toBeVisible();
+  for (const id of ['label-test-preview', 'label-quality-preview']) {
+    const image = page.getByTestId(id);
+    await expect(image).toBeVisible();
+    expect(await onlyBlackAndWhite(image)).toEqual({ pixels: 400 * 240, grey: 0 });
   }
 });

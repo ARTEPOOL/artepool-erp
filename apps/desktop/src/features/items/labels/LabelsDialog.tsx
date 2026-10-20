@@ -4,7 +4,10 @@ import { Printer } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import {
   DEFAULT_LABEL_PRINTER,
+  defaultLabelDesign,
+  designForSize,
   type ItemDetail,
+  type LabelDesign,
   type LabelPrinterConfig,
   type LabelSizeItem,
 } from '@artepool/shared/contracts';
@@ -27,6 +30,7 @@ import { barcodeFor } from './barcode';
 import { layoutBoxes, layoutLabel, type LayoutResult } from './layout';
 import { canPrintLabelsSilently, printLabels, useLabelPrinter } from './printer';
 import { canvasMeasurer, printedDotsUrl, renderLabel, type LabelImage } from './render';
+import { labelWords } from './words';
 import styles from './labels.module.css';
 
 const MAX_LABELS = 500;
@@ -59,7 +63,6 @@ export function LabelsDialog(props: {
   const { t, i18n } = useTranslation('items');
   const toast = useToast();
   const name = localName(i18n.language);
-  const language = i18n.language === 'en' ? 'en' : 'ar';
   const sizes = useLabelSizes();
   const printer: LabelPrinterConfig = useLabelPrinter().data ?? DEFAULT_LABEL_PRINTER;
   const active = (sizes.data ?? [])
@@ -89,6 +92,8 @@ export function LabelsDialog(props: {
 
   // The label, laid out and drawn at the printer's dots (A4 sheets: finely, for an office printer).
   const measurer = useMemo(() => canvasMeasurer(), []);
+  const design = useMemo(() => defaultLabelDesign(), []);
+  const words = useMemo(() => labelWords(i18n), [i18n]);
   const drawn = useMemo((): { layout: LayoutResult; image: LabelImage | null } | null => {
     if (!size || !barcode) return null;
     const geometry = sheet
@@ -104,23 +109,33 @@ export function LabelsDialog(props: {
           dpi: printer.dpi,
           printableWidthMm: printer.printableWidthMm,
         };
+    // The owner's design for this size; "Add English name" shows it on this print.
+    const base = designForSize(design, size.code);
+    const forPrint: LabelDesign = {
+      ...base,
+      elements: addEnglish
+        ? { ...base.elements, nameEn: { ...base.elements.nameEn, show: true } }
+        : base.elements,
+    };
     const layout = layoutLabel(
       geometry,
+      forPrint,
       {
         nameAr: props.item.nameAr,
-        nameEn: addEnglish ? props.item.nameEn : null,
-        barcode,
-        // The label follows the screen's language: "120.00 درهم" or "AED 120.00".
+        nameEn: props.item.nameEn,
+        itemCode: props.item.code,
+        barcodeData: data,
+        pack: null,
+        shopName: null,
         price:
           priced && gross !== null
-            ? {
-                language,
-                amount: money(gross),
-                currency: t('aed'),
-                vatNote: props.item.price?.includesVat ? t('labels.inclVat') : null,
-              }
+            ? { amount: money(gross), includesVat: props.item.price?.includesVat ?? false }
             : null,
+        expiry: null,
+        batch: null,
+        printDate: null,
       },
+      words,
       measurer,
     );
     if (!layout.ok) return { layout, image: null };
@@ -135,7 +150,20 @@ export function LabelsDialog(props: {
       // No canvas to draw on (only in some test browsers): laid out, not drawn.
       return { layout, image: null };
     }
-  }, [size, barcode, sheet, printer, props.item, addEnglish, priced, gross, language, measurer, t]);
+  }, [
+    size,
+    barcode,
+    sheet,
+    printer,
+    design,
+    props.item,
+    data,
+    addEnglish,
+    priced,
+    gross,
+    words,
+    measurer,
+  ]);
   const layout = drawn?.layout;
   // Exactly the dots the printer gets: the preview and the print dialog show the same thing.
   const imageUrl = useMemo(() => (drawn?.image ? printedDotsUrl(drawn.image) : ''), [drawn]);
@@ -234,10 +262,8 @@ export function LabelsDialog(props: {
                 widthDots: layout.widthDots,
                 content: layout.content,
                 boxes: layoutBoxes(layout),
-                name: layout.name.map((line) => line.text),
-                english: layout.english?.text ?? null,
-                price: layout.price?.runs ?? null,
-                vat: layout.vat?.text ?? null,
+                texts: layout.texts.map((line) => ({ part: line.part, text: line.text })),
+                prices: layout.prices.map((line) => line.runs),
                 moduleDots: layout.bars.moduleDots,
               })}
             >

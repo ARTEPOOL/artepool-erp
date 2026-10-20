@@ -588,14 +588,21 @@ describe('Items & stock: the stock adjustment dialog', () => {
 
 describe('Items & stock: barcode labels', () => {
   /** What the label layout put on the preview (decision 0096). */
-  const layoutOf = (preview: HTMLElement) =>
-    JSON.parse(preview.getAttribute('data-layout')!) as {
-      name: string[];
-      english: string | null;
-      price: { text: string; x: number; dir: string }[] | null;
-      vat: string | null;
+  const layoutOf = (preview: HTMLElement) => {
+    const data = JSON.parse(preview.getAttribute('data-layout')!) as {
+      texts: { part: string; text: string }[];
+      prices: { text: string; x: number; dir: string }[][];
       moduleDots: number;
     };
+    const textsOf = (part: string) => data.texts.filter((l) => l.part === part).map((l) => l.text);
+    return {
+      name: textsOf('nameAr'),
+      english: textsOf('nameEn')[0] ?? null,
+      price: data.prices[0] ?? null,
+      vat: textsOf('vatNote')[0] ?? null,
+      moduleDots: data.moduleDots,
+    };
+  };
 
   it('lays out one label at the chosen size and prints the requested number', async () => {
     const print = vi.spyOn(window, 'print').mockImplementation(() => undefined);

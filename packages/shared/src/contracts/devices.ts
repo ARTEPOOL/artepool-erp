@@ -46,6 +46,10 @@ export interface DevicesResponse {
 }
 
 /** This PC, as the server knows it (shown at the bottom of the sign-in screen). */
+/** How labels reach the label printer (decision 0097). */
+export const LABEL_PRINT_MODES = ['driver', 'tspl'] as const;
+export type LabelPrintMode = (typeof LABEL_PRINT_MODES)[number];
+
 /** The 2-inch label printer's dots per inch, and the ones a label printer may have. */
 export const LABEL_DPIS = [203, 300] as const;
 
@@ -74,6 +78,11 @@ export const LabelPrinterConfig = z.object({
   printableWidthMm: mm(20, 120),
   offsetXMm: mm(-10, 10),
   offsetYMm: mm(-10, 10),
+  /** Darkness (TSPL DENSITY 0–15) and speed (TSPL SPEED, inches a second), used in RAW mode (0097). */
+  darkness: z.number().int().min(0).max(15).default(8),
+  speed: z.number().int().min(1).max(6).default(3),
+  /** How labels reach the printer: its Windows driver, or RAW TSPL (decision 0097). */
+  mode: z.enum(LABEL_PRINT_MODES).default('driver'),
 });
 export type LabelPrinterConfig = z.infer<typeof LabelPrinterConfig>;
 
@@ -84,6 +93,9 @@ export const DEFAULT_LABEL_PRINTER: LabelPrinterConfig = {
   printableWidthMm: 48,
   offsetXMm: 0,
   offsetYMm: 0,
+  darkness: 8,
+  speed: 3,
+  mode: 'driver',
 };
 
 export interface ThisDeviceResponse {

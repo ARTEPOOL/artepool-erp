@@ -60,6 +60,38 @@ export function canvasMeasurer(family = receiptFontFamily()): Measurer {
   };
 }
 
+/**
+ * Where black starts when the drawn label is cut to black and white (0–255 lightness). Higher than
+ * the receipt's 160: thin strokes of small letters stay whole on a 203 dpi thermal head. Never
+ * dithered: a dot is black or white.
+ */
+export const LABEL_THRESHOLD = 175;
+
+const ARABIC_TEXT = /[\u0600-\u06FF]/;
+
+/**
+ * Draws one run of text. Arabic gets a thin outline of its own colour as well: GE SS TV has one
+ * weight, and its joins are thin at 203 dpi; the outline makes them about half a dot bolder.
+ */
+export function drawText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  style: { fontDots: number; bold: boolean; dir: 'rtl' | 'ltr'; align: CanvasTextAlign },
+  family: string,
+) {
+  ctx.font = font(style.fontDots, style.bold, family);
+  ctx.direction = style.dir;
+  ctx.textAlign = style.align;
+  ctx.fillText(text, x, y);
+  if (ARABIC_TEXT.test(text)) {
+    ctx.lineWidth = Math.max(0.6, style.fontDots * 0.04);
+    ctx.lineJoin = 'round';
+    ctx.strokeText(text, x, y);
+  }
+}
+
 /** A white canvas of the label's size, with the offset applied; `draw` adds the content. */
 function paint(
   widthDots: number,
@@ -82,7 +114,7 @@ function paint(
   draw(ctx);
   ctx.restore();
   const { data } = ctx.getImageData(0, 0, widthDots, heightDots);
-  const { bits, widthBytes } = toMonochrome(data, widthDots, heightDots);
+  const { bits, widthBytes } = toMonochrome(data, widthDots, heightDots, LABEL_THRESHOLD);
   return { canvas, bits, widthBytes, widthDots, height: heightDots };
 }
 
@@ -93,32 +125,28 @@ export function renderLabel(
   family = receiptFontFamily(),
 ): LabelImage {
   return paint(layout.widthDots, layout.heightDots, offset, (ctx) => {
-    const line = (l: {
-      text: string;
-      cx: number;
-      baseline: number;
-      fontDots: number;
-      bold: boolean;
-      dir: 'rtl' | 'ltr';
-    }) => {
-      ctx.font = font(l.fontDots, l.bold, family);
-      ctx.direction = l.dir;
-      ctx.textAlign = 'center';
-      ctx.fillText(l.text, l.cx, l.baseline);
-    };
-    layout.name.forEach(line);
-    if (layout.english) line(layout.english);
+    for (const line of layout.texts) {
+      drawText(ctx, line.text, line.x, line.baseline, line, family);
+    }
     for (const bar of layout.bars.rects) ctx.fillRect(bar.x, layout.bars.y, bar.w, layout.bars.h);
-    line(layout.code);
-    if (layout.price) {
-      ctx.font = font(layout.price.fontDots, true, family);
-      ctx.textAlign = 'left';
-      for (const run of layout.price.runs) {
-        ctx.direction = run.dir;
-        ctx.fillText(run.text, run.x, run.baseline);
+    for (const price of layout.prices) {
+      for (const run of price.runs) {
+        drawText(
+          ctx,
+          run.text,
+          run.x,
+          price.baseline,
+          { fontDots: price.fontDots, bold: price.bold, dir: run.dir, align: 'left' },
+          family,
+        );
       }
     }
-    if (layout.vat) line(layout.vat);
+    if (layout.border) {
+      const b = layout.border;
+      const thick = Math.max(2, Math.round(layout.widthDots / 200));
+      ctx.lineWidth = thick;
+      ctx.strokeRect(b.x + thick / 2, b.y + thick / 2, b.w - thick, b.h - thick);
+    }
   });
 }
 
@@ -169,6 +197,97 @@ export function renderTestLabel(
       const y = Math.round(h / 2 + arm + d(1));
       const barsH = Math.max(0, Math.min(d(6), h - y - d(4)));
       for (const bar of barRects(barcode, dots, x)) ctx.fillRect(bar.x, y, bar.w, barsH);
+    }
+  });
+}
+
+/**
+ * The print quality test (Settings → Devices, decision 0097): fine lines of 1, 2 and 3 dots across
+ * and down, a solid block, Arabic and English text small and large, and the same barcode at 2 and 3
+ * dots per module. On a good print every line is separate, the block is evenly black, the small
+ * letters are whole and both barcodes scan.
+ */
+export function renderQualityLabel(
+  g: LabelGeometry,
+  offsetMm: { x: number; y: number },
+  texts: { arabic: string; english: string },
+  family = receiptFontFamily(),
+): LabelImage {
+  const d = (mm: number) => Math.round((mm * g.dpi) / 25.4);
+  const w = d(g.widthMm);
+  const h = d(g.heightMm);
+  const printable = Math.min(w, d(g.printableWidthMm)) - d(2);
+  const left = Math.floor((w - printable) / 2);
+  return paint(w, h, { x: d(offsetMm.x), y: d(offsetMm.y) }, (ctx) => {
+    let y = d(1);
+    // Lines down (1, 2, 3 dots, each twice, a gap of their own width), then a solid block.
+    const block = d(4);
+    let x = left;
+    for (const width of [1, 2, 3]) {
+      for (let i = 0; i < 2; i += 1) {
+        ctx.fillRect(x, y, width, block);
+        x += width * 2;
+      }
+      x += d(1);
+    }
+    ctx.fillRect(left + printable - block * 2, y, block * 2, block);
+    // Lines across, under them.
+    y += block + d(0.6);
+    for (const width of [1, 2, 3]) {
+      ctx.fillRect(left, y, Math.round(printable * 0.45), width);
+      y += width * 2 + 1;
+    }
+    // Text: small (1.8 mm) and large (3 mm), Arabic and English.
+    const small = d(1.8);
+    const large = d(3);
+    y += large;
+    drawText(
+      ctx,
+      texts.arabic,
+      left + printable,
+      y,
+      { fontDots: large, bold: true, dir: 'rtl', align: 'right' },
+      family,
+    );
+    drawText(
+      ctx,
+      texts.english,
+      left,
+      y,
+      { fontDots: small, bold: false, dir: 'ltr', align: 'left' },
+      family,
+    );
+    y += small + d(0.8);
+    drawText(
+      ctx,
+      texts.arabic,
+      left + printable,
+      y,
+      { fontDots: small, bold: false, dir: 'rtl', align: 'right' },
+      family,
+    );
+    drawText(
+      ctx,
+      texts.english,
+      left,
+      y,
+      { fontDots: large, bold: true, dir: 'ltr', align: 'left' },
+      family,
+    );
+    y += d(1);
+    // The same code at 2 and 3 dots per module, side by side when they fit, else one under the other.
+    const barcode = barcodeFor('Q-1234')!;
+    const barsH = Math.max(d(3), Math.min(d(5), h - y - d(1)));
+    let bx = left;
+    for (const dots of [2, 3]) {
+      const width = fullModules(barcode) * dots;
+      if (bx + width > left + printable) {
+        bx = left;
+        y += barsH + d(0.8);
+      }
+      if (y + barsH > h) break;
+      for (const bar of barRects(barcode, dots, bx)) ctx.fillRect(bar.x, y, bar.w, barsH);
+      bx += width + d(1);
     }
   });
 }
