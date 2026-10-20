@@ -123,7 +123,8 @@ It runs client–server on the local network: PostgreSQL and the API service on 
 - **Labels** for the 2-inch label printer (LV-275, 203 dpi, TSPL):
   - 50 × 30 default, 50 × 25, 40 × 30; no size wider than the roll (`labels.max_width_mm`); content within the printable width (48 mm, per PC).
   - Drawn by the app at printer dots in fixed mm zones: Arabic name (2 lines, shrink, "…"; English optional), EAN/UPC or Code 128 on whole dots with quiet zones, "120.00 درهم" / "AED 120.00", "incl. VAT" when the price includes VAT.
-  - Printed silently at exact size (per-PC label printer, offset, test label in Settings → Devices); the print dialog is only a fallback and for A4 sheets; RAW TSPL next. (0043, 0096)
+  - Printed silently at exact size (per-PC label printer, offset, test label in Settings → Devices); the print dialog is only a fallback and for A4 sheets. (0043, 0096)
+  - The owner designs the label (print designer): elements with show/hide, order, size, bold, alignment (sale pack, expiry/batch at print time, print date); never below the minimum barcode (5 mm bars, 2 dots/module, quiet zones); base design + optional per-size override. Pure 1-bit at printer dots; darkness/speed. Next: batch labels + "price changed" list, then RAW TSPL; later in-store EAN-13. (0097)
 - **Counts** are blind while counting; one warehouse in Phase 1. (0044)
 
 **Sales (A4)**
