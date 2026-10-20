@@ -324,8 +324,10 @@ export function ItemsPage() {
               scan.onKeyDown(event);
               if (event.key === 'Enter') {
                 event.preventDefault();
-                const typed = scan.read(search.trim());
-                if (typed !== search.trim()) setSearch(typed);
+                // What is in the field now: a scanner's Enter can come before the screen catches up.
+                const raw = event.currentTarget.value.trim();
+                const typed = scan.read(raw);
+                if (typed !== raw) setSearch(typed);
                 searchNow(typed);
               }
             }}

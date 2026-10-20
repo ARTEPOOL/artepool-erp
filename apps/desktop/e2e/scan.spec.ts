@@ -9,7 +9,7 @@ import { expect, signInAsOwner, test } from './fixtures';
 
 /**
  * Types like a device: one key event and one input event per key, `gapMs` apart (0 = as fast as a
- * scanner), then Enter.
+ * scanner: the key events are stamped together), then Enter.
  */
 async function typeLikeDevice(field: Locator, keys: string[], gapMs: number, enter = true) {
   await field.evaluate(
@@ -19,9 +19,13 @@ async function typeLikeDevice(field: Locator, keys: string[], gapMs: number, ent
       const setValue = (value: string) => descriptor.set!.call(input, value);
       const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
       input.focus();
-      for (const key of keys) {
-        const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
-        input.dispatchEvent(event);
+      const keyDown = (key: string) =>
+        new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+      // A scanner's keys carry the time they arrived, however long the screen then takes to
+      // handle each one: made all at once here, as the keys of a real scan arrive together.
+      const ready = gapMs === 0 ? keys.map(keyDown) : null;
+      for (const [index, key] of keys.entries()) {
+        input.dispatchEvent(ready?.[index] ?? keyDown(key));
         // A key replaces the selected text, as in any text field.
         const start = input.selectionStart ?? input.value.length;
         const end = input.selectionEnd ?? input.value.length;

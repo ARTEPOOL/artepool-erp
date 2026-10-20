@@ -84,7 +84,8 @@ export function SellableItemPicker(props: { onAdd: (item: ItemListItem) => void 
             // A scanned barcode or a full code adds the item at once.
             if (event.key !== 'Enter') return;
             event.preventDefault();
-            const typed = scan.read(box.text.trim());
+            // What is in the field now: a scanner's Enter can come before the screen catches up.
+            const typed = scan.read(event.currentTarget.value.trim());
             const exact = choices.find(
               (c) =>
                 sellable(c) &&

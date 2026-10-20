@@ -435,7 +435,9 @@ function Catalog(props: {
     if (event.key !== 'Enter') return;
     event.preventDefault();
     // A scanner types the barcode and Enter: the exact match goes straight to the cart.
-    const typed = scan.read(text.trim());
+    // What is in the field now: a scanner's Enter can come before the screen catches up.
+    const raw = event.currentTarget.value.trim();
+    const typed = scan.read(raw);
     const exact =
       items.find(
         (i) => i.primaryBarcode === typed || i.code.toLowerCase() === typed.toLowerCase(),
@@ -447,7 +449,7 @@ function Catalog(props: {
     if (exact) {
       props.onAdd(exact);
       setText('');
-    } else if (typed !== text.trim()) {
+    } else if (typed !== raw) {
       setText(typed);
     }
   };
