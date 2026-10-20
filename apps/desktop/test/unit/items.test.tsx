@@ -134,6 +134,8 @@ const detail = (patch: Partial<ItemDetail>): ItemDetail => ({
   isActive: true,
   descriptionAr: null,
   descriptionEn: null,
+  packAr: null,
+  packEn: null,
   defaultBusinessLineId: '1',
   reorderLevelMilli: '5000',
   reorderQtyMilli: null,

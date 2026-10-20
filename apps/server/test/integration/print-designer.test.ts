@@ -8,6 +8,7 @@ import { randomUUID } from 'node:crypto';
 import { sql } from 'kysely';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type {
+  LabelDesignResponse,
   ReceiptLogoResponse,
   BankAccount,
   BankAccountsResponse,
@@ -20,6 +21,7 @@ import type {
   QuotationDetail,
   TemplateSettings,
 } from '@artepool/shared/contracts';
+import { defaultLabelDesign } from '@artepool/shared/contracts';
 import { documentHtml, receiptHtml } from '../../src/modules/printing/service';
 import {
   addDevice,
@@ -488,5 +490,61 @@ describe('the thermal receipt’s own logo (decision 0075)', () => {
     );
     expect(cleared.own).toBe(false);
     expect(cleared.logo).toEqual(before.logo);
+  });
+});
+
+describe('the barcode label design (decision 0097)', () => {
+  it('everyone reads it; the owner saves versions; the minimum barcode cannot be designed away', async () => {
+    const first = await ok<LabelDesignResponse>(accountant('GET', '/api/v1/label-design'));
+    expect(first.canEdit).toBe(false);
+    expect(first.design).toEqual(defaultLabelDesign());
+    expect(first.shopName).toEqual({
+      ar: 'آرتي بول لحمامات السباحة',
+      en: 'ARTEPOOL Swimming Pools',
+    });
+
+    const design = defaultLabelDesign();
+    design.elements.nameEn = { ...design.elements.nameEn, show: true };
+    design.overrides['40X30'] = { elements: { nameEn: { show: false } } };
+    // Not the owner: refused.
+    expect(
+      await refusal(
+        accountant('POST', '/api/v1/label-design/versions', {
+          design,
+          basedOnVersionId: first.versionId,
+        }),
+      ),
+    ).toMatchObject({ status: 403 });
+    // Bars below 5 mm: refused by the contract.
+    expect(
+      await refusal(
+        owner('POST', '/api/v1/label-design/versions', {
+          design: { ...design, barcode: { ...design.barcode, heightMm: 4 } },
+          basedOnVersionId: first.versionId,
+        }),
+      ),
+    ).toMatchObject({ code: 'VALIDATION_FAILED' });
+    const saved = await ok<LabelDesignResponse>(
+      owner('POST', '/api/v1/label-design/versions', {
+        design,
+        note: 'English name',
+        basedOnVersionId: first.versionId,
+      }),
+      201,
+    );
+    expect(saved.versionNo).toBe(first.versionNo + 1);
+    expect(saved.design).toEqual(design);
+    expect(
+      (await ok<LabelDesignResponse>(accountant('GET', '/api/v1/label-design'))).design,
+    ).toEqual(design);
+    // Saving over a newer version: refused.
+    expect(
+      await refusal(
+        owner('POST', '/api/v1/label-design/versions', {
+          design,
+          basedOnVersionId: first.versionId,
+        }),
+      ),
+    ).toMatchObject({ code: 'STALE_VERSION' });
   });
 });

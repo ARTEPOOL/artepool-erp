@@ -674,6 +674,7 @@ Lines of business ([0018](decisions/0018-chart-of-accounts-and-posting-map.md)).
 | reorder_level | numeric(14,3)? | `>= 0`; stock items only |
 | reorder_qty | numeric(14,3)? | `> 0` |
 | fallback_unit_cost_4dp | bigint? | `>= 0`. **The item's purchase price, without VAT** ([0038](decisions/0038-item-purchase-price-owner-only.md)): stock items and services only (a kit's cost is the sum of its components). Setting or changing it needs `items.cost` (owner-only; trigger `c_item_cost_rules`, migration 0010). It values sales and approved oversells until a weighted-average cost exists. |
+| pack_ar, pack_en | text? | 1–40 characters (migration 0040, decision [0097](decisions/0097-label-designer-and-print-quality.md)): the sale pack printed on labels ("كيس 25 كجم" / "25 kg bag"); empty = the unit's name |
 | is_sellable | boolean | `DEFAULT true` |
 | [active], [std] | | |
 
@@ -1776,6 +1777,7 @@ Migrations are written **in build order** (milestones in [`phase-1-plan.md`](pha
 | 0034 | `kiosk_lock` | M5c | `auth.kiosk_lock_changes`, `auth.kiosk_code_failures`, `auth.kiosk_state()`, four kiosk alert types (0082, 0083, 0089) | — |
 | 0035 | `kiosk_owner_session` | M5c | `auth.owner_signed_in_on()`, `auth.kiosk_state()` with `owner_signed_in`; owner code at most 15 minutes (0091) | — |
 | 0036 | `ops_backup` | M6.1 | `ops.backup_runs`, `ops.integrity_runs`, `ops.backup_requests`; backup settings; `offline_copy_due` alert; `system.backup.manage` and owner-only health/restore/integrity permissions; backup role grants | — |
+| 0040 | `label_design` | Labels | `md.items.pack_ar` / `pack_en` (sale pack for labels, ≤ 40 characters); the default label design as a version of the `barcode_label` print template (read by `GET /api/v1/label-design`, saved by the owner via `POST /api/v1/label-design/versions`); decision 0097 | — |
 | 0039 | `label_printer_quality` | Labels | `auth.valid_label_printer` also takes optional `darkness` (0–15), `speed` (1–6) and `mode` (`driver` / `tspl`); decision 0097 | — |
 | 0038 | `device_label_printer` | Labels | Check on `auth.devices.printer_config -> 'label'` (`auth.valid_label_printer`); decision 0096 | — |
 | 0037 | `label_sizes_two_inch` | Labels | Setting `labels.max_width_mm` (50); label sizes for the 2-inch roll (50×30 first; 25×15, 30×20, 58×40, 100×50 deactivated); trigger: no active size wider than the roll; decision 0096 | — |

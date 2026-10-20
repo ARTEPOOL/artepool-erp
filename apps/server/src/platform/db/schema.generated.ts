@@ -742,6 +742,8 @@ export interface MdItems {
   item_type: string;
   name_ar: string;
   name_en: string;
+  pack_ar: string | null;
+  pack_en: string | null;
   reorder_level: Numeric | null;
   reorder_qty: Numeric | null;
   row_version: Generated<number>;

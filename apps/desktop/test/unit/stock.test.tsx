@@ -94,6 +94,8 @@ const CHLORINE: ItemDetail = {
   isActive: true,
   descriptionAr: null,
   descriptionEn: null,
+  packAr: null,
+  packEn: null,
   defaultBusinessLineId: null,
   reorderLevelMilli: '5000',
   reorderQtyMilli: null,

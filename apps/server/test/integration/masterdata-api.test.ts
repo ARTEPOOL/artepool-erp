@@ -232,6 +232,38 @@ describe('items (design 07, decision 0032)', () => {
     expect(pumpItem.price).toEqual({ price4dp: '1300000', includesVat: false });
   });
 
+  it('keep a sale pack for the label; a save that leaves it out keeps it (decision 0097)', async () => {
+    pumpItem = (
+      await owner('PUT', `/api/v1/items/${pumpItem.id}`, {
+        ...pump(),
+        price: pumpItem.price,
+        packAr: 'كرتونة 2 قطعة',
+        packEn: 'Box of 2',
+        rowVersion: pumpItem.rowVersion,
+      })
+    ).json<ItemDetail>();
+    expect(pumpItem).toMatchObject({ packAr: 'كرتونة 2 قطعة', packEn: 'Box of 2' });
+    pumpItem = (
+      await owner('PUT', `/api/v1/items/${pumpItem.id}`, {
+        ...pump(),
+        price: pumpItem.price,
+        rowVersion: pumpItem.rowVersion,
+      })
+    ).json<ItemDetail>();
+    expect(pumpItem).toMatchObject({ packAr: 'كرتونة 2 قطعة', packEn: 'Box of 2' });
+    // Emptied in the item window: cleared.
+    pumpItem = (
+      await owner('PUT', `/api/v1/items/${pumpItem.id}`, {
+        ...pump(),
+        price: pumpItem.price,
+        packAr: '',
+        packEn: '',
+        rowVersion: pumpItem.rowVersion,
+      })
+    ).json<ItemDetail>();
+    expect(pumpItem).toMatchObject({ packAr: null, packEn: null });
+  });
+
   it('refuse a save over someone else’s ("changed by someone else")', async () => {
     expect(
       await refusal(owner('PUT', `/api/v1/items/${pumpItem.id}`, { ...pump(), rowVersion: 1 })),

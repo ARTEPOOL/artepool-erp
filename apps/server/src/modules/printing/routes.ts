@@ -4,15 +4,18 @@ import { z } from 'zod';
 import {
   DESIGNED_KINDS,
   PreviewTemplateRequest,
+  SaveLabelDesignRequest,
   SaveReceiptLogoRequest,
   SaveTemplateRequest,
   type FilePayload,
+  type LabelDesignResponse,
   type PreviewTemplateResponse,
   type PrintTemplatesResponse,
 } from '@artepool/shared/contracts';
 import { AppError } from '../../platform/errors/app-error';
 import { defineRoute, defineWrite } from '../../platform/http/route';
 import * as designer from './designer';
+import * as labels from './label-design';
 import { renderPdf } from './render';
 
 /** Owner only (decision 0020): `print_templates.manage`, checked again by the database. */
@@ -21,6 +24,30 @@ const KindParams = z.object({ kind: z.enum(DESIGNED_KINDS) });
 
 export function registerPrintingRoutes(app: FastifyInstance): void {
   const db = app.deps.db;
+
+  // The barcode label design (decision 0097): read by everyone who prints labels, saved by the owner.
+  defineRoute(app, {
+    method: 'GET',
+    url: '/api/v1/label-design',
+    access: { kind: 'session' },
+    handler: async ({ request }): Promise<LabelDesignResponse> => {
+      const { rows } = await sql<{ allowed: boolean }>`
+        SELECT auth.user_has_permission(${request.auth!.userId}, 'print_templates.manage') AS allowed`.execute(
+        db,
+      );
+      return labels.getLabelDesign(db, rows[0]?.allowed ?? false);
+    },
+  });
+  defineWrite(app, {
+    method: 'POST',
+    url: '/api/v1/label-design/versions',
+    access: manage,
+    body: SaveLabelDesignRequest,
+    handler: async ({ trx, body }) => ({
+      status: 201,
+      body: await labels.saveLabelDesign(trx, body),
+    }),
+  });
 
   defineRoute(app, {
     method: 'GET',
