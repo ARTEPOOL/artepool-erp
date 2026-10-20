@@ -5,7 +5,7 @@
  * (the same code twice changes nothing). A person typing a name is left alone.
  */
 import type { Locator } from '@playwright/test';
-import { expect, signInAsOwner, test } from './fixtures';
+import { control, expect, scanAnywhere, signInAsOwner, test } from './fixtures';
 
 /**
  * Types like a device: one key event and one input event per key, `gapMs` apart (0 = as fast as a
@@ -64,4 +64,31 @@ test('scans replace each other and come back in Latin letters', async ({ page, o
   await page.waitForTimeout(500);
   await typeLikeDevice(search, [...'كلور'], 120, false);
   await expect(search).toHaveValue('كلور');
+});
+
+test('a scan with the cursor anywhere lands in the search and opens the item', async ({
+  page,
+  open,
+  t,
+}) => {
+  const n = `${Date.now() % 100000}`.padStart(5, '0');
+  const barcode = `629${n}0002`;
+  await control.addPosItem({
+    code: `SCN-${n}`,
+    nameAr: `فلتر رمل ${n}`,
+    nameEn: `Sand filter ${n}`,
+    barcode,
+    price4dp: '500000',
+    quantityMilli: '1000',
+  });
+  await open('office');
+  await signInAsOwner(page, t);
+  await page.getByRole('link', { name: t('settings:nav.items') }).click();
+  const search = page.getByRole('searchbox', { name: t('items:search') });
+  await expect(search).toBeVisible();
+  // The cursor on the page, not in the search box.
+  await page.getByRole('heading', { level: 1 }).click();
+  await scanAnywhere(page, barcode);
+  await expect(search).toHaveValue(barcode);
+  await expect(page.getByText(`SCN-${n}`).first()).toBeVisible();
 });

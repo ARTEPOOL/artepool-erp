@@ -131,3 +131,70 @@ export function useScanInput(onScanned?: (code: string) => void) {
     },
   };
 }
+
+/** True when the key went into something a person types in (a field, a list, an editor). */
+const typingTarget = (target: EventTarget | null) =>
+  target instanceof HTMLElement &&
+  (target.isContentEditable ||
+    ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) ||
+    target.closest('[role="listbox"], [role="menu"], [role="grid"]') !== null);
+
+/**
+ * A scan anywhere on the screen (decision 0096 follow-up): while the cursor is not in a field and
+ * no window is open, a scanner's burst of keys ending in Enter (or a pause) is caught and given to
+ * `onScan` in Latin letters, so nobody has to click the search box first. Keys typed by a person
+ * are too slow to look like a scan and are left alone; the Enter that ends a scan is kept from
+ * pressing whatever button has the focus.
+ */
+export function useGlobalScan(onScan: (code: string) => void, enabled = true) {
+  const callback = useRef(onScan);
+  callback.current = onScan;
+  useEffect(() => {
+    if (!enabled) return;
+    let keys: string[] = [];
+    let times: number[] = [];
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const reset = () => {
+      keys = [];
+      times = [];
+      if (timer) clearTimeout(timer);
+      timer = null;
+    };
+    const finish = () => {
+      const code = fromArabicKeyboard(keys.join('').trim());
+      const scanned = isScanBurst(times) && code !== '';
+      reset();
+      if (scanned) callback.current(code);
+      return scanned;
+    };
+    const onKey = (event: globalThis.KeyboardEvent) => {
+      if (typingTarget(event.target) || document.querySelector('[role="dialog"]')) {
+        reset();
+        return;
+      }
+      if (event.key === 'Enter') {
+        if (finish()) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+        return;
+      }
+      if (event.ctrlKey || event.metaKey || event.altKey) return reset();
+      if ([...event.key].length > 2 || event.key === ' ') return;
+      const now = event.timeStamp;
+      const last = times.at(-1);
+      if (last !== undefined && now - last > PAUSE_MS) reset();
+      keys.push(event.key);
+      times.push(now);
+      if (timer) clearTimeout(timer);
+      // Scanners set up without Enter: the pause ends the scan.
+      timer = setTimeout(finish, PAUSE_MS);
+    };
+    // Capture: the scan is seen before any button or list reacts to its keys.
+    window.addEventListener('keydown', onKey, true);
+    return () => {
+      window.removeEventListener('keydown', onKey, true);
+      reset();
+    };
+  }, [enabled]);
+}

@@ -5,7 +5,7 @@
  * adjustment is pending review); then closes the shift with a blind count that is short, recounts
  * with the supervisor, and the Z report shows both counts.
  */
-import { control, expect, snap, test, unique } from './fixtures';
+import { control, expect, scanAnywhere, snap, test, unique } from './fixtures';
 import type { Page } from '@playwright/test';
 
 test.describe.configure({ mode: 'serial' });
@@ -72,13 +72,15 @@ test('sell, oversell with approval, close the shift with a recount', async ({
   await snap(page, '50-pos-open-shift');
   await page.getByRole('button', { name: t('pos:shiftOpen.open') }).click();
 
-  // Scan the barcode twice: one line of two pieces (252.00).
+  // Scan the barcode twice: one line of two pieces (252.00). The second time the cursor is not
+  // in the search box: the scan goes to the cart all the same, with no click.
   const search = page.getByRole('textbox', { name: t('pos:search') });
-  for (let i = 0; i < 2; i += 1) {
-    await search.fill(barcode);
-    await expect(page.getByRole('button', { name: new RegExp(`TAB-${n}`) })).toBeVisible();
-    await search.press('Enter');
-  }
+  await search.fill(barcode);
+  await expect(page.getByRole('button', { name: new RegExp(`TAB-${n}`) })).toBeVisible();
+  await search.press('Enter');
+  await expect(page.getByLabel(t('pos:cart')).getByText('126.00').first()).toBeVisible();
+  await search.blur();
+  await scanAnywhere(page, barcode);
   await expect(page.getByLabel(t('pos:cart')).getByText('252.00').first()).toBeVisible();
   await snap(page, '51-pos-cart');
 

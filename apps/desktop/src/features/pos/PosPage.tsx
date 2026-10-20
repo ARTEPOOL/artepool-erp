@@ -65,7 +65,7 @@ import { HeldCartsDialog } from './HeldCartsDialog';
 import { LineDialog } from './LineDialog';
 import { PaymentDialog } from './PaymentDialog';
 import { ReturnDialog } from './ReturnDialog';
-import { useScanInput } from '../items/scan';
+import { useGlobalScan, useScanInput } from '../items/scan';
 import { OpenShiftCard } from './shift/OpenShiftCard';
 import styles from './pos.module.css';
 
@@ -428,30 +428,53 @@ function Catalog(props: {
   const activeCategories = (categories.data ?? []).filter((c) => c.isActive);
   const categoryOf = (id: string) => activeCategories.find((c) => c.id === id);
 
+  // A code entered (a scan, or a code and Enter): the exact match goes straight to the cart. When
+  // it is not among the items shown yet, it goes in as soon as the search for it has found it.
+  const pending = useRef<string | null>(null);
+  const exactFor = (typed: string) =>
+    items.find((i) => i.primaryBarcode === typed || i.code.toLowerCase() === typed.toLowerCase()) ??
+    (q === typed && catalog.data?.exactMatchId
+      ? items.find((i) => i.id === catalog.data?.exactMatchId)
+      : undefined);
+  const submit = (typed: string) => {
+    const exact = exactFor(typed) ?? (q === typed && items.length === 1 ? items[0] : undefined);
+    if (exact) {
+      pending.current = null;
+      props.onAdd(exact);
+      setText('');
+      return;
+    }
+    // Searched in every category: a scanned item is found whatever category is chosen.
+    pending.current = typed;
+    setCategory(null);
+    setText(typed);
+    setQ(typed);
+  };
+  useEffect(() => {
+    const typed = pending.current;
+    if (typed === null || q !== typed || catalog.isFetching || !catalog.data) return;
+    pending.current = null;
+    const exact = exactFor(typed);
+    // Not found: the code stays in the search, which says nothing matches.
+    if (exact) {
+      props.onAdd(exact);
+      setText('');
+    }
+  });
+
   // A scan replaces the code scanned before; letters come back in Latin with an Arabic keyboard.
   const scan = useScanInput(setText);
+  // A scan with the cursor anywhere else on the screen lands here too.
+  useGlobalScan((code) => {
+    props.searchRef.current?.focus();
+    submit(code);
+  });
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     scan.onKeyDown(event);
     if (event.key !== 'Enter') return;
     event.preventDefault();
-    // A scanner types the barcode and Enter: the exact match goes straight to the cart.
     // What is in the field now: a scanner's Enter can come before the screen catches up.
-    const raw = event.currentTarget.value.trim();
-    const typed = scan.read(raw);
-    const exact =
-      items.find(
-        (i) => i.primaryBarcode === typed || i.code.toLowerCase() === typed.toLowerCase(),
-      ) ??
-      (q === typed && catalog.data?.exactMatchId
-        ? items.find((i) => i.id === catalog.data?.exactMatchId)
-        : undefined) ??
-      (items.length === 1 ? items[0] : undefined);
-    if (exact) {
-      props.onAdd(exact);
-      setText('');
-    } else if (typed !== raw) {
-      setText(typed);
-    }
+    submit(scan.read(event.currentTarget.value.trim()));
   };
 
   return (

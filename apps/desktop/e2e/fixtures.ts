@@ -137,6 +137,20 @@ export async function typeCode(page: Page, code: string): Promise<void> {
 }
 
 /** A screenshot for the pull request and the owner's review: e2e-screens/<project>/<name>.png */
+/**
+ * A barcode scanner with the cursor anywhere on the screen (not in a field): its keys, stamped
+ * together as a real scan's are, then Enter, sent to whatever has the focus.
+ */
+export async function scanAnywhere(page: Page, code: string): Promise<void> {
+  await page.evaluate((keys) => {
+    const target = document.activeElement ?? document.body;
+    const events = [...keys, 'Enter'].map(
+      (key) => new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }),
+    );
+    for (const event of events) target.dispatchEvent(event);
+  }, code);
+}
+
 export async function snap(page: Page, name: string): Promise<void> {
   const dir = join(import.meta.dirname, '..', 'e2e-screens', base.info().project.name);
   mkdirSync(dir, { recursive: true });

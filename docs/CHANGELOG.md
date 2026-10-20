@@ -1,5 +1,11 @@
 # Changelog
 
+## Barcode scanner: no need to click the search box first (2026-10-20)
+
+**In plain words:** at the point of sale and in Items & stock, a scan now works wherever the cursor is: you no longer have to click in the search box first. At the point of sale the scanned item goes straight into the cart, even when it is not among the items shown on the screen and whatever category is chosen; in Items & stock its card opens. A scan is told apart from a person typing by its speed, so typing is never caught; a scan while a window is open (for example the payment window) is ignored, and the scanner's Enter never presses a button by mistake.
+
+- Tests: scans anywhere (Latin letters with the Arabic keyboard, scanners without Enter), typing left alone, nothing caught in a field or while a window is open; at the point of sale a hidden item found by its barcode and put in the cart; in a real browser at the point of sale and in Items & stock.
+
 ## Labels: a language for each element; the English shop name under the Arabic one (2026-10-20)
 
 **In plain words:** when the label was in both languages, the shop's name was written "Arabic / English" on one line, so the English part got cut ("ARTE SWIMMING PO…"). Now "both" always means two lines: the English line under the Arabic one, for the shop name, sale pack, price, "incl. VAT", expiry and batch. And each of these has its own **language** in the label designer: As the design, Arabic, English or Both. For example the price in English only ("AED 120.00") and the shop name in both. A size can have its own choice too (e.g. Arabic price only on 40 × 30). Designs you saved before print exactly as before.

@@ -54,7 +54,7 @@ import { ItemCard } from './ItemCard';
 import { ItemDialog } from './ItemDialog';
 import { BatchLabelsDialog } from './labels/BatchLabelsDialog';
 import { LabelsDialog } from './labels/LabelsDialog';
-import { useScanInput } from './scan';
+import { useGlobalScan, useScanInput } from './scan';
 import { ItemIcon, StatusChip, TypeLabel } from './parts';
 import { canAdjustAny } from './stock';
 import styles from './items.module.css';
@@ -147,6 +147,12 @@ export function ItemsPage() {
   const scan = useScanInput((code) => {
     setSearch(code);
     searchNow(code);
+  });
+  // A scan with the cursor anywhere else on the screen lands in the search too, and its item opens.
+  useGlobalScan((code) => {
+    setSearch(code);
+    searchNow(code);
+    searchRef.current?.focus();
   });
   const [segment, setSegment] = useState<string>(ALL);
   const [selectedId, setSelectedId] = useState<string | null>(null);
