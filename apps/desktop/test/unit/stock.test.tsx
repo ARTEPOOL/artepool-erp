@@ -622,7 +622,10 @@ describe('Items & stock: barcode labels', () => {
 
   it('lays out one label at the chosen size and prints the requested number', async () => {
     const print = vi.spyOn(window, 'print').mockImplementation(() => undefined);
-    await openItems(bridgeFor(STOREKEEPER));
+    const bridge = bridgeFor(STOREKEEPER).on('POST', '/api/v1/label-prints', (request) =>
+      ok({ recorded: ['10'], priceChanged: [], echo: request.body }, 201),
+    );
+    await openItems(bridge);
     const card = await stockCard();
     fireEvent.click(within(card).getByRole('button', { name: 'ملصقات باركود' }));
     const dialog = await screen.findByRole('dialog', { name: 'ملصقات باركود' });
@@ -685,5 +688,15 @@ describe('Items & stock: barcode labels', () => {
     });
     await waitFor(() => expect(screen.queryByTestId('label-print')).toBeNull());
     expect(document.head.textContent).not.toContain('@page');
+    // Recorded only once the person says the labels printed (decision 0099): no price on them.
+    expect(bridge.callsTo('POST', '/api/v1/label-prints')).toHaveLength(0);
+    fireEvent.click(await within(dialog).findByRole('button', { name: 'أيوه، اتطبعت' }));
+    await waitFor(() => expect(bridge.callsTo('POST', '/api/v1/label-prints')).toHaveLength(1));
+    expect(bridge.callsTo('POST', '/api/v1/label-prints')[0]!.body).toEqual({
+      sizeId: '2',
+      designVersionId: '9',
+      source: 'item',
+      lines: [{ itemId: '10', copies: 3, price: null }],
+    });
   });
 });

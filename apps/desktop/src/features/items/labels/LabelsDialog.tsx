@@ -29,6 +29,7 @@ import { DateField } from '../../invoices/parts';
 import { drawLabel, labelContent, useLabelDesign } from './design';
 import { layoutBoxes } from './layout';
 import { canPrintLabelsSilently, printLabels, useLabelPrinter } from './printer';
+import { printedPrice, useRecordLabelPrints } from './record';
 import { canvasMeasurer, printedDotsUrl } from './render';
 import { labelWords } from './words';
 import styles from './labels.module.css';
@@ -80,6 +81,10 @@ export function LabelsDialog(props: {
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [dialogCopies, setDialogCopies] = useState(0);
+  const recordPrints = useRecordLabelPrints();
+  // After the print dialog: how many labels were sent, until the person says whether they printed
+  // (the dialog says "done" even when it was cancelled).
+  const [askPrinted, setAskPrinted] = useState(0);
 
   const size = active.find((s) => s.id === sizeId) ?? active[0];
   const design = designQuery.data?.design ?? defaultLabelDesign();
@@ -137,6 +142,30 @@ export function LabelsDialog(props: {
   const imageUrl = useMemo(() => (drawn?.image ? printedDotsUrl(drawn.image) : ''), [drawn]);
   const refused = layout && !layout.ok ? layout.reason : null;
 
+  /** Tells the server what was printed, with the price on the label (decision 0099). */
+  const record = async (copies: number) => {
+    if (!size || !designQuery.data) return;
+    try {
+      const result = await recordPrints.mutateAsync({
+        sizeId: size.id,
+        designVersionId: designQuery.data.versionId,
+        source: 'item',
+        lines: [
+          {
+            itemId: props.item.id,
+            copies,
+            price: printedPrice(props.item.price, props.rateBp, showPrice && canPrice),
+          },
+        ],
+      });
+      setProblem(result.priceChanged.length > 0 ? t('labels.priceChangedWhilePrinting') : null);
+    } catch {
+      // The labels are printed; only the record is missing (the item may then not show on the
+      // "price changed" list later). Said plainly, without stopping anything.
+      setProblem(t('labels.notRecorded'));
+    }
+  };
+
   // The print dialog (no label printer here, or A4 sheets): the drawn labels go into a print-only
   // container and the page size is set for this print only. Both stay until the printing has
   // really finished ("afterprint"): some print dialogs do not hold the screen.
@@ -145,7 +174,11 @@ export function LabelsDialog(props: {
     const style = document.createElement('style');
     style.textContent = pageRule(size, sheet);
     document.head.appendChild(style);
-    const done = () => setDialogCopies(0);
+    const copies = dialogCopies;
+    const done = () => {
+      setDialogCopies(0);
+      setAskPrinted(copies);
+    };
     window.addEventListener('afterprint', done, { once: true });
     window.print();
     return () => {
@@ -167,6 +200,7 @@ export function LabelsDialog(props: {
     if (outcome.printed) {
       setProblem(null);
       toast(t('labels.sent', { count: n }));
+      await record(n);
     } else {
       setProblem(t(`labels.problem.${outcome.reason}`));
     }
@@ -270,6 +304,21 @@ export function LabelsDialog(props: {
         )}
         {!silent && size && layout?.ok && (
           <Note>{t(sheet ? 'labels.sheetNote' : 'labels.dialogNote')}</Note>
+        )}
+        {askPrinted > 0 && (
+          <Note>
+            {t('labels.didPrint', { count: askPrinted })}{' '}
+            <Button
+              onPress={() => {
+                const copies = askPrinted;
+                setAskPrinted(0);
+                void record(copies);
+              }}
+            >
+              {t('labels.didPrintYes')}
+            </Button>{' '}
+            <Button onPress={() => setAskPrinted(0)}>{t('labels.didPrintNo')}</Button>
+          </Note>
         )}
         {problem && <Alert>{problem}</Alert>}
         <DialogFooter>

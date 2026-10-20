@@ -72,3 +72,61 @@
     break-after: page;
   }
 }
+
+/* Labels for many items (decision 0099) */
+.searchLabel {
+  display: grid;
+  gap: var(--space-1);
+  font-size: var(--text-label);
+}
+
+.cellInput {
+  inline-size: 100%;
+  min-inline-size: 6rem;
+  min-block-size: var(--control-md);
+  padding-inline: var(--space-3);
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--text-label);
+}
+
+.cellInput:focus-visible {
+  border-color: var(--color-primary);
+  outline: 3px solid var(--color-primary-soft);
+}
+
+.cellInput.bad {
+  border-color: var(--color-danger);
+}
+
+.batchTable td .cellInput {
+  inline-size: 6rem;
+}
+
+.results {
+  display: grid;
+  gap: var(--space-1);
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.results li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.batchTable {
+  max-block-size: 22rem;
+  overflow: auto;
+}
+
+.total {
+  margin: 0;
+  font-weight: 700;
+}

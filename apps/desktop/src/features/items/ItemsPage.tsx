@@ -52,6 +52,7 @@ import { useItem, useItemList, type ItemsFilter } from './api';
 import { quantityText } from './form';
 import { ItemCard } from './ItemCard';
 import { ItemDialog } from './ItemDialog';
+import { BatchLabelsDialog } from './labels/BatchLabelsDialog';
 import { LabelsDialog } from './labels/LabelsDialog';
 import { useScanInput } from './scan';
 import { ItemIcon, StatusChip, TypeLabel } from './parts';
@@ -63,7 +64,8 @@ type Dialog =
   | { kind: 'edit'; item: ItemDetail }
   | { kind: 'import'; entity: 'items' | 'item_prices' }
   | { kind: 'adjust'; item: AdjustTarget }
-  | { kind: 'labels'; item: ItemDetail };
+  | { kind: 'labels'; item: ItemDetail }
+  | { kind: 'batchLabels' };
 
 const ALL = 'all';
 const TO_REORDER = 'toReorder';
@@ -284,6 +286,12 @@ export function ItemsPage() {
         >
           <Barcode className={iconClass.sm} aria-hidden="true" />
           {t('labels.button')}
+        </Button>
+      )}
+      {can('labels.print') && (
+        <Button onPress={() => setDialog({ kind: 'batchLabels' })}>
+          <Barcode className={iconClass.sm} aria-hidden="true" />
+          {t('labels.batchButton')}
         </Button>
       )}
       {canImport && can('items.manage') && can('prices.manage') && (
@@ -547,6 +555,7 @@ export function ItemsPage() {
           onClose={() => setDialog(null)}
         />
       )}
+      {dialog?.kind === 'batchLabels' && <BatchLabelsDialog onClose={() => setDialog(null)} />}
       {dialog?.kind === 'import' && (
         <ImportDialog
           entity={dialog.entity}

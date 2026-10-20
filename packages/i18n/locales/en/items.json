@@ -247,9 +247,55 @@
     "expiryWord": "EXP",
     "batchWord": "LOT",
     "expiry": "Expiry date",
-    "batch": "Batch number",
+    "batch": {
+      "title": "Labels for many items",
+      "source": "Which items",
+      "sources": {
+        "list": "Choose them myself",
+        "stock_document": "From a stock increase or opening stock",
+        "price_changed": "Price changed"
+      },
+      "search": "Search an item or scan its barcode",
+      "results": "Search results",
+      "add": "Add",
+      "document": "Document",
+      "chooseDocument": "Choose a stock increase or opening stock",
+      "kinds": {
+        "increase": "Stock increase",
+        "opening": "Opening stock"
+      },
+      "category": "Category",
+      "allCategories": "All categories",
+      "nothingChanged": "No item has an old label: every price is the one last printed.",
+      "empty": {
+        "list": "Search an item or scan its barcode to add it.",
+        "stock_document": "Choose the document: each item gets one label per unit received.",
+        "price_changed": "Loading the items whose price changed…"
+      },
+      "lines": "Items to print",
+      "item": "Item",
+      "oldNew": "Old price → new",
+      "remove": "Remove",
+      "countOf": "Number of labels for {name}",
+      "removeOf": "Remove {name}",
+      "total": "Total: {count} label(s)",
+      "wontFit": "{count} item(s) don't fit this size and will not print.",
+      "badCount": "The number of labels must be a whole number (0 = not printed).",
+      "tooMany": "At most {max} labels in one print. Split them over several prints.",
+      "confirm": "You are about to print {count} labels. Are you sure?",
+      "confirmYes": "Yes, print",
+      "confirmNo": "Back",
+      "priceChanged": "The price of these items changed while printing, so they were not recorded: {codes}. Print their labels again.",
+      "print": "Print {count} label(s)"
+    },
     "extraHint": "Optional: printed on the label when typed.",
     "extrasTooMuch": "The expiry date and the batch number do not fit on this size. Clear them or choose a bigger size.",
-    "fitted": "The design was made a little smaller to fit this size (shorter bars or smaller letters), never below the minimum."
+    "fitted": "The design was made a little smaller to fit this size (shorter bars or smaller letters), never below the minimum.",
+    "priceChangedWhilePrinting": "The item's price changed while printing, so this print was not recorded. Print its labels again with the new price.",
+    "notRecorded": "The labels were printed, but the print could not be recorded (connection problem). The item may not show on the \"price changed\" list later.",
+    "didPrint": "Did the {count} label(s) print?",
+    "didPrintYes": "Yes, printed",
+    "didPrintNo": "No",
+    "batchButton": "Labels for many items"
   }
 }

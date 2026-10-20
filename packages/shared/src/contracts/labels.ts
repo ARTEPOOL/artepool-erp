@@ -202,7 +202,7 @@ export interface LabelItem {
   id: string;
   code: string;
   nameAr: string;
-  nameEn: string | null;
+  nameEn: string;
   primaryBarcode: string | null;
   price: { price4dp: string; includesVat: boolean } | null;
   /** The rate of the item's VAT category now (basis points). */
