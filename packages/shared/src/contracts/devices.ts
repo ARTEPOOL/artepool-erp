@@ -46,10 +46,52 @@ export interface DevicesResponse {
 }
 
 /** This PC, as the server knows it (shown at the bottom of the sign-in screen). */
+/** The 2-inch label printer's dots per inch, and the ones a label printer may have. */
+export const LABEL_DPIS = [203, 300] as const;
+
+/** A number of millimetres with at most one decimal, within limits. */
+const mm = (min: number, max: number) =>
+  z
+    .number()
+    .min(min)
+    .max(max)
+    .refine((v) => Math.abs(v * 10 - Math.round(v * 10)) < 1e-9, 'one decimal at most');
+
+/**
+ * The label printer of a PC (decision 0096), kept on the server: the Windows printer's name (null =
+ * none chosen yet), its dots per inch, how wide it prints, and the offset found with the test
+ * label (positive X = to the right, positive Y = down, in mm).
+ */
+export const LabelPrinterConfig = z.object({
+  printer: z
+    .string()
+    .trim()
+    .min(1)
+    .max(256)
+    .refine((v) => !v.includes('\0') && !v.includes('/') && !v.includes('..'), 'not a printer name')
+    .nullable(),
+  dpi: z.union([z.literal(203), z.literal(300)]),
+  printableWidthMm: mm(20, 120),
+  offsetXMm: mm(-10, 10),
+  offsetYMm: mm(-10, 10),
+});
+export type LabelPrinterConfig = z.infer<typeof LabelPrinterConfig>;
+
+/** A PC with no label printer set yet: 2-inch printer, 203 dpi, 48 mm, no offset. */
+export const DEFAULT_LABEL_PRINTER: LabelPrinterConfig = {
+  printer: null,
+  dpi: 203,
+  printableWidthMm: 48,
+  offsetXMm: 0,
+  offsetYMm: 0,
+};
+
 export interface ThisDeviceResponse {
   device: { id: string; code: string; name: string; kind: DeviceKind };
   /** ISO time when the device key must have been renewed (the PC renews it 30 days before). */
   keyExpiresAt: string;
+  /** This PC's label printer (decision 0096); the defaults when none is set yet. */
+  labelPrinter: LabelPrinterConfig;
 }
 
 export interface EnrollmentCodeResponse {

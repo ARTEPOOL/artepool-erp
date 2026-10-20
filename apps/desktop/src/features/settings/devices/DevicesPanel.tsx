@@ -48,6 +48,7 @@ import { CardHead, NoAccess, PanelHeader, settingsClasses as styles } from '../p
 import { ReasonDialog } from '../users/dialogs';
 import deviceStyles from './devices.module.css';
 import { KioskAlertsCard, KioskLockCell } from './KioskLock';
+import { LabelPrinterCard } from './LabelPrinter';
 import { ReceiptPrinterCard } from './ReceiptPrinter';
 import { ScreenLockCard } from './ScreenLock';
 
@@ -314,8 +315,9 @@ export function DevicesPanel() {
         </Card>
       </div>
       <ReceiptPrinterCard index={3} />
-      <ScreenLockCard index={4} />
-      <KioskAlertsCard index={5} />
+      <LabelPrinterCard index={4} />
+      <ScreenLockCard index={5} />
+      <KioskAlertsCard index={6} />
       {revoking && <RevokeDialog device={revoking} onClose={() => setRevoking(null)} />}
       {moving && (
         <MoveDrawerDialog device={moving} devices={list} onClose={() => setMoving(null)} />

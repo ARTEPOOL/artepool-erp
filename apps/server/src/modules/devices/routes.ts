@@ -6,6 +6,7 @@ import {
   IdText,
   KioskCodeUnlockRequest,
   KioskEventRequest,
+  LabelPrinterConfig,
   MoveDrawerRequest,
   RenewKeyRequest,
   RevokeDeviceRequest,
@@ -51,6 +52,19 @@ export function registerDeviceRoutes(app: FastifyInstance): void {
     access: { kind: 'device' },
     body: RenewKeyRequest,
     handler: ({ request, body }) => devices.renewKey(deps, request, body.newKeyHash),
+  });
+
+  // This PC's label printer (decision 0096): set by the owner on the PC it is attached to.
+  defineWrite(app, {
+    method: 'PUT',
+    url: '/api/v1/devices/me/label-printer',
+    access: manage,
+    body: LabelPrinterConfig,
+    reason: () => 'label printer of this PC',
+    handler: async ({ trx, request, body }) => {
+      await devices.setLabelPrinter(trx, request.device!.id, body);
+      return { body: { labelPrinter: body } };
+    },
   });
 
   defineRoute(app, {

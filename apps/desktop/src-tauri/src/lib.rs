@@ -235,6 +235,44 @@ async fn printer_print_image(
     .map_err(|e| e.to_string())
 }
 
+/// Prints barcode labels (an image at the label printer's dots, base64) through the printer's own
+/// Windows driver at the label's exact size, one page per label, silently (decision 0096).
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+async fn printer_print_label(
+    printer: String,
+    document_name: String,
+    width_dots: u32,
+    height: u32,
+    bits_base64: String,
+    dpi: u32,
+    width_mm10: u32,
+    height_mm10: u32,
+    copies: u32,
+) -> Result<(), String> {
+    use base64::Engine as _;
+    let bits = base64::engine::general_purpose::STANDARD
+        .decode(bits_base64.as_bytes())
+        .map_err(|_| "The print job is not valid".to_string())?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let job = artepool_printer::LabelJob {
+            bitmap: artepool_printer::ReceiptBitmap {
+                width_dots,
+                height,
+                bits: &bits,
+            },
+            dpi,
+            width_mm10,
+            height_mm10,
+            copies,
+        };
+        artepool_printer::send_label(&printer, &document_name, &job)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -300,7 +338,8 @@ pub fn run() {
             google_signin_wait,
             printer_list,
             printer_print,
-            printer_print_image
+            printer_print_image,
+            printer_print_label
         ])
         .run(tauri::generate_context!())
         .expect("ARTÉPOOL ERP could not start");

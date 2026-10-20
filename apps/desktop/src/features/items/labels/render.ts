@@ -27,9 +27,16 @@ const REFERENCE = { arabic: 'آ أ إ ج ع ي ق ن ك لأ هُ ؤ', latin: '�
 const font = (dots: number, bold: boolean, family: string) =>
   `${bold ? '700' : '400'} ${dots}px ${family}`;
 
+/** Without a canvas (only in some test browsers): about as wide and high as the app's fonts. */
+const estimate: Measurer = {
+  width: (text, fontDots) => text.length * fontDots * 0.55,
+  extent: (fontDots) => ({ ascent: fontDots * 0.9, descent: fontDots * 0.45 }),
+};
+
 /** Text measured with the canvas, in the app's own font. */
 export function canvasMeasurer(family = receiptFontFamily()): Measurer {
-  const ctx = document.createElement('canvas').getContext('2d')!;
+  const ctx = document.createElement('canvas').getContext('2d');
+  if (!ctx) return estimate;
   const extents = new Map<string, { ascent: number; descent: number }>();
   return {
     width(text, fontDots, bold) {
@@ -63,7 +70,8 @@ function paint(
   const canvas = document.createElement('canvas');
   canvas.width = widthDots;
   canvas.height = heightDots;
-  const ctx = canvas.getContext('2d')!;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('No canvas to draw the label on');
   ctx.fillStyle = '#fff';
   ctx.fillRect(0, 0, widthDots, heightDots);
   ctx.save();

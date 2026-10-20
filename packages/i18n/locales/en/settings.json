@@ -301,7 +301,30 @@
         "codeBlocked": "5 wrong owner codes: the owner-code unlock is closed for 15 minutes"
       },
       "ownerIn": "Kiosk lock off · the owner is signed in"
-    }
+    },
+    "labelPrinter": "Label printer of this PC",
+    "labelPrinterHelp": "Barcode labels print on it silently, at the label's real size. Set it on the PC the printer is attached to.",
+    "labelDpi": "Print density",
+    "labelDpiValue": "{dpi} dpi",
+    "labelPrintableWidth": "Printable width (mm)",
+    "labelPrintableWidthHint": "2-inch printer: 48 mm (see its self-test page).",
+    "labelOffsetX": "Move right (mm)",
+    "labelOffsetXHint": "Minus moves left. From −10 to 10.",
+    "labelOffsetY": "Move down (mm)",
+    "labelOffsetYHint": "Minus moves up. From −10 to 10.",
+    "labelMmRule": "A number from {min} to {max} mm, with one decimal at most.",
+    "labelSave": "Save label printer",
+    "labelTestSize": "Test label size",
+    "labelTestPrint": "Print test label",
+    "labelTestPreview": "Test label: border, centre cross and a 5 mm ruler",
+    "labelTestCaption": "{width} × {height} mm · {dpi} dpi · X {x} · Y {y} mm",
+    "labelProblem": {
+      "browser": "Printing works in the Windows app only.",
+      "no_printer": "Choose the label printer and save first.",
+      "failed": "The label printer did not respond. Check that it is on, connected and has labels.",
+      "no_drawer": "The label printer has no cash drawer."
+    },
+    "labelPrinterNote": "Print the test label: the cross should be in the middle and the border on the label's edge. If not, change “Move right” or “Move down”, save, and print again."
   },
   "audit": {
     "title": "Audit log",

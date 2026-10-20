@@ -408,7 +408,7 @@ Enrolled PCs only ([0024](decisions/0024-device-enrollment-proves-the-server.md)
 | key_renewed_at | timestamptz? | Server time, set by trigger when `key_hash` changes |
 | enrolled_at | timestamptz | Server time, set by trigger |
 | enrolled_by | bigint → auth.users | The user who created the enrollment code |
-| printer_config | jsonb | `DEFAULT '{}'`: thermal / label / A4 printer names, receipt width and language |
+| printer_config | jsonb | `DEFAULT '{}'`. Key `label` (migration 0038, decision 0096): this PC's label printer `{printer, dpi (203/300), printableWidthMm (20–120), offsetXMm, offsetYMm (−10–10)}`, checked by `auth.valid_label_printer`; set by the owner through `PUT /api/v1/devices/me/label-printer` (audited). The receipt printer stays on the PC (decision 0070) |
 | revoked_at, revoked_by | timestamptz?, bigint? | Set by trigger from the server clock and the request context |
 | revoke_reason | text? | Required (3+ characters) when revoked |
 | [std] | | |
@@ -1776,6 +1776,7 @@ Migrations are written **in build order** (milestones in [`phase-1-plan.md`](pha
 | 0034 | `kiosk_lock` | M5c | `auth.kiosk_lock_changes`, `auth.kiosk_code_failures`, `auth.kiosk_state()`, four kiosk alert types (0082, 0083, 0089) | — |
 | 0035 | `kiosk_owner_session` | M5c | `auth.owner_signed_in_on()`, `auth.kiosk_state()` with `owner_signed_in`; owner code at most 15 minutes (0091) | — |
 | 0036 | `ops_backup` | M6.1 | `ops.backup_runs`, `ops.integrity_runs`, `ops.backup_requests`; backup settings; `offline_copy_due` alert; `system.backup.manage` and owner-only health/restore/integrity permissions; backup role grants | — |
+| 0038 | `device_label_printer` | Labels | Check on `auth.devices.printer_config -> 'label'` (`auth.valid_label_printer`); decision 0096 | — |
 | 0037 | `label_sizes_two_inch` | Labels | Setting `labels.max_width_mm` (50); label sizes for the 2-inch roll (50×30 first; 25×15, 30×20, 58×40, 100×50 deactivated); trigger: no active size wider than the roll; decision 0096 | — |
 
 After 0036, a final check asserts that every business table has the audit trigger, the no-delete guard and the expected grants. The same check runs as an automated test.

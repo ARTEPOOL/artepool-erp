@@ -7,7 +7,9 @@ import type { FastifyRequest } from 'fastify';
 import { sql, type Kysely, type Transaction } from 'kysely';
 import {
   clientProofMessage,
+  DEFAULT_LABEL_PRINTER,
   ENROLL_PROTOCOL,
+  LabelPrinterConfig,
   enrollTranscript,
   serverProofMessage,
   type DeviceKind,
@@ -300,13 +302,30 @@ export async function thisDevice(
   const device = request.device!;
   const row = await deps.db
     .selectFrom('auth.devices')
-    .select('name')
+    .select(['name', 'printer_config'])
     .where('id', '=', device.id)
     .executeTakeFirstOrThrow();
+  const label = LabelPrinterConfig.safeParse((row.printer_config as { label?: unknown }).label);
   return {
     device: { id: device.id.toString(), code: device.code, name: row.name, kind: device.kind },
     keyExpiresAt: device.keyExpiresAt.toISOString(),
+    labelPrinter: label.success ? label.data : DEFAULT_LABEL_PRINTER,
   };
+}
+
+/** Sets THIS PC's label printer (decision 0096): the owner, on the PC the printer is attached to. */
+export async function setLabelPrinter(
+  trx: Transaction<DB>,
+  deviceId: bigint,
+  config: LabelPrinterConfig,
+): Promise<void> {
+  await trx
+    .updateTable('auth.devices')
+    .set({
+      printer_config: sql`printer_config || jsonb_build_object('label', ${JSON.stringify(config)}::jsonb)`,
+    })
+    .where('id', '=', deviceId)
+    .executeTakeFirstOrThrow();
 }
 
 // ---------------------------------------------------------------------------------------------
