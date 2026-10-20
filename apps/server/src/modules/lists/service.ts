@@ -2,7 +2,7 @@
  * Settings → Lists (decision 0034): technicians, payment methods, warehouses and reason codes.
  * The database checks their accounts and defaults; nothing is deleted (decision 0037).
  */
-import type { Kysely, Transaction } from 'kysely';
+import { sql, type Kysely, type Transaction } from 'kysely';
 import { normalizePhone } from '@artepool/shared';
 import type {
   CreatePaymentMethodRequest,
@@ -27,7 +27,7 @@ import type {
 import type { DB } from '../../platform/db/schema.generated';
 import { stamped } from '../../platform/db/stamped';
 import { expectUpdated, fieldError } from '../../platform/db/versioned';
-import { AppError } from '../../platform/errors/app-error';
+import { AppError, ruleError } from '../../platform/errors/app-error';
 
 const id = (value: string | null) => (value === null ? null : BigInt(value));
 
@@ -394,6 +394,27 @@ export async function listLabelSizes(db: Kysely<DB>): Promise<LabelSizeItem[]> {
   }));
 }
 
+/** The widest label the label printer's roll takes (setting labels.max_width_mm, decision 0096). */
+export async function labelMaxWidthMm(db: Kysely<DB> | Transaction<DB>): Promise<number> {
+  const row = await db
+    .selectFrom('sys.settings')
+    .select(sql<number>`(value #>> '{}')::int`.as('mm'))
+    .where('key', '=', 'labels.max_width_mm')
+    .executeTakeFirst();
+  return row?.mm ?? 50;
+}
+
+/** A clear message before the database refuses a size wider than the roll. */
+async function assertFitsRoll(trx: Transaction<DB>, widthMm: number) {
+  const maxMm = await labelMaxWidthMm(trx);
+  if (widthMm > maxMm) {
+    throw ruleError('LABEL_TOO_WIDE', `Label width ${widthMm} mm is over ${maxMm} mm`, {
+      field: 'widthMm',
+      maxMm,
+    });
+  }
+}
+
 const labelSizeValues = (body: UpdateLabelSizeRequest | CreateLabelSizeRequest) => ({
   name_ar: body.nameAr,
   name_en: body.nameEn,
@@ -403,6 +424,7 @@ const labelSizeValues = (body: UpdateLabelSizeRequest | CreateLabelSizeRequest) 
 });
 
 export async function createLabelSize(trx: Transaction<DB>, body: CreateLabelSizeRequest) {
+  await assertFitsRoll(trx, body.widthMm);
   const row = await trx
     .insertInto('md.label_sizes')
     .values(stamped('md.label_sizes', { code: body.code.toUpperCase(), ...labelSizeValues(body) }))
@@ -416,6 +438,13 @@ export async function updateLabelSize(
   sizeId: bigint,
   body: UpdateLabelSizeRequest,
 ) {
+  const current = await trx
+    .selectFrom('md.label_sizes')
+    .select(['width_mm', 'is_active'])
+    .where('id', '=', sizeId)
+    .executeTakeFirst();
+  if (current?.is_active && body.widthMm !== current.width_mm)
+    await assertFitsRoll(trx, body.widthMm);
   const result = await trx
     .updateTable('md.label_sizes')
     .set(labelSizeValues(body))
@@ -432,6 +461,14 @@ export async function setLabelSizeActive(
   active: boolean,
   rowVersion: number,
 ) {
+  if (active) {
+    const current = await trx
+      .selectFrom('md.label_sizes')
+      .select('width_mm')
+      .where('id', '=', sizeId)
+      .executeTakeFirst();
+    if (current) await assertFitsRoll(trx, current.width_mm);
+  }
   const result = await trx
     .updateTable('md.label_sizes')
     .set({ is_active: active })

@@ -398,6 +398,12 @@ export interface LabelSizeItem {
   rowVersion: number;
 }
 
+/** GET /api/v1/label-sizes: the sizes and the widest label the printer's roll takes (0096). */
+export interface LabelSizesResponse {
+  labelSizes: LabelSizeItem[];
+  maxWidthMm: number;
+}
+
 const LabelSizeFields = z.object({
   nameAr: z.string().trim().min(1).max(100),
   nameEn: z.string().trim().min(1).max(100),

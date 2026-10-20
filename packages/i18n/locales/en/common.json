@@ -158,6 +158,7 @@
       "DRAWER_MOVE_INVALID": "A drawer moves only from a revoked PC to an active point-of-sale PC.",
       "DEVICE_HAS_OPEN_SHIFT": "This PC has an open shift on its drawer. Close the shift first (or close it from Shifts as a stuck shift).",
       "SHIFT_NOT_STUCK": "This shift is open on this PC: close it from the point of sale.",
+      "LABEL_TOO_WIDE": "The label is wider than the label printer's roll (at most {maxMm} mm).",
       "COUNT_ALREADY_DONE": "The closing count is already done; a recount needs a supervisor.",
       "RECOUNT_USED": "The one recount of this shift is already used.",
       "APPROVAL_INVALID": "This approval is for something else.",

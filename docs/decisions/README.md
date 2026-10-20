@@ -102,6 +102,7 @@ There is one short file per decision, numbered in order.
 | [0093](0093-no-remote-access-in-phase-1.md) | No remote access in Phase 1 (no VPN, no open ports, no remote-desktop tools); VPN-agnostic design; laptop on the shop LAN | Accepted |
 | [0094](0094-adding-the-cashier-and-the-owner-laptop.md) | Adding the cashier (Settings → Users, PIN; kind decides the mode, no separate icon) and the owner's laptop (enrollment code, LAN only) | Accepted |
 | [0095](0095-google-drive-connect-by-choosing-the-account.md) | Google Drive connected by choosing the account in the browser (PKCE + loopback); one built-in registration of the app for every installation; code at google.com/device as fallback | Accepted |
+| [0096](0096-barcode-labels-2-inch-printer.md) | Barcode labels for the 2-inch label printer: 50 × 30 default (50 × 25, 40 × 30), no size wider than the roll, content within the printable width; fixed zones in mm (Arabic name 2 lines, optional English, EAN/Code 128 on whole dots, price order, incl. VAT); silent printing at exact size, per-PC label printer with offset and test label; RAW TSPL next (updates 0043) | Accepted |
 
 ## Template
 

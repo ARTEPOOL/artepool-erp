@@ -803,28 +803,57 @@ describe('counts (CNT-, decision 0044)', () => {
   });
 });
 
-describe('barcode label sizes (decision 0043)', () => {
-  it('has the eight agreed sizes; the owner can add more; none is deleted', async () => {
-    const { rows } = await api.query<{ code: string }>(
-      `SELECT code FROM md.label_sizes WHERE is_active ORDER BY sort_order`,
+describe('barcode label sizes (decisions 0043, 0096)', () => {
+  it('offers the sizes for the 2-inch roll, 50 × 30 first; the others are deactivated, never deleted', async () => {
+    const { rows } = await api.query<{ code: string; is_active: boolean }>(
+      `SELECT code, is_active FROM md.label_sizes ORDER BY sort_order, code`,
     );
-    expect(rows.map((r) => r.code)).toEqual([
+    expect(rows.filter((r) => r.is_active).map((r) => r.code)).toEqual([
+      '50X30',
+      '50X25',
+      '40X30',
+      '38X25',
+    ]);
+    expect(rows.filter((r) => !r.is_active).map((r) => r.code)).toEqual([
       '25X15',
       '30X20',
-      '38X25',
-      '40X30',
-      '50X25',
-      '50X30',
       '58X40',
       '100X50',
     ]);
+    // Deactivated with the migration's reason, in the audit log.
+    const audit = await api.query<{ reason: string }>(
+      `SELECT reason FROM audit.log WHERE entity_type = 'md.label_sizes' AND action = 'update'
+        AND new_values ->> 'is_active' = 'false'`,
+    );
+    expect(audit.rows).toHaveLength(4);
+    expect(audit.rows[0]!.reason).toMatch(/decision 0096/);
+  });
+
+  it('the owner adds a size; never wider than the label roll, never deleted', async () => {
     await tx(
       (c) =>
         c.query(
-          `INSERT INTO md.label_sizes (code, name_ar, name_en, width_mm, height_mm) VALUES ('SHELF', 'ملصق الرف', 'Shelf label', 70, 35)`,
+          `INSERT INTO md.label_sizes (code, name_ar, name_en, width_mm, height_mm) VALUES ('SHELF', 'ملصق الرف', 'Shelf label', 45, 35)`,
         ),
       owner,
     );
+    const tooWide = rule('LABEL_TOO_WIDE');
+    await expect(
+      tx(
+        (c) =>
+          c.query(
+            `INSERT INTO md.label_sizes (code, name_ar, name_en, width_mm, height_mm) VALUES ('WIDE', 'عريض', 'Wide', 70, 35)`,
+          ),
+        owner,
+      ),
+    ).rejects.toMatchObject(tooWide);
+    await expect(
+      tx((c) => c.query(`UPDATE md.label_sizes SET width_mm = 51 WHERE code = 'SHELF'`), owner),
+    ).rejects.toMatchObject(tooWide);
+    // A size wider than the roll cannot be switched back on.
+    await expect(
+      tx((c) => c.query(`UPDATE md.label_sizes SET is_active = true WHERE code = '58X40'`), owner),
+    ).rejects.toMatchObject(tooWide);
     await expect(
       api.query(`DELETE FROM md.label_sizes WHERE code = 'SHELF'`),
     ).rejects.toMatchObject({

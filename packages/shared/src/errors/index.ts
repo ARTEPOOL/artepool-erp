@@ -203,6 +203,7 @@ export const RULE_CODES = [
   'DRAWER_MOVE_INVALID',
   'DEVICE_HAS_OPEN_SHIFT',
   'SHIFT_NOT_STUCK',
+  'LABEL_TOO_WIDE',
 ] as const;
 
 export type RuleCode = (typeof RULE_CODES)[number];

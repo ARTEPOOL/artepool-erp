@@ -1,5 +1,11 @@
 # Changelog
 
+## Barcode labels, part 1: sizes for the 2-inch printer (2026-10-20)
+
+**In plain words:** the label sizes now match your label printer (2-inch roll). 50 × 30 mm comes first and is the default, then 50 × 25 and 40 × 30. The sizes that cannot print well on it (25 × 15, 30 × 20, 58 × 40, 100 × 50) are switched off (kept, not deleted). A new size can never be wider than the roll (50 mm). The new label drawing and silent printing follow in the next parts.
+
+- Decision 0096 (updates 0043); migration 0037; rule `LABEL_TOO_WIDE`; PRD 1.30.
+
 ## Google Drive in one step (2026-10-19)
 
 **In plain words:** connecting Google Drive is now like any "Sign in with Google": Settings → Backup → Connect Google Drive → Choose account; choose the shop's Google account and press Allow. No IDs or codes to type. The app's registration at Google is built into the installation, so any shop that installs the system just chooses its own account. If the browser does not open, "Connect with a code instead" still works.

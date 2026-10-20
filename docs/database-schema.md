@@ -820,19 +820,19 @@ One level (`STANDARD`) in P1. A second level (for example "Contractors & compani
 | sort_order | integer | |
 | [active], [std] | | |
 
-### 7.16 `md.label_sizes` (decision [0043](decisions/0043-barcode-label-sizes.md), migration 0011)
+### 7.16 `md.label_sizes` (decisions [0043](decisions/0043-barcode-label-sizes.md), [0096](decisions/0096-barcode-labels-2-inch-printer.md); migrations 0011, 0037)
 
 | Column | Type | Rules |
 |---|---|---|
 | id | bigint PK | |
 | code | text | unique (case-insensitive); fixed after creation |
 | name_ar, name_en | text | |
-| width_mm | smallint | 10–210 |
+| width_mm | smallint | 10–210; an active size is never wider than the setting `labels.max_width_mm` (50 mm, the label roll; trigger `b_label_size_fits_roll`, rule `LABEL_TOO_WIDE`) |
 | height_mm | smallint | 10–297 |
 | sort_order | smallint | |
 | [active], [std] | | Deactivated with a reason, never deleted |
 
-Seeded: 25×15, 30×20, 38×25, 40×30, 50×25, 50×30, 58×40, 100×50 mm. Writes need `system.settings.edit` (owner).
+Seeded: 25×15, 30×20, 38×25, 40×30, 50×25, 50×30, 58×40, 100×50 mm. Since 0037 (decision 0096) the active ones are 50×30 (first = default), 50×25, 40×30 and 38×25; 25×15, 30×20, 58×40 and 100×50 are deactivated. Writes need `system.settings.edit` (owner).
 
 ---
 
@@ -1776,6 +1776,7 @@ Migrations are written **in build order** (milestones in [`phase-1-plan.md`](pha
 | 0034 | `kiosk_lock` | M5c | `auth.kiosk_lock_changes`, `auth.kiosk_code_failures`, `auth.kiosk_state()`, four kiosk alert types (0082, 0083, 0089) | — |
 | 0035 | `kiosk_owner_session` | M5c | `auth.owner_signed_in_on()`, `auth.kiosk_state()` with `owner_signed_in`; owner code at most 15 minutes (0091) | — |
 | 0036 | `ops_backup` | M6.1 | `ops.backup_runs`, `ops.integrity_runs`, `ops.backup_requests`; backup settings; `offline_copy_due` alert; `system.backup.manage` and owner-only health/restore/integrity permissions; backup role grants | — |
+| 0037 | `label_sizes_two_inch` | Labels | Setting `labels.max_width_mm` (50); label sizes for the 2-inch roll (50×30 first; 25×15, 30×20, 58×40, 100×50 deactivated); trigger: no active size wider than the roll; decision 0096 | — |
 
 After 0036, a final check asserts that every business table has the audit trigger, the no-delete guard and the expected grants. The same check runs as an automated test.
 

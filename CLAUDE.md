@@ -120,7 +120,10 @@ It runs client–server on the local network: PostgreSQL and the API service on 
 - **Adjustments** need no supervisor's approval (the limit setting is empty; a value turns it back on). (0054, replaces 0041)
 - **Opening stock:** once at go-live, owner only (`stock.opening`); empty cost → the item's purchase price. (0042)
 - **Item quantity in the item window:** a new stock item's quantity is posted as its opening stock (owner, accountant, storekeeper: `stock.new_item_quantity`); editing shows the current quantity and a change becomes a "Data correction" adjustment (`stock.adjust`, approval above the limit). No cost is typed there: the purchase price is used. The storekeeper manages items. (0053)
-- **Labels:** preset sizes + custom sizes (`md.label_sizes`), printed through the print dialog for now. (0043)
+- **Labels** for the 2-inch label printer (LV-275, 203 dpi, TSPL):
+  - 50 × 30 default, 50 × 25, 40 × 30; no size wider than the roll (`labels.max_width_mm`); content within the printable width (48 mm, per PC).
+  - Drawn by the app at printer dots in fixed mm zones: Arabic name (2 lines, shrink, "…"; English optional), EAN/UPC or Code 128 on whole dots with quiet zones, "120.00 درهم" / "AED 120.00", "incl. VAT" when the price includes VAT.
+  - Printed silently at exact size (per-PC label printer, offset, test label in Settings → Devices); the print dialog is only a fallback and for A4 sheets; RAW TSPL next. (0043, 0096)
 - **Counts** are blind while counting; one warehouse in Phase 1. (0044)
 
 **Sales (A4)**

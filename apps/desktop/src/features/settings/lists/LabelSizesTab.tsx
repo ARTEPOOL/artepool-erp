@@ -1,21 +1,28 @@
 /**
- * Settings → Lists → Label sizes (decision 0043): the barcode label sizes offered when printing
- * labels, in whole millimetres. Everyone who opens Lists sees them; only the owner
- * (`system.settings.edit`) adds, changes or deactivates one. The code never changes.
+ * Settings → Lists → Label sizes (decisions 0043, 0096): the barcode label sizes offered when
+ * printing labels, in whole millimetres, never wider than the label printer's roll. Everyone who
+ * opens Lists sees them; only the owner (`system.settings.edit`) adds, changes or deactivates one.
+ * The code never changes.
  */
 import { useTranslation } from 'react-i18next';
 import type { LabelSizeItem } from '@artepool/shared/contracts';
 import { Note, TextField } from '../../../ui';
 import { useCan } from '../../auth/context';
-import { MD_KEYS, useLabelSizes } from '../../masterdata/refs';
+import { MD_KEYS, useLabelMaxWidth, useLabelSizes } from '../../masterdata/refs';
 import { ListEditor } from './ListEditor';
 import { listClasses as styles, parseWhole } from './parts';
 
-/** The limits the server accepts (an A4 sheet at most). */
+/** The limits the server accepts: the height up to an A4 sheet; the width up to the label roll. */
 export const LABEL_LIMITS = {
   width: { min: 10, max: 210 },
   height: { min: 10, max: 297 },
 } as const;
+
+/** The width limits for this shop: never wider than the label printer's roll (decision 0096). */
+const widthLimits = (maxWidthMm: number | undefined) => ({
+  min: LABEL_LIMITS.width.min,
+  max: Math.min(LABEL_LIMITS.width.max, maxWidthMm ?? LABEL_LIMITS.width.max),
+});
 
 type LabelSizeForm = {
   code: string;
@@ -36,6 +43,7 @@ export function LabelSizesTab() {
   const { t } = useTranslation('lists');
   const can = useCan();
   const sizes = useLabelSizes();
+  const width = widthLimits(useLabelMaxWidth().data);
   return (
     <ListEditor<LabelSizeItem, LabelSizeForm>
       section="labelSizes"
@@ -69,14 +77,13 @@ export function LabelSizesTab() {
         sortOrder: String(s?.sortOrder ?? 0),
       })}
       toBody={(form) => ({
-        widthMm: parseMm(form.widthMm, LABEL_LIMITS.width),
+        widthMm: parseMm(form.widthMm, width),
         heightMm: parseMm(form.heightMm, LABEL_LIMITS.height),
         sortOrder: parseWhole(form.sortOrder, 999) ?? 0,
       })}
       check={(form) => {
         const problems: Record<string, string> = {};
-        if (parseMm(form.widthMm, LABEL_LIMITS.width) === null)
-          problems.widthMm = t('labelSizes.mmRule', LABEL_LIMITS.width);
+        if (parseMm(form.widthMm, width) === null) problems.widthMm = t('labelSizes.mmRule', width);
         if (parseMm(form.heightMm, LABEL_LIMITS.height) === null)
           problems.heightMm = t('labelSizes.mmRule', LABEL_LIMITS.height);
         if (parseWhole(form.sortOrder, 999) === null) problems.sortOrder = t('sortOrderRule');
@@ -93,7 +100,7 @@ export function LabelSizesTab() {
             inputMode="numeric"
             maxLength={3}
             isRequired
-            hint={t('labelSizes.mmHint', LABEL_LIMITS.width)}
+            hint={t('labelSizes.widthHint', width)}
             error={error('widthMm')}
           />
           <TextField

@@ -217,7 +217,7 @@ Phase tags: **[P1]** to **[P4]** (see section 13).
 - **Out-of-stock at POS:** the sale is allowed with supervisor approval. The system posts an **oversell adjustment** in the same transaction and flags it for the storekeeper to review ([0003](docs/decisions/0003-pos-oversell-with-approval.md)).
 - **Defective stock bucket** for returned broken goods, separate from sellable stock. Defective goods are **held at cost in "Inventory – defective" until written off** ([0015](docs/decisions/0015-defective-returns-held-at-cost.md)).
 - Bundles deduct their components.
-- Barcode label printing: sizes 25×15 to 100×50 mm, A4 label sheets and custom sizes, through the print dialog for now ([0043](docs/decisions/0043-barcode-label-sizes.md)).
+- Barcode label printing for the 2-inch label printer: 50×30 mm by default, also 50×25 and 40×30, custom sizes never wider than the roll; the content stays within the printable width (48 mm). Fixed zones: the Arabic name (2 lines, shrinks, then "…"; English name optional), an EAN-13/EAN-8/UPC-A or Code 128 barcode on whole printer dots, the price ("120.00 درهم" / "AED 120.00") and "incl. VAT". Printed silently at the exact size on each PC's label printer (offset and a test label in Settings → Devices); the print dialog only as a fallback and for A4 label sheets; RAW TSPL next ([0043](docs/decisions/0043-barcode-label-sizes.md), [0096](docs/decisions/0096-barcode-labels-2-inch-printer.md)).
 - **Who sees stock cost and value:** owner and accountant only; storekeeper and cashier see quantities ([0040](docs/decisions/0040-stock-cost-visibility.md)). Adjustments above 500.00 AED need a supervisor's approval ([0041](docs/decisions/0041-stock-adjustment-approval-threshold.md)). Opening stock is posted once, by the owner ([0042](docs/decisions/0042-opening-stock-owner-only.md)). Full counts are blind ([0044](docs/decisions/0044-blind-stock-counts.md)).
 - Multi-warehouse ready; transfers between warehouses come in [P3].
 
@@ -445,6 +445,7 @@ Each phase ends with automated tests passing, a security review, an accountant r
 | Version | Date | Change |
 |---|---|---|
 | 1.10 | 2026-10-14 | M4b decisions 0064–0067: print designer with locked tax fields per document type (seller address on every tax invoice, customer address on full tax invoices; a full tax invoice needs the customer's address); company bank accounts with UAE IBAN check; customer PO number on A4 invoices and quotations; no QR code until e-invoicing. |
+| 1.30 | 2026-10-20 | Decision 0096: barcode labels for the 2-inch label printer (sizes, fixed layout in mm, silent printing at exact size, per-PC label printer with offset and test label; RAW TSPL next). |
 | 1.29 | 2026-10-19 | Decision 0095: Google Drive connected by choosing the account; one built-in registration of the app for every installation. Noted: the owner may offer the system to other companies later (a separate decision; scope unchanged). |
 | 1.28 | 2026-10-19 | M6 approved in five parts: backups, installer + first-run setup wizard (0092), adding the cashier (0094), cashier Windows account hardening, owner's laptop on the LAN (0094); remote access dropped for Phase 1 (0093, 0084 deferred). |
 | 1.27 | 2026-10-19 | Decision 0091: the kiosk lock is off while the owner is signed in on the POS PC; the owner code on the lock screen lifts it for 15 minutes. |
