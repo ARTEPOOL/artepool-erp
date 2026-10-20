@@ -19,6 +19,8 @@ const SAVED: LabelPrinterConfig = {
   darkness: 8,
   speed: 3,
   mode: 'driver',
+  gapMm: 2,
+  flip: false,
 };
 
 function bridge() {
@@ -84,5 +86,30 @@ describe('Settings → Devices → label printer of this PC', () => {
     expect(
       screen.getByRole('button', { name: 'حفظ طابعة الملصقات' }).hasAttribute('disabled'),
     ).toBe(true);
+  });
+
+  it('direct printing (TSPL): the gap and the direction are asked for and saved (0100)', async () => {
+    const fake = bridge();
+    await openDevices(fake);
+    // The driver's own tips while printing through the driver; no gap field.
+    expect(screen.queryByLabelText(/المسافة بين الملصقات/)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'مباشرة (TSPL)' }));
+    const gap = screen.getByLabelText<HTMLInputElement>(/المسافة بين الملصقات/);
+    expect(gap.value).toBe('2');
+    fireEvent.change(gap, { target: { value: '12' } });
+    expect(await screen.findByText(/رقم من 0 إلى 10 مم/)).toBeTruthy();
+    fireEvent.change(gap, { target: { value: '2.5' } });
+    fireEvent.click(screen.getByRole('switch', { name: /اقلب الطباعة/ }));
+    expect(screen.getByText(/الطباعة المباشرة بتبعت الملصق للطابعة بلغتها/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'حفظ طابعة الملصقات' }));
+    await waitFor(() =>
+      expect(fake.callsTo('PUT', '/api/v1/devices/me/label-printer')).toHaveLength(1),
+    );
+    expect(fake.callsTo('PUT', '/api/v1/devices/me/label-printer')[0]!.body).toEqual({
+      ...SAVED,
+      mode: 'tspl',
+      gapMm: 2.5,
+      flip: true,
+    });
   });
 });

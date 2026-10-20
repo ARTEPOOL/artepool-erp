@@ -1,6 +1,6 @@
 # طابعة الملصقات — دليل التشغيل
 
-> **Label printer runbook** (decisions [0096](../decisions/0096-barcode-labels-2-inch-printer.md), [0097](../decisions/0097-label-designer-and-print-quality.md)).
+> **Label printer runbook** (decisions [0096](../decisions/0096-barcode-labels-2-inch-printer.md), [0097](../decisions/0097-label-designer-and-print-quality.md), [0100](../decisions/0100-direct-tspl-label-printing.md)).
 > For the owner. The shop's printer: LENVII LV-275, 2-inch (58 mm), 203 dpi, USB.
 
 ## 1) أول مرة: ضبط الطابعة على الجهاز
@@ -25,6 +25,17 @@
    - لو **يمين** النص: اكتب رقم بالسالب (مثلًا **-2**).
    - لو **فوق** أو **تحت**: نفس الكلام في «تحريك للأسفل».
 3. كرّر لحد ما العلامة تبقى في النص. الإعداد ده بيتحفظ للجهاز ده على السيرفر، فمش هيضيع لو البرنامج اتسطّب تاني.
+
+### الطباعة المباشرة (TSPL)
+
+1. في نفس الكارت، **طريقة الطباعة**: اختار **«مباشرة (TSPL)»**.
+2. **المسافة بين الملصقات**: قيسها على الرول (غالبًا 2 أو 3 مم).
+3. دوس **«حفظ طابعة الملصقات»**، وبعدين **«اطبع ملصق اختبار»**.
+   - ✅ لازم الملصق يطلع في مكانه، والعلامة **+** في النص.
+   - لو الملصق طالع **بالمقلوب**: شغّل **«اقلب الطباعة»** واحفظ واطبع تاني.
+   - لو العلامة مش في النص: «تحريك لليمين» / «تحريك للأسفل» زي القسم 2.
+   - لو الطابعة **بتسيب ملصق فاضي** أو بتقطع في النص: راجع «المسافة بين الملصقات»، واعمل معايرة للطابعة بزرار FEED.
+4. لو الطابعة ما طبعتش خالص: رجّع طريقة الطباعة لـ **«درايفر الويندوز»** واحفظ. البرنامج مش بيطبع تاني بالدرايفر لوحده، علشان ما يطلعش ملصقات مكررة.
 
 ### اختبار الجودة
 
@@ -92,7 +103,7 @@
 
 ## 7) For the technician
 
-- Labels are drawn by the app at the printer's dots and sent through the Windows driver with the label's paper size set by the app (one page per label). The RAW TSPL mode (Phase B) will bypass the driver.
+- Labels are drawn by the app at the printer's dots. "Windows driver" way: sent through the driver with the label's paper size set by the app (one page per label). "Direct (TSPL)" way (decision 0100): one RAW job per item — `SIZE w mm,h mm` / `GAP g mm,0 mm` / `DIRECTION 1,0` (0 when turned round) / `REFERENCE 0,0` / `DENSITY d` / `SPEED s` / `CLS` / `BITMAP x,0,bytes,height,0,<data>` (0 bit = black) / `PRINT 1,copies`; the bitmap is cut to the printable width, centred, and a narrower label starts `(head − label) / 2` in.
 - The label printer settings live in `auth.devices.printer_config -> 'label'` for each PC (printer, dpi, printable width, offsets, darkness 0–15, speed 1–6, mode), audited.
 - Every label print is recorded in `inv.label_prints` (per item: price on the label, copies, size, design version, user, PC), audited, never deleted; the "price changed" list compares each item's last record with its price today (decision 0099).
 - The label design is a version of the `barcode_label` print template (`sys.print_template_versions`), owner only, never changed after saving. The image sent is pure 1-bit at the printer's dpi.

@@ -301,6 +301,8 @@ describe("this PC's label printer (decision 0096)", () => {
       darkness: 8,
       speed: 3,
       mode: 'driver',
+      gapMm: 2,
+      flip: false,
     });
     const config = {
       printer: 'LV-275 Label',
@@ -320,14 +322,24 @@ describe("this PC's label printer (decision 0096)", () => {
     const after = (
       await call(server, 'GET', '/api/v1/devices/me', { device: office })
     ).json<ThisDeviceResponse>();
-    // Darkness, speed and mode not sent: their defaults (decision 0097).
-    expect(after.labelPrinter).toEqual({ ...config, darkness: 8, speed: 3, mode: 'driver' });
-    expect((await put({ ...config, darkness: 12, speed: 2, mode: 'tspl' })).statusCode).toBe(200);
+    // Darkness, speed, mode, gap and direction not sent: their defaults (decisions 0097, 0100).
+    expect(after.labelPrinter).toEqual({
+      ...config,
+      darkness: 8,
+      speed: 3,
+      mode: 'driver',
+      gapMm: 2,
+      flip: false,
+    });
+    expect(
+      (await put({ ...config, darkness: 12, speed: 2, mode: 'tspl', gapMm: 2.5, flip: true }))
+        .statusCode,
+    ).toBe(200);
     expect(
       (
         await call(server, 'GET', '/api/v1/devices/me', { device: office })
       ).json<ThisDeviceResponse>().labelPrinter,
-    ).toMatchObject({ darkness: 12, speed: 2, mode: 'tspl' });
+    ).toMatchObject({ darkness: 12, speed: 2, mode: 'tspl', gapMm: 2.5, flip: true });
     // Out of range, wrong dpi, more than one decimal: refused.
     for (const bad of [
       { ...config, offsetXMm: 12 },
@@ -337,6 +349,9 @@ describe("this PC's label printer (decision 0096)", () => {
       { ...config, darkness: 16 },
       { ...config, speed: 0 },
       { ...config, mode: 'zpl' },
+      { ...config, gapMm: 11 },
+      { ...config, gapMm: 2.25 },
+      { ...config, flip: 'yes' },
     ]) {
       expect(errorCode(await put(bad))).toBe('VALIDATION_FAILED');
     }
@@ -363,6 +378,22 @@ describe("this PC's label printer (decision 0096)", () => {
           .execute(),
       ),
     ).rejects.toMatchObject({ code: 'VALIDATION_FAILED', details: { sqlState: '23514' } });
+    // ... and a gap out of range or a direction that is not yes/no (decision 0100).
+    for (const label of [
+      { ...config, gapMm: 11 },
+      { ...config, gapMm: 2.25 },
+      { ...config, flip: 'yes' },
+    ]) {
+      await expect(
+        withBusinessTx(server.db, { userId: 1n, requestId: randomUUID(), reason: 'test' }, (trx) =>
+          trx
+            .updateTable('auth.devices')
+            .set({ printer_config: JSON.stringify({ label }) })
+            .where('id', '=', office.id)
+            .execute(),
+        ),
+      ).rejects.toMatchObject({ code: 'VALIDATION_FAILED', details: { sqlState: '23514' } });
+    }
   });
 });
 

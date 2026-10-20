@@ -322,7 +322,8 @@
       "browser": "Printing works in the Windows app only.",
       "no_printer": "Choose the label printer and save first.",
       "failed": "The label printer did not respond. Check that it is on, connected and has labels.",
-      "no_drawer": "The label printer has no cash drawer."
+      "no_drawer": "The label printer has no cash drawer.",
+      "failed_direct": "The printer did not take the labels by direct printing. Try again, or switch the printing way back to \"Windows driver\" (Settings → Devices)."
     },
     "labelPrinterNote": "Print the test label: the cross should be in the middle and the border on the label's edge. If not, change “Move right” or “Move down”, save, and print again.",
     "labelDarkness": "Darkness (0–15)",
@@ -331,6 +332,15 @@
     "labelSpeedHint": "Slower = crisper. 2 or 3 for small text.",
     "labelWholeRule": "A whole number from {min} to {max}.",
     "labelDriverTips": "Darkness and speed are sent to the printer in direct (TSPL) mode. Through the Windows driver, set them in the printer's Printing preferences: media type Direct thermal, media Gap (labels with gaps), the same darkness and speed, and no scaling.",
+    "labelMode": "Printing way",
+    "labelModes": {
+      "driver": "Windows driver",
+      "tspl": "Direct (TSPL)"
+    },
+    "labelGap": "Gap between labels (mm)",
+    "labelGapHint": "Usually 2 or 3 mm. Measure it on the label roll.",
+    "labelFlip": "Turn the print round (if labels come out upside down)",
+    "labelTsplTips": "Direct printing sends the label to the printer in its own language (TSPL), without the driver, at the darkness and speed above. Print the test label and the quality test first. If the printer does not print, switch back to \"Windows driver\".",
     "labelQualityPrint": "Print quality test",
     "labelQualityPreview": "Print quality test: fine lines, a solid block, small and large text, barcodes at 2 and 3 dots",
     "labelQualitySample": "Chlorine tablets 25 kg"

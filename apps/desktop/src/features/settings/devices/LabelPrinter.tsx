@@ -1,7 +1,8 @@
 /**
  * Settings → Devices: the label printer of THIS PC (decision 0096). Kept on the server for this PC
  * (audited), so it survives a reinstall: the Windows printer, its dots per inch, how wide it prints,
- * and the X/Y offset. "Print test label" prints a border, a centre cross and a 5 mm ruler at the
+ * the X/Y offset, and how labels reach it (its Windows driver, or TSPL straight to it, decision
+ * 0100, with the gap between labels and the direction). "Print test label" prints a border, a centre cross and a 5 mm ruler at the
  * label's real size: if the cross is not in the middle, move it with the offset and print again.
  * Only the Windows app reaches a printer; the preview shows the test label in any case.
  */
@@ -14,7 +15,17 @@ import {
   type LabelPrinterConfig as LabelPrinterValues,
 } from '@artepool/shared/contracts';
 import { useSave } from '../../../api/hooks';
-import { Alert, Button, Card, iconClass, Note, Segmented, TextField, useToast } from '../../../ui';
+import {
+  Alert,
+  Button,
+  Card,
+  iconClass,
+  Note,
+  Segmented,
+  Switch,
+  TextField,
+  useToast,
+} from '../../../ui';
 import { useErrorText } from '../../auth/context';
 import {
   canPrintLabelsSilently,
@@ -42,8 +53,10 @@ interface Form {
   offsetYMm: string;
   darkness: string;
   speed: string;
-  /** Kept as saved: chosen in the RAW printing step (decision 0097). */
+  /** Through the Windows driver, or TSPL straight to the printer (decision 0100). */
   mode: LabelPrinterValues['mode'];
+  gapMm: string;
+  flip: boolean;
 }
 
 const toForm = (c: LabelPrinterValues): Form => ({
@@ -55,6 +68,8 @@ const toForm = (c: LabelPrinterValues): Form => ({
   darkness: String(c.darkness),
   speed: String(c.speed),
   mode: c.mode,
+  gapMm: String(c.gapMm),
+  flip: c.flip,
 });
 
 /** A whole number, or null. */
@@ -76,6 +91,8 @@ function toConfig(form: Form): LabelPrinterValues | null {
     darkness: whole(form.darkness),
     speed: whole(form.speed),
     mode: form.mode,
+    gapMm: mm(form.gapMm),
+    flip: form.flip,
   });
   return parsed.success ? parsed.data : null;
 }
@@ -206,6 +223,15 @@ export function LabelPrinterCard({ index }: { index: number }) {
       ) : (
         <Note>{t('devices.printerWindowsOnly')}</Note>
       )}
+      <Segmented<Form['mode']>
+        label={t('devices.labelMode')}
+        value={form.mode}
+        onChange={(mode) => set({ mode })}
+        options={[
+          { value: 'driver', label: t('devices.labelModes.driver') },
+          { value: 'tspl', label: t('devices.labelModes.tspl') },
+        ]}
+      />
       <Segmented<Form['dpi']>
         label={t('devices.labelDpi')}
         value={form.dpi}
@@ -269,7 +295,26 @@ export function LabelPrinterCard({ index }: { index: number }) {
           error={badWhole(form.speed, 1, 6)}
         />
       </div>
-      <Note>{t('devices.labelDriverTips')}</Note>
+      {form.mode === 'tspl' ? (
+        <>
+          <TextField
+            label={t('devices.labelGap')}
+            value={form.gapMm}
+            onChange={(gapMm) => set({ gapMm })}
+            ltr
+            inputMode="decimal"
+            maxLength={4}
+            hint={t('devices.labelGapHint')}
+            error={bad(form.gapMm, 0, 10)}
+          />
+          <Switch isSelected={form.flip} onChange={(flip) => set({ flip })}>
+            {t('devices.labelFlip')}
+          </Switch>
+          <Note>{t('devices.labelTsplTips')}</Note>
+        </>
+      ) : (
+        <Note>{t('devices.labelDriverTips')}</Note>
+      )}
       <div className={styles.savebar}>
         <Button
           variant="primary"

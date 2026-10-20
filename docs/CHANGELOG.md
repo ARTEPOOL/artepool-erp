@@ -1,5 +1,12 @@
 # Changelog
 
+## Labels: direct printing (TSPL) (2026-10-20)
+
+**In plain words:** in Settings → Devices → "Label printer of this PC" there is a new choice, **Printing way**: "Windows driver" (as before) or **"Direct (TSPL)"**. Direct printing sends the label to the printer in its own language, without the Windows driver in between, so nothing is resized or blurred, and the darkness and speed you set are used. For direct printing you also set the **gap between labels** (usually 2 or 3 mm) and, if labels come out upside down, **"Turn the print round"**. Try it first with "Print test label" and "Print quality test". If direct printing fails, the app does not print again through the driver by itself (the printer might have printed part already, and you would get double labels): it tells you to try again or switch back to "Windows driver".
+
+- Decision 0100; migration 0042 (gap and direction in the PC's label printer settings).
+- Tests: the exact printer commands, the label placed under the print head for 50 and 40 mm labels, black stays black, the picture in the job is exactly the drawing, the printing way chosen, no automatic second print, the settings checked by the server and the database.
+
 ## Labels for many items at once, and the "price changed" list (2026-10-20)
 
 **In plain words:** Items & stock has a new button, **"Labels for many items"**. You can fill it three ways: add items yourself (search or scan; scanning the same item again adds one more label), take the items of a stock increase or the opening stock (one label per piece that came in), or press **"Price changed"**: every item whose last printed label shows an old price, with the old and the new price side by side. A change of the price, of "price includes VAT", of the VAT category or of the VAT rate all count. You can filter that list by category. Each item starts with one label per piece on hand (0 when there is none; 1 for items sold by kg or metre), and you can change any number. The total is always shown, and above 100 labels the screen asks you to confirm. Every print is now recorded with the price on the label, so after printing the new prices the items leave the list. When labels go through the print dialog (no label printer set on that PC), the screen asks "Did the labels print?" and records only on "Yes".

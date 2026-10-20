@@ -240,7 +240,8 @@
       "browser": "Printing works in the Windows app only.",
       "no_printer": "No label printer is set on this PC (Settings → Devices).",
       "failed": "The label printer did not respond. Check that it is on, connected and has labels.",
-      "no_drawer": "The label printer has no cash drawer."
+      "no_drawer": "The label printer has no cash drawer.",
+      "failed_direct": "The label printer did not take the labels by direct printing. Try again, or switch the printing way back to \"Windows driver\" in Settings → Devices."
     },
     "dialogNote": "No label printer is set on this PC: the print dialog opens. Choose the label printer there, size 100%.",
     "sheetNote": "A4 sheets print through the print dialog, at 100% size.",

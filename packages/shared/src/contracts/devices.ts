@@ -83,6 +83,10 @@ export const LabelPrinterConfig = z.object({
   speed: z.number().int().min(1).max(6).default(3),
   /** How labels reach the printer: its Windows driver, or RAW TSPL (decision 0097). */
   mode: z.enum(LABEL_PRINT_MODES).default('driver'),
+  /** RAW TSPL: the gap between labels on the roll (TSPL GAP), in mm (decision 0100). */
+  gapMm: mm(0, 10).default(2),
+  /** RAW TSPL: the print turned round (TSPL DIRECTION 0 instead of 1), when labels come out upside down. */
+  flip: z.boolean().default(false),
 });
 export type LabelPrinterConfig = z.infer<typeof LabelPrinterConfig>;
 
@@ -96,6 +100,8 @@ export const DEFAULT_LABEL_PRINTER: LabelPrinterConfig = {
   darkness: 8,
   speed: 3,
   mode: 'driver',
+  gapMm: 2,
+  flip: false,
 };
 
 export interface ThisDeviceResponse {

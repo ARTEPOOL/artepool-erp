@@ -126,7 +126,8 @@ It runs client–server on the local network: PostgreSQL and the API service on 
   - Printed silently at exact size (per-PC label printer, offset, test label in Settings → Devices); the print dialog is only a fallback and for A4 sheets. (0043, 0096)
   - The owner designs the label (print designer): elements with show/hide, order, size, bold, alignment (sale pack, expiry/batch at print time, print date); never below the minimum barcode (5 mm bars, 2 dots/module, quiet zones); base design + optional per-size override. Pure 1-bit at printer dots; darkness/speed. (0097)
   - Quiet zones may use the side margin, ≥ 0.5 mm from the label edge (inside the border if any); bars stay in the content area. (0098)
-  - Labels for many items (search/scan, from a stock increase or opening stock, "price changed" list filterable by category); every print recorded in `inv.label_prints` with the price printed (no record if the price changed meanwhile); price, includes-VAT, VAT category or rate changes count; default counts: on hand for unit items (0 if ≤ 0), 1 for kg/m; total shown, confirm above 100. Next: RAW TSPL; later in-store EAN-13. (0099)
+  - Labels for many items (search/scan, from a stock increase or opening stock, "price changed" list filterable by category); every print recorded in `inv.label_prints` with the price printed (no record if the price changed meanwhile); price, includes-VAT, VAT category or rate changes count; default counts: on hand for unit items (0 if ≤ 0), 1 for kg/m; total shown, confirm above 100. (0099)
+  - Printing way per PC: Windows driver (default) or Direct TSPL (SIZE/GAP/DIRECTION/DENSITY/SPEED/BITMAP/PRINT; gap and "turn round" settings; label centred under the head); a failed direct print is never re-sent through the driver by itself. Later: in-store EAN-13. (0100)
 - **Counts** are blind while counting; one warehouse in Phase 1. (0044)
 
 **Sales (A4)**
