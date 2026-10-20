@@ -625,6 +625,23 @@ export function ItemDialog(props: {
             />
           </div>
 
+          <div className={mdStyles.grid2}>
+            <TextField
+              label={t('fields.packAr')}
+              value={form.packAr}
+              onChange={(packAr) => set({ packAr })}
+              maxLength={40}
+              hint={t('fields.packHint')}
+            />
+            <TextField
+              label={t('fields.packEn')}
+              value={form.packEn}
+              onChange={(packEn) => set({ packEn })}
+              ltr
+              maxLength={40}
+            />
+          </div>
+
           {showDescriptions ? (
             <div className={mdStyles.grid2}>
               <TextField

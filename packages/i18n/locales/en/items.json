@@ -83,7 +83,10 @@
     "components": "Kit components",
     "purchaseCost": "Purchase price (excl. VAT)",
     "kitCost": "Kit cost (from its components)",
-    "openingQty": "Current quantity"
+    "openingQty": "Current quantity",
+    "packAr": "Sale pack (Arabic)",
+    "packEn": "Sale pack (English)",
+    "packHint": "Printed on the barcode label, e.g. “25 kg bag”. Empty = the item's unit."
   },
   "barcodes": {
     "primary": "Main",
@@ -229,7 +232,8 @@
     "inclVat": "incl. VAT",
     "refused": {
       "too_small": "This label size is too small for the name, the barcode and the price. Choose a bigger size or turn the price off.",
-      "barcode_too_long": "This code is too long for a barcode on this label size. Choose a wider size."
+      "barcode_too_long": "This code is too long for a barcode on this label size. Choose a wider size.",
+      "cannot_encode": "This code has letters that cannot be printed as a barcode."
     },
     "sent": "{count} label(s) sent to the label printer.",
     "problem": {
@@ -241,6 +245,11 @@
     "dialogNote": "No label printer is set on this PC: the print dialog opens. Choose the label printer there, size 100%.",
     "sheetNote": "A4 sheets print through the print dialog, at 100% size.",
     "expiryWord": "EXP",
-    "batchWord": "LOT"
+    "batchWord": "LOT",
+    "expiry": "Expiry date",
+    "batch": "Batch number",
+    "extraHint": "Optional: printed on the label when typed.",
+    "extrasTooMuch": "The expiry date and the batch number do not fit on this size. Clear them or choose a bigger size.",
+    "fitted": "The design was made a little smaller to fit this size (shorter bars or smaller letters), never below the minimum."
   }
 }

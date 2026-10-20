@@ -20,6 +20,7 @@ import type {
   StockSummary,
   UnitItem,
 } from '@artepool/shared/contracts';
+import { defaultLabelDesign } from '@artepool/shared/contracts';
 import { App } from '../../src/app/App';
 import {
   FakeBridge,
@@ -298,6 +299,19 @@ function bridgeFor(permissions: string[]) {
     .on('GET', '/api/v1/business-lines', ok({ businessLines: [] }))
     .on('GET', '/api/v1/reason-codes', ok({ reasonCodes: REASONS }))
     .on('GET', '/api/v1/label-sizes', ok({ labelSizes: SIZES, maxWidthMm: 50 }))
+    .on(
+      'GET',
+      '/api/v1/label-design',
+      ok({
+        versionId: '9',
+        versionNo: 1,
+        savedAt: '2026-10-20T08:00:00.000Z',
+        savedBy: null,
+        design: defaultLabelDesign(),
+        shopName: { ar: 'آرتيبول', en: 'ARTEPOOL' },
+        canEdit: false,
+      }),
+    )
     .on('GET', '/api/v1/stock/summary', ok(summary))
     .on('GET', '/api/v1/items', (request: BridgeRequest) => {
       const toReorder = new URLSearchParams(request.path.split('?')[1]).get('toReorder');

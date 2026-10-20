@@ -400,6 +400,8 @@ describe('Items & stock: the item form', () => {
       nameEn: 'Liquid chlorine',
       descriptionAr: null,
       descriptionEn: null,
+      packAr: null,
+      packEn: null,
       categoryId: '1',
       unitId: '1',
       vatCategoryId: '1',

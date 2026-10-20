@@ -47,6 +47,9 @@ export interface ItemForm {
   nameEn: string;
   descriptionAr: string;
   descriptionEn: string;
+  /** The sale pack printed on labels (decision 0097). */
+  packAr: string;
+  packEn: string;
   unitId: string;
   vatCategoryId: string;
   businessLineId: string;
@@ -105,6 +108,8 @@ export function emptyForm(defaults: { unitId: string; vatCategoryId: string }): 
     nameEn: '',
     descriptionAr: '',
     descriptionEn: '',
+    packAr: '',
+    packEn: '',
     unitId: defaults.unitId,
     vatCategoryId: defaults.vatCategoryId,
     businessLineId: '',
@@ -128,6 +133,8 @@ export function formFromItem(item: ItemDetail): ItemForm {
     nameEn: item.nameEn,
     descriptionAr: item.descriptionAr ?? '',
     descriptionEn: item.descriptionEn ?? '',
+    packAr: item.packAr ?? '',
+    packEn: item.packEn ?? '',
     unitId: item.unitId,
     vatCategoryId: item.vatCategoryId,
     businessLineId: item.defaultBusinessLineId ?? '',
@@ -318,6 +325,8 @@ export function buildItem(
       nameEn: form.nameEn.trim(),
       descriptionAr: form.descriptionAr.trim() || null,
       descriptionEn: form.descriptionEn.trim() || null,
+      packAr: form.packAr.trim() || null,
+      packEn: form.packEn.trim() || null,
       categoryId: form.categoryId,
       unitId: form.unitId,
       vatCategoryId: form.vatCategoryId,

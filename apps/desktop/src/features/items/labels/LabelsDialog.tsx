@@ -7,10 +7,10 @@ import {
   defaultLabelDesign,
   designForSize,
   type ItemDetail,
-  type LabelDesign,
   type LabelPrinterConfig,
   type LabelSizeItem,
 } from '@artepool/shared/contracts';
+import { dubaiDay } from '../../../lib/format';
 import {
   Alert,
   Button,
@@ -23,19 +23,17 @@ import {
   TextField,
   useToast,
 } from '../../../ui';
-import { money, priceBoth } from '../../masterdata/format';
-import { localName, useLabelSizes } from '../../masterdata/refs';
+import { localName, useLabelSizes, useUnits } from '../../masterdata/refs';
 import mdStyles from '../../masterdata/masterdata.module.css';
-import { barcodeFor } from './barcode';
-import { layoutBoxes, layoutLabel, type LayoutResult } from './layout';
+import { DateField } from '../../invoices/parts';
+import { drawLabel, labelContent, useLabelDesign } from './design';
+import { layoutBoxes } from './layout';
 import { canPrintLabelsSilently, printLabels, useLabelPrinter } from './printer';
-import { canvasMeasurer, printedDotsUrl, renderLabel, type LabelImage } from './render';
+import { canvasMeasurer, printedDotsUrl } from './render';
 import { labelWords } from './words';
 import styles from './labels.module.css';
 
 const MAX_LABELS = 500;
-/** A4 label sheets print through the print dialog on an office printer: drawn finely. */
-const SHEET_DPI = 300;
 
 /** The label size as CSS custom properties, read by the module CSS (a real-size image). */
 const sizeVars = (size: Pick<LabelSizeItem, 'widthMm' | 'heightMm'>) =>
@@ -49,10 +47,11 @@ function pageRule(size: LabelSizeItem, sheet: boolean): string {
 }
 
 /**
- * Design 07 "Barcode labels" (decisions 0043, 0096): how many, which size, the price and the English
- * name if wanted. The label is drawn at the label printer's own dots (the preview is that image at
- * real size) and printed silently on this PC's label printer; without one (or for A4 label sheets)
- * the print dialog opens instead.
+ * Design 07 "Barcode labels" (decisions 0043, 0096, 0097): how many, which size, the price, the
+ * English name if wanted, and the expiry date and batch number when the owner's design shows them.
+ * The label follows the owner's design and is drawn at the label printer's own dots (the preview is
+ * that image); it prints silently on this PC's label printer, or through the print dialog without
+ * one (and for A4 label sheets).
  */
 export function LabelsDialog(props: {
   item: ItemDetail;
@@ -64,6 +63,8 @@ export function LabelsDialog(props: {
   const toast = useToast();
   const name = localName(i18n.language);
   const sizes = useLabelSizes();
+  const units = useUnits();
+  const designQuery = useLabelDesign();
   const printer: LabelPrinterConfig = useLabelPrinter().data ?? DEFAULT_LABEL_PRINTER;
   const active = (sizes.data ?? [])
     .filter((s) => s.isActive)
@@ -73,94 +74,61 @@ export function LabelsDialog(props: {
   const [sheet, setSheet] = useState(false);
   const [showPrice, setShowPrice] = useState(props.item.price !== null);
   const [addEnglish, setAddEnglish] = useState(false);
+  const [expiry, setExpiry] = useState('');
+  const [batch, setBatch] = useState('');
   const [countError, setCountError] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [dialogCopies, setDialogCopies] = useState(0);
 
   const size = active.find((s) => s.id === sizeId) ?? active[0];
-  const data = props.item.primaryBarcode ?? props.item.code;
-  const barcode = useMemo(() => barcodeFor(data), [data]);
-  const gross =
-    props.item.price && props.rateBp !== undefined
-      ? priceBoth(BigInt(props.item.price.price4dp), props.item.price.includesVat, props.rateBp)
-          .grossFils
-      : null;
-  const priced = showPrice && gross !== null;
+  const design = designQuery.data?.design ?? defaultLabelDesign();
+  const forSize = size ? designForSize(design, size.code) : design;
   const silent = !sheet && canPrintLabelsSilently(printer);
   const n = /^\d{1,3}$/.test(count.trim()) ? Number(count.trim()) : 0;
+  const canPrice = props.item.price !== null && props.rateBp !== undefined;
 
   // The label, laid out and drawn at the printer's dots (A4 sheets: finely, for an office printer).
   const measurer = useMemo(() => canvasMeasurer(), []);
-  const design = useMemo(() => defaultLabelDesign(), []);
   const words = useMemo(() => labelWords(i18n), [i18n]);
-  const drawn = useMemo((): { layout: LayoutResult; image: LabelImage | null } | null => {
-    if (!size || !barcode) return null;
-    const geometry = sheet
+  const drawn = useMemo(() => {
+    if (!size || !designQuery.data) return null;
+    // "Add English name" shows it on this print, whatever the design says.
+    const printDesign = addEnglish
       ? {
-          widthMm: size.widthMm,
-          heightMm: size.heightMm,
-          dpi: SHEET_DPI,
-          printableWidthMm: size.widthMm,
+          ...design,
+          elements: { ...design.elements, nameEn: { ...design.elements.nameEn, show: true } },
+          overrides: Object.fromEntries(
+            Object.entries(design.overrides).map(([code, o]) => [
+              code,
+              { ...o, elements: { ...o.elements, nameEn: { ...o.elements.nameEn, show: true } } },
+            ]),
+          ),
         }
-      : {
-          widthMm: size.widthMm,
-          heightMm: size.heightMm,
-          dpi: printer.dpi,
-          printableWidthMm: printer.printableWidthMm,
-        };
-    // The owner's design for this size; "Add English name" shows it on this print.
-    const base = designForSize(design, size.code);
-    const forPrint: LabelDesign = {
-      ...base,
-      elements: addEnglish
-        ? { ...base.elements, nameEn: { ...base.elements.nameEn, show: true } }
-        : base.elements,
-    };
-    const layout = layoutLabel(
-      geometry,
-      forPrint,
-      {
-        nameAr: props.item.nameAr,
-        nameEn: props.item.nameEn,
-        itemCode: props.item.code,
-        barcodeData: data,
-        pack: null,
-        shopName: null,
-        price:
-          priced && gross !== null
-            ? { amount: money(gross), includesVat: props.item.price?.includesVat ?? false }
-            : null,
-        expiry: null,
-        batch: null,
-        printDate: null,
-      },
-      words,
-      measurer,
-    );
-    if (!layout.ok) return { layout, image: null };
-    const dots = (mm: number) => Math.round((mm * geometry.dpi) / 25.4);
-    // The printer's calibration moves the drawing on a roll; a sheet is placed by the office printer.
-    const offset = sheet
-      ? { x: 0, y: 0 }
-      : { x: dots(printer.offsetXMm), y: dots(printer.offsetYMm) };
-    try {
-      return { layout, image: renderLabel(layout, offset) };
-    } catch {
-      // No canvas to draw on (only in some test browsers): laid out, not drawn.
-      return { layout, image: null };
-    }
+      : design;
+    const content = labelContent(props.item, {
+      design: printDesign,
+      shopName: designQuery.data.shopName,
+      units: units.data ?? [],
+      rateBp: props.rateBp,
+      withPrice: showPrice,
+      extras: { expiry, batch },
+      today: dubaiDay(),
+    });
+    return drawLabel({ size, printer, sheet, design: printDesign, content, words, measurer });
   }, [
     size,
-    barcode,
-    sheet,
-    printer,
+    designQuery.data,
     design,
-    props.item,
-    data,
     addEnglish,
-    priced,
-    gross,
+    props.item,
+    props.rateBp,
+    units.data,
+    showPrice,
+    expiry,
+    batch,
+    printer,
+    sheet,
     words,
     measurer,
   ]);
@@ -236,13 +204,31 @@ export function LabelsDialog(props: {
             }))}
           />
         </div>
-        <Switch isSelected={priced} onChange={setShowPrice} isDisabled={gross === null}>
+        {(forSize.elements.expiry.show || forSize.elements.batch.show) && (
+          <div className={mdStyles.grid2}>
+            {forSize.elements.expiry.show && (
+              <DateField label={t('labels.expiry')} value={expiry} onChange={setExpiry} />
+            )}
+            {forSize.elements.batch.show && (
+              <TextField
+                label={t('labels.batch')}
+                value={batch}
+                onChange={setBatch}
+                ltr
+                maxLength={20}
+                autoComplete="off"
+                hint={t('labels.extraHint')}
+              />
+            )}
+          </div>
+        )}
+        <Switch isSelected={showPrice && canPrice} onChange={setShowPrice} isDisabled={!canPrice}>
           {t('labels.showPrice')}
         </Switch>
         <Switch
-          isSelected={addEnglish}
+          isSelected={addEnglish || forSize.elements.nameEn.show}
           onChange={setAddEnglish}
-          isDisabled={!props.item.nameEn?.trim()}
+          isDisabled={!props.item.nameEn?.trim() || forSize.elements.nameEn.show}
         >
           {t('labels.addEnglish')}
         </Switch>
@@ -250,8 +236,13 @@ export function LabelsDialog(props: {
           {t('labels.sheet')}
         </Switch>
         {sizes.isSuccess && active.length === 0 && <Alert>{t('labels.noSizes')}</Alert>}
-        {!barcode && <Alert>{t('labels.cannotEncode')}</Alert>}
-        {refused && <Alert>{t(`labels.refused.${refused}`)}</Alert>}
+        {refused && (
+          <Alert>
+            {refused === 'too_small' && (expiry || batch.trim())
+              ? t('labels.extrasTooMuch')
+              : t(`labels.refused.${refused}`)}
+          </Alert>
+        )}
         {layout?.ok && size && (
           <div className={styles.previewBox}>
             <span className={styles.muted}>{t('labels.preview')}</span>
@@ -271,9 +262,10 @@ export function LabelsDialog(props: {
                 className={`${styles.label} ${styles.zoomed}`}
                 style={sizeVars(size)}
                 src={imageUrl || undefined}
-                alt={t('labels.barcodeOf', { code: data })}
+                alt={t('labels.barcodeOf', { code: props.item.primaryBarcode ?? props.item.code })}
               />
             </div>
+            {layout.fitted && <Note>{t('labels.fitted')}</Note>}
           </div>
         )}
         {!silent && size && layout?.ok && (

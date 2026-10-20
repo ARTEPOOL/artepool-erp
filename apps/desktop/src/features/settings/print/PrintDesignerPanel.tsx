@@ -47,6 +47,7 @@ import { renderReceipt } from '../../pos/receipt/render';
 import { printPdf } from '../../sales/print';
 import { SaveProblem } from '../company/SaveProblem';
 import { CardHead, NoAccess, PanelHeader } from '../parts';
+import { LabelDesigner } from './LabelDesigner';
 import { ReceiptLogo } from './ReceiptLogo';
 import { sampleReceipt } from './sample';
 import styles from './print.module.css';
@@ -65,7 +66,7 @@ export function PrintDesignerPanel() {
     queryKey: PRINT_KEY,
     queryFn: () => api.get<PrintTemplatesResponse>('/api/v1/print-templates'),
   });
-  const [kind, setKind] = useState<DesignedKind>('tax_invoice_a4');
+  const [kind, setKind] = useState<DesignedKind | 'barcode_label'>('tax_invoice_a4');
   if (!can('print_templates.manage')) return <NoAccess />;
   const current = query.data?.templates.find((x) => x.kind === kind);
   return (
@@ -76,11 +77,18 @@ export function PrintDesignerPanel() {
         value={kind}
         onChange={setKind}
         tabs={(
-          ['tax_invoice_a4', 'quotation_a4', 'credit_note_a4', 'receipt_thermal'] as const
+          [
+            'tax_invoice_a4',
+            'quotation_a4',
+            'credit_note_a4',
+            'receipt_thermal',
+            'barcode_label',
+          ] as const
         ).map((k) => ({ value: k, label: t(`print.kinds.${k}`) }))}
       />
       {query.isError && <Alert>{errorText(query.error)}</Alert>}
-      {query.data && current && (
+      {kind === 'barcode_label' && <LabelDesigner />}
+      {kind !== 'barcode_label' && query.data && current && (
         <Designer key={`${kind}:${current.versionId}`} template={current} data={query.data} />
       )}
     </>

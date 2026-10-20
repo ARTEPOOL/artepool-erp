@@ -1,5 +1,15 @@
 # Changelog
 
+## Barcode labels: the owner's label design, crisper print, scanner fixes (2026-10-20)
+
+**In plain words:** you now design the barcode label yourself in **Settings → Print designer → Barcode label**. Every part can be shown or hidden, moved up or down, made small, medium or large, bold or not, and put right, centre or left. The parts are: Arabic name, English name, sale pack (e.g. "كيس 25 كجم", typed on the item; otherwise its unit), barcode, item code, price, "شامل الضريبة", expiry date and batch number (typed when printing, for pool chemicals), print date, shop name and a free text line. The barcode can never be made smaller than what a scanner reads (bars at least 5 mm, 2 printer dots per bar, empty space at both sides). One design serves every size and adjusts by itself; for one size you can change only what is different (e.g. hide the English name on 40 × 30). The previews show a real item on every active size, and a size the design does not fit says "won't fit" instead of printing a broken label. "Print test label" and "Reset to default design" are in the designer; every save is a new version.
+
+The label is now pure black and white at the printer's own dots (no grey edges), the Arabic letters are slightly bolder, and the label printer has **darkness** and **speed** settings plus a **"Print quality test"** label (fine lines, a black block, small and large text, barcodes at 2 and 3 dots). The barcode scanner works with the Arabic keyboard, and scanning a second time replaces the first code instead of adding to it.
+
+- Decision 0097; migrations 0039 (darkness, speed, mode on the label printer) and 0040 (sale pack on items, default label design); runbook `docs/runbooks/label-printer.md`.
+- Tests: no overlap and minimum barcode for every size and design, barcodes read back by a barcode reader, only black and white dots in the printed image, the designer (override, save with the version it started from, minimum height, reset), scanner timing in a real browser.
+- Next: printing labels for many items at once with the "price changed, label is old" list, then direct TSPL printing.
+
 ## Barcode labels, parts 2–5: drawn in millimetres, printed silently (2026-10-20)
 
 **In plain words:** the barcode label is now drawn by the program itself at the label printer's own dots. Every part has its own place: the Arabic name (2 lines, smaller letters if needed, then "…"), the English name if you ask for it and there is room, the barcode (supplier EAN-13 stays EAN-13; bars are whole printer dots), the code, the price ("120.00 درهم" / "AED 120.00") and "شامل الضريبة" when the price includes VAT. Nothing overlaps, and nothing goes outside the printer's 48 mm. The preview is exactly what prints. With the label printer set in Settings → Devices, labels print straight away with no print dialog; "Print test label" helps move the print to the centre if it comes out to one side.

@@ -533,7 +533,8 @@
       "tax_invoice_a4": "A4 invoice",
       "quotation_a4": "Quotation",
       "credit_note_a4": "Credit note",
-      "receipt_thermal": "Thermal receipt"
+      "receipt_thermal": "Thermal receipt",
+      "barcode_label": "Barcode label"
     },
     "saved": "Saved as version {version}.",
     "version": "Version {version}",
@@ -827,5 +828,93 @@
     "showCode": "Show the code",
     "googleCancelled": "Google sign-in did not finish. Try again.",
     "googleMissing": "This installation has no Google registration yet. The installer adds it; ask the person who installed the system."
+  },
+  "labelDesign": {
+    "saved": "Label design saved (version {version}).",
+    "reset": "Reset to the default design",
+    "elementsTitle": "What the label shows",
+    "elementsHelp": "Top to bottom. Turn an element on or off, move it up or down, and choose its size, alignment and bold. The barcode is always printed.",
+    "elements": {
+      "nameAr": "Arabic name",
+      "nameEn": "English name",
+      "pack": "Sale pack",
+      "barcode": "Barcode",
+      "itemCode": "Item code",
+      "price": "Price",
+      "vatNote": "“incl. VAT”",
+      "expiry": "Expiry date (typed when printing)",
+      "batch": "Batch number (typed when printing)",
+      "printDate": "Print date",
+      "shopName": "Shop name",
+      "customText": "Free text"
+    },
+    "moveUp": "Move {element} up",
+    "moveDown": "Move {element} down",
+    "size": "Size of {element}",
+    "align": "Alignment of {element}",
+    "sizes": {
+      "s": "Small",
+      "m": "Medium",
+      "l": "Large"
+    },
+    "aligns": {
+      "right": "Right",
+      "center": "Centre",
+      "left": "Left"
+    },
+    "bold": "Bold",
+    "barcodeTitle": "Barcode",
+    "barcodeHeight": "Bar height (mm)",
+    "barcodeHeightHint": "From {min} to {max} mm, in half millimetres. On a small label the bars get shorter, never below {min} mm.",
+    "barcodeHeightRule": "From {min} to {max} mm, in half millimetres.",
+    "showDigits": "Digits under the bars",
+    "symbology": "Barcode type",
+    "symbologies": {
+      "auto": "Automatic (EAN-13 stays EAN-13)",
+      "code128": "Always Code 128"
+    },
+    "minimumNote": "So that every label scans, the barcode can never be made smaller than bars of 5 mm, 2 printer dots per line and a blank margin each side.",
+    "wordsTitle": "Words and look",
+    "language": "Language of the fixed words (currency, “incl. VAT”, expiry, batch)",
+    "languages": {
+      "ar": "Arabic",
+      "en": "English",
+      "both": "Both"
+    },
+    "vatNote": "“incl. VAT” under the price",
+    "vatNotes": {
+      "always": "Always",
+      "whenIncluded": "When the price includes VAT",
+      "never": "Never"
+    },
+    "customText": "Free text",
+    "customTextHint": "For example the shop's phone number (60 characters at most).",
+    "marginSide": "Side margin (mm)",
+    "marginEdge": "Top and bottom margin (mm)",
+    "border": "Border around the label",
+    "overridesTitle": "Changes for one size",
+    "overridesHelp": "A size without changes uses the design above, fitted automatically. Choose a size to show or hide an element, or change its size, on that size only.",
+    "overrideSize": "Size",
+    "overrideNone": "Choose a size",
+    "overrideShow": "{element} on this size",
+    "overrideSizeOf": "Size of {element} on this size",
+    "asBase": "As the design",
+    "overrideShowOn": "Show",
+    "overrideShowOff": "Hide",
+    "overrideRemove": "Remove the changes for this size",
+    "previewTitle": "Preview on every size",
+    "itemSearch": "Search an item",
+    "item": "Item in the preview",
+    "sampleItem": "Sample item",
+    "fits": "Fits",
+    "fitted": "Made a little smaller to fit",
+    "wontFit": "Won't fit in {size}",
+    "extrasWontFit": "An expiry date and a batch number will not fit in {size}: shown without them.",
+    "previewOf": "Label {size} as it will print",
+    "refused": {
+      "too_small": "This size is too small for the design: hide an element or choose smaller text for this size.",
+      "barcode_too_long": "The code is too long for a barcode on this width.",
+      "cannot_encode": "This code cannot be printed as a barcode."
+    }
   }
 }

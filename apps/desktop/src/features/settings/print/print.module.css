@@ -159,3 +159,88 @@
   inline-size: 100%;
   accent-color: var(--color-primary);
 }
+
+/* The barcode label designer (decision 0097): one row per element, the per-size changes, and the
+   previews of every size side by side. */
+.elementList,
+.overrideList {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.elementRow {
+  display: grid;
+  gap: var(--space-2);
+  padding-block-end: var(--space-2);
+  border-block-end: 1px solid var(--color-border);
+}
+
+.elementHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.elementMove {
+  display: inline-flex;
+  gap: var(--space-1);
+}
+
+.elementStyle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.overrideList li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-label);
+}
+
+.overrideList select {
+  min-block-size: var(--control-sm);
+  padding-inline: var(--space-2);
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.labelPreviews {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  align-items: flex-start;
+}
+
+.labelPreview {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.labelPreview figcaption {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-label);
+}
+
+/* Twice the real size, so small letters can be checked; exactly the printed dots. */
+.labelPreview img {
+  inline-size: calc(var(--label-w) * 2);
+  block-size: calc(var(--label-h) * 2);
+  max-inline-size: 100%;
+  object-fit: contain;
+  border: 1px dashed var(--color-border);
+  image-rendering: pixelated;
+}
