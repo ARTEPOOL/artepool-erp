@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Accepted (2026-10-19) |
+| **Status** | Accepted (2026-10-19); extended by [0102](0102-first-run-new-setup-or-restore.md) (a second path: restore from backup) |
 | **Date** | 2026-10-19 |
 | **Decided by** | Owner |
 | **Related** | [0025](0025-first-owner-and-pc-from-server-commands.md) (updated), [0022](0022-owner-2-step-recovery.md), [0024](0024-device-enrollment-proves-the-server.md), [0030](0030-company-details-owner-only.md) |

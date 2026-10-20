@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Accepted (2026-10-19) |
+| **Status** | Accepted (2026-10-19); extended by [0102](0102-first-run-new-setup-or-restore.md) (the master key inside the encrypted copies; restore in the first-run wizard) |
 | **Date** | 2026-10-18 |
 | **Decided by** | Owner |
 

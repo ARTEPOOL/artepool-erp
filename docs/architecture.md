@@ -81,6 +81,14 @@
 
 ---
 
+### Installation layout (M6.2, decisions [0102](decisions/0102-first-run-new-setup-or-restore.md)–[0105](decisions/0105-server-address-and-name.md))
+
+- **Program:** `C:\Program Files\ARTEPOOL\` (the bundled `node.exe` + server bundle, PostgreSQL binaries, WinSW, the launcher, the desktop app). Replaced by upgrades; the previous version is kept until the new one answers.
+- **Data:** `C:\ProgramData\ARTEPOOL\` — `pgdata`, `wal` (archive), `backups` (always kept), `logs`, `secrets` (master key and database passwords, DPAPI LocalMachine, ACL: SYSTEM, Administrators, the service accounts), `config\server.json` (no secrets), `setup` (the one-time wizard token).
+- **Services:** `ARTEPOOL Database`, `ARTEPOOL Server`, `ARTEPOOL Backup`, each under its own virtual service account, automatic start, restart on failure. The launcher unprotects the secrets in memory and starts Node with them; nothing is written in clear.
+- **Network:** PostgreSQL on localhost only; one firewall rule for the API port from the local subnet (private profile). The PCs reach the server **by its name**; the server PC keeps its address by a router reservation; the app never changes network settings.
+- **Upgrades** back up first and migrate all-or-nothing; **uninstall** keeps `ProgramData`. Updates for the other PCs are served by the server PC on the LAN and checked against the update signature.
+
 ## 3. How the integrity rules are enforced
 
 | Rule | Mechanism | Where |
@@ -320,7 +328,7 @@ App (POS section)                     API                                       
   - Default roles: Owner, Accountant, Cashier, Storekeeper, Technician. Custom roles are allowed.
   - Owner-only permissions (users, roles, devices, settings, numbering series and, from [0030](decisions/0030-company-details-owner-only.md), company details) can never be given to another role; the database refuses it.
 - **Secrets:**
-  - TOTP and future integration secrets use AES-256-GCM, with the master key protected by Windows DPAPI. The key is never in the database or its backups; the owner keeps an offline copy.
+  - TOTP and future integration secrets use AES-256-GCM, with the master key protected by Windows DPAPI. The key is never in the database. It travels only inside the **age-encrypted** backups (Google Drive, encrypted USB copy), which only the owner's offline private key opens, so a restore on a new server PC keeps passwords and 2-step working ([0102](decisions/0102-first-run-new-setup-or-restore.md)); the hourly local copies never carry it.
   - Only card last 4 digits and auth codes are stored.
 - **TLS:**
   - A local CA with **name constraints**, so it can only vouch for the ARTÉPOOL server.
