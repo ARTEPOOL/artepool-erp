@@ -279,7 +279,7 @@ describe('Labels for many items: the "price changed" list', () => {
     expect(within(dialog).getByTestId('labels-total').textContent).toBe('المجموع: 8 ملصق');
     // Old → new price with VAT.
     expect(within(dialog).getByTestId('labels-line-CHEM-0010').textContent).toContain(
-      '100.00 → 120.00',
+      '100.00 ← 120.00',
     );
 
     // By category: equipment only.

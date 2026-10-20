@@ -275,6 +275,7 @@
       "lines": "Items to print",
       "item": "Item",
       "oldNew": "Old price → new",
+      "arrow": "→",
       "remove": "Remove",
       "countOf": "Number of labels for {name}",
       "removeOf": "Remove {name}",

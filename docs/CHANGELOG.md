@@ -1,5 +1,12 @@
 # Changelog
 
+## Labels for many items at once, and the "price changed" list (2026-10-20)
+
+**In plain words:** Items & stock has a new button, **"Labels for many items"**. You can fill it three ways: add items yourself (search or scan; scanning the same item again adds one more label), take the items of a stock increase or the opening stock (one label per piece that came in), or press **"Price changed"**: every item whose last printed label shows an old price, with the old and the new price side by side. A change of the price, of "price includes VAT", of the VAT category or of the VAT rate all count. You can filter that list by category. Each item starts with one label per piece on hand (0 when there is none; 1 for items sold by kg or metre), and you can change any number. The total is always shown, and above 100 labels the screen asks you to confirm. Every print is now recorded with the price on the label, so after printing the new prices the items leave the list. When labels go through the print dialog (no label printer set on that PC), the screen asks "Did the labels print?" and records only on "Yes".
+
+- Decision 0099; migration 0041 (`inv.label_prints`, audited, never deleted; refuses a record whose price changed while printing).
+- Tests: the record, the list for price / includes-VAT / category / rate changes, the category filter, a print whose price changed meanwhile, permissions, default counts, the confirmation above 100, and the whole flow in a real browser in Arabic and English.
+
 ## Barcode labels: 40 × 30 takes 10-character item codes (2026-10-20)
 
 **In plain words:** on a 40 × 30 label, item codes like EQUIP-0001 or CLEAN-0001 (items without a supplier barcode) used to be refused. The blank space a scanner needs on both sides of the barcode may now use the label's side margin, always at least 0.5 mm away from the label's edge. The bars stay as wide as before (still easy to scan). A code that still does not fit is refused with "use 50 × 30". With a border on the label, the blank space stays inside the border.

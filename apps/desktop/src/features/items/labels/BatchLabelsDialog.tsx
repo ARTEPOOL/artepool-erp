@@ -467,10 +467,9 @@ export function BatchLabelsDialog(props: { onClose: () => void }) {
                     </td>
                     {source === 'price_changed' && (
                       <td>
-                        <bdi>
-                          {d.line.printed ? money(BigInt(d.line.printed.grossFils)) : '—'} →{' '}
-                          {d.line.nowGrossFils ? money(BigInt(d.line.nowGrossFils)) : '—'}
-                        </bdi>
+                        <bdi>{d.line.printed ? money(BigInt(d.line.printed.grossFils)) : '—'}</bdi>{' '}
+                        {t('labels.batch.arrow')}{' '}
+                        <bdi>{d.line.nowGrossFils ? money(BigInt(d.line.nowGrossFils)) : '—'}</bdi>
                       </td>
                     )}
                     <td>

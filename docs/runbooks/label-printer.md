@@ -60,7 +60,25 @@
 
 لو الجهاز مفيهوش طابعة ملصقات مضبوطة، هتفتح شاشة الطباعة العادية. اختار طابعة الملصقات منها، وخلّي المقاس **100%**.
 
-## 5) لو حصلت مشكلة
+## 5) ملصقات لأصناف كتير مرة واحدة
+
+**الأصناف والمخزون ← «ملصقات لأصناف كتير»**، وبعدين اختار الأصناف منين:
+
+1. **«أختارها بنفسي»:** دوّر على الصنف أو امسح الباركود بتاعه. لو مسحته تاني بيزيد ملصق.
+2. **«من تسوية زيادة أو رصيد افتتاحي»:** اختار المستند، وكل صنف بياخد ملصق لكل قطعة دخلت. الأصناف اللي بتتباع بالكيلو أو بالمتر بتاخد ملصق واحد.
+3. **«السعر اتغيّر»:** بتطلع كل الأصناف اللي السعر اللي على آخر ملصق ليها غير سعرها النهارده، سواء اتغيّر السعر نفسه، أو «السعر شامل الضريبة»، أو فئة الضريبة، أو نسبة الضريبة.
+   - جنب كل صنف السعر القديم والجديد.
+   - تقدر تختار **تصنيف** واحد بس.
+   - العدد بيبدأ بالكمية اللي في المخزن، ولو مفيش كمية بيبقى 0. الأصناف اللي بالكيلو أو بالمتر بتبدأ بملصق واحد.
+
+بعد كده:
+- غيّر أي عدد لو عايز. الصنف اللي عدده 0 مش هيتطبع.
+- ✅ **المجموع** ظاهر تحت الجدول دايمًا، ولو أكتر من 100 ملصق البرنامج هيسألك «متأكد؟» قبل ما يطبع.
+- دوس **«اطبع … ملصق»**. كل طباعة بتتسجّل بالسعر اللي اتطبع، فالأصناف اللي طبعت ليها بالسعر الجديد بتختفي من قايمة «السعر اتغيّر».
+- لو الجهاز مفيهوش طابعة ملصقات مضبوطة، هتفتح شاشة الطباعة، وبعدها البرنامج هيسألك **«اتطبعت؟»**. دوس «أيوه» بس لو الملصقات طلعت فعلًا.
+- لو سعر صنف اتغيّر وانت بتطبع، البرنامج هيقولك اسمه علشان تطبعه تاني بالسعر الجديد.
+
+## 6) لو حصلت مشكلة
 
 | المشكلة | تعمل إيه |
 |---|---|
@@ -72,9 +90,10 @@
 | الكتابة رمادي أو الباركود ما بيتقراش | «اطبع اختبار جودة» وزوّد درجة السواد (القسم 2) |
 | الطابعة بتسيب ملصق فاضي بين كل ملصقين | من زرار FEED في الطابعة: اعمل لها معايرة على الملصقات (اضغط FEED مطوّلًا وهي شغالة، حسب كتالوج الطابعة) |
 
-## 6) For the technician
+## 7) For the technician
 
 - Labels are drawn by the app at the printer's dots and sent through the Windows driver with the label's paper size set by the app (one page per label). The RAW TSPL mode (Phase B) will bypass the driver.
 - The label printer settings live in `auth.devices.printer_config -> 'label'` for each PC (printer, dpi, printable width, offsets, darkness 0–15, speed 1–6, mode), audited.
+- Every label print is recorded in `inv.label_prints` (per item: price on the label, copies, size, design version, user, PC), audited, never deleted; the "price changed" list compares each item's last record with its price today (decision 0099).
 - The label design is a version of the `barcode_label` print template (`sys.print_template_versions`), owner only, never changed after saving. The image sent is pure 1-bit at the printer's dpi.
 - Sizes: Settings → Lists → Label sizes; never wider than `labels.max_width_mm` (50).
