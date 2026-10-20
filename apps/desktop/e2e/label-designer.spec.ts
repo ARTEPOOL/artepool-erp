@@ -35,7 +35,7 @@ async function greyPixels(image: Locator): Promise<number> {
   });
 }
 
-async function saveDesign(page: Page, t: (key: string, options?: object) => string) {
+async function saveDesign(page: Page, t: (key: string) => string) {
   await page.getByRole('button', { name: t('settings:print.save'), exact: true }).click();
   await expect(page.getByText(t('settings:print.unsaved'))).toHaveCount(0);
 }

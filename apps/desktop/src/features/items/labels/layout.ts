@@ -16,7 +16,7 @@ import {
   type LabelLanguage,
   type LabelTextSize,
 } from '@artepool/shared/contracts';
-import { barcodeFor, barRects, fullModules, moduleDots } from './barcode';
+import { barcodeFor, barRects, moduleDots } from './barcode';
 
 export interface LabelGeometry {
   widthMm: number;
@@ -95,7 +95,19 @@ export interface LabelLayout {
   /** Where content may go: the printable width minus the margins, centred on the label. */
   content: Box;
   texts: TextLine[];
-  bars: { rects: { x: number; w: number }[]; y: number; h: number; moduleDots: number; box: Box };
+  /**
+   * The bars (`box`: the bars alone, inside the content area) and their quiet zones (`quiet`): blank,
+   * they may reach into the side margin but stay `QUIET_EDGE_MM` from the label's edge, or inside
+   * the border when there is one (decision 0098).
+   */
+  bars: {
+    rects: { x: number; w: number }[];
+    y: number;
+    h: number;
+    moduleDots: number;
+    box: Box;
+    quiet: { x: number; w: number };
+  };
   prices: PriceLine[];
   border: Box | null;
   /** True when the design had to be made smaller to fit this size. */
@@ -112,6 +124,8 @@ export const MIN_TEXT_MM = 2;
 const GAP_MM = 0.5;
 const TIGHT_MM = 0.3;
 const BORDER_INSET_MM = 0.6;
+/** The quiet zones stay at least this far from the label's edge (small sideways drift of the roll). */
+export const QUIET_EDGE_MM = 0.5;
 
 const ARABIC = /[؀-ۿ]/;
 const dirOf = (text: string): 'rtl' | 'ltr' => (ARABIC.test(text) ? 'rtl' : 'ltr');
@@ -262,8 +276,18 @@ export function layoutLabel(
     code128: design.barcode.symbology === 'code128',
   });
   if (!barcode) return { ok: false, reason: 'cannot_encode' };
-  const dots = moduleDots(barcode, contentW, g.dpi);
+  // The bars keep to the content area; their blank quiet zones may use the side margin, but stay
+  // clear of the label's edge (or inside the border, which would read as a bar next to them).
+  const quietLo = design.border ? contentX : d(QUIET_EDGE_MM);
+  const quietHi = design.border ? contentX + contentW : widthDots - d(QUIET_EDGE_MM);
+  const dots = moduleDots(barcode, quietHi - quietLo, g.dpi, contentW);
   if (dots === null) return { ok: false, reason: 'barcode_too_long' };
+  const barsW = barcode.modules * dots;
+  const quietL = barcode.quiet.left * dots;
+  const quietR = barcode.quiet.right * dots;
+  const barsLo = Math.max(contentX, quietLo + quietL);
+  const barsHi = Math.min(contentX + contentW, quietHi - quietR) - barsW;
+  if (barsLo > barsHi) return { ok: false, reason: 'barcode_too_long' };
 
   const minFont = d(MIN_TEXT_MM);
   const minBars = d(LABEL_BARCODE_MIN_HEIGHT_MM);
@@ -386,14 +410,14 @@ export function layoutLabel(
         y += block.lineH;
       }
     } else if (block.kind === 'bars') {
-      const symbolW = fullModules(barcode) * dots;
-      const x = anchor(block.align, symbolW);
+      const x = Math.min(barsHi, Math.max(barsLo, anchor(block.align, barsW)));
       bars = {
-        rects: barRects(barcode, dots, x),
+        rects: barRects(barcode, dots, x - quietL),
         y,
         h: block.h,
         moduleDots: dots,
-        box: { x, y, w: symbolW, h: block.h },
+        box: { x, y, w: barsW, h: block.h },
+        quiet: { x: x - quietL, w: quietL + barsW + quietR },
       };
       y += block.h;
       if (block.digitsH > 0) {
@@ -401,10 +425,7 @@ export function layoutLabel(
         const lineH = block.digitsH - tight;
         const width = Math.min(contentW, Math.ceil(m.width(barcode.data, block.digitsFont, false)));
         // The digits sit under the bars, centred on them, inside the content area.
-        const x0 = Math.min(
-          right - width,
-          Math.max(contentX, Math.round(x + (symbolW - width) / 2)),
-        );
+        const x0 = Math.min(right - width, Math.max(contentX, Math.round(x + (barsW - width) / 2)));
         texts.push({
           part: 'digits',
           text: barcode.data,

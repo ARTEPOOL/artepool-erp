@@ -117,6 +117,29 @@ test('a long name, the price and the barcode: apart, inside, readable', async ({
   const [found] = await readBarcodes(new Uint8Array(png), { formats: ['Code128'] });
   expect(found?.text).toMatch(/^[A-Z]+-\d{4}$/);
 
+  // 40 × 30 (decision 0098): a 10-character code like EQUIP-0001 fits, its quiet zones using the
+  // side margin, and the drawn label is read back too.
+  const sizeField = dialog.getByLabel(t('items:labels.size'), { exact: true });
+  await sizeField.selectOption(
+    await sizeField.locator('option', { hasText: '(40 × 30)' }).getAttribute('value'),
+  );
+  await expect
+    .poll(
+      async () => (JSON.parse((await preview.getAttribute('data-layout'))!) as Layout).widthDots,
+    )
+    .toBe(320);
+  const small = await preview.getByRole('img').getAttribute('src');
+  const [onSmall] = await readBarcodes(
+    new Uint8Array(Buffer.from(small!.replace(/^data:image\/png;base64,/, ''), 'base64')),
+    { formats: ['Code128'] },
+  );
+  expect(found!.text).toHaveLength(10);
+  expect(onSmall?.text).toBe(found!.text);
+  expect(await onlyBlackAndWhite(preview.getByRole('img'))).toEqual({ pixels: 320 * 240, grey: 0 });
+  await sizeField.selectOption(
+    await sizeField.locator('option', { hasText: '(50 × 30)' }).getAttribute('value'),
+  );
+
   // The English name when asked for.
   await dialog.getByText(t('items:labels.addEnglish'), { exact: true }).click();
   const withEnglish = JSON.parse((await preview.getAttribute('data-layout'))!) as Layout;

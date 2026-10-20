@@ -131,14 +131,23 @@ export const fullModules = (barcode: Barcode) =>
 
 /**
  * Printer dots per module: the widest whole number that fits the space (with quiet zones) and stays
- * within MODULE_MM; null when even the narrowest does not fit.
+ * within MODULE_MM; null when even the narrowest does not fit. `barsDots`, when given, is the
+ * narrower space the bars themselves must keep to (the quiet zones may go beyond it, decision 0098).
  */
-export function moduleDots(barcode: Barcode, availableDots: number, dpi: number): number | null {
+export function moduleDots(
+  barcode: Barcode,
+  availableDots: number,
+  dpi: number,
+  barsDots = availableDots,
+): number | null {
   const dotsPerMm = dpi / 25.4;
   // A small tolerance: 2 dots at 203 dpi (0.2502 mm) count as 0.25 mm.
   const min = Math.max(1, Math.ceil(MODULE_MM.min * dotsPerMm - 0.01));
   const max = Math.max(min, Math.floor(MODULE_MM.max * dotsPerMm + 0.01));
-  const fits = Math.floor(availableDots / fullModules(barcode));
+  const fits = Math.min(
+    Math.floor(availableDots / fullModules(barcode)),
+    Math.floor(barsDots / barcode.modules),
+  );
   const dots = Math.min(fits, max);
   return dots >= min ? dots : null;
 }

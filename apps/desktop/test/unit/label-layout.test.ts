@@ -8,6 +8,7 @@
  * fonts; the real fonts are checked in the browser (Playwright).
  */
 import fc from 'fast-check';
+import { readBarcodes } from 'zxing-wasm/reader';
 import { describe, expect, it } from 'vitest';
 import {
   defaultLabelDesign,
@@ -23,6 +24,7 @@ import {
   layoutBoxes,
   layoutLabel,
   MIN_TEXT_MM,
+  QUIET_EDGE_MM,
   TEXT_MM,
   wrapLines,
   type LabelContent,
@@ -122,6 +124,17 @@ function expectSound(layout: LabelLayout, printableWidthMm: number, dpi: number)
   expect(layout.bars.h).toBeGreaterThanOrEqual(Math.round((5 * dpi) / 25.4));
   expect(layout.bars.moduleDots).toBeGreaterThanOrEqual(dpi === 203 ? 2 : 3);
   for (const bar of layout.bars.rects) expect(bar.w % layout.bars.moduleDots).toBe(0);
+  // The quiet zones (decision 0098): blank, 0.5 mm clear of the label's edge at least, inside the
+  // border when there is one; the bars within them.
+  const { quiet, box: bars, rects } = layout.bars;
+  const edge = Math.round((QUIET_EDGE_MM * dpi) / 25.4);
+  const lo = layout.border ? area.x : edge;
+  const hi = layout.border ? area.x + area.w : layout.widthDots - edge;
+  expect(quiet.x).toBeGreaterThanOrEqual(lo);
+  expect(quiet.x + quiet.w).toBeLessThanOrEqual(hi);
+  expect(rects[0]!.x - quiet.x).toBeGreaterThanOrEqual(bars.x - quiet.x);
+  expect(rects[0]!.x).toBe(bars.x);
+  expect(rects.at(-1)!.x + rects.at(-1)!.w).toBeLessThanOrEqual(bars.x + bars.w);
 }
 
 describe('wrapping the name', () => {
@@ -345,6 +358,68 @@ describe('what the design decides', () => {
         measurer,
       ),
     ).toEqual({ ok: false, reason: 'barcode_too_long' });
+  });
+});
+
+describe('the quiet zones may use the side margin (decision 0098)', () => {
+  /** The bars as the label prints them: the label's whole width, white with black bars. */
+  function barsImage(layout: LabelLayout) {
+    const width = layout.widthDots;
+    const height = 60;
+    const data = new Uint8ClampedArray(width * height * 4).fill(255);
+    for (const bar of layout.bars.rects) {
+      for (let y = 0; y < height; y += 1)
+        data.fill(0, (y * width + bar.x) * 4, (y * width + bar.x + bar.w) * 4);
+    }
+    // Opaque: every 4th byte back to 255.
+    for (let i = 3; i < data.length; i += 4) data[i] = 255;
+    return { data, width, height, colorSpace: 'srgb' as const };
+  }
+
+  it.each(['EQUIP-0001', 'CLEAN-0001'])(
+    '40 × 30 at 203 dpi: %s as Code 128 at 2 dots per module, read back by a barcode reader',
+    async (code) => {
+      const layout = layoutLabel(
+        geometry(40, 30),
+        defaultLabelDesign(),
+        content({ itemCode: code, barcodeData: code, expiry: null, batch: null }),
+        WORDS,
+        measurer,
+      );
+      if (!layout.ok) throw new Error(`refused: ${layout.reason}`);
+      expectSound(layout, 48, 203);
+      expect(layout.bars.moduleDots).toBe(2);
+      // Wider than the content area with its quiet zones: they reach into the margin.
+      expect(layout.bars.quiet.w).toBeGreaterThan(layout.content.w);
+      const [found] = await readBarcodes(barsImage(layout), {
+        formats: ['Code128'],
+        tryHarder: false,
+      });
+      expect(found?.text).toBe(code);
+    },
+  );
+
+  it('with a border the quiet zones stay inside it: then the 10-character code is refused', () => {
+    const design = { ...defaultLabelDesign(), border: true };
+    const result = layoutLabel(
+      geometry(40, 30),
+      design,
+      content({ barcodeData: 'EQUIP-0001', expiry: null, batch: null }),
+      WORDS,
+      measurer,
+    );
+    expect(result).toEqual({ ok: false, reason: 'barcode_too_long' });
+  });
+
+  it('a code that still does not fit 40 × 30 is refused, and fits 50 × 30', () => {
+    const long = content({ barcodeData: 'FILTER-00012', expiry: null, batch: null });
+    expect(layoutLabel(geometry(40, 30), defaultLabelDesign(), long, WORDS, measurer)).toEqual({
+      ok: false,
+      reason: 'barcode_too_long',
+    });
+    const wide = layoutLabel(geometry(50, 30), defaultLabelDesign(), long, WORDS, measurer);
+    expect(wide.ok).toBe(true);
+    if (wide.ok) expectSound(wide, 48, 203);
   });
 });
 

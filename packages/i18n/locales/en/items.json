@@ -232,7 +232,7 @@
     "inclVat": "incl. VAT",
     "refused": {
       "too_small": "This label size is too small for the name, the barcode and the price. Choose a bigger size or turn the price off.",
-      "barcode_too_long": "This code is too long for a barcode on this label size. Choose a wider size.",
+      "barcode_too_long": "This code is too long for a barcode on this label size. Choose a wider size, such as 50 × 30.",
       "cannot_encode": "This code has letters that cannot be printed as a barcode."
     },
     "sent": "{count} label(s) sent to the label printer.",

@@ -913,7 +913,7 @@
     "previewOf": "Label {size} as it will print",
     "refused": {
       "too_small": "This size is too small for the design: hide an element or choose smaller text for this size.",
-      "barcode_too_long": "The code is too long for a barcode on this width.",
+      "barcode_too_long": "The code is too long for its barcode to fit this width. Print these labels on 50 × 30.",
       "cannot_encode": "This code cannot be printed as a barcode."
     }
   }
