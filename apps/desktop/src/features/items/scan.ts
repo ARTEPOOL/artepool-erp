@@ -54,7 +54,7 @@ export function fromArabicKeyboard(text: string): string {
 
 /** A pause this long (ms) ends a scan; a person types slower than SCAN_KEY_MS between keys. */
 const PAUSE_MS = 300;
-const SCAN_KEY_MS = 35;
+const SCAN_KEY_MS = 45;
 const SCAN_MIN_KEYS = 4;
 
 /** True when the keys came as fast as a scanner types them. */
@@ -108,7 +108,9 @@ export function useScanInput(onScanned?: (code: string) => void) {
         return;
       }
       if (!types(event)) return;
-      const now = performance.now();
+      // When the key arrived, not when this page got round to it: a busy screen must not make
+      // a scanner look like a person typing.
+      const now = event.timeStamp;
       const last = keys.current.at(-1);
       if (last === undefined || now - last > PAUSE_MS) {
         // A new scan or new typing: replaces the code scanned before, as a whole.

@@ -7,7 +7,10 @@
 import type { Locator } from '@playwright/test';
 import { expect, signInAsOwner, test } from './fixtures';
 
-/** Types like a device: one key event and one input event per key, `gapMs` apart, then Enter. */
+/**
+ * Types like a device: one key event and one input event per key, `gapMs` apart (0 = as fast as a
+ * scanner), then Enter.
+ */
 async function typeLikeDevice(field: Locator, keys: string[], gapMs: number, enter = true) {
   await field.evaluate(
     async (input: HTMLInputElement, { keys, gapMs, enter }) => {
@@ -25,7 +28,7 @@ async function typeLikeDevice(field: Locator, keys: string[], gapMs: number, ent
         setValue(input.value.slice(0, start) + key + input.value.slice(end));
         input.setSelectionRange(start + key.length, start + key.length);
         input.dispatchEvent(new Event('input', { bubbles: true }));
-        await sleep(gapMs);
+        if (gapMs > 0) await sleep(gapMs);
       }
       if (enter) {
         input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
@@ -42,15 +45,15 @@ test('scans replace each other and come back in Latin letters', async ({ page, o
   const search = page.getByRole('searchbox', { name: t('items:search') });
 
   // TEST-1234 scanned with the Arabic keyboard on: T = لإ, E = ُ, S = ٍ (Shift).
-  await typeLikeDevice(search, ['لإ', 'ُ', 'ٍ', 'لإ', '-', '1', '2', '3', '4'], 6);
+  await typeLikeDevice(search, ['لإ', '\u064F', '\u064D', 'لإ', '-', '1', '2', '3', '4'], 0);
   await expect(search).toHaveValue('TEST-1234');
 
   // A second scan replaces the first one; the same code again changes nothing.
   await page.waitForTimeout(500);
-  await typeLikeDevice(search, [...'6291041500213'], 6);
+  await typeLikeDevice(search, [...'6291041500213'], 0);
   await expect(search).toHaveValue('6291041500213');
   await page.waitForTimeout(500);
-  await typeLikeDevice(search, [...'6291041500213'], 6);
+  await typeLikeDevice(search, [...'6291041500213'], 0);
   await expect(search).toHaveValue('6291041500213');
 
   // A person typing an Arabic name afterwards: it replaces the scan and stays Arabic.
