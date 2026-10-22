@@ -10,6 +10,7 @@ pub mod connection;
 pub mod enroll;
 pub mod loopback;
 pub mod rules;
+pub mod setup;
 pub mod store;
 pub mod tls;
 
@@ -136,7 +137,7 @@ struct RenewAnswer {
     key_expires_at: String,
 }
 
-fn parse_body(answer: &Answer) -> Value {
+pub(crate) fn parse_body(answer: &Answer) -> Value {
     if answer.content_type.contains("application/json")
         && let Ok(value) = serde_json::from_slice(&answer.body)
     {

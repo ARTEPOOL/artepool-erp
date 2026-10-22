@@ -1,0 +1,68 @@
+{
+  "title": "Welcome to ARTEPOOL",
+  "subtitle": "This is the first-run setup of the server PC. It is done once only.",
+  "paths": {
+    "new": {
+      "title": "New setup",
+      "text": "First time: enter the company details and your account, and enroll this PC as the point of sale.",
+      "start": "Start"
+    },
+    "restore": {
+      "title": "Restore from backup",
+      "text": "A new server PC instead of a broken or stolen one: bring back all the data from a backup.",
+      "soon": "Coming in the next update."
+    }
+  },
+  "step": "Step {n} of {total}: {name}",
+  "steps": {
+    "company": "Company details",
+    "owner": "Your account",
+    "twoStep": "Phone code",
+    "codes": "Recovery codes",
+    "device": "This PC"
+  },
+  "company": {
+    "title": "Company details",
+    "subtitle": "These are printed on every tax invoice. You can change them later in Settings.",
+    "logo": "Logo (optional)",
+    "logoHint": "A PNG or JPEG picture, up to 512 KB.",
+    "logoType": "Choose a PNG or JPEG picture only.",
+    "logoSize": "The picture is larger than 512 KB.",
+    "save": "Save and continue"
+  },
+  "owner": {
+    "title": "Your owner account",
+    "subtitle": "The only account made here. Add the other staff later in Settings → Users.",
+    "username": "Username",
+    "usernameHint": "Small English letters and digits, for example mohammed.",
+    "nameAr": "Name in Arabic",
+    "nameEn": "Name in English",
+    "password": "Password",
+    "again": "Type the password again",
+    "passwordHint": "At least 10 characters. A short sentence is easy to remember and hard to guess.",
+    "missing": "Fill in every field.",
+    "mismatch": "The two passwords are not the same.",
+    "invalidUsername": "The username has 3 to 32 characters: small English letters, digits, dots or dashes only.",
+    "save": "Create the account and continue"
+  },
+  "device": {
+    "title": "This PC",
+    "subtitle": "This PC is enrolled as a point of sale, so the cashier can sell on it.",
+    "name": "PC name",
+    "nameDefault": "Counter and server",
+    "code": "PC code",
+    "codeHint": "A short name in English letters, for example POS-01.",
+    "missing": "Type the PC's name.",
+    "enroll": "Enroll this PC and continue"
+  },
+  "finish": {
+    "title": "One step left",
+    "subtitle": "Everything is ready. Press Finish to close the first-run setup for good.",
+    "button": "Finish setup"
+  },
+  "done": {
+    "title": "Setup is done",
+    "subtitle": "Now sign in with your username, password and phone code.",
+    "button": "Go to sign-in"
+  }
+}

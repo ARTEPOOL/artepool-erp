@@ -63,6 +63,33 @@ async fn bridge_enroll(
     state.0.enroll(input).await.map_err(|e| e.to_string())
 }
 
+/// The installer's files on the server PC (decision 0102): `C:\ProgramData\ARTEPOOL`.
+fn setup_access() -> Option<artepool_bridge::setup::SetupAccess> {
+    let base = std::env::var_os("ProgramData")?;
+    artepool_bridge::setup::SetupAccess::from_data_dir(
+        &std::path::Path::new(&base).join("ARTEPOOL"),
+    )
+}
+
+#[tauri::command]
+fn setup_info() -> artepool_bridge::setup::SetupInfo {
+    artepool_bridge::setup::SetupAccess::info(setup_access().as_ref())
+}
+
+#[tauri::command]
+async fn setup_request(
+    app: tauri::AppHandle,
+    request: artepool_bridge::setup::SetupRequest,
+) -> Result<BridgeResponse, String> {
+    let Some(access) = setup_access() else {
+        return Ok(BridgeResponse::Unreachable);
+    };
+    let version = app.package_info().version.to_string();
+    artepool_bridge::setup::setup_request(&access, request, &version)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 async fn bridge_request(
     state: tauri::State<'_, AppBridge>,
@@ -332,6 +359,8 @@ pub fn run() {
             bridge_local_device,
             bridge_enroll,
             bridge_request,
+            setup_info,
+            setup_request,
             kiosk_refresh,
             google_signin_start,
             google_signin_open,

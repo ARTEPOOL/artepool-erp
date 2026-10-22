@@ -214,6 +214,7 @@ Run from the repository root. Setup on a new PC: [`docs/runbooks/dev-setup-windo
 | Backups (decision 0086): the service / one local copy now / restore test / integrity checks / external-drive copy | `pnpm backup:run` / `pnpm backup:once` / `pnpm backup:restore-test` / `pnpm backup:check` / `pnpm backup:offline <folder>` |
 | Tamper demonstration (throwaway database) | `pnpm demo:audit-tamper` |
 | Create the development master key (`.secrets/`, once per dev PC) | `pnpm dev:secrets` |
+| Try the first-run wizard in a browser (a setup token in `.secrets/setup/`; database without a completed setup) | `pnpm dev:setup-token` |
 | Create the ARTÉPOOL CA + server certificate (HTTPS, TLS 1.3); `--renew-server` for a new server certificate | `pnpm tls:init [--name host] [--ip address]` |
 | Run the API in dev mode (HTTPS: `https://localhost:3100/health`, trust `.secrets/tls/ca.crt`) | `pnpm dev:server` |
 | Run the screens in a browser (`http://localhost:1420`; the dev server plays the PC's secure side, device file `.secrets/dev-device.json`) | `pnpm dev:desktop:web` |

@@ -70,6 +70,8 @@ export const control = {
   codeFor: async (userId: string) =>
     (await control.call<{ code: string }>('POST', '/code', { userId })).code,
   resetOwnerTwoStep: () => control.call('POST', '/owner/reset-2fa'),
+  /** A fresh server PC just installed: empty database, setup token, "setup" PC not enrolled. */
+  setupServer: () => control.call('POST', '/setup-server'),
   addDevice: (code: string, name: string) => control.call('POST', '/devices', { code, name }),
   addPosItem: (item: {
     code: string;

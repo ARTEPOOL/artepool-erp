@@ -1,5 +1,12 @@
 # Changelog
 
+## Installation, part D: the first-run wizard, "New setup" (2026-10-22)
+
+**In plain words:** right after the server is installed, the app on the server PC opens the first-run setup by itself, in Arabic or English. You choose **New setup** ("Restore from backup" is shown but comes with the next part), then in five steps: the **company details** (and the logo if you want), **your owner account**, the **phone code** (scan the QR code, type the 6 digits), your **10 recovery codes** (print or write them; you confirm before going on), and **this PC**, enrolled as the point of sale. Then **Finish**: the setup closes for good and the normal sign-in screen appears. If the app is closed halfway, it starts again where it stopped. The setup works only on the server PC itself, only with the one-time key the installer leaves there (only Windows administrators can read it), and never again once finished. Every step is written to the audit log as "setup wizard".
+
+- Decisions 0092, 0102; no database change beyond part C.
+- Tests: the server refuses without the key, with a wrong key, from another PC, before starting and after finishing; a full run gives the company, the owner with the phone code and 10 recovery codes, and this PC as a POS through the real enrollment; the audit trail; the screens in Arabic (a full run, a refused password, picking up halfway, no wizard on other PCs); the Windows side reads only the installer's files and sends only setup steps; a real-browser run in Arabic and English against a fresh server.
+
 ## Installation, part C: the first-run state and the server clock guard (2026-10-22)
 
 **In plain words:** two protections in the database, ready for the setup wizard. (1) The database now remembers whether the first-run setup on the server PC was done: "not started", "in progress" or "done". It only moves forward, so once the setup is done it can never be run again, and nobody can delete that record. Databases that already have an owner count as done. (2) **The server clock guard:** if the server PC's clock goes back (someone changes the date, or the battery of the clock fails) by more than 2 minutes before the last thing recorded, nothing can be saved, so nothing is ever recorded "in the past". The screen says: correct the date and time in Windows on the server PC. The owner gets a critical "server clock went back" alert. Once the clock is right again, everything works as before.

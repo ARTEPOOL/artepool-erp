@@ -8,6 +8,7 @@ import arMasterdata from '../locales/ar/masterdata.json';
 import arParties from '../locales/ar/parties.json';
 import arSettings from '../locales/ar/settings.json';
 import arSetup from '../locales/ar/setup.json';
+import arFirstRun from '../locales/ar/firstRun.json';
 import arShell from '../locales/ar/shell.json';
 import arReceipts from '../locales/ar/receipts.json';
 import arPos from '../locales/ar/pos.json';
@@ -24,6 +25,7 @@ import enMasterdata from '../locales/en/masterdata.json';
 import enParties from '../locales/en/parties.json';
 import enSettings from '../locales/en/settings.json';
 import enSetup from '../locales/en/setup.json';
+import enFirstRun from '../locales/en/firstRun.json';
 import enShell from '../locales/en/shell.json';
 import enReceipts from '../locales/en/receipts.json';
 import enPos from '../locales/en/pos.json';
@@ -48,6 +50,7 @@ export const resources = {
     parties: arParties,
     accounting: arAccounting,
     setup: arSetup,
+    firstRun: arFirstRun,
     lists: arLists,
     inventory: arInventory,
     sales: arSales,
@@ -66,6 +69,7 @@ export const resources = {
     parties: enParties,
     accounting: enAccounting,
     setup: enSetup,
+    firstRun: enFirstRun,
     lists: enLists,
     inventory: enInventory,
     sales: enSales,

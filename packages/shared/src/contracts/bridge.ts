@@ -43,6 +43,28 @@ export type BridgeResponse =
   /** This PC has no device key yet: it must be enrolled first. */
   | { kind: 'not_enrolled' };
 
+/**
+ * The first-run wizard (decision 0102): whether this PC holds the installer's setup token (only
+ * the server PC, right after installation, and only for Windows administrators), and how it
+ * reaches its own server. The token itself never reaches the screens.
+ */
+export interface SetupInfo {
+  available: boolean;
+  /** e.g. `127.0.0.1:3100`: the server PC talks to its own server. */
+  serverAddress: string | null;
+}
+
+/** Only the setup endpoints go through the setup channel. */
+export const SetupRequest = z.object({
+  method: z.enum(['GET', 'POST', 'PUT']),
+  path: z
+    .string()
+    .max(128)
+    .regex(/^\/api\/v1\/setup\/[a-z0-9/-]+$/),
+  body: z.unknown().optional(),
+});
+export type SetupRequest = z.infer<typeof SetupRequest>;
+
 export interface LocalDevice {
   enrolled: boolean;
   /** The server this PC is enrolled with, e.g. `https://artepool-server:3100`. */

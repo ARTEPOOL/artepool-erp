@@ -6,6 +6,8 @@ import type {
   EnrollOutcome,
   LocalDevice,
   SessionView,
+  SetupInfo,
+  SetupRequest,
   SignInResponse,
   UserView,
 } from '@artepool/shared/contracts';
@@ -64,6 +66,9 @@ export class FakeBridge implements Bridge {
   enrollOutcome: EnrollOutcome = { ok: false, reason: 'not_genuine' };
   readonly calls: BridgeRequest[] = [];
   readonly enrollCalls: EnrollInput[] = [];
+  /** The first-run wizard: off unless a test turns it on. */
+  setup: SetupInfo = { available: false, serverAddress: null };
+  readonly setupCalls: SetupRequest[] = [];
   private readonly answers = new Map<string, Answer[]>();
 
   constructor(device: typeof OFFICE | null = OFFICE) {
@@ -98,8 +103,22 @@ export class FakeBridge implements Bridge {
     return Promise.resolve(this.enrollOutcome);
   }
 
+  setupInfo(): Promise<SetupInfo> {
+    return Promise.resolve(this.setup);
+  }
+
+  /** Setup steps share the scripted answers (their paths are /api/v1/setup/…). */
+  setupRequest(request: SetupRequest): Promise<BridgeResponse> {
+    this.setupCalls.push(request);
+    return this.answer(request);
+  }
+
   request(request: BridgeRequest): Promise<BridgeResponse> {
     this.calls.push(request);
+    return this.answer(request);
+  }
+
+  private answer(request: BridgeRequest): Promise<BridgeResponse> {
     // An exact path first, then the same path without its query (?limit=…).
     const list =
       this.answers.get(`${request.method} ${request.path}`) ??

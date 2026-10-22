@@ -13,7 +13,11 @@ export const E2E = {
     office: { port: 1520, deviceFile: join(stateDir, 'office.json') },
     pos: { port: 1521, deviceFile: join(stateDir, 'pos.json') },
     fresh: { port: 1522, deviceFile: join(stateDir, 'fresh.json') },
+    /** The server PC right after installation: the first-run wizard (decision 0102). */
+    setup: { port: 1523, deviceFile: join(stateDir, 'setup.json') },
   },
+  /** Where the "setup" PC finds its own server, CA and setup token (see the dev bridge). */
+  setupFile: join(stateDir, 'setup-access.json'),
 } as const;
 
 export type Pc = keyof typeof E2E.pcs;

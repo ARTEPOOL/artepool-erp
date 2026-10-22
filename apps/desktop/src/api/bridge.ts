@@ -9,13 +9,21 @@ import type {
   EnrollInput,
   EnrollOutcome,
   LocalDevice,
+  SetupInfo,
+  SetupRequest,
 } from '@artepool/shared/contracts';
 
 export interface Bridge {
   localDevice(): Promise<LocalDevice>;
   enroll(input: EnrollInput): Promise<EnrollOutcome>;
   request(request: BridgeRequest): Promise<BridgeResponse>;
+  /** The first-run wizard (decision 0102): is the setup token on this PC? */
+  setupInfo(): Promise<SetupInfo>;
+  /** A setup step, sent with the setup token by the native side. */
+  setupRequest(request: SetupRequest): Promise<BridgeResponse>;
 }
+
+const NO_SETUP: SetupInfo = { available: false, serverAddress: null };
 
 async function post<T>(path: string, body: unknown): Promise<T> {
   const response = await fetch(path, {
@@ -49,6 +57,21 @@ export const devServerBridge: Bridge = {
       return { kind: 'unreachable' };
     }
   },
+  async setupInfo() {
+    try {
+      const response = await fetch('/__artepool/setup', { credentials: 'same-origin' });
+      return response.ok ? ((await response.json()) as SetupInfo) : NO_SETUP;
+    } catch {
+      return NO_SETUP;
+    }
+  },
+  async setupRequest(request) {
+    try {
+      return await post<BridgeResponse>('/__artepool/setup/request', request);
+    } catch {
+      return { kind: 'unreachable' };
+    }
+  },
 };
 
 /**
@@ -67,6 +90,20 @@ export const tauriBridge: Bridge = {
   async request(request) {
     try {
       return await invoke<BridgeResponse>('bridge_request', { request });
+    } catch {
+      return { kind: 'unreachable' };
+    }
+  },
+  async setupInfo() {
+    try {
+      return await invoke<SetupInfo>('setup_info');
+    } catch {
+      return NO_SETUP;
+    }
+  },
+  async setupRequest(request) {
+    try {
+      return await invoke<BridgeResponse>('setup_request', { request });
     } catch {
       return { kind: 'unreachable' };
     }

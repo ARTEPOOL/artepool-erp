@@ -569,7 +569,7 @@ export async function storeTwoStep(
   deps: Pick<AppDeps, 'secretBox'>,
   userId: bigint,
   secret: string,
-  step: number,
+  step: bigint,
   recoveryHashes: string[],
 ) {
   const user = await trx

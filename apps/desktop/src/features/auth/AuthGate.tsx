@@ -10,6 +10,7 @@ import { PasswordRecoveredScreen, RecoverPasswordScreen } from './RecoverPasswor
 import { SecondFactorScreen } from './SecondFactorScreen';
 import { SignInScreen } from './SignInScreen';
 import { RecoveryCodesScreen, TwoStepSetupScreen } from './TwoStepScreens';
+import { SetupWizard } from '../setup/SetupWizard';
 
 /**
  * Shows the screen the sign-in flow is at, and the app (`children`) only once the session is
@@ -32,6 +33,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
           <Note>{t('auth:starting')}</Note>
         </AuthFrame>
       );
+    case 'setup':
+      return <SetupWizard status={phase.status} serverAddress={phase.serverAddress} />;
     case 'enroll':
       return <EnrollScreen notice={phase.notice} />;
     case 'outdated':

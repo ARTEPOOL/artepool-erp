@@ -87,7 +87,7 @@ async function enrollThisPc(code: string) {
   const device = {
     deviceCode: 'SERVER-PC',
     deviceName: 'Counter and server',
-    deviceKind: 'pos',
+    deviceKind: 'pos' as const,
     deviceKeyHash: sha256(newToken()).toString('base64url'),
   };
   return call(server, 'POST', '/api/v1/enroll/complete', {

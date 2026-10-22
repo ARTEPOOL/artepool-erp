@@ -5,6 +5,8 @@
  *   GET  /__artepool/device   → LocalDevice
  *   POST /__artepool/enroll   → EnrollOutcome
  *   POST /__artepool/request  → BridgeResponse
+ *   GET  /__artepool/setup    → SetupInfo (the first-run wizard, decision 0102)
+ *   POST /__artepool/setup/request → BridgeResponse (setup steps only, with the setup token)
  *
  * Only pages served by this dev server may call them (same origin), so another web page open in
  * the same browser cannot use this PC's device key.
@@ -13,8 +15,9 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { join } from 'node:path';
 import type { Plugin } from 'vite';
 import { repoRoot } from '@artepool/node-kit';
-import { BridgeRequest, EnrollInput } from '@artepool/shared/contracts';
+import { BridgeRequest, EnrollInput, SetupRequest } from '@artepool/shared/contracts';
 import { DevBridge } from './bridge';
+import { setupInfo, setupRequest } from './setup';
 
 export interface DevBridgePluginOptions {
   clientVersion: string;
@@ -88,6 +91,7 @@ export function artepoolDevBridge(options: DevBridgePluginOptions): Plugin {
           const route = `${request.method} ${request.url?.split('?')[0]}`;
           try {
             if (route === 'GET /device') return reply(response, 200, await bridge.localDevice());
+            if (route === 'GET /setup') return reply(response, 200, await setupInfo());
             if (request.method !== 'POST' || !request.headers['content-type']?.includes('json')) {
               return reply(response, 404, { error: 'not found' });
             }
@@ -95,6 +99,11 @@ export function artepoolDevBridge(options: DevBridgePluginOptions): Plugin {
               const input = EnrollInput.safeParse(await readBody(request));
               if (!input.success) return reply(response, 400, { error: 'invalid' });
               return reply(response, 200, await bridge.enroll(input.data));
+            }
+            if (route === 'POST /setup/request') {
+              const input = SetupRequest.safeParse(await readBody(request));
+              if (!input.success) return reply(response, 400, { error: 'invalid' });
+              return reply(response, 200, await setupRequest(input.data, options.clientVersion));
             }
             if (route === 'POST /request') {
               const input = BridgeRequest.safeParse(await readBody(request));

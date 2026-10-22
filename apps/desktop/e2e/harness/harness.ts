@@ -8,9 +8,10 @@
  *
  * Everything is removed when the run ends. It never touches the development database.
  */
-import { mkdir, rm } from 'node:fs/promises';
+import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { loadEnv } from '@artepool/node-kit';
 
 loadEnv();
@@ -100,7 +101,39 @@ function send(response: ServerResponse, status: number, value: unknown): void {
   response.end(JSON.stringify(value, (_k, v: unknown) => (typeof v === 'bigint' ? String(v) : v)));
 }
 
+/**
+ * The server PC right after installation (decision 0102): a server of its own on a fresh,
+ * empty database, the installer's setup token, and the "setup" PC pointed at it, not enrolled.
+ * Made again for each wizard test (the wizard deletes the token when it completes).
+ */
+let setupServer: { server: typeof server; https: typeof https } | null = null;
+async function newSetupServer(): Promise<void> {
+  if (setupServer) {
+    await setupServer.https.close();
+    await setupServer.server.close();
+  }
+  const tokenFile = join(E2E.stateDir, 'setup-token');
+  const caFile = join(E2E.stateDir, 'setup-ca.crt');
+  await writeFile(tokenFile, randomBytes(32).toString('base64url'), { mode: 0o600 });
+  const fresh = await support.startTestServer(undefined, {
+    limits: generous(),
+    setupTokenFile: tokenFile,
+  });
+  const listening = await support.listenHttps(fresh);
+  await writeFile(caFile, listening.ca.certPem);
+  await writeFile(
+    E2E.setupFile,
+    JSON.stringify({ serverAddress: listening.url, caFile, tokenFile }),
+  );
+  await rm(E2E.pcs.setup.deviceFile, { force: true });
+  setupServer = { server: fresh, https: listening };
+}
+
 const routes: Record<string, (input: Record<string, unknown>) => Promise<unknown>> = {
+  'POST /setup-server': async () => {
+    await newSetupServer();
+    return {};
+  },
   'GET /ready': () => Promise.resolve({ ready: true, api: https.url }),
   'GET /owner': () => Promise.resolve({ username: OWNER.username, password: OWNER.password }),
   'POST /owner/code': async () => ({ code: await currentCode() }),
@@ -193,6 +226,10 @@ async function close(): Promise<void> {
   if (closing) return;
   closing = true;
   control.close();
+  if (setupServer) {
+    await setupServer.https.close();
+    await setupServer.server.close();
+  }
   await https.close();
   await server.close();
   await dropTemplate();
