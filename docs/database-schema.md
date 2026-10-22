@@ -295,6 +295,21 @@ Which account prints is the template's `bankAccountId` setting, so a reprint sho
 
 ---
 
+### 4.13 `sys.setup_state` (exactly one row; migration 0043, decision 0102)
+
+The first-run wizard on the server PC. Forward only, one step at a time; never deleted; audited.
+
+| Column | Type | Notes |
+|---|---|---|
+| id | smallint PK | Always 1 |
+| state | text | `not_started` → `in_progress` → `complete`; nothing changes once complete (`SETUP_ALREADY_DONE`) |
+| path | text? | `new` / `restore`, chosen once with `in_progress`; empty on databases that existed before the wizard |
+| installation_id | uuid | Names the installation; never changes |
+| started_at, completed_at | timestamptz? | Set by the trigger from the server clock |
+| created_*, updated_*, row_version | | `sys.add_touch` |
+
+Migration 0043 marks it `complete` on any database that already has an active owner. The API may update `state` and `path` only.
+
 ## 5. Schema `auth`
 
 ### 5.1 `auth.users`
@@ -1629,7 +1644,8 @@ The owner asks the backup service for something now. Inserted by the API (owner 
 | `sales.check_note_quantities()` | trigger | Notes ≤ original quantities / remaining advance |
 | `gl.check_entry_balanced()` | deferred constraint trigger | Balanced, ≥ 2 lines |
 | `gl.check_period_open()` | trigger | Journal entries, document issue, stock and cash postings |
-| `sys.clock_guard()` | function | Detects the server clock going backwards |
+| `sys.clock_guard()` | trigger on `audit.log`, security definer | Refuses any write (every write is audited) whose server time is more than 2 minutes (`sys.clock_tolerance()`) before the latest audit row: `CLOCK_BACKWARDS`. Checked once per transaction. Only the `clock_backwards` alert itself gets through (migration 0043) |
+| `sys.clock_status()` | security definer | Server time, latest record, behind or not: the server checks it every 5 minutes and raises one critical `clock_backwards` alert per day |
 | `sys.require_reason_to_deactivate()` | trigger | Deactivating master data or an account needs a reason in the request context ([0037](decisions/0037-master-data-defaults.md)) |
 | `gl.account_in_use(id)` | function | Why an account is in use (event link, line of business, payment method, reason code; postings from 0011), or NULL |
 | `gl.ensure_periods(n)` | security definer | Creates the missing months up to n months ahead ([0035](decisions/0035-fiscal-year-and-provisional-chart.md)) |

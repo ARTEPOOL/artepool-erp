@@ -163,7 +163,9 @@
       "RECOUNT_USED": "The one recount of this shift is already used.",
       "APPROVAL_INVALID": "This approval is for something else.",
       "NOT_POS_SALE": "Only a POS sale can be returned at the point of sale.",
-      "LABEL_PRICE_CHANGED": "The item's price changed while printing: print its labels again with the new price."
+      "LABEL_PRICE_CHANGED": "The item's price changed while printing: print its labels again with the new price.",
+      "CLOCK_BACKWARDS": "The server PC's clock went back before the latest record, so nothing can be saved. Correct the date and time in Windows on the server PC and try again.",
+      "SETUP_ALREADY_DONE": "The first-run setup is already done and cannot be run again."
     },
     "KIOSK_CODE_BLOCKED": "Too many wrong owner codes on this PC. Try again in 15 minutes; the owner has been alerted.",
     "BACKUP_REQUEST_OPEN": "This is already waiting or running. Wait for it to finish.",

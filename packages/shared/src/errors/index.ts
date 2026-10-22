@@ -205,6 +205,8 @@ export const RULE_CODES = [
   'SHIFT_NOT_STUCK',
   'LABEL_TOO_WIDE',
   'LABEL_PRICE_CHANGED',
+  'CLOCK_BACKWARDS',
+  'SETUP_ALREADY_DONE',
 ] as const;
 
 export type RuleCode = (typeof RULE_CODES)[number];

@@ -215,6 +215,12 @@ importers:
 
   db:
     devDependencies:
+      '@artepool/migrate':
+        specifier: workspace:*
+        version: link:../tools/migrate
+      '@artepool/node-kit':
+        specifier: workspace:*
+        version: link:../packages/node-kit
       '@artepool/shared':
         specifier: workspace:*
         version: link:../packages/shared

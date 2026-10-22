@@ -1421,6 +1421,20 @@ export interface SysSettings {
   value: Json;
 }
 
+export interface SysSetupState {
+  completed_at: Timestamp | null;
+  created_at: Timestamp;
+  created_by: bigint;
+  id: Generated<number>;
+  installation_id: Generated<string>;
+  path: string | null;
+  row_version: number;
+  started_at: Timestamp | null;
+  state: Generated<string>;
+  updated_at: Timestamp;
+  updated_by: bigint;
+}
+
 export interface DB {
   "audit.anchors": AuditAnchors;
   "audit.chain_head": AuditChainHead;
@@ -1501,4 +1515,5 @@ export interface DB {
   "sys.receipt_logo": SysReceiptLogo;
   "sys.schema_migrations": SysSchemaMigrations;
   "sys.settings": SysSettings;
+  "sys.setup_state": SysSetupState;
 }

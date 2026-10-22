@@ -7,6 +7,7 @@ import { createDb, createPool } from './platform/db/pool';
 import { createDeps } from './platform/http/deps';
 import { raiseBackupAlerts } from './modules/backup/service';
 import { ensurePeriods } from './modules/ledger/periods';
+import { raiseClockAlert } from './platform/time/clock-guard';
 
 const config = loadConfig();
 const [secretBox, tls] = await Promise.all([
@@ -41,10 +42,31 @@ async function checkBackups(): Promise<void> {
 const backupTimer = setInterval(() => void checkBackups(), 5 * 60 * 1000);
 backupTimer.unref();
 
+/**
+ * The server clock went back behind the latest record (migration 0043): writes are refused and
+ * the owner is alerted. Checked at start-up and every 5 minutes.
+ */
+async function checkClock(): Promise<void> {
+  try {
+    const status = await raiseClockAlert(db);
+    if (status.isBehind) {
+      app.log.error(
+        { serverTime: status.serverTime, latestRecordAt: status.latestRecordAt },
+        'the server clock is behind the latest record: check the Windows time',
+      );
+    }
+  } catch (error) {
+    app.log.error({ err: error }, 'could not check the server clock');
+  }
+}
+const clockTimer = setInterval(() => void checkClock(), 5 * 60 * 1000);
+clockTimer.unref();
+
 async function shutdown(signal: string): Promise<void> {
   app.log.info(`${signal} received, stopping`);
   clearInterval(periodsTimer);
   clearInterval(backupTimer);
+  clearInterval(clockTimer);
   await app.close();
   await db.destroy();
   process.exit(0);
@@ -54,6 +76,7 @@ process.on('SIGTERM', () => void shutdown('SIGTERM'));
 
 try {
   await app.listen({ host: config.host, port: config.port });
+  await checkClock();
   await keepPeriodsAhead();
 } catch (error) {
   app.log.fatal({ err: error }, 'server failed to start');

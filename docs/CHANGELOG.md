@@ -1,5 +1,12 @@
 # Changelog
 
+## Installation, part C: the first-run state and the server clock guard (2026-10-22)
+
+**In plain words:** two protections in the database, ready for the setup wizard. (1) The database now remembers whether the first-run setup on the server PC was done: "not started", "in progress" or "done". It only moves forward, so once the setup is done it can never be run again, and nobody can delete that record. Databases that already have an owner count as done. (2) **The server clock guard:** if the server PC's clock goes back (someone changes the date, or the battery of the clock fails) by more than 2 minutes before the last thing recorded, nothing can be saved, so nothing is ever recorded "in the past". The screen says: correct the date and time in Windows on the server PC. The owner gets a critical "server clock went back" alert. Once the clock is right again, everything works as before.
+
+- Migration 0043 (`sys.setup_state`, `sys.clock_guard`, `sys.clock_status`); no screen change yet (the wizard is part D, the health screen part H).
+- Tests: forward only, one step at a time, the path chosen once, no delete or second row, every change audited, a database with an owner marked done; writes allowed with normal drift (under 2 minutes), refused when the clock is further back, the alert alone let through, the audit chain intact; the server refuses with the right message and raises one alert per day.
+
 ## Installation, part B: the server packaged for the shop PC (2026-10-20)
 
 **In plain words:** the server programs can now be packed into one folder for installing on the shop PC (`pnpm build:server`): no source code, no development settings. On the shop PC the settings live in one file (`C:\ProgramData\ARTEPOOL\config\server.json`) that may not contain any password. The five secrets (the master key and the four database passwords) are kept by Windows itself (DPAPI): they open only on that PC, in a folder only Windows and administrators can open. A small program, `artepool-svc`, unlocks them in memory when the server starts and never writes them anywhere in clear. If a secret is missing, does not open, or the folder is open to other users, the server refuses to start and says why. Nothing changes for you yet: you see this when the installer comes (part F).
