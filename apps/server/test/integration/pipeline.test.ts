@@ -136,9 +136,12 @@ describe('every route declares who may use it', () => {
     await app.close();
   });
 
-  it('keeps the public surface to the health check and the two enrollment steps', () => {
+  it('keeps the public surface to the health check, the two enrollment steps and the setup wizard', () => {
     const app = buildApp({ logLevel: 'silent' }, server.deps);
-    const publicRoutes = app.accessTable.filter((r) => r.access.kind === 'public');
+    // The setup wizard's routes check the installer's token themselves (access.test.ts).
+    const publicRoutes = app.accessTable.filter(
+      (r) => r.access.kind === 'public' && !r.url.startsWith('/api/v1/setup/'),
+    );
     expect(publicRoutes.map((r) => `${r.method} ${r.url}`)).toEqual([
       'GET /health',
       'POST /api/v1/enroll/hello',
