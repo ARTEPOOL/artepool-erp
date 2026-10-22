@@ -41,6 +41,7 @@
     "PIN_REJECTED": "This PIN cannot be used. Choose 4 digits that are not easy to guess.",
     "ENROLLMENT_FAILED": "The enrollment code is wrong or has expired. Ask the owner for a new code.",
     "ENROLLMENT_UNAVAILABLE": "Enrollment is not available yet: the server's secure connection is not set up.",
+    "SETUP_UNAVAILABLE": "The first-run setup works only on the server PC itself, right after installation.",
     "DEVICE_CODE_TAKEN": "This computer name is already used by another enrolled PC. Choose a different name.",
     "DEVICE_PROTECTED": "This PC cannot be revoked here: it is the server or the PC you are using now.",
     "VALIDATION_FAILED": "Some information is missing or not valid.",

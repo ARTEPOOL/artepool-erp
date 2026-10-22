@@ -1,4 +1,6 @@
+import { join } from 'node:path';
 import { backupPaths, type BackupPaths } from '@artepool/backup';
+import { repoRoot } from '@artepool/node-kit';
 import { SecretHasher } from '../crypto/hashing';
 import type { SecretBox } from '../crypto/secret-box';
 import type { Db } from '../db/pool';
@@ -19,6 +21,11 @@ export interface AppDeps {
   readonly caCertificatePem: string | null;
   /** The backup folder and the sealed Google Drive credentials (decision 0086). */
   readonly backup: BackupPaths;
+  /**
+   * The installer's one-time setup token (decision 0102): `ProgramData\ARTEPOOL\setup\token` on
+   * the installed server, readable by administrators only and deleted when setup completes.
+   */
+  readonly setupTokenFile: string;
 }
 
 export function createDeps(input: {
@@ -28,6 +35,7 @@ export function createDeps(input: {
   limits?: RateLimits;
   caCertificatePem?: string | null;
   backup?: BackupPaths;
+  setupTokenFile?: string;
 }): AppDeps {
   return {
     db: input.db,
@@ -37,6 +45,9 @@ export function createDeps(input: {
     settings: new SettingsCache(input.db),
     limits: input.limits ?? defaultRateLimits(),
     backup: input.backup ?? backupPaths(),
+    setupTokenFile:
+      input.setupTokenFile ??
+      (process.env.ARTEPOOL_SETUP_TOKEN_FILE || join(repoRoot, '.secrets', 'setup', 'token')),
   };
 }
 

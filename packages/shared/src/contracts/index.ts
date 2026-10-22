@@ -18,3 +18,4 @@ export * from './pos';
 export * from './printing';
 export * from './reports';
 export * from './backup';
+export * from './setup';

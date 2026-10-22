@@ -91,6 +91,7 @@ export function settingsFromConfig(config: InstalledConfig): Record<string, stri
     ARTEPOOL_BACKUP_DIR: config.backupDir ?? join(config.dataDir, 'backups'),
     ARTEPOOL_DRIVE_CREDENTIALS_FILE: join(secrets, 'backup', 'google-drive.sealed'),
     ARTEPOOL_LOG_DIR: join(config.dataDir, 'logs'),
+    ARTEPOOL_SETUP_TOKEN_FILE: join(config.dataDir, 'setup', 'token'),
     ARTEPOOL_PG_BIN: config.pgBin,
   };
   if (config.chromium) settings.ARTEPOOL_CHROMIUM = config.chromium;

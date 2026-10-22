@@ -26,6 +26,7 @@ import { registerUserRoutes } from './modules/users/routes';
 import type { AppDeps } from './platform/http/deps';
 import { REDACT_PATHS, safeErrorSerializer } from './platform/http/logging';
 import { registerHealth } from './routes/health';
+import { registerSetupRoutes } from './modules/setup/routes';
 
 export interface AppOptions extends Pick<ServerConfig, 'logLevel'> {
   /** Where logs go (tests capture them to prove that no secret is ever logged). */
@@ -101,6 +102,7 @@ export function buildApp(options: AppOptions, deps: AppDeps): FastifyInstance {
   registerApprovalRoutes(app);
   registerAuditRoutes(app);
   registerCompanyRoutes(app);
+  registerSetupRoutes(app);
   registerPrintingRoutes(app);
   registerSettingsRoutes(app);
   registerBackupRoutes(app);

@@ -533,37 +533,9 @@ export async function confirmTwoStep(
   const step = verifyTotp(pending.secret, code, null);
   if (step === null) throw new AppError('INVALID_TWO_STEP_CODE', 'Setup code does not match');
 
-  const codes = Array.from({ length: RECOVERY_CODE_COUNT }, () => newRecoveryCode());
-  const hashes = await Promise.all(codes.map((c) => deps.hasher.hash(normalizeCode(c))));
+  const recovery = await newRecoveryCodes(deps);
   const response = await withBusinessTx(deps.db, contextOf(request), async (trx) => {
-    const user = await trx
-      .updateTable('auth.users')
-      .set({
-        totp_secret_enc: deps.secretBox.seal(
-          Buffer.from(pending.secret, 'utf8'),
-          totpAad(auth.userId),
-        ),
-        totp_enabled: true,
-        totp_last_step: step,
-      })
-      .where('id', '=', auth.userId)
-      .returning([...USER_COLUMNS])
-      .executeTakeFirstOrThrow();
-    await trx
-      .updateTable('auth.recovery_codes')
-      .set({ revoked_at: sql`now()` })
-      .where('user_id', '=', auth.userId)
-      .where('used_at', 'is', null)
-      .where('revoked_at', 'is', null)
-      .execute();
-    await trx
-      .insertInto('auth.recovery_codes')
-      .values(hashes.map((code_hash) => ({ user_id: auth.userId, code_hash }) as never))
-      .execute();
-    await recordEvent(trx, 'auth.two_step_enabled', {
-      ...userEntity(auth.userId),
-      data: { recoveryCodes: RECOVERY_CODE_COUNT },
-    });
+    const user = await storeTwoStep(trx, deps, auth.userId, pending.secret, step, recovery.hashes);
     await endSessions(trx, { userId: auth.userId, deviceId: request.device!.id }, 'upgraded');
     const opened = await openSession(trx, deps, {
       user,
@@ -575,7 +547,57 @@ export async function confirmTwoStep(
     return { token: opened.token, session: opened.session, user: userView(user) };
   });
   pendingTwoStep.delete(auth.sessionId);
-  return { ...response, recoveryCodes: codes };
+  return { ...response, recoveryCodes: recovery.codes };
+}
+
+/** Ten new recovery codes (shown once) and their Argon2id hashes (stored). */
+export async function newRecoveryCodes(
+  deps: Pick<AppDeps, 'hasher'>,
+): Promise<{ codes: string[]; hashes: string[] }> {
+  const codes = Array.from({ length: RECOVERY_CODE_COUNT }, () => newRecoveryCode());
+  const hashes = await Promise.all(codes.map((c) => deps.hasher.hash(normalizeCode(c))));
+  return { codes, hashes };
+}
+
+/**
+ * Turns on a user's 2-step code (after one code from the phone matched): the secret sealed with
+ * the master key, the earlier recovery codes retired, the new ones stored. Also used by the
+ * first-run wizard (M6.2), where nobody is signed in yet.
+ */
+export async function storeTwoStep(
+  trx: Transaction<DB>,
+  deps: Pick<AppDeps, 'secretBox'>,
+  userId: bigint,
+  secret: string,
+  step: number,
+  recoveryHashes: string[],
+) {
+  const user = await trx
+    .updateTable('auth.users')
+    .set({
+      totp_secret_enc: deps.secretBox.seal(Buffer.from(secret, 'utf8'), totpAad(userId)),
+      totp_enabled: true,
+      totp_last_step: step,
+    })
+    .where('id', '=', userId)
+    .returning([...USER_COLUMNS])
+    .executeTakeFirstOrThrow();
+  await trx
+    .updateTable('auth.recovery_codes')
+    .set({ revoked_at: sql`now()` })
+    .where('user_id', '=', userId)
+    .where('used_at', 'is', null)
+    .where('revoked_at', 'is', null)
+    .execute();
+  await trx
+    .insertInto('auth.recovery_codes')
+    .values(recoveryHashes.map((code_hash) => ({ user_id: userId, code_hash }) as never))
+    .execute();
+  await recordEvent(trx, 'auth.two_step_enabled', {
+    ...userEntity(userId),
+    data: { recoveryCodes: recoveryHashes.length },
+  });
+  return user;
 }
 
 // ---------------------------------------------------------------------------------------------
