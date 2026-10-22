@@ -73,14 +73,17 @@ test('a new setup from start to finish, then the normal sign-in', async ({
   await expect(page.getByRole('heading', { name: t('firstRun:done.title') })).toBeVisible();
   await snap(page, '99-setup-done');
 
-  // The normal sign-in on this PC, now the POS; the wizard never comes back.
+  // The normal sign-in on this PC, now the POS (quick PIN sign-in first; the owner switches to
+  // the password); the wizard never comes back.
   await page.getByRole('button', { name: t('firstRun:done.button') }).click();
-  await expect(page.getByRole('heading', { name: t('auth:signIn.title') })).toBeVisible({
+  await expect(page.getByRole('heading', { name: t('auth:pin.title') })).toBeVisible({
     timeout: 30_000,
   });
   await expect(page.getByText(`SERVER-${lang.toUpperCase()}`)).toBeVisible();
   await page.reload();
-  await expect(page.getByRole('heading', { name: t('auth:signIn.title') })).toBeVisible({
+  await expect(page.getByRole('heading', { name: t('auth:pin.title') })).toBeVisible({
     timeout: 30_000,
   });
+  await page.getByRole('button', { name: t('auth:signIn.password'), exact: true }).click();
+  await expect(page.getByRole('heading', { name: t('auth:signIn.title') })).toBeVisible();
 });
