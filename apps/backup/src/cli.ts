@@ -2,9 +2,14 @@
  * The backup service from the command line (development; the installer runs it as a Windows
  * service in M6.2). `once`: one local copy now; `restore-test`: restore the newest copy into a
  * throwaway database and run every check; `check`: the integrity checks on the live database;
- * `offline <folder>`: copy to the external drive; `run`: the service (the schedule, every minute).
+ * `offline <folder>`: copy to the external drive; `run`: the service (the schedule, every minute);
+ * `open <copy> <key file> <output.dump>`: an encrypted off-site copy opened with the owner's
+ * private key, its database copy written out (emergency manual restore; the wizard is the normal
+ * way, decision 0102).
  */
+import { readFile, writeFile } from 'node:fs/promises';
 import { loadEnv } from '@artepool/node-kit';
+import { openCopy } from './bundle';
 import { configFromEnv } from './config';
 import { connect } from './db';
 import { nightlyIntegrity } from './integrity';
@@ -15,6 +20,27 @@ import { tick } from './service';
 
 loadEnv();
 const command = process.argv[2] ?? 'once';
+if (command === 'open') {
+  const [copyFile, keyFile, output] = process.argv.slice(3);
+  if (!copyFile || !keyFile || !output) {
+    console.error('Use: open <copy.dump.age> <private key file> <output.dump>');
+    process.exit(2);
+  }
+  try {
+    const opened = await openCopy(await readFile(copyFile), await readFile(keyFile, 'utf8'));
+    await writeFile(output, opened.dump, { flag: 'wx' });
+    console.log(`Database copy written: ${output}`);
+    console.log(
+      opened.masterKey
+        ? "The copy also holds the server's master key; only the setup wizard's restore puts it back."
+        : 'This copy holds no master key: after restoring it, set up the 2-step codes again.',
+    );
+    process.exit(0);
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : error);
+    process.exit(1);
+  }
+}
 const config = configFromEnv();
 const client = await connect(config.connection);
 try {

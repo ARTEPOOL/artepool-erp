@@ -1,17 +1,20 @@
 /**
- * The daily off-site copy (decision 0086): the newest local copy is encrypted with the owner's
- * age public key, then uploaded to the dedicated Google Drive account. Google only ever holds the
- * encrypted file; only the owner's offline private key opens it. Older off-site copies beyond 30
- * daily + 12 monthly go to the Drive trash.
+ * The daily off-site copy (decision 0086): the newest local copy, with the server's master key
+ * (decision 0102, see bundle.ts), is encrypted with the owner's age public key, then uploaded to
+ * the dedicated Google Drive account. Google only ever holds the encrypted file; only the owner's
+ * offline private key opens it. Older off-site copies beyond 30 daily + 12 monthly go to the
+ * Drive trash.
  */
 import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { basename } from 'node:path';
 import { Readable } from 'node:stream';
 import { buffer } from 'node:stream/consumers';
 import { Encrypter } from 'age-encryption';
 import type pg from 'pg';
 import { SecretBox } from '@artepool/node-kit';
+import { encryptBundle } from './bundle';
 import type { BackupConfig } from './config';
 import { Drive, loadDriveCredentials } from './google';
 import { latestLocalCopy, localBackup } from './local';
@@ -62,7 +65,12 @@ export async function offsiteUpload(
     const credentials = await loadDriveCredentials(config.driveCredentialsFile, box);
     if (!credentials) throw new OffsiteNotReady('drive_not_connected');
     const copy = (await latestLocalCopy(config)) ?? (await localBackup(client, config)).path;
-    const sealed = await encryptFile(copy, recipient);
+    const sealed = await encryptBundle(
+      await readFile(copy),
+      basename(copy),
+      await SecretBox.keyForBackup(config.masterKey),
+      recipient,
+    );
     const fileName = `${basename(copy)}.age`;
     const drive = await Drive.open(config.google, credentials);
     const uploaded = await drive.upload(fileName, sealed);

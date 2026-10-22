@@ -100,11 +100,13 @@ To be rehearsed on the real server PC with the installer (M6.2); until then this
 1. **Install** the server on the replacement PC (M6.2 installer). Do not run the setup wizard.
 2. **Pick the copy:** the newest file from the local backup folder, the external drive
    (`ARTEPOOL-BACKUPS\artepool-…Z.dump`), or Google Drive (`artepool-…Z.dump.age`).
-3. **Decrypt** a Google Drive copy with the owner's private key and the standard `age` tool
-   (<https://github.com/FiloSottile/age/releases>):
+3. **Open** a Google Drive copy with the owner's private key. Since M6.2 the encrypted copy holds
+   the database copy *and* the server's master key (decision 0102), so the standard `age` tool alone
+   no longer gives the `.dump`; use (the setup wizard's "Restore from backup" is the normal way):
    ```
-   age --decrypt --identity artepool-backup-key.txt artepool-20261019-100000Z.dump.age > artepool.dump
+   pnpm backup:open artepool-20261019-100000Z.dump.age artepool-backup-key.txt artepool.dump
    ```
+   On the installed server: `artepool-svc run backup open …` with the same three files.
 4. **Stop** the API and backup services. As the PostgreSQL superuser, create the empty database
    owned by `artepool_owner` (the installer's roles must exist), then restore:
    ```

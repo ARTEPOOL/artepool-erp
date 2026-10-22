@@ -61,6 +61,14 @@ export class SecretBox {
     return 'key' in source ? SecretBox.fromKey(source.key) : SecretBox.fromFile(source.file);
   }
 
+  /**
+   * The key itself, only for the encrypted off-site copy (decision 0102: the master key travels
+   * inside copies that only the owner's offline private key opens).
+   */
+  static async keyForBackup(source: { file: string } | { key: Buffer }): Promise<Buffer> {
+    return Buffer.from((await SecretBox.fromSource(source)).key);
+  }
+
   seal(plaintext: Buffer, aad: string): Buffer {
     const nonce = randomBytes(NONCE_BYTES);
     const cipher = createCipheriv('aes-256-gcm', this.key, nonce);

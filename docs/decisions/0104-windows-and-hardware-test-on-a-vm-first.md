@@ -16,7 +16,7 @@
 
 Windows 10 no longer gets Microsoft's updates since October 2025 (only with paid extended updates): Windows 11 is recommended for the server PC.
 
-**Pro or Home.** The shop PC is believed to be Windows 10 **Pro** (the owner confirms). Everything in the system works on **Home** too, except:
+**Pro or Home.** The shop PC is **Windows 10 Pro** (confirmed by the owner, 2026-10-22): BitLocker and full control of update restarts are available. Because Windows 10 gets no more free security updates, upgrading the shop PC to Windows 11 Pro (if its hardware allows) or buying Microsoft's extended updates is recommended before go-live. For reference, everything in the system works on **Home** too, except:
 
 | Protection (M6.4) | Pro | Home |
 |---|---|---|

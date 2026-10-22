@@ -8,6 +8,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Decrypter, generateX25519Identity, identityToRecipient } from 'age-encryption';
+import { openCopy } from '../../src/bundle';
 import type pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { SecretBox } from '@artepool/node-kit';
@@ -128,11 +129,11 @@ describe('the off-site copy', () => {
     const uploaded = google.files.find((f) => f.name === result.fileName)!;
     const plain = await readFile((await latestLocalCopy(config))!);
     expect(uploaded.body.includes(plain.subarray(0, 64))).toBe(false);
-    const decrypter = new Decrypter();
-    decrypter.addIdentity(identity);
-    expect(Buffer.from(await decrypter.decrypt(new Uint8Array(uploaded.body))).equals(plain)).toBe(
-      true,
-    );
+    // Inside: the database copy and the master key (decision 0102), opened with the private key.
+    const opened = await openCopy(uploaded.body, identity);
+    expect(opened.dump.equals(plain)).toBe(true);
+    expect(opened.masterKey!.equals(await SecretBox.keyForBackup(config.masterKey))).toBe(true);
+    expect(opened.dumpName).toBe(copy.fileName);
     // Another key cannot open it.
     const stranger = new Decrypter();
     stranger.addIdentity(await generateX25519Identity());

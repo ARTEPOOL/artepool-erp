@@ -1,5 +1,12 @@
 # Changelog
 
+## Installation, part E (first piece): the encrypted copy carries the master key (2026-10-22)
+
+**In plain words:** the daily copy that goes to Google Drive now holds, inside its encryption, the server's master key together with the database copy (decision 0102). Only your offline private key opens it. So if the server PC is ever lost, the restore (coming next) brings back everything, including everyone's phone 2-step codes, not only the data. Copies made before today, and the external-drive copies, still restore; after restoring one of those the 2-step codes are set up again. For the technical emergency path there is a new command, `pnpm backup:open`, which opens an encrypted copy with the private key. The shop PC is recorded as Windows 10 Pro.
+
+- No database change.
+- Tests: the copy holds the database copy and the master key, only the private key opens it, a changed copy or another key is refused, plain copies still open; the upload test now checks the contents; `backup:open` writes the copy only with the right key and never overwrites a file.
+
 ## Installation, part D: the first-run wizard, "New setup" (2026-10-22)
 
 **In plain words:** right after the server is installed, the app on the server PC opens the first-run setup by itself, in Arabic or English. You choose **New setup** ("Restore from backup" is shown but comes with the next part), then in five steps: the **company details** (and the logo if you want), **your owner account**, the **phone code** (scan the QR code, type the 6 digits), your **10 recovery codes** (print or write them; you confirm before going on), and **this PC**, enrolled as the point of sale. Then **Finish**: the setup closes for good and the normal sign-in screen appears. If the app is closed halfway, it starts again where it stopped. The setup works only on the server PC itself, only with the one-time key the installer leaves there (only Windows administrators can read it), and never again once finished. Every step is written to the audit log as "setup wizard".

@@ -211,7 +211,7 @@ Run from the repository root. Setup on a new PC: [`docs/runbooks/dev-setup-windo
 | Unit tests / integration tests (real PostgreSQL) / all | `pnpm test:unit` / `pnpm test:integration` / `pnpm test` |
 | Screen tests in a real browser (Playwright, Arabic + English, light + dark; real API on a throwaway database) | `pnpm test:e2e` (once: `pnpm --filter @artepool/desktop exec playwright install chromium`) |
 | Verify the audit hash chain | `pnpm audit:verify` |
-| Backups (decision 0086): the service / one local copy now / restore test / integrity checks / external-drive copy | `pnpm backup:run` / `pnpm backup:once` / `pnpm backup:restore-test` / `pnpm backup:check` / `pnpm backup:offline <folder>` |
+| Backups (decision 0086): the service / one local copy now / restore test / integrity checks / external-drive copy / open an encrypted copy with the private key (emergency manual restore) | `pnpm backup:run` / `pnpm backup:once` / `pnpm backup:restore-test` / `pnpm backup:check` / `pnpm backup:offline <folder>` / `pnpm backup:open <copy.age> <key file> <out.dump>` |
 | Tamper demonstration (throwaway database) | `pnpm demo:audit-tamper` |
 | Create the development master key (`.secrets/`, once per dev PC) | `pnpm dev:secrets` |
 | Try the first-run wizard in a browser (a setup token in `.secrets/setup/`; database without a completed setup) | `pnpm dev:setup-token` |
