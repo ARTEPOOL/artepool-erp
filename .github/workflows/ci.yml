@@ -82,7 +82,8 @@ jobs:
   screens:
     name: Screen tests (Playwright, Arabic + English)
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    # 86 flows in two languages, one at a time: about 30 minutes on the runner.
+    timeout-minutes: 45
     services:
       postgres:
         image: postgres:18
@@ -118,6 +119,14 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Chromium for Playwright
         run: pnpm --filter @artepool/desktop exec playwright install --with-deps chromium
+      - name: PostgreSQL 18 client tools (pg_dump / pg_restore for the restore flow)
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSo /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt noble-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client-18
+          echo "ARTEPOOL_PG_BIN=/usr/lib/postgresql/18/bin" >> "$GITHUB_ENV"
       - name: Screen flows against the real API (throwaway database)
         run: pnpm test:e2e
       - name: Screenshots and report
