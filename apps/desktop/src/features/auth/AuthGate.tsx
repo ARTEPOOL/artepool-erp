@@ -34,7 +34,13 @@ export function AuthGate({ children }: { children: ReactNode }) {
         </AuthFrame>
       );
     case 'setup':
-      return <SetupWizard status={phase.status} serverAddress={phase.serverAddress} />;
+      return (
+        <SetupWizard
+          status={phase.status}
+          serverAddress={phase.serverAddress}
+          windowsBuild={phase.windowsBuild}
+        />
+      );
     case 'enroll':
       return <EnrollScreen notice={phase.notice} />;
     case 'outdated':

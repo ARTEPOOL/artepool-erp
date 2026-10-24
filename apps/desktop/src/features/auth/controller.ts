@@ -32,7 +32,12 @@ export type SignInNotice = 'expired' | 'signedOut' | null;
 export type Phase =
   | { name: 'starting' }
   /** The first-run wizard on the server PC (decision 0102). */
-  | { name: 'setup'; status: SetupStatusResponse; serverAddress: string }
+  | {
+      name: 'setup';
+      status: SetupStatusResponse;
+      serverAddress: string;
+      windowsBuild: number | null;
+    }
   | { name: 'enroll'; notice: 'revoked' | 'expired' | null }
   | { name: 'outdated'; minVersion: string }
   | { name: 'signIn'; notice: SignInNotice }
@@ -140,7 +145,7 @@ export class AuthController {
       return;
     }
     this.set({ device: local.device, suggestedCode: local.suggestedCode });
-    if (setup?.available && setup.serverAddress && (await this.openSetup(setup.serverAddress))) {
+    if (setup?.available && setup.serverAddress && (await this.openSetup(setup))) {
       return;
     }
     if (!local.enrolled) {
@@ -166,12 +171,17 @@ export class AuthController {
    * The server PC right after installation: the setup token is here and setup is not complete →
    * the wizard. Anywhere else (no token, a normal PC) this changes nothing.
    */
-  private async openSetup(serverAddress: string): Promise<boolean> {
+  private async openSetup(info: SetupInfo): Promise<boolean> {
     try {
       const status = await this.setupApi.get<SetupStatusResponse>('/api/v1/setup/status');
       if (status.state === 'complete') return false;
       this.set({ server: 'ok' });
-      this.go({ name: 'setup', status, serverAddress });
+      this.go({
+        name: 'setup',
+        status,
+        serverAddress: info.serverAddress!,
+        windowsBuild: info.windowsBuild,
+      });
       return true;
     } catch {
       return false;

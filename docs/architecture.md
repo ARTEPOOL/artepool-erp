@@ -51,7 +51,7 @@
 ## 2. Topology and runtime components
 
 ```
-┌──────────────────────────── MAIN SERVER PC (BitLocker, UPS) ────────────────────────────┐
+┌───────────────────── MAIN SERVER PC (any Windows 10/11 edition, UPS) ───────────────────┐
 │  PostgreSQL 18 ── listens on 127.0.0.1 only                                              │
 │        ▲ role artepool_api                ▲ role artepool_backup                         │
 │  ┌─────┴──────────────────────┐   ┌───────┴──────────────────────────────────┐           │

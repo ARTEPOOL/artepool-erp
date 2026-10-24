@@ -71,9 +71,42 @@ fn setup_access() -> Option<artepool_bridge::setup::SetupAccess> {
     )
 }
 
+/// This PC's Windows build (decision 0106: Windows 10 gets a warning in the setup screen).
+#[cfg(windows)]
+fn windows_build() -> Option<u32> {
+    #[repr(C)]
+    struct OsVersionInfo {
+        size: u32,
+        major: u32,
+        minor: u32,
+        build: u32,
+        platform: u32,
+        service_pack: [u16; 128],
+    }
+    #[link(name = "ntdll")]
+    unsafe extern "system" {
+        // Unlike GetVersionEx, it reports the real version whatever the app's manifest says.
+        fn RtlGetVersion(info: *mut OsVersionInfo) -> i32;
+    }
+    let mut info = OsVersionInfo {
+        size: std::mem::size_of::<OsVersionInfo>() as u32,
+        major: 0,
+        minor: 0,
+        build: 0,
+        platform: 0,
+        service_pack: [0; 128],
+    };
+    (unsafe { RtlGetVersion(&mut info) } == 0).then_some(info.build)
+}
+
+#[cfg(not(windows))]
+fn windows_build() -> Option<u32> {
+    None
+}
+
 #[tauri::command]
 fn setup_info() -> artepool_bridge::setup::SetupInfo {
-    artepool_bridge::setup::SetupAccess::info(setup_access().as_ref())
+    artepool_bridge::setup::SetupAccess::info(setup_access().as_ref(), windows_build())
 }
 
 #[tauri::command]

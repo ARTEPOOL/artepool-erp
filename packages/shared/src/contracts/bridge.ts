@@ -52,7 +52,15 @@ export interface SetupInfo {
   available: boolean;
   /** e.g. `127.0.0.1:3100`: the server PC talks to its own server. */
   serverAddress: string | null;
+  /**
+   * The Windows build of this PC (decision 0106), or null when unknown: below 22000 is Windows 10,
+   * which no longer gets free security updates (a warning, never a block).
+   */
+  windowsBuild: number | null;
 }
+
+/** Windows 11 starts at build 22000. */
+export const WINDOWS_11_BUILD = 22000;
 
 /** Only the setup endpoints go through the setup channel. */
 export const SetupRequest = z.object({

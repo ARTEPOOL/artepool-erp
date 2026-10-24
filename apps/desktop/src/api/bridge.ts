@@ -23,7 +23,7 @@ export interface Bridge {
   setupRequest(request: SetupRequest): Promise<BridgeResponse>;
 }
 
-const NO_SETUP: SetupInfo = { available: false, serverAddress: null };
+const NO_SETUP: SetupInfo = { available: false, serverAddress: null, windowsBuild: null };
 
 async function post<T>(path: string, body: unknown): Promise<T> {
   const response = await fetch(path, {

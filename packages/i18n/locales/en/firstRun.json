@@ -1,6 +1,7 @@
 {
   "title": "Welcome to ARTEPOOL",
   "subtitle": "This is the first-run setup of the server PC. It is done once only.",
+  "windows10": "This PC runs Windows 10, which no longer gets free security updates from Microsoft. Upgrading to Windows 11, or buying Microsoft's extended updates, is advised. You can continue the setup as usual.",
   "paths": {
     "new": {
       "title": "New setup",

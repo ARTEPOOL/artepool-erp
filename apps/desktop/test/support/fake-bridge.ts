@@ -67,7 +67,7 @@ export class FakeBridge implements Bridge {
   readonly calls: BridgeRequest[] = [];
   readonly enrollCalls: EnrollInput[] = [];
   /** The first-run wizard: off unless a test turns it on. */
-  setup: SetupInfo = { available: false, serverAddress: null };
+  setup: SetupInfo = { available: false, serverAddress: null, windowsBuild: null };
   readonly setupCalls: SetupRequest[] = [];
   private readonly answers = new Map<string, Answer[]>();
 

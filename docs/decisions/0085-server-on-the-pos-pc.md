@@ -15,7 +15,7 @@
   - creates the cashier's Windows account as a **standard user** (not an administrator) with **automatic sign-in** to the POS app (0082), with the kiosk policies of 0082 (no Task Manager, Run box or command prompt);
   - when the owner turns the kiosk lock off (0089, 0091), only the app lock is lifted: these Windows restrictions stay;
   - keeps an administrator account for the owner only;
-  - turns on BitLocker (PRD §5) and records that a **UPS** is connected.
+  - recommends disk encryption where the Windows edition offers it (BitLocker, or Device encryption on Home; 0106) and records that a **UPS** is connected.
 - **Health screen:** shows the services, the disk, the last backups, and a **UPS reminder** until the owner confirms one is installed (and again every 6 months).
 
 ## Why

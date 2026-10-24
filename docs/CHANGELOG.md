@@ -1,5 +1,12 @@
 # Changelog
 
+## Every Windows edition, and a Windows 10 warning (2026-10-24)
+
+**In plain words:** the system is built to run on Windows 10 and Windows 11, every edition (Home, Pro and Enterprise), not only on the shop PC's Windows 10 Pro. Nothing depends on a Pro-only feature: the cashier's limits are set in the registry (Home honours them), disk encryption is recommended where Windows offers it but never required, and the test machines use VirtualBox. Before go-live the installation is tested on Windows 11 Home, Windows 10 Home and Windows 11 Pro. When the setup screen opens on a Windows 10 PC, it now shows a warning that Windows 10 no longer gets free security updates and advises upgrading; the setup continues as usual.
+
+- Decision 0106 (amends 0104); no database change.
+- Tests: the warning shows on Windows 10 and the setup goes on; no warning on Windows 11; the PC's Windows build reaches the screen.
+
 ## Installation, part E (first piece): the encrypted copy carries the master key (2026-10-22)
 
 **In plain words:** the daily copy that goes to Google Drive now holds, inside its encryption, the server's master key together with the database copy (decision 0102). Only your offline private key opens it. So if the server PC is ever lost, the restore (coming next) brings back everything, including everyone's phone 2-step codes, not only the data. Copies made before today, and the external-drive copies, still restore; after restoring one of those the 2-step codes are set up again. For the technical emergency path there is a new command, `pnpm backup:open`, which opens an encrypted copy with the private key. The shop PC is recorded as Windows 10 Pro.

@@ -509,7 +509,7 @@ A milestone is done only when its tests pass in CI.
 
 #### M6.4 — Cashier Windows account hardening (0085)
 
-**Delivers:** a standard (non-admin) Windows account created by the installer, with auto sign-in; Task Manager, Run and the command prompt turned off by policy; no access to the database, backups, logs or `.secrets` folders; cannot stop the services; an owner-only administrator account; BitLocker; the UPS reminder in the health screen. Turning the kiosk lock off (0089) lifts only the app lock; the Windows restrictions stay.
+**Delivers:** a standard (non-admin) Windows account created by the installer, with auto sign-in; Task Manager, Run and the command prompt turned off through the registry (works on Home, no Group Policy: 0106); no access to the database, backups, logs or `.secrets` folders; cannot stop the services; an owner-only administrator account; disk encryption recommended where the edition offers it (0106); the UPS reminder in the health screen. Turning the kiosk lock off (0089) lifts only the app lock; the Windows restrictions stay.
 
 **Key tests:** the cashier account cannot read the database folder or `.secrets`, or stop the services (scripted check on the Windows runner).
 

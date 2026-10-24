@@ -39,7 +39,7 @@ function type(label: string | RegExp, value: string) {
 
 function serverPc(): FakeBridge {
   const bridge = new FakeBridge(null);
-  bridge.setup = { available: true, serverAddress: '127.0.0.1:3100' };
+  bridge.setup = { available: true, serverAddress: '127.0.0.1:3100', windowsBuild: null };
   return bridge;
 }
 
@@ -158,7 +158,7 @@ describe('the first-run wizard', () => {
     expect(new Set(bridge.calls.map((c) => c.path))).toEqual(new Set(['/api/v1/kiosk/state']));
 
     // The token is gone now: on to the normal sign-in on this (now enrolled) PC.
-    bridge.setup = { available: false, serverAddress: null };
+    bridge.setup = { available: false, serverAddress: null, windowsBuild: null };
     bridge.local = {
       enrolled: true,
       serverUrl: 'https://127.0.0.1:3100',
@@ -170,6 +170,25 @@ describe('the first-run wizard', () => {
       .on('GET', '/api/v1/auth/pin-users', ok({ pinAllowed: true, users: [] }));
     fireEvent.click(screen.getByRole('button', { name: 'روح لشاشة الدخول' }));
     await waitFor(() => expect(screen.queryByRole('heading', { name: 'الإعداد خلص' })).toBeNull());
+  });
+
+  it('warns on Windows 10 that it no longer gets free security updates, without blocking (0106)', async () => {
+    const windows10 = serverPc()
+      .on('GET', '/api/v1/setup/status', ok(status()))
+      .on('POST', '/api/v1/setup/start', ok(status({ state: 'in_progress', path: 'new' })));
+    windows10.setup = { ...windows10.setup, windowsBuild: 19045 };
+    render(<App bridge={windows10} />);
+    expect(await screen.findByText(/الجهاز ده عليه Windows 10/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'ابدأ' }));
+    await screen.findByText('الخطوة 1 من 5: بيانات الشركة');
+  });
+
+  it('shows no warning on Windows 11', async () => {
+    const windows11 = serverPc().on('GET', '/api/v1/setup/status', ok(status()));
+    windows11.setup = { ...windows11.setup, windowsBuild: 22631 };
+    render(<App bridge={windows11} />);
+    await screen.findByRole('heading', { name: 'أهلًا بيك في آرتيبول' });
+    expect(screen.queryByText(/الجهاز ده عليه Windows 10/)).toBeNull();
   });
 
   it('picks up where it stopped after the app was closed', async () => {

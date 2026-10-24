@@ -19,6 +19,8 @@ use crate::{BridgeError, BridgeResponse, parse_body, tls};
 pub struct SetupInfo {
     pub available: bool,
     pub server_address: Option<String>,
+    /// This PC's Windows build (decision 0106): below 22000 is Windows 10 (a warning, never a block).
+    pub windows_build: Option<u32>,
 }
 
 /// One setup step from the screens.
@@ -104,10 +106,11 @@ impl SetupAccess {
         })
     }
 
-    pub fn info(access: Option<&Self>) -> SetupInfo {
+    pub fn info(access: Option<&Self>, windows_build: Option<u32>) -> SetupInfo {
         SetupInfo {
             available: access.is_some(),
             server_address: access.map(|a| a.server_address.clone()),
+            windows_build,
         }
     }
 }
@@ -217,10 +220,11 @@ mod tests {
         let access = SetupAccess::from_data_dir(&dir).expect("readable");
         assert_eq!(access.server_address, "127.0.0.1:3100");
         assert_eq!(
-            SetupAccess::info(Some(&access)),
+            SetupAccess::info(Some(&access), Some(19045)),
             SetupInfo {
                 available: true,
-                server_address: Some("127.0.0.1:3100".into())
+                server_address: Some("127.0.0.1:3100".into()),
+                windows_build: Some(19045),
             }
         );
         // The token never shows in logs.
@@ -230,10 +234,11 @@ mod tests {
         std::fs::remove_file(dir.join("setup").join("token")).unwrap();
         assert!(SetupAccess::from_data_dir(&dir).is_none());
         assert_eq!(
-            SetupAccess::info(None),
+            SetupAccess::info(None, None),
             SetupInfo {
                 available: false,
-                server_address: None
+                server_address: None,
+                windows_build: None,
             }
         );
         std::fs::remove_dir_all(dir).unwrap();

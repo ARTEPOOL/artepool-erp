@@ -7,6 +7,7 @@
  */
 import { useState, type ChangeEvent, type CSSProperties, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+import { WINDOWS_11_BUILD } from '@artepool/shared/contracts';
 import type {
   CompanyProfile,
   EnrollFailure,
@@ -74,9 +75,11 @@ function useProblem() {
 export function SetupWizard({
   status,
   serverAddress,
+  windowsBuild = null,
 }: {
   status: SetupStatusResponse;
   serverAddress: string;
+  windowsBuild?: number | null;
 }) {
   const [step, setStep] = useState<Step>(() => firstStep(status));
   const [company, setCompany] = useState<CompanyProfile | null>(status.company);
@@ -85,7 +88,12 @@ export function SetupWizard({
 
   switch (step) {
     case 'welcome':
-      return <Welcome onStarted={() => setStep(company ? 'owner' : 'company')} />;
+      return (
+        <Welcome
+          windows10={windowsBuild !== null && windowsBuild < WINDOWS_11_BUILD}
+          onStarted={() => setStep(company ? 'owner' : 'company')}
+        />
+      );
     case 'company':
       return (
         <CompanyStep
@@ -136,7 +144,7 @@ export function SetupWizard({
   }
 }
 
-function Welcome({ onStarted }: { onStarted: () => void }) {
+function Welcome({ onStarted, windows10 }: { onStarted: () => void; windows10: boolean }) {
   const { t } = useTranslation('firstRun');
   const controller = useAuthController();
   const errorText = useErrorText();
@@ -158,6 +166,8 @@ function Welcome({ onStarted }: { onStarted: () => void }) {
     <AuthFrame wide>
       <Hello title={t('title')} subtitle={t('subtitle')} />
       <div className={cx(authStyles.form, 'rise')} style={{ '--i': 2 } as CSSProperties}>
+        {/* Decision 0106: a warning only; setup goes on as usual. */}
+        {windows10 && <Alert tone="warn">{t('windows10')}</Alert>}
         {problem.shown}
         <section className={styles.path} aria-labelledby="setup-new">
           <h2 id="setup-new">{t('paths.new.title')}</h2>

@@ -62,9 +62,19 @@ async function access(): Promise<SetupAccess | null> {
   }
 }
 
+/** Development is not on Windows: ARTEPOOL_DEV_WINDOWS_BUILD plays the PC's build (tests). */
+function windowsBuild(env: NodeJS.ProcessEnv = process.env): number | null {
+  const build = Number.parseInt(env.ARTEPOOL_DEV_WINDOWS_BUILD ?? '', 10);
+  return Number.isInteger(build) && build > 0 ? build : null;
+}
+
 export async function setupInfo(): Promise<SetupInfo> {
   const found = await access();
-  return { available: found !== null, serverAddress: found?.serverAddress ?? null };
+  return {
+    available: found !== null,
+    serverAddress: found?.serverAddress ?? null,
+    windowsBuild: windowsBuild(),
+  };
 }
 
 export async function setupRequest(

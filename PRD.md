@@ -123,7 +123,7 @@ These rules apply to every table and every feature.
 
 | Area | Requirement |
 |---|---|
-| Disk | BitLocker on the Main Server and on any PC holding backups |
+| Disk | Disk encryption recommended on the Main Server and on any PC holding backups (BitLocker, or Device encryption on Home); never required: every Windows edition is supported ([0106](docs/decisions/0106-every-windows-edition.md)) |
 | Database | Sensitive columns encrypted. The database listens on localhost only, and the firewall allows only the API port from the LAN. |
 | Transport | TLS between clients and the API |
 | Passwords | Argon2id hashes; never stored or logged in plain text |
@@ -389,8 +389,8 @@ Phase tags: **[P1]** to **[P4]** (see section 13).
 
 | Device | Notes |
 |---|---|
-| Main Server PC | Windows 10 22H2 / 11 64-bit (Pro recommended: BitLocker, update-restart control), 4-core CPU, SSD with 60 GB free, ≥16 GB RAM, wired network, router reservation, UPS, BitLocker ([0104](docs/decisions/0104-windows-and-hardware-test-on-a-vm-first.md)); installed only after the clean-VM test passes |
-| Client PCs | Windows 10 22H2 / 11 64-bit, 8 GB RAM ([0104](docs/decisions/0104-windows-and-hardware-test-on-a-vm-first.md)) |
+| Main Server PC | Windows 10 22H2 / 11 64-bit, any edition (Home, Pro, Enterprise; nothing Pro-only, [0106](docs/decisions/0106-every-windows-edition.md)), 4-core CPU, SSD with 60 GB free, ≥16 GB RAM, wired network, router reservation, UPS ([0104](docs/decisions/0104-windows-and-hardware-test-on-a-vm-first.md)); installed only after the clean-VM tests (Home and Pro) pass |
+| Client PCs | Windows 10 22H2 / 11 64-bit, any edition, 8 GB RAM ([0104](docs/decisions/0104-windows-and-hardware-test-on-a-vm-first.md)) |
 | Thermal receipt printer | 80 mm, ESC/POS (Epson TM-T20III / TM-T82 or compatible), with drawer kick port ([0055](docs/decisions/0055-thermal-printer-esc-pos.md)) |
 | Cash drawer | RJ11/RJ12, compatible with the printer |
 | Barcode scanner | USB keyboard-emulation |
@@ -445,6 +445,7 @@ Each phase ends with automated tests passing, a security review, an accountant r
 | Version | Date | Change |
 |---|---|---|
 | 1.10 | 2026-10-14 | M4b decisions 0064–0067: print designer with locked tax fields per document type (seller address on every tax invoice, customer address on full tax invoices; a full tax invoice needs the customer's address); company bank accounts with UAE IBAN check; customer PO number on A4 invoices and quotations; no QR code until e-invoicing. |
+| 1.36 | 2026-10-24 | Decision 0106: every Windows 10/11 edition (Home, Pro, Enterprise); nothing depends on a Pro-only feature; tests on Windows 10 Home and 11 Home before go-live; a Windows 10 warning in the setup screen, never blocking. |
 | 1.35 | 2026-10-20 | M6.2 approved. Decisions 0102–0105: first run "New setup" or "Restore from backup" (master key inside the encrypted copies, PCs enroll again); upgrades and uninstall never touch the data, updates USB → server → LAN; minimum Windows/hardware, Pro vs Home, clean-VM test first, SmartScreen guide; router reservation + server found by name. |
 | 1.34 | 2026-10-20 | Decision 0101: a language for each label element (Arabic / English / both, also per size); "both" puts the English line under the Arabic one (the shop's name no longer cut). |
 | 1.33 | 2026-10-20 | Decision 0100: direct (RAW TSPL) label printing per PC with gap and direction settings; the Windows driver kept as the other way; a failed direct print is never re-sent through the driver by itself. |
