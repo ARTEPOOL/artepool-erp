@@ -48,6 +48,7 @@ function launcherEnv(extra: Record<string, string> = {}): NodeJS.ProcessEnv {
   return {
     PATH: process.env.PATH,
     ARTEPOOL_CONFIG: configFile,
+    ARTEPOOL_PROGRAM_DIR: join(root, 'Program Files', 'ARTEPOOL'),
     ARTEPOOL_MASTER_KEY: masterKey,
     ARTEPOOL_MIGRATOR_PASSWORD: requireEnv('ARTEPOOL_MIGRATOR_PASSWORD'),
     ARTEPOOL_API_PASSWORD: requireEnv('ARTEPOOL_API_PASSWORD'),
@@ -121,6 +122,7 @@ beforeAll(async () => {
         host: process.env.PGHOST || 'localhost',
         port: Number(process.env.PGPORT || 5432),
         name: db.name,
+        superuser: process.env.PG_SUPERUSER || 'postgres',
       },
       pgBin: join(root, 'pgsql', 'bin'),
       logLevel: 'warn',
@@ -188,6 +190,26 @@ describe('the packaged server', () => {
     const created = await run('owner-create', [], launcherEnv(), answers('blue-pool-water-71'));
     expect(created.out).toContain('Owner "mohammed" created');
     expect(created.code).toBe(0);
+  });
+
+  it('restore: reports its steps as JSON lines and refuses a file that is not a backup copy', async () => {
+    const notACopy = join(root, 'holiday-photo.jpg');
+    await writeFile(notACopy, randomBytes(64));
+    const result = await run(
+      'restore',
+      [notACopy],
+      launcherEnv({ PG_SUPERUSER_PASSWORD: process.env.PG_SUPERUSER_PASSWORD ?? '' }),
+      '',
+    );
+    const lines = result.out
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line) as unknown);
+    expect(lines, result.out).toEqual([
+      { step: 'opening' },
+      { result: { ok: false, reason: 'not_a_copy' } },
+    ]);
+    expect(result.code).toBe(1);
   });
 
   it('answers /health over TLS 1.3 with the database upgraded', async () => {

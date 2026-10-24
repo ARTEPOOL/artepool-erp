@@ -30,6 +30,11 @@ export const installedConfigSchema = z
         host: z.string().min(1).default('localhost'),
         port: port.default(5432),
         name: z.string().regex(/^[a-z][a-z0-9_]*$/),
+        /** PostgreSQL's superuser: only the restore from a backup connects as it (decision 0102). */
+        superuser: z
+          .string()
+          .regex(/^[a-z_][a-z0-9_]*$/)
+          .default('postgres'),
       })
       .strict(),
     /** The local copies on a second disk when there is one; default `<dataDir>\backups`. */
@@ -87,6 +92,8 @@ export function settingsFromConfig(config: InstalledConfig): Record<string, stri
     PGHOST: config.database.host,
     PGPORT: String(config.database.port),
     ARTEPOOL_DB: config.database.name,
+    PG_SUPERUSER: config.database.superuser,
+    ARTEPOOL_DATA_DIR: config.dataDir,
     ARTEPOOL_TLS_DIR: join(secrets, 'tls'),
     ARTEPOOL_BACKUP_DIR: config.backupDir ?? join(config.dataDir, 'backups'),
     ARTEPOOL_DRIVE_CREDENTIALS_FILE: join(secrets, 'backup', 'google-drive.sealed'),

@@ -10,3 +10,4 @@ export * from './offsite';
 export * from './bundle';
 export * from './offline';
 export * from './service';
+export * from './full-restore';

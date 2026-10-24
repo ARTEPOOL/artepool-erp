@@ -5,7 +5,8 @@
  *
  * - `server.mjs` (the API), `backup.mjs` (the backup service and its commands), `migrate.mjs`, and
  *   the console tools (`owner-create.mjs`, `device-code.mjs`, `owner-reset-2fa.mjs`,
- *   `owner-reset-password.mjs`), bundled by esbuild with their shared code in chunk files;
+ *   `owner-reset-password.mjs`) and the restore from a backup (`restore.mjs`, started by the
+ *   first-run wizard), bundled by esbuild with their shared code in chunk files;
  * - `node_modules/` with only the packages that cannot be bundled (the Argon2 native library, the
  *   PDF browser driver);
  * - `resources/` with the files read at run time, at the same paths as in the repository;
@@ -31,6 +32,7 @@ export const ENTRY_POINTS: Record<string, string> = {
   'device-code': 'apps/server/src/cli/device-code.ts',
   'owner-reset-2fa': 'apps/server/src/cli/owner-reset-2fa.ts',
   'owner-reset-password': 'apps/server/src/cli/owner-reset-password.ts',
+  restore: 'apps/server/src/cli/restore.ts',
 };
 
 /** Packages kept as files: a native library, and the browser driver that loads its own files. */

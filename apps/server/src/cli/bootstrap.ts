@@ -134,8 +134,9 @@ export async function createFirstOwner(
 export function createConsoleCode(
   db: Db,
   settings: SettingsCache,
+  reason = 'server console: enrollment code',
 ): Promise<{ code: string; expiresAt: Date }> {
-  return withBusinessTx(db, consoleContext('server console: enrollment code'), (trx) =>
+  return withBusinessTx(db, consoleContext(reason), (trx) =>
     createEnrollmentCode(trx, { settings }, 'console'),
   );
 }

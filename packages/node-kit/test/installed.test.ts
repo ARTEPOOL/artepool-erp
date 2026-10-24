@@ -54,6 +54,8 @@ describe('the settings file', () => {
       PGHOST: 'localhost',
       PGPORT: '5432',
       ARTEPOOL_DB: 'artepool',
+      PG_SUPERUSER: 'postgres',
+      ARTEPOOL_DATA_DIR: dataDir,
       ARTEPOOL_TLS_DIR: join(dataDir, 'secrets', 'tls'),
       ARTEPOOL_BACKUP_DIR: join(dataDir, 'backups'),
       ARTEPOOL_DRIVE_CREDENTIALS_FILE: join(dataDir, 'secrets', 'backup', 'google-drive.sealed'),

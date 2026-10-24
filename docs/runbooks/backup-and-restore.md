@@ -97,6 +97,19 @@
 
 To be rehearsed on the real server PC with the installer (M6.2); until then this is the procedure.
 
+The setup wizard's "Restore from backup" does all of this by itself (it starts the restore program
+below). Without the wizard, an administrator can start the same program from an elevated prompt:
+```
+artepool-svc run restore D:\artepool-20261019-100000Z.dump.age
+```
+It asks for the private key (or reads it from the standard input; nothing for a plain copy from
+the external drive), restores into a separate database, upgrades it, runs every check, and only if
+all pass puts it in place of the new installation's empty database (kept aside as
+`artepool_before_restore_<time>`), puts the master key back into the protected store, marks the old
+PCs "enroll again", prints a one-time enrollment code for this PC, and makes a fresh copy with a
+restore test. It works only on a fresh installation (setup not finished). The manual steps below
+are the last resort.
+
 1. **Install** the server on the replacement PC (M6.2 installer). Do not run the setup wizard.
 2. **Pick the copy:** the newest file from the local backup folder, the external drive
    (`ARTEPOOL-BACKUPS\artepool-…Z.dump`), or Google Drive (`artepool-…Z.dump.age`).

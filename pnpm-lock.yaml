@@ -54,6 +54,9 @@ importers:
         specifier: 8.23.1
         version: 8.23.1
     devDependencies:
+      '@artepool/migrate':
+        specifier: workspace:*
+        version: link:../../tools/migrate
       '@artepool/testing':
         specifier: workspace:*
         version: link:../../packages/testing
@@ -160,6 +163,9 @@ importers:
       '@artepool/backup':
         specifier: workspace:*
         version: link:../backup
+      '@artepool/migrate':
+        specifier: workspace:*
+        version: link:../../tools/migrate
       '@artepool/node-kit':
         specifier: workspace:*
         version: link:../../packages/node-kit

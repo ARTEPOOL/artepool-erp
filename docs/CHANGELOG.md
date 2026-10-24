@@ -1,5 +1,12 @@
 # Changelog
 
+## Installation, part E (second piece): the restore engine (2026-10-24)
+
+**In plain words:** the part that brings a backup back on a new server PC is built and tested (the setup screens for it come next). Given a copy (from Google Drive, the external drive or a USB stick) and, for an encrypted one, your private key, it puts the copy into a **separate** database first, brings it up to the current version, and runs **every check** (audit chain, journals, trial balance, stock, numbering). **Only if all pass** does it take the place of the new installation's empty database; that empty one is kept aside, never deleted. Then it puts the copy's master key back (so passwords and phone codes keep working), marks the old PCs "enroll again", gives a one-time code to enroll this PC, and makes a fresh copy with a restore test. A wrong key, a changed copy, a copy of an installation that was never set up, or a PC that is already in use: nothing is replaced. It runs only as a Windows administrator; the database superuser's password is kept protected like the other secrets and is given to this program alone.
+
+- No database change.
+- Tests: a full restore of a real copy (old data back, old PCs revoked, the restore in the audit log, the empty database kept aside and closed); a wrong key, a changed audit log, a copy never set up and an installation in use change nothing; a plain external-drive copy restores without a master key; the master key goes back (development: the old key file kept); this PC's enrollment code; the fresh copy and restore test; the Windows services stopped and waited for; the key handed to the launcher on its input, never on the command line; the launcher gives the superuser's password to the restore alone; the bundled program refuses a file that is not a copy.
+
 ## Every Windows edition, and a Windows 10 warning (2026-10-24)
 
 **In plain words:** the system is built to run on Windows 10 and Windows 11, every edition (Home, Pro and Enterprise), not only on the shop PC's Windows 10 Pro. Nothing depends on a Pro-only feature: the cashier's limits are set in the registry (Home honours them), disk encryption is recommended where Windows offers it but never required, and the test machines use VirtualBox. Before go-live the installation is tested on Windows 11 Home, Windows 10 Home and Windows 11 Pro. When the setup screen opens on a Windows 10 PC, it now shows a warning that Windows 10 no longer gets free security updates and advises upgrading; the setup continues as usual.
