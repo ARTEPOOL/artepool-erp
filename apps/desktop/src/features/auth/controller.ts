@@ -188,6 +188,11 @@ export class AuthController {
     }
   }
 
+  /** Restore from a backup (decision 0102): the native side finds the copies and runs it. */
+  get restore(): Pick<Bridge, 'restoreCopies' | 'restoreStart' | 'restoreStatus'> {
+    return this.bridge;
+  }
+
   /** The wizard enrolls this PC as the POS (the normal protocol, decision 0024). */
   async enrollForSetup(input: Parameters<Bridge['enroll']>[0]) {
     const outcome = await this.bridge.enroll(input);

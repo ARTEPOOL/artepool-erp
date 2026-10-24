@@ -120,3 +120,89 @@ export type EnrollOutcome =
       device: { id: string; code: string; name: string; kind: string };
     }
   | { ok: false; reason: EnrollFailure };
+
+/**
+ * Restore from a backup on a new server PC (decision 0102, M6.2 part E). The native side looks for
+ * copies in the usual places (USB drives and their `ARTEPOOL-BACKUPS` folder, Downloads, Desktop,
+ * Documents, the local backups folder) and runs the restore program as the administrator the
+ * wizard already runs as; the private key goes to it on its standard input only.
+ */
+export type RestorePlace =
+  'removable' | 'downloads' | 'desktop' | 'documents' | 'backups' | 'typed';
+
+export interface RestoreCopy {
+  path: string;
+  name: string;
+  bytes: number;
+  /** ISO time the file was last changed. */
+  modifiedAt: string;
+  place: RestorePlace;
+  /** `.dump.age` (Google Drive copies): the private key is needed. */
+  encrypted: boolean;
+}
+
+/** A backup copy's file name: `….dump` (external drive, local) or `….dump.age` (Google Drive). */
+export const RESTORE_COPY_NAME = /\.dump(\.age)?$/i;
+
+/** The owner's age private key (`age-keygen`), one line. */
+export const PRIVATE_KEY = /^AGE-SECRET-KEY-1[0-9A-Z]{58}$/;
+
+/**
+ * The private key in a key file's text or a pasted text: the comment lines `age-keygen` writes
+ * are skipped, and a paste into a one-line field (line breaks dropped) still works.
+ */
+export function privateKeyIn(text: string): string | null {
+  return /AGE-SECRET-KEY-1[0-9A-Z]{58}(?![0-9A-Z])/.exec(text)?.[0] ?? null;
+}
+
+export const RestoreLookup = z.object({
+  /** A full path typed by the person; omitted: look in the usual places. */
+  path: z.string().trim().min(1).max(1024).optional(),
+});
+export type RestoreLookup = z.infer<typeof RestoreLookup>;
+
+export const RestoreStart = z.object({
+  path: z.string().min(1).max(1024).regex(RESTORE_COPY_NAME),
+  /** Empty for a plain copy (the external drive's). */
+  privateKey: z.union([z.literal(''), z.string().regex(PRIVATE_KEY)]),
+});
+export type RestoreStart = z.infer<typeof RestoreStart>;
+
+export type RestoreStep =
+  'opening' | 'restoring' | 'upgrading' | 'checking' | 'replacing' | 'enrolling' | 'backing_up';
+
+export type RestoreFailure =
+  | 'setup_done'
+  | 'wrong_key'
+  | 'not_a_copy'
+  | 'damaged'
+  | 'restore_failed'
+  | 'newer_copy'
+  | 'checks_failed'
+  | 'not_set_up'
+  | 'replace_failed'
+  /** The restore program could not be started (not installed, or not run as administrator). */
+  | 'launch_failed'
+  /** No setup token on this PC: the restore is only for the server PC right after installation. */
+  | 'unavailable'
+  /** A restore is already running. */
+  | 'busy';
+
+export type RestoreResult =
+  | {
+      ok: true;
+      masterKeyRestored: boolean;
+      revokedDevices: number;
+      devicesWithOpenShifts: string[];
+      /** A one-time code to enroll this PC on the restored server. */
+      enrollment: { code: string; expiresAt: string } | null;
+      /** The fresh copy and its restore test. */
+      backup: { ok: boolean };
+    }
+  | { ok: false; reason: RestoreFailure; detail?: string };
+
+export interface RestoreStatus {
+  running: boolean;
+  step: RestoreStep | null;
+  result: RestoreResult | null;
+}

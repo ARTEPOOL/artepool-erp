@@ -83,9 +83,9 @@ describe('the first-run wizard', () => {
     bridge.enrollOutcome = { ok: true, serverUrl: 'https://127.0.0.1:3100', device: POS };
     render(<App bridge={bridge} />);
 
-    // Two paths; restore comes later.
+    // Two paths: a new setup, or a restore from a backup.
     await screen.findByRole('heading', { name: 'أهلًا بيك في آرتيبول' });
-    expect(screen.getByText('هيتضاف في التحديث الجاي.')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'استرجع من نسخة احتياطية' })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'ابدأ' }));
 
     // 1. Company: checked here first, then saved.

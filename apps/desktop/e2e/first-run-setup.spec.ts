@@ -17,7 +17,7 @@ test('a new setup from start to finish, then the normal sign-in', async ({
   await control.setupServer();
   await open('setup');
   await expect(page.getByRole('heading', { name: t('firstRun:title') })).toBeVisible();
-  await expect(page.getByText(t('firstRun:paths.restore.soon'))).toBeVisible();
+  await expect(page.getByRole('button', { name: t('firstRun:paths.restore.start') })).toBeVisible();
   await snap(page, '96-setup-welcome');
   await page.getByRole('button', { name: t('firstRun:paths.new.start') }).click();
 

@@ -123,6 +123,100 @@ async fn setup_request(
         .map_err(|e| e.to_string())
 }
 
+/// Where the restore looks for backup copies (decision 0102): USB drives, the person's Downloads,
+/// Desktop and Documents, and this PC's local backups folder.
+fn restore_places() -> Vec<(std::path::PathBuf, artepool_bridge::restore::Place)> {
+    use artepool_bridge::restore::Place;
+    use std::path::PathBuf;
+    let mut places = removable_drives()
+        .into_iter()
+        .map(|drive| (drive, Place::Removable))
+        .collect::<Vec<_>>();
+    if let Some(home) = std::env::var_os("USERPROFILE") {
+        let home = PathBuf::from(home);
+        places.push((home.join("Downloads"), Place::Downloads));
+        places.push((home.join("Desktop"), Place::Desktop));
+        places.push((home.join("Documents"), Place::Documents));
+    }
+    if let Some(data) = std::env::var_os("ProgramData") {
+        places.push((
+            PathBuf::from(data).join("ARTEPOOL").join("backups"),
+            Place::Backups,
+        ));
+    }
+    places
+}
+
+/// The roots of the USB drives and memory cards plugged in now.
+#[cfg(windows)]
+fn removable_drives() -> Vec<std::path::PathBuf> {
+    #[link(name = "kernel32")]
+    unsafe extern "system" {
+        fn GetLogicalDrives() -> u32;
+        fn GetDriveTypeW(root: *const u16) -> u32;
+    }
+    const DRIVE_REMOVABLE: u32 = 2;
+    let mask = unsafe { GetLogicalDrives() };
+    (0..26u8)
+        .filter(|i| mask & (1 << i) != 0)
+        .filter_map(|i| {
+            let root = format!("{}:\\", char::from(b'A' + i));
+            let wide: Vec<u16> = root.encode_utf16().chain(Some(0)).collect();
+            (unsafe { GetDriveTypeW(wide.as_ptr()) } == DRIVE_REMOVABLE)
+                .then(|| std::path::PathBuf::from(root))
+        })
+        .collect()
+}
+
+#[cfg(not(windows))]
+fn removable_drives() -> Vec<std::path::PathBuf> {
+    Vec::new()
+}
+
+/// The launcher the installer puts in `C:\Program Files\ARTEPOOL` (M6.2 part F).
+fn restore_launcher() -> std::path::PathBuf {
+    let base = std::env::var_os("ProgramFiles").unwrap_or_else(|| "C:\\Program Files".into());
+    std::path::Path::new(&base)
+        .join("ARTEPOOL")
+        .join("artepool-svc.exe")
+}
+
+/// The copies in the usual places, or the one file whose full path the person typed. Only while
+/// the setup token is on this PC (right after installation, administrators only).
+#[tauri::command]
+fn restore_copies(path: Option<String>) -> Vec<artepool_bridge::restore::RestoreCopy> {
+    use artepool_bridge::restore::{Place, copy_at, find_copies};
+    if setup_access().is_none() {
+        return Vec::new();
+    }
+    match path {
+        Some(path) => copy_at(std::path::Path::new(path.trim()), Place::Typed)
+            .into_iter()
+            .collect(),
+        None => find_copies(&restore_places()),
+    }
+}
+
+#[tauri::command]
+fn restore_start(
+    state: tauri::State<'_, artepool_bridge::restore::RestoreRun>,
+    request: artepool_bridge::restore::RestoreStart,
+) -> Result<(), String> {
+    if setup_access().is_none() {
+        return Err("unavailable".into());
+    }
+    state
+        .start(&restore_launcher(), &request)
+        .map_err(str::to_string)
+}
+
+#[tauri::command]
+fn restore_status(
+    state: tauri::State<'_, artepool_bridge::restore::RestoreRun>,
+) -> artepool_bridge::restore::RestoreStatus {
+    state.status()
+}
+
 #[tauri::command]
 async fn bridge_request(
     state: tauri::State<'_, AppBridge>,
@@ -358,6 +452,7 @@ pub fn run() {
             app.manage(AppBridge(bridge));
             app.manage(Kiosk(AtomicBool::new(false)));
             app.manage(GoogleSignIn(Mutex::new(None)));
+            app.manage(artepool_bridge::restore::RestoreRun::default());
             apply_kiosk(app.handle(), pos);
             // Checked here every few seconds as well, whatever the screens do: a timed "off"
             // ends on time even if the screens stop asking.
@@ -394,6 +489,9 @@ pub fn run() {
             bridge_request,
             setup_info,
             setup_request,
+            restore_copies,
+            restore_start,
+            restore_status,
             kiosk_refresh,
             google_signin_start,
             google_signin_open,

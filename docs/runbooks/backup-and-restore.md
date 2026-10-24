@@ -97,7 +97,7 @@
 
 To be rehearsed on the real server PC with the installer (M6.2); until then this is the procedure.
 
-The setup wizard's "Restore from backup" does all of this by itself (it starts the restore program
+**For the owner: see [restore-on-new-pc.md](restore-on-new-pc.md).** The setup wizard's "Restore from backup" does all of this by itself (it starts the restore program
 below). Without the wizard, an administrator can start the same program from an elevated prompt:
 ```
 artepool-svc run restore D:\artepool-20261019-100000Z.dump.age

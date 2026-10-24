@@ -3,9 +3,16 @@
  * → the owner account → phone 2-step → recovery codes → this PC enrolled as the POS → finish. It
  * opens by itself when the installer's setup token is on this PC and setup is not complete; every
  * step goes through the setup channel (the native side adds the token) and may be repeated, so
- * closing the app halfway picks up where it stopped. "Restore from backup" comes with part E.
+ * closing the app halfway picks up where it stopped. Path "Restore from backup" (part E) is in
+ * RestoreFlow.tsx; after it, this PC is enrolled with the restore's code and sign-in follows.
  */
-import { useState, type ChangeEvent, type CSSProperties, type FormEvent } from 'react';
+import {
+  useState,
+  type ChangeEvent,
+  type CSSProperties,
+  type FormEvent,
+  type ReactNode,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { WINDOWS_11_BUILD } from '@artepool/shared/contracts';
 import type {
@@ -17,7 +24,7 @@ import type {
   TwoStepStartResponse,
 } from '@artepool/shared/contracts';
 import { ApiError } from '../../api/client';
-import { Alert, Button, Checkbox, cx, Note, TextField } from '../../ui';
+import { Alert, Button, Checkbox, cx, TextField } from '../../ui';
 import authStyles from '../auth/auth.module.css';
 import { useAuthController, useAuthState, useErrorText } from '../auth/context';
 import { AuthFrame, Hello } from '../auth/parts';
@@ -31,9 +38,20 @@ import {
   type CompanyField,
   type CompanyForm,
 } from '../settings/company/form';
+import { RestoreFlow } from './RestoreFlow';
 import styles from './setup.module.css';
 
-type Step = 'welcome' | 'company' | 'owner' | 'twoStep' | 'codes' | 'device' | 'finish' | 'done';
+type Step =
+  | 'welcome'
+  | 'company'
+  | 'owner'
+  | 'twoStep'
+  | 'codes'
+  | 'device'
+  | 'finish'
+  | 'done'
+  | 'restore'
+  | 'restoredDevice';
 const NUMBERED = ['company', 'owner', 'twoStep', 'codes', 'device'] as const;
 
 /** Where to pick up, from what the server already has. */
@@ -84,6 +102,7 @@ export function SetupWizard({
   const [step, setStep] = useState<Step>(() => firstStep(status));
   const [company, setCompany] = useState<CompanyProfile | null>(status.company);
   const [codes, setCodes] = useState<string[]>([]);
+  const [enrollmentCode, setEnrollmentCode] = useState<string | null>(null);
   const controller = useAuthController();
 
   switch (step) {
@@ -92,6 +111,34 @@ export function SetupWizard({
         <Welcome
           windows10={windowsBuild !== null && windowsBuild < WINDOWS_11_BUILD}
           onStarted={() => setStep(company ? 'owner' : 'company')}
+          onRestore={() => setStep('restore')}
+        />
+      );
+    case 'restore':
+      return (
+        <RestoreFlow
+          onBack={() => setStep('welcome')}
+          onEnroll={(code) => {
+            if (!code) {
+              // No code: the normal "enroll this PC" screen (a code from the console).
+              void controller.setupFinished();
+              return;
+            }
+            setEnrollmentCode(code);
+            setStep('restoredDevice');
+          }}
+        />
+      );
+    case 'restoredDevice':
+      return (
+        <DeviceStep
+          serverAddress={serverAddress}
+          code={enrollmentCode ?? undefined}
+          above={null}
+          onEnrolled={() => {
+            setEnrollmentCode(null);
+            setStep('done');
+          }}
         />
       );
     case 'company':
@@ -144,7 +191,15 @@ export function SetupWizard({
   }
 }
 
-function Welcome({ onStarted, windows10 }: { onStarted: () => void; windows10: boolean }) {
+function Welcome({
+  onStarted,
+  onRestore,
+  windows10,
+}: {
+  onStarted: () => void;
+  onRestore: () => void;
+  windows10: boolean;
+}) {
   const { t } = useTranslation('firstRun');
   const controller = useAuthController();
   const errorText = useErrorText();
@@ -179,7 +234,9 @@ function Welcome({ onStarted, windows10 }: { onStarted: () => void; windows10: b
         <section className={cx(styles.path, styles.muted)} aria-labelledby="setup-restore">
           <h2 id="setup-restore">{t('paths.restore.title')}</h2>
           <p>{t('paths.restore.text')}</p>
-          <Note>{t('paths.restore.soon')}</Note>
+          <Button size="lg" block isDisabled={busy} onPress={onRestore}>
+            {t('paths.restore.start')}
+          </Button>
         </section>
       </div>
     </AuthFrame>
@@ -400,9 +457,14 @@ function OwnerStep({ onCreated }: { onCreated: () => void }) {
 function DeviceStep({
   serverAddress,
   onEnrolled,
+  code: givenCode,
+  above = <StepTitle step="device" />,
 }: {
   serverAddress: string;
   onEnrolled: () => void;
+  /** After a restore: the enrollment code the restore made (else one is asked for here). */
+  code?: string;
+  above?: ReactNode;
 }) {
   const { t } = useTranslation(['firstRun', 'auth']);
   const controller = useAuthController();
@@ -419,12 +481,12 @@ function DeviceStep({
     setBusy(true);
     problem.clear();
     try {
-      const made = await controller.setupApi.post<SetupDeviceCodeResponse>(
-        '/api/v1/setup/device-code',
-      );
+      const enrollmentCode =
+        givenCode ??
+        (await controller.setupApi.post<SetupDeviceCodeResponse>('/api/v1/setup/device-code')).code;
       const outcome = await controller.enrollForSetup({
         serverAddress,
-        code: made.code,
+        code: enrollmentCode,
         deviceCode: (code.trim() || suggestedCode).toUpperCase(),
         deviceName: name.trim(),
         deviceKind: 'pos',
@@ -440,7 +502,7 @@ function DeviceStep({
 
   return (
     <AuthFrame wide>
-      <StepTitle step="device" />
+      {above}
       <Hello title={t('device.title')} subtitle={t('device.subtitle')} />
       <form
         className={cx(authStyles.form, 'rise')}

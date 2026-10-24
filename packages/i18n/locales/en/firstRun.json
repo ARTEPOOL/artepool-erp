@@ -11,7 +11,7 @@
     "restore": {
       "title": "Restore from backup",
       "text": "A new server PC instead of a broken or stolen one: bring back all the data from a backup.",
-      "soon": "Coming in the next update."
+      "start": "Restore from backup"
     }
   },
   "step": "Step {n} of {total}: {name}",
@@ -65,5 +65,93 @@
     "title": "Setup is done",
     "subtitle": "Now sign in with your username, password and phone code.",
     "button": "Go to sign-in"
+  },
+  "restore": {
+    "choose": {
+      "title": "Choose the backup copy",
+      "subtitle": "The newest copy brings back the most. Copies on a USB stick or the external drive, in Downloads, on the Desktop or in Documents are found by themselves.",
+      "none": "No backup copy was found. Plug in the USB stick or the external drive, or download the copy from Google Drive, then press Look again.",
+      "drive": "From Google Drive: on any PC, open drive.google.com with the backup account, open the ARTEPOOL folder, download the newest file that ends in .dump.age and put it on this PC (in Downloads, for example). Then press Look again.",
+      "list": "Copies found",
+      "again": "Look again",
+      "path": "Or type the file's full path",
+      "pathHint": "For example D:\\ARTEPOOL-BACKUPS\\artepool-20261019-100000Z.dump",
+      "use": "Use this file",
+      "notFound": "There is no backup copy at this path. Its name ends in .dump or .dump.age.",
+      "pick": "Choose a copy first.",
+      "next": "Continue",
+      "back": "Back",
+      "encrypted": "Encrypted (Google Drive)",
+      "plain": "Not encrypted (external drive)",
+      "megabytes": "{size} MB",
+      "places": {
+        "removable": "USB drive",
+        "downloads": "Downloads",
+        "desktop": "Desktop",
+        "documents": "Documents",
+        "backups": "This PC's backups",
+        "typed": "Typed path"
+      }
+    },
+    "key": {
+      "title": "Your private backup key",
+      "subtitle": "Google Drive copies open only with your private key: the line that starts with AGE-SECRET-KEY-1 in the key file you kept on a USB stick or on paper.",
+      "label": "Private key",
+      "file": "Or load the key file",
+      "invalid": "This is not a private key. It starts with AGE-SECRET-KEY-1 and is 74 characters long.",
+      "fileInvalid": "There is no private key in this file.",
+      "next": "Continue"
+    },
+    "confirm": {
+      "title": "Ready to restore",
+      "subtitle": "The data in this copy becomes this server's data. The empty data of this new installation is kept aside, never deleted.",
+      "copy": "Copy: {name}",
+      "plainWarning": "This copy is not encrypted, so it does not hold the server's master key: after the restore everyone sets up the phone code again, and Google Drive is connected again.",
+      "start": "Start the restore"
+    },
+    "running": {
+      "title": "Restoring…",
+      "subtitle": "Do not turn this PC off. This can take a few minutes.",
+      "steps": {
+        "opening": "Opening the copy",
+        "restoring": "Restoring the data",
+        "upgrading": "Updating it to this version",
+        "checking": "Checking everything: audit log, accounts, stock, numbering",
+        "replacing": "Putting it in place",
+        "enrolling": "Preparing this PC",
+        "backing_up": "Making a fresh backup and testing it"
+      }
+    },
+    "failed": {
+      "title": "Nothing was changed",
+      "again": "Try again",
+      "detail": "Details for support: {detail}"
+    },
+    "failures": {
+      "setup_done": "This server is already in use: the restore works only right after a new installation.",
+      "wrong_key": "This key does not open this copy. Check that it is the key of this shop's backups.",
+      "not_a_copy": "This file is not an ARTEPOOL backup copy.",
+      "damaged": "This copy is damaged. Try an older copy.",
+      "restore_failed": "The copy could not be restored. Try an older copy, or call support.",
+      "newer_copy": "This copy comes from a newer version of ARTEPOOL. Install the latest version first, then restore again.",
+      "checks_failed": "The copy did not pass the checks (it may have been changed), so it was not used. Try an older copy.",
+      "not_set_up": "This copy comes from an installation whose setup was never finished: it has no owner to sign in with.",
+      "replace_failed": "The restored data could not be put in place, so this installation stays as it was. Call support.",
+      "launch_failed": "The restore program could not start. Open this app as administrator (right-click, Run as administrator) and try again.",
+      "unavailable": "The restore works only on the server PC right after installation.",
+      "busy": "A restore is already running."
+    },
+    "restored": {
+      "title": "Your data is back",
+      "subtitle": "Every check passed.",
+      "devices": "PCs of the old server to enroll again: {count}. In Settings → Devices, make a code for each one.",
+      "openShifts": "These PCs had an open shift and stay until it is closed: {list}",
+      "noKey": "This copy held no master key: everyone sets up the phone code again at sign-in.",
+      "drive": "Connect Google Drive again in Settings → Backups. Your backup key stays the same.",
+      "backupFailed": "The fresh backup did not succeed. The backup service tries again within the hour; check System health later.",
+      "enroll": "Now enroll this PC as the point of sale.",
+      "noCode": "This PC could not get its enrollment code. In an administrator command prompt on this PC, run artepool-svc run device-code, then enroll this PC with that code.",
+      "toEnroll": "Enroll this PC"
+    }
   }
 }

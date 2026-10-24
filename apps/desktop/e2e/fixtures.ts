@@ -72,6 +72,8 @@ export const control = {
   resetOwnerTwoStep: () => control.call('POST', '/owner/reset-2fa'),
   /** A fresh server PC just installed: empty database, setup token, "setup" PC not enrolled. */
   setupServer: () => control.call('POST', '/setup-server'),
+  /** The main server's encrypted off-site copy on the setup PC's USB drive, and the key file. */
+  restoreCopy: () => control.call<{ name: string; keyFile: string }>('POST', '/restore-copy'),
   addDevice: (code: string, name: string) => control.call('POST', '/devices', { code, name }),
   addPosItem: (item: {
     code: string;

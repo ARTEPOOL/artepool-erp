@@ -9,6 +9,7 @@
 pub mod connection;
 pub mod enroll;
 pub mod loopback;
+pub mod restore;
 pub mod rules;
 pub mod setup;
 pub mod store;
