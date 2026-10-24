@@ -30,6 +30,9 @@ import { AuditPanel } from '../features/settings/audit/AuditPanel';
 import { DevicesPanel } from '../features/settings/devices/DevicesPanel';
 import { SettingsIndex, SettingsPage } from '../features/settings/SettingsPage';
 import { UsersPanel } from '../features/settings/users/UsersPanel';
+import { PosPage } from '../features/pos/PosPage';
+import { ShiftPage } from '../features/pos/shift/ShiftPage';
+import { ShiftsPage } from '../features/pos/shift/ShiftsPage';
 import { Shell } from './Shell';
 
 const root = createRootRoute({ component: Shell });
@@ -70,6 +73,13 @@ const receipt = createRoute({
       : {},
   component: ReceiptPage,
 });
+const pos = createRoute({ getParentRoute: () => root, path: 'pos', component: PosPage });
+const posShift = createRoute({
+  getParentRoute: () => root,
+  path: 'pos/shift',
+  component: ShiftPage,
+});
+const shifts = createRoute({ getParentRoute: () => root, path: 'shifts', component: ShiftsPage });
 const items = createRoute({ getParentRoute: () => root, path: 'items', component: ItemsPage });
 // Stock pages reached from Items & stock (design 07) and the dashboard alerts.
 const openingStock = createRoute({
@@ -134,6 +144,9 @@ const lists = createRoute({ getParentRoute: () => settings, path: 'lists', compo
 
 const routeTree = root.addChildren([
   home,
+  pos,
+  posShift,
+  shifts,
   invoices,
   invoice,
   quotations,

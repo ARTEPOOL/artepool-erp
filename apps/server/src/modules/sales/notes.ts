@@ -88,6 +88,8 @@ export async function createNote(
   trx: Transaction<DB>,
   auth: Auth,
   body: CreateNoteRequest,
+  /** A return at the POS: the note belongs to the drawer shift open now (decision 0060). */
+  pos?: { shiftId: bigint },
 ): Promise<DocumentDetail> {
   const original = await trx
     .selectFrom('sales.documents')
@@ -122,7 +124,8 @@ export async function createNote(
     .values(
       filledByDatabase('sales.documents', {
         doc_type: body.kind,
-        channel: 'office',
+        channel: pos ? 'pos' : 'office',
+        shift_id: pos?.shiftId ?? null,
         branch_id: original.branch_id,
         business_line_id: original.business_line_id,
         warehouse_id: original.warehouse_id,

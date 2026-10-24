@@ -254,9 +254,12 @@ function failureOf(error: unknown): 'unreachable' | 'not_genuine' {
     : 'unreachable';
 }
 
-function statusFailure(answer: HttpAnswer): 'code_rejected' | 'unavailable' | 'not_genuine' {
+function statusFailure(
+  answer: HttpAnswer,
+): 'code_rejected' | 'code_taken' | 'unavailable' | 'not_genuine' {
   const code = errorCode(parse(answer));
   if (code === 'ENROLLMENT_FAILED') return 'code_rejected';
+  if (code === 'DEVICE_CODE_TAKEN') return 'code_taken';
   if (code === 'ENROLLMENT_UNAVAILABLE') return 'unavailable';
   return answer.status >= 500 ? 'unavailable' : 'not_genuine';
 }

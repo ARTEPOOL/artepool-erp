@@ -1,6 +1,6 @@
 # ARTÉPOOL ERP — Product Requirements Document (PRD)
 
-**Version:** 1.3
+**Version:** 1.9
 **Date:** 2026-10-07
 **Owner:** Mohammed Yasser Al Huraidi (partner, ARTÉPOOL)
 **Status:** Scope approved. Owner and accountant decisions applied (see `docs/decisions/`). **Phase 1 plan approved (2026-10-07).**
@@ -244,8 +244,11 @@ Phase tags: **[P1]** to **[P4]** (see section 13).
 ### 9.5 Point of Sale [P1]
 - Fast item search and barcode scan, categories, cart, quantity edits.
 - Removing items or reducing quantities before the invoice is issued is **always allowed without approval** and **logged silently** in the audit trail.
-- Split tender (cash + card + others).
-- **Thermal receipt (80 mm) prints automatically** (silent printing) after each sale. A4 copies are printed from the Invoices (A4) section.
+- Split tender (cash + card + others). Card: amount and the terminal's approval code only; no card number, not even the last 4 digits ([0061](docs/decisions/0061-card-payments-no-card-data.md)).
+- Discounts within the role's limit (cashier 5% by default); above it, and for any unit-price change, a supervisor approves ([0059](docs/decisions/0059-pos-discounts-and-prices.md)).
+- Cash customer by default; a VAT-registered customer gets a full tax invoice with their TRN automatically ([0062](docs/decisions/0062-pos-receipt-and-customer.md)).
+- **Returns:** a "Return" button with supervisor approval issues a credit note linked to the original invoice, reverses stock and refunds from the currently open shift (card sales as card) ([0060](docs/decisions/0060-pos-returns.md)).
+- **Thermal receipt (80 mm) prints automatically** (silent printing) after each sale, in Arabic and English together, on standard ESC/POS printers ([0055](docs/decisions/0055-thermal-printer-esc-pos.md), [0062](docs/decisions/0062-pos-receipt-and-customer.md)). A4 copies are printed from the Invoices (A4) section.
 - Each sale creates an invoice (`POS-` series) and deducts stock in the same transaction.
 - Out-of-stock sale with supervisor approval (see 9.3).
 - Hold/resume cart.
@@ -257,11 +260,11 @@ Phase tags: **[P1]** to **[P4]** (see section 13).
 - The drawer opens automatically only for sales with a cash component.
 - **No Sale** open: special permission + reason, always logged.
 - **Paid-in / paid-out** (petty cash, change float) with a reason.
-- **Cash drop** alert when cash in the drawer exceeds a configurable amount.
+- **Cash drop** alert when cash in the drawer exceeds a configurable amount (AED 3,000 by default, [0057](docs/decisions/0057-cash-drop-alert.md)).
 - **X report** (mid-shift, no close).
-- **Z report / shift close** with a **blind count**: the cashier enters the counted cash by denomination without seeing the expected amount; the system then shows over/short.
+- **Z report / shift close** with a **blind count**: the cashier enters the counted cash by denomination (notes 1000–5, coins 1–0.05, plus an "other amount"; exact to the fils, [0056](docs/decisions/0056-blind-count-denominations.md)) without seeing the expected amount; the system then shows over/short.
 - **One recount** is allowed, only with supervisor approval. Both counts are kept and printed on the Z report ([0006](docs/decisions/0006-one-recount-with-supervisor-approval.md)).
-- Over/short history per cashier, with alerts on repeated variances.
+- Over/short is **accepted by the owner or the accountant** and posts to Cash over/short. History per cashier, with an alert when a cashier has a difference above AED 20 three times in 30 days (both configurable, [0058](docs/decisions/0058-shift-variance-acceptance.md)).
 - Drawer-left-open alert where the hardware supports status reporting.
 
 ### 9.6a Print designer [P1]
@@ -376,7 +379,7 @@ Phase tags: **[P1]** to **[P4]** (see section 13).
 |---|---|
 | Main Server PC | Reliable desktop, SSD, ≥16 GB RAM, UPS, BitLocker |
 | Client PCs | Windows 10/11 |
-| Thermal receipt printer | 80 mm, ESC/POS, with drawer kick port |
+| Thermal receipt printer | 80 mm, ESC/POS (Epson TM-T20III / TM-T82 or compatible), with drawer kick port ([0055](docs/decisions/0055-thermal-printer-esc-pos.md)) |
 | Cash drawer | RJ11/RJ12, compatible with the printer |
 | Barcode scanner | USB keyboard-emulation |
 | Label printer | For barcode labels |
@@ -418,7 +421,7 @@ Each phase ends with automated tests passing, a security review, an accountant r
 |---|---|---|
 | 1 | Tax invoice layout and chart of accounts | Invoice content decided (10.2). **Chart of accounts and posting map: pending accountant review** ([0018](docs/decisions/0018-chart-of-accounts-and-posting-map.md)). |
 | 2 | E-invoicing obligations and dates | Approach decided (ASP via API). **Go-live date: pending accountant** ([0019](docs/decisions/0019-einvoicing-via-accredited-provider.md)). |
-| 3 | Hardware models (printer, drawer, scanner, label printer) | Open: needed before milestone M6 (POS) |
+| 3 | Hardware models (printer, drawer, scanner, label printer) | Receipt printer type decided (standard 80 mm ESC/POS, drawer on the printer, [0055](docs/decisions/0055-thermal-printer-esc-pos.md)); the exact model is bought later and checked with the manual hardware test checklist |
 | 4 | Existing data to migrate (items, customers, opening balances) and its format | Open: needed before go-live (Excel import templates are provided in P1) |
 | 5 | Whether retention (withholding) is used in construction contracts | Open: needed before P3 |
 | 6 | Custom UI reference designs | Open: to be supplied at implementation time |
@@ -429,6 +432,7 @@ Each phase ends with automated tests passing, a security review, an accountant r
 
 | Version | Date | Change |
 |---|---|---|
+| 1.9 | 2026-10-13 | Decision 0063: A4 cash taken by a cashier on their open shift goes into the drawer; A4 invoices shown in the shift's sales (POS, A4, total) but never in its expected cash. |
 | 1.0 | 2026-10-06 | Initial approved scope for Phase 1 planning |
 | 1.1 | 2026-10-06 | Applied owner and accountant decisions 0001–0019: confirmed stack; separate repository; POS oversell with approval; one cashier per shift; cart removals logged without approval; one recount with approval; no code-signing for now; POS silent printing and separate A4 section; VAT per line; invoice format by VAT registration; POS-/INV- series; discounts net per line; VAT on advance/progress payments; 4-decimal unit precision and no cash rounding; defective held at cost; monthly lock; quarterly VAT export and annual archive; chart of accounts by line of business (pending review); e-invoicing via accredited provider (go-live pending). Ledger core moved into P1. |
 | 1.2 | 2026-10-07 | Phase 1 plan approved. Owner confirmed: VAT only on payments received before an invoice is issued; a 1-fils difference per movement is acceptable while the books match stock exactly; reprints marked "Copy" by default (setting); other document prefixes approved as defaults. Development moves to the owner's Windows PC after M0. |
@@ -436,4 +440,5 @@ Each phase ends with automated tests passing, a security review, an accountant r
 | 1.4 | 2026-10-08 | M2 decisions 0031–0037:<br>• Excel import all or nothing after a check<br>• one sale price per item with a "price includes VAT" switch, net/VAT/total on every invoice, required customer type (price levels ready for later)<br>• four fixed UAE VAT categories with owner-only rate changes<br>• screen placement<br>• fiscal year January–December, with the chart provisional until the accountant approves<br>• customers start as cash, and credit is a permissioned, audited change<br>• master-data rules for codes, phones, TRNs and the logo |
 | 1.5 | 2026-10-11 | Decisions 0038–0039: the item purchase price (without VAT, owner only, copied onto each sale) and the owner reports dashboard (four figures, date range, net profit after expenses). |
 | 1.6 | 2026-10-11 | M3 decisions 0040–0044: stock cost visible to owner and accountant only; adjustment approval above 500.00 AED; opening stock by the owner only; barcode label sizes (list + custom); blind full counts and one warehouse in Phase 1. |
+| 1.8 | 2026-10-13 | M4 follow-ups 0053–0054 (item-window quantity; no approval for stock adjustments). M5 decisions 0055–0062: ESC/POS 80 mm printers with the drawer on the printer; count denominations down to 0.05 plus "other amount"; cash drop alert at AED 3,000; over/short accepted by owner or accountant with a repeated-variance alert; POS discounts and prices as A4 (cashier 5%, price change always approved, oversell stays approved); POS returns as credit notes refunded from the open shift; card amount + approval code only; receipts in Arabic and English, cash customer by default. |
 | 1.7 | 2026-10-12 | M4 decisions 0045–0052: Quotations and Receipts as their own sections; unpaid invoices for cash customers need approval; office cash to Cash in safe; cheques paid on receipt; quotations valid 15 days; print designer screen as M4b; customer opening balances by the owner only; payments settle the oldest invoices first. |

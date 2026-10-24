@@ -40,6 +40,7 @@
     "PIN_REJECTED": "This PIN cannot be used. Choose 4 digits that are not easy to guess.",
     "ENROLLMENT_FAILED": "The enrollment code is wrong or has expired. Ask the owner for a new code.",
     "ENROLLMENT_UNAVAILABLE": "Enrollment is not available yet: the server's secure connection is not set up.",
+    "DEVICE_CODE_TAKEN": "This computer name is already used by another enrolled PC. Choose a different name.",
     "DEVICE_PROTECTED": "This PC cannot be revoked here: it is the server or the PC you are using now.",
     "VALIDATION_FAILED": "Some information is missing or not valid.",
     "DUPLICATE": "A record with the same details already exists.",
@@ -132,7 +133,23 @@
       "DOCUMENT_STEP": "This step is not possible in the document's current state.",
       "JOURNAL_UNBALANCED": "The entry does not balance: debits do not equal credits.",
       "POSTING_ACCOUNT_INVALID": "This account cannot receive postings (header or deactivated).",
-      "POSTING_CUSTOMER_REQUIRED": "A line on a control account needs its customer."
+      "POSTING_CUSTOMER_REQUIRED": "A line on a control account needs its customer.",
+      "RECOUNT_INVALID": "A recount replaces the shift's closing count, once.",
+      "REASON_INVALID": "This reason is for something else.",
+      "DRAWER_SHORT": "The drawer does not hold that much cash.",
+      "COUNT_MISSING": "Count the cash before closing the shift.",
+      "CLOSING_TRANSFER": "The counted cash must go to the safe when the shift closes.",
+      "OPENING_FLOAT": "The opening float must come from the safe.",
+      "SHIFT_NOT_CLOSED": "Only a closed shift's difference can be accepted.",
+      "OWN_VARIANCE": "A cashier never accepts the difference of their own shift.",
+      "POS_DEVICE_ONLY": "This works only on a PC enrolled as a point of sale.",
+      "OVERSELL_APPROVAL": "Not enough stock: a supervisor must approve selling beyond stock.",
+      "PAYMENT_MISMATCH": "The payments do not match the amount due.",
+      "SHIFT_ALREADY_OPEN": "This drawer already has an open shift.",
+      "COUNT_ALREADY_DONE": "The closing count is already done; a recount needs a supervisor.",
+      "RECOUNT_USED": "The one recount of this shift is already used.",
+      "APPROVAL_INVALID": "This approval is for something else.",
+      "NOT_POS_SALE": "Only a POS sale can be returned at the point of sale."
     }
   }
 }

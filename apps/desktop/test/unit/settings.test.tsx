@@ -196,7 +196,8 @@ describe('the app frame', () => {
     await signIn(signedInBridge(['pos.sell']));
     const nav = screen.getByRole('navigation', { name: 'القائمة' });
     expect(within(nav).queryByRole('link', { name: 'الإعدادات' })).toBeNull();
-    expect(within(nav).getByText('نقطة البيع').closest('[aria-disabled]')).toBeTruthy();
+    // M5: the cashier's menu leads to the point of sale.
+    expect(within(nav).getByRole('link', { name: 'نقطة البيع' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'فتح الإعدادات' })).toBeNull();
   });
 

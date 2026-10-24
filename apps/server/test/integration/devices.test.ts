@@ -228,7 +228,7 @@ describe('enrolling a PC (decision 0024)', () => {
   it('keeps the code when the PC name is already taken, so a retry with another name works', async () => {
     const { code } = await newCode();
     const taken = await enrollPc(code!, { deviceCode: 'office-01', remoteAddress: '10.0.4.1' });
-    expect(errorCode(taken.complete)).toBe('DUPLICATE');
+    expect(errorCode(taken.complete)).toBe('DEVICE_CODE_TAKEN');
     const retry = await enrollPc(code!, {
       deviceCode: 'OFFICE-02',
       kind: 'office',

@@ -114,7 +114,7 @@ describe('seeds', () => {
       (await api.query<{ n: number }>(`SELECT count(*)::int AS n FROM ${sql}`)).rows[0]!.n;
     expect(await count('md.units')).toBe(12);
     expect(await count('md.item_categories')).toBe(5);
-    expect(await count('md.cash_denominations')).toBe(11);
+    expect(await count('md.cash_denominations')).toBe(13); // 11 + the 0.10 and 0.05 coins (0022)
     expect(await count('sys.reason_codes')).toBe(33); // 21 from 0009 + 7 stock reasons from 0011 + 5 sales reasons from 0015
     const { rows: lines } = await api.query<{ code: string; rev: string; cogs: string }>(
       `SELECT b.code, r.code AS rev, c.code AS cogs FROM md.business_lines b

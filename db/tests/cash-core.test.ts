@@ -62,7 +62,7 @@ const openShift = (registerId: string, cashier: bigint) =>
     (c) =>
       one<{ id: string; shift_number: string; cashier_id: string }>(
         c,
-        `INSERT INTO cash.shifts (register_id, opening_float_fils) VALUES ($1, 50000)
+        `INSERT INTO cash.shifts (register_id, opening_float_fils) VALUES ($1, 0)
          RETURNING id, shift_number, cashier_id::text`,
         [registerId],
       ),
@@ -164,7 +164,7 @@ describe('counts (decision 0006)', () => {
 
     await expect(count(99999)).rejects.toMatchObject(rule('COUNT_TOTAL')); // 3 × 100.00 = 300.00
     const first = await count(30000);
-    await expect(count(30000, first.id)).rejects.toMatchObject({ code: '23514' }); // no approval
+    await expect(count(30000, first.id)).rejects.toMatchObject(denied('APPROVAL_INVALID')); // no approval
     const approval = await tx(
       async (c) =>
         (
@@ -180,15 +180,32 @@ describe('counts (decision 0006)', () => {
     const recount = await count(30000, first.id, approval);
     await expect(count(30000, first.id, approval)).rejects.toBeTruthy(); // only one recount
 
-    await tx(
-      (c) =>
-        c.query(
-          `UPDATE cash.shifts SET status = 'closed', closing_count_id = $2, expected_cash_fils = 30000,
-                  counted_cash_fils = 30000, variance_fils = 0, z_snapshot = '{}' WHERE id = $1`,
-          [shift.id, recount.id],
-        ),
-      cashier,
-    );
+    // (Migration 0022: the counted cash goes to the safe with the close, and has its journal entry.)
+    await tx(async (c) => {
+      const m = await one<{ id: string }>(
+        c,
+        `INSERT INTO cash.movements (shift_id, movement_type, amount_fils)
+         VALUES ($1, 'closing_transfer', 30000) RETURNING id::text`,
+        [shift.id],
+      );
+      const e = await one<{ id: string }>(
+        c,
+        `INSERT INTO gl.journal_entries (entry_date, source_type, cash_movement_id, total_debit_fils, total_credit_fils)
+         VALUES (sys.business_date(), 'cash_movement', $1, 30000, 30000) RETURNING id::text`,
+        [m.id],
+      );
+      await c.query(
+        `INSERT INTO gl.journal_lines (entry_id, line_no, account_id, debit_fils, credit_fils)
+         SELECT $1::bigint, 1, id, 30000, 0 FROM gl.accounts WHERE code = '1120'
+         UNION ALL SELECT $1::bigint, 2, id, 0, 30000 FROM gl.accounts WHERE code = '1110'`,
+        [e.id],
+      );
+      await c.query(
+        `UPDATE cash.shifts SET status = 'closed', closing_count_id = $2, expected_cash_fils = 30000,
+                counted_cash_fils = 30000, variance_fils = 0, z_snapshot = '{}' WHERE id = $1`,
+        [shift.id, recount.id],
+      );
+    }, cashier);
     await expect(
       tx(
         (c) => c.query(`UPDATE cash.shifts SET variance_note = 'later' WHERE id = $1`, [shift.id]),

@@ -116,11 +116,20 @@ name = "artepool-desktop"
 version = "0.1.0"
 dependencies = [
  "artepool-bridge",
+ "artepool-printer",
+ "base64 0.23.1",
  "serde_json",
  "tauri",
  "tauri-build",
  "tauri-plugin-single-instance",
  "tauri-plugin-updater",
+]
+
+[[package]]
+name = "artepool-printer"
+version = "0.1.0"
+dependencies = [
+ "thiserror 2.0.21",
 ]
 
 [[package]]

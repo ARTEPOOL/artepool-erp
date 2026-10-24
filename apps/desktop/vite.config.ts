@@ -9,7 +9,13 @@ import { version } from './package.json';
 export default defineConfig({
   plugins: [react(), artepoolDevBridge({ clientVersion: version })],
   clearScreen: false,
-  server: { port: 1420, strictPort: true },
+  server: {
+    port: 1420,
+    strictPort: true,
+    // The Rust side is built and watched by Tauri itself; on Windows, watching its build output
+    // while cargo writes it fails with EBUSY.
+    watch: { ignored: ['**/src-tauri/**'] },
+  },
   // Nothing is inlined as a data: URL, so the strict Content-Security-Policy in index.html
   // (font-src 'self') holds for the bundled fonts too.
   build: { target: 'es2023', sourcemap: true, assetsInlineLimit: 0 },

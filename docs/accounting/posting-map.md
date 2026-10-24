@@ -23,8 +23,8 @@
 | 15 | **Defective goods written off** | Defective stock write-offs 5700 | Inventory – defective 1320 |
 | 16 | **Paid-out** from the drawer (e.g. small purchase) | The account linked to the reason (default: petty cash expenses 6900) | Cash on hand – POS drawers 1110 |
 | 17 | **Paid-in** to the drawer | Cash on hand – POS drawers 1110 | The account linked to the reason |
-| 18 | **Cash drop** to the safe / **float top-up** from the safe | Drop: Cash in safe 1120 · Top-up: Cash drawers 1110 | Drop: Cash drawers 1110 · Top-up: Cash in safe 1120 |
-| 19 | **Shift closed short** (over = the reverse) | Cash over / short 6910 | Cash on hand – POS drawers 1110 |
+| 18 | **Cash drop** to the safe / **float top-up** from the safe. Also the **opening float** (taken from the safe when the shift opens) and the **closing transfer** (the counted cash goes back to the safe when the shift closes) | Drop and closing transfer: Cash in safe 1120 · Top-up and opening float: Cash drawers 1110 | Drop and closing transfer: Cash drawers 1110 · Top-up and opening float: Cash in safe 1120 |
+| 19 | **Shift variance accepted** by the owner or accountant: short (over = the reverse) | Cash over / short 6910 | Cash on hand – POS drawers 1110 |
 | 20 | **Opening customer balances** (go-live) | Customer receivable 1210 | Opening balance equity 3900 |
 | 21 | **Opening stock** (go-live) | Inventory – sellable 1310 | Opening balance equity 3900 |
 
@@ -38,5 +38,7 @@
 - **Rows 4–6 and 9:** customer advances and VAT on payments received.
 - **Rows 12–13:** one adjustments account for gains and losses.
 - **Rows 14–15:** defective goods held at cost until written off.
+- **Decision 0063:** cash received on an A4 invoice (or in Receipts) by a cashier on their own open shift is debited to the drawers account (1110), not Cash in safe (1120), so it is counted with the drawer at the close.
+- **Row 18:** the drawers account (1110) returns to zero at each close: the float comes from the safe and the counted cash goes back to it. Until the variance is accepted, the difference stays in 1110.
 - **Row 19:** cash over/short.
 - **Rows 20–21:** opening balances through account 3900.

@@ -60,6 +60,35 @@ async fn bridge_request(
     state.0.request(request).await.map_err(|e| e.to_string())
 }
 
+/// The printers of this PC, for choosing the receipt printer (Settings → Devices).
+#[tauri::command]
+async fn printer_list() -> Result<Vec<String>, String> {
+    tauri::async_runtime::spawn_blocking(artepool_printer::list_printers)
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())
+}
+
+/// Sends a receipt (ESC/POS bytes made by the screens, base64) RAW to the chosen printer:
+/// silent, no dialog (decisions 0008, 0055).
+#[tauri::command]
+async fn printer_print(
+    printer: String,
+    document_name: String,
+    data_base64: String,
+) -> Result<(), String> {
+    use base64::Engine as _;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(data_base64.as_bytes())
+        .map_err(|_| "The print job is not valid".to_string())?;
+    tauri::async_runtime::spawn_blocking(move || {
+        artepool_printer::send_raw(&printer, &document_name, &bytes)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -82,7 +111,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             bridge_local_device,
             bridge_enroll,
-            bridge_request
+            bridge_request,
+            printer_list,
+            printer_print
         ])
         .run(tauri::generate_context!())
         .expect("ARTÉPOOL ERP could not start");

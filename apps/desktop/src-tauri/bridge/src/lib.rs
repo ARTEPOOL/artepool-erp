@@ -152,6 +152,7 @@ fn status_failure(answer: &Answer) -> &'static str {
     match error_code(&parse_body(answer)) {
         Some("ENROLLMENT_FAILED") => "code_rejected",
         Some("ENROLLMENT_UNAVAILABLE") => "unavailable",
+        Some("DEVICE_CODE_TAKEN") => "code_taken",
         _ if answer.status >= 500 => "unavailable",
         _ => "not_genuine",
     }

@@ -275,7 +275,14 @@ export function DocumentView({ doc }: { doc: DocumentDetail }) {
     dueFils > 0n;
 
   const rows: { label: string; value: ReactNode }[] = [
-    { label: t('view.type'), value: t(`sales:docTypes.${doc.docType}`) },
+    {
+      label: t('view.type'),
+      // A POS sale opens here too and prints on A4 with the same number (decision 0008).
+      value:
+        doc.channel === 'pos'
+          ? `${t(`sales:docTypes.${doc.docType}`)} · ${t('view.soldAtPos')}`
+          : t(`sales:docTypes.${doc.docType}`),
+    },
     { label: t('view.format'), value: <FormatChip format={doc.invoiceFormat} /> },
     {
       label: t('sales:fields.status'),
