@@ -51,9 +51,13 @@ test('five wrong passwords lock the account for 15 minutes', async ({ page, open
   await control.addUser({ username, password: 'blue-pool-water-2' });
   await open('office');
   await page.getByLabel(t('auth:signIn.username'), { exact: true }).fill(username);
+  const password = page.getByLabel(t('auth:signIn.password'), { exact: true });
   for (let attempt = 1; attempt <= 5; attempt++) {
-    await page.getByLabel(t('auth:signIn.password'), { exact: true }).fill(`wrong-${attempt}`);
+    await password.fill(`wrong-${attempt}`);
     await page.getByRole('button', { name: t('auth:signIn.submit') }).click();
+    // Each answer empties the field: wait for it, or the next password typed while this
+    // attempt is still on its way would be wiped by its answer and never sent.
+    await expect(password).toHaveValue('');
     await expect(page.getByRole('alert')).toBeVisible();
   }
   await expect(page.getByText(t('common:errors.ACCOUNT_LOCKED', { minutes: 15 }))).toBeVisible();
