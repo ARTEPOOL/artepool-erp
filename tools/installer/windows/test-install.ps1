@@ -233,8 +233,12 @@ Ok (-not (Test-Path $data)) 'the data is wiped, as on a new PC'
 Install-Server 'second'
 Check-Health 'second'
 $key = Get-Content "$work\key.txt" -Raw
-$lines = $key | & $svc run restore "$work\copy.dump.age"
-Ok ($LASTEXITCODE -eq 0) 'the restore program finished'
+$lines = @($key | & $svc run restore "$work\copy.dump.age" 2>&1 | ForEach-Object { "$_" })
+$restoreExit = $LASTEXITCODE
+# Its steps and its result (with the reason when it fails); the key went on its input only.
+$lines | ForEach-Object { Write-Host "  restore: $_" }
+if ($restoreExit -ne 0) { Show-Logs }
+Ok ($restoreExit -eq 0) "the restore program finished (exit $restoreExit)"
 $result = ($lines | Where-Object { $_ -like '{"result"*' } | Select-Object -Last 1 | ConvertFrom-Json).result
 Ok ($result.ok -eq $true) "the restore succeeded ($($lines -join ' | '))"
 Ok ($result.masterKeyRestored -eq $true) 'the master key came back with the copy'
