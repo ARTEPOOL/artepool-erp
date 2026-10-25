@@ -26,15 +26,11 @@ for (let attempt = 1; attempt <= 60; attempt++) {
         timeout: 3000,
       },
       (response) => {
+        // Read while the connection is still there: once the answer has ended it may be gone.
+        const protocol = (response.socket as TLSSocket | null)?.getProtocol() ?? '';
         let body = '';
         response.on('data', (chunk: Buffer) => (body += chunk.toString()));
-        response.on('end', () =>
-          resolve({
-            status: response.statusCode,
-            protocol: (response.socket as TLSSocket).getProtocol() ?? '',
-            body,
-          }),
-        );
+        response.on('end', () => resolve({ status: response.statusCode, protocol, body }));
       },
     );
     request.on('timeout', () => request.destroy(new Error('timeout')));
