@@ -34,14 +34,25 @@ const PGSQL_EXCLUDE = [
   'pgsql/symbols',
 ];
 
+/**
+ * NSIS 3: MAKENSIS, an installed copy, or the one the desktop app's build (`pnpm build:desktop`,
+ * always run first) downloads and checks into `%LOCALAPPDATA%\tauri\NSIS`.
+ */
 function makensis(): string {
+  const tauri = process.env.LOCALAPPDATA ? join(process.env.LOCALAPPDATA, 'tauri', 'NSIS') : null;
   const candidates = [
     process.env.MAKENSIS,
     'C:\\Program Files (x86)\\NSIS\\makensis.exe',
     'C:\\Program Files\\NSIS\\makensis.exe',
+    tauri && join(tauri, 'makensis.exe'),
+    tauri && join(tauri, 'Bin', 'makensis.exe'),
   ].filter(Boolean) as string[];
   const found = candidates.find((path) => existsSync(path));
-  if (!found) throw new Error('NSIS (makensis.exe) was not found. Install NSIS 3 or set MAKENSIS.');
+  if (!found) {
+    throw new Error(
+      `NSIS (makensis.exe) was not found in ${candidates.join(', ')}. Install NSIS 3 or set MAKENSIS.`,
+    );
+  }
   return found;
 }
 
