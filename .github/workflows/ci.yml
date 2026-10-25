@@ -245,9 +245,9 @@ jobs:
           name: artepool-erp-windows
           path: apps/desktop/src-tauri/target/release/bundle/nsis/*.exe
           retention-days: 14
-      - name: Server installer (pinned PostgreSQL, Node and WinSW, each checked by SHA-256)
-        run: pnpm build:installer
-      - name: Install, restore and uninstall the server as on a clean PC
+      - name: Server installer (pinned PostgreSQL, Node and WinSW, each checked by SHA-256), and two test upgrades
+        run: pnpm build:installer --test-upgrade
+      - name: Install, upgrade, restore and uninstall the server as on a clean PC
         shell: pwsh
         run: ./tools/installer/windows/test-install.ps1 -Installer (Get-ChildItem dist/installer/ARTEPOOL-Server-Setup-*.exe).FullName
       - name: Server installer

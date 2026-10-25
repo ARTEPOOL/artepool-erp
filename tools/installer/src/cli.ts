@@ -2,7 +2,7 @@
 import { buildInstaller } from './build';
 
 try {
-  const file = await buildInstaller();
+  const file = await buildInstaller({ testUpgrade: process.argv.includes('--test-upgrade') });
   console.log(`Server installer: ${file}`);
 } catch (error) {
   console.error(error instanceof Error ? error.message : error);

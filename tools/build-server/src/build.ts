@@ -35,6 +35,7 @@ export const ENTRY_POINTS: Record<string, string> = {
   restore: 'apps/server/src/cli/restore.ts',
   install: 'apps/server/src/cli/install.ts',
   emergency: 'apps/server/src/cli/emergency.ts',
+  upgrade: 'apps/server/src/cli/upgrade.ts',
 };
 
 /** Packages kept as files: a native library, and the browser driver that loads its own files. */

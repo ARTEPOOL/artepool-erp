@@ -10,6 +10,10 @@
 # The desktop app's start at sign-in (a scheduled task for every person, least privilege) and its
 # watchdog (it starts the app again only when it stopped while the kiosk lock was on), then the
 # desktop app's own uninstaller removes the task.
+# Upgrades (decision 0103, M6.2 part G2), with the two test setups `pnpm build:installer
+# --test-upgrade` makes: one that works (data kept, its migration applied, a checked pre-upgrade
+# copy, the previous programs kept), an older setup refused, and one whose migration fails (the
+# database unchanged, the previous version back and answering).
 # The install logs are searched for every secret (and the emergency temporary password): none
 # may appear.
 param([Parameter(Mandatory = $true)][string]$Installer)
@@ -56,7 +60,13 @@ function Uninstall-Server([string]$label) {
   Ok ($null -eq (Get-NetFirewallRule -DisplayName 'ARTEPOOL Server' -ErrorAction SilentlyContinue)) "$label firewall rule removed"
   Ok (Test-Path "$data\pgdata\PG_VERSION") "$label the data is kept in ProgramData"
   Ok (@(Emergency-Shortcuts).Count -eq 0) "$label the emergency tool's shortcut is removed"
+  Ok (-not (Test-Path "$pf.previous") -and -not (Test-Path "$pf.failed")) "$label the folders upgrades leave are removed"
 }
+
+$uninstallKey = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\ARTEPOOL-Server'
+function Installed-Version { (Get-ItemProperty $uninstallKey).DisplayVersion }
+function Run-Setup([string]$file) { (Start-Process -FilePath $file -ArgumentList '/S' -Wait -PassThru).ExitCode }
+function Version-Of([IO.FileInfo]$setup) { $setup.BaseName -replace '^ARTEPOOL-Server-Setup-', '' }
 
 function Secret([string]$name) {
   $entropy = [Text.Encoding]::UTF8.GetBytes("ARTEPOOL secrets v1/$name")
@@ -223,6 +233,50 @@ $oldKey = Secret 'master-key'
 Copy-Item $copy.FullName "$work\local.dump"
 & pnpm exec tsx "$repo\tools\installer\windows\make-bundle.ts" "$work\local.dump" $oldKey $work
 Ok ($LASTEXITCODE -eq 0) 'the encrypted off-site copy is made'
+
+# ---- Upgrades (decision 0103): one that works, an older setup, one whose migration fails ----
+$tests = @(Get-ChildItem (Join-Path (Split-Path $Installer) 'test') -Filter 'ARTEPOOL-Server-Setup-*.exe' |
+  Sort-Object { [version](Version-Of $_) })
+Ok ($tests.Count -eq 2) 'the two test upgrades were built'
+$firstVersion = Installed-Version
+$users = Psql 'SELECT count(*) FROM auth.users'
+$exit = Run-Setup $tests[0].FullName
+if ($exit -ne 0) { Show-Logs }
+Ok ($exit -eq 0) "upgrade $firstVersion -> $(Version-Of $tests[0]) (exit $exit)"
+Ok ((Installed-Version) -eq (Version-Of $tests[0])) 'the new version is installed'
+Check-Health 'after the upgrade'
+Ok ((Psql 'SELECT count(*) FROM auth.users') -eq $users) 'the data is kept'
+Ok ((Psql "SELECT to_regclass('sys.ci_upgrade_check') IS NOT NULL") -eq 't') "the new version's migration is applied"
+Ok ((Psql "SELECT count(*) FROM audit.log WHERE action = 'event:system.upgraded'") -eq '1') 'the upgrade is in the audit log'
+$pre = @(Get-ChildItem "$data\backups\pre-upgrade" -Filter '*.dump')
+Ok ($pre.Count -eq 1) "a pre-upgrade copy was made ($($pre[0].Name))"
+$sum = (Get-Content "$($pre[0].FullName).sha256" -Raw).Split(' ')[0]
+Ok ($sum -eq (Get-FileHash $pre[0].FullName -Algorithm SHA256).Hash.ToLower()) 'its SHA-256 is beside it'
+Ok (Test-Path "$pf.previous\artepool-svc.exe") 'the previous programs are kept beside'
+foreach ($name in 'ArtepoolDatabase', 'ArtepoolServer', 'ArtepoolBackup') {
+  Ok ((Get-Service $name).Status -eq 'Running') "$name runs after the upgrade"
+}
+$result = Get-Content "$data\updates\last-result.json" -Raw | ConvertFrom-Json
+Ok ($result.ok -eq $true) 'the result is saved for System health'
+
+$exit = Run-Setup $Installer
+Ok ($exit -eq 4) "an older setup over a newer installation changes nothing (exit $exit)"
+Ok ((Installed-Version) -eq (Version-Of $tests[0])) 'the newer version stays'
+
+$migrations = Psql 'SELECT count(*) FROM sys.schema_migrations'
+$exit = Run-Setup $tests[1].FullName
+Ok ($exit -eq 6) "a failing upgrade puts the previous version back (exit $exit)"
+Ok ((Installed-Version) -eq (Version-Of $tests[0])) 'the previous version is installed again'
+Check-Health 'after the failed upgrade'
+foreach ($name in 'ArtepoolDatabase', 'ArtepoolServer', 'ArtepoolBackup') {
+  Ok ((Get-Service $name).Status -eq 'Running') "$name runs again after the failed upgrade"
+}
+Ok ((Psql 'SELECT count(*) FROM sys.schema_migrations') -eq $migrations) 'the database is unchanged'
+Ok ((Psql "SELECT to_regclass('sys.ci_upgrade_broken') IS NULL") -eq 't') 'nothing of the failing migration is left'
+$result = Get-Content "$data\updates\last-result.json" -Raw | ConvertFrom-Json
+Ok ($result.ok -eq $false -and $result.step -eq 'migrate') "the failure is saved for System health ($($result.step))"
+Ok (Test-Path "$pf.failed\artepool-svc.exe") 'the failed programs are kept aside for support'
+Check-Logs-Hold-No-Secret 'after the upgrades:'
 
 # ---- 4. Uninstall keeps the data; then a new PC ----
 Uninstall-Server 'first'

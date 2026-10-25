@@ -130,19 +130,19 @@ pub const SECRETS: [Secret; 6] = [
         programs: None,
     },
     // The installation sets PostgreSQL's superuser password to this value. Only the installation
-    // program and the restore from a backup need it (they create databases and roles, or rename
-    // databases); the services never get it.
+    // program, the restore from a backup and the upgrade need it (they create databases and roles,
+    // or rename databases); the services never get it.
     Secret {
         name: "pg-superuser-password",
         file: "pg-superuser-password.dpapi",
         env: "PG_SUPERUSER_PASSWORD",
         kind: SecretKind::Password,
-        programs: Some(&["install", "restore"]),
+        programs: Some(&["install", "restore", "upgrade"]),
     },
 ];
 
 /// The bundled programs `run` may start (`<name>.mjs` in the server folder).
-pub const PROGRAMS: [&str; 10] = [
+pub const PROGRAMS: [&str; 11] = [
     "server",
     "backup",
     "migrate",
@@ -153,6 +153,7 @@ pub const PROGRAMS: [&str; 10] = [
     "restore",
     "install",
     "emergency",
+    "upgrade",
 ];
 
 pub fn secret_named(name: &str) -> Result<Secret, SvcError> {

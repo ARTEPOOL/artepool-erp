@@ -89,7 +89,61 @@ function googleJson(): string | null {
   return `${JSON.stringify(value, null, 2)}\n`;
 }
 
-export async function buildInstaller(): Promise<string> {
+function runMakensis(version: string, outFile: string): void {
+  execFileSync(
+    makensis(),
+    [
+      '/V3',
+      '/INPUTCHARSET',
+      'UTF8',
+      `/DVERSION=${version}`,
+      `/DSTAGE=${stage}`,
+      `/DOUTFILE=${outFile}`,
+      join(repoRoot, 'tools', 'installer', 'windows', 'server.nsi'),
+    ],
+    { stdio: 'inherit' },
+  );
+}
+
+/** 1.4.2 + 1 → 1.4.3. */
+export function nextPatch(version: string, by: number): string {
+  const [major, minor, patch] = version.split('.').map(Number);
+  return `${major}.${minor}.${patch! + by}`;
+}
+
+/**
+ * `--test-upgrade` (the Windows CI test of upgrades, M6.2 part G2): from the same staged files,
+ * two more server setups in `dist/installer/test` — never published:
+ *   <version+1>  one more, harmless migration (an upgrade that works);
+ *   <version+2>  then a migration that fails (the database must stay unchanged and the previous
+ *                version come back).
+ */
+export async function buildTestUpgradeInstallers(version: string): Promise<string[]> {
+  const migrations = join(stage, 'server', 'resources', 'db', 'migrations');
+  const count = (await readdir(migrations)).filter((f) => f.endsWith('.sql')).length;
+  const name = (n: number, what: string) => `${String(count + n).padStart(4, '0')}_${what}.sql`;
+  const good = join(migrations, name(1, 'ci_upgrade_check'));
+  const broken = join(migrations, name(2, 'ci_upgrade_broken'));
+  const dir = join(out, 'test');
+  await mkdir(dir, { recursive: true });
+  const files: string[] = [];
+  try {
+    await writeFile(good, 'CREATE TABLE sys.ci_upgrade_check (id integer);\n');
+    const next = nextPatch(version, 1);
+    files.push(join(dir, `ARTEPOOL-Server-Setup-${next}.exe`));
+    runMakensis(next, files[0]!);
+    await writeFile(broken, 'CREATE TABLE sys.ci_upgrade_broken (id integer);\nSELECT 1 / 0;\n');
+    const failing = nextPatch(version, 2);
+    files.push(join(dir, `ARTEPOOL-Server-Setup-${failing}.exe`));
+    runMakensis(failing, files[1]!);
+  } finally {
+    await rm(good, { force: true });
+    await rm(broken, { force: true });
+  }
+  return files;
+}
+
+export async function buildInstaller(options: { testUpgrade?: boolean } = {}): Promise<string> {
   if (process.platform !== 'win32')
     throw new Error('The installer is built on Windows (NSIS, Windows tar).');
   const version = (
@@ -146,19 +200,7 @@ export async function buildInstaller(): Promise<string> {
   }
 
   const outFile = join(out, `ARTEPOOL-Server-Setup-${version}.exe`);
-  execFileSync(
-    makensis(),
-    [
-      '/V3',
-      '/INPUTCHARSET',
-      'UTF8',
-      `/DVERSION=${version}`,
-      `/DSTAGE=${stage}`,
-      `/DOUTFILE=${outFile}`,
-      join(repoRoot, 'tools', 'installer', 'windows', 'server.nsi'),
-    ],
-    { stdio: 'inherit' },
-  );
+  runMakensis(version, outFile);
   // The office PCs and the laptop get the desktop app's own installer (offline WebView2 inside).
   const officeFile = join(out, `ARTEPOOL-Office-Setup-${version}.exe`);
   await copyFile(await desktopInstaller(), officeFile);
@@ -167,5 +209,6 @@ export async function buildInstaller(): Promise<string> {
     sums.push(`${await sha256File(file)}  ${basename(file)}\n`);
   }
   await writeFile(join(out, 'SHA256SUMS.txt'), sums.join(''));
+  if (options.testUpgrade) await buildTestUpgradeInstallers(version);
   return outFile;
 }
