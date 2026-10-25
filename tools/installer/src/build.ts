@@ -12,7 +12,10 @@
  *      winsw\winsw.exe         runs the launcher as the ArtepoolServer and ArtepoolBackup services
  *      app\artepool-erp-setup.exe   the desktop app's own installer, run silently
  *      google.json             the app's Google registration (decision 0095), when given
- * 3. NSIS makes the installer from `windows/server.nsi`; `SHA256SUMS.txt` is written beside it.
+ * 3. NSIS makes the installer from `windows/server.nsi`;
+ * 4. `ARTEPOOL-Office-Setup-<version>.exe` (the desktop app's own installer, with the offline
+ *    WebView2 installer inside) is put beside it for the office PCs and the laptop;
+ *    `SHA256SUMS.txt` lists both.
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
@@ -156,9 +159,13 @@ export async function buildInstaller(): Promise<string> {
     ],
     { stdio: 'inherit' },
   );
-  await writeFile(
-    join(out, 'SHA256SUMS.txt'),
-    `${await sha256File(outFile)}  ${basename(outFile)}\n`,
-  );
+  // The office PCs and the laptop get the desktop app's own installer (offline WebView2 inside).
+  const officeFile = join(out, `ARTEPOOL-Office-Setup-${version}.exe`);
+  await copyFile(await desktopInstaller(), officeFile);
+  const sums = [];
+  for (const file of [outFile, officeFile]) {
+    sums.push(`${await sha256File(file)}  ${basename(file)}\n`);
+  }
+  await writeFile(join(out, 'SHA256SUMS.txt'), sums.join(''));
   return outFile;
 }

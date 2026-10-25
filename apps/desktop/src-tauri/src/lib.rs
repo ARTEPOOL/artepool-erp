@@ -3,6 +3,8 @@
 //! only the pinned ARTÉPOOL CA, and the device key kept in Windows Credential Manager. The
 //! screens never see the key and cannot open a connection themselves (see tauri.conf.json CSP).
 
+mod autostart;
+
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -299,6 +301,7 @@ async fn bridge_request(
 /// `run`). Lifted, the window is a normal window that may be minimised or closed.
 fn apply_kiosk(app: &tauri::AppHandle, locked: bool) {
     app.state::<Kiosk>().0.store(locked, Ordering::SeqCst);
+    autostart::set_locked(locked);
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.set_decorations(!locked);
         let _ = window.set_fullscreen(locked);
@@ -497,9 +500,63 @@ async fn printer_print_label(
     .map_err(|e| e.to_string())
 }
 
+/// The command-line modes that are not the app: the watchdog, and the installer's
+/// `--register-autostart` / `--unregister-autostart`. `Some(exit code)` when one ran.
+pub fn command_line() -> Option<i32> {
+    autostart::command_line(&std::env::args().collect::<Vec<_>>())
+}
+
+/// This PC is enrolled as a point of sale (read before any window opens).
+#[cfg(windows)]
+fn enrolled_as_pos() -> bool {
+    artepool_bridge::store::CredentialStore::new("ARTEPOOL ERP", "device")
+        .ok()
+        .map(|store| Bridge::new(store, env!("CARGO_PKG_VERSION"), computer_name()))
+        .and_then(|bridge| bridge.local_device().ok())
+        .and_then(|local| local.device)
+        .is_some_and(|device| device.kind == "pos")
+}
+
+#[cfg(not(windows))]
+fn enrolled_as_pos() -> bool {
+    true
+}
+
+/// Sends the watchdog's report (`restarted` / `not_running`) until the server accepts it; it
+/// audits it and alerts the owner (decisions 0082, 0083).
+async fn send_kiosk_report(app: tauri::AppHandle, kind: &'static str) {
+    for _ in 0..60 {
+        let answer = app
+            .state::<AppBridge>()
+            .0
+            .request(BridgeRequest {
+                method: "POST".into(),
+                path: "/api/v1/kiosk/events".into(),
+                body: Some(serde_json::json!({ "kind": kind })),
+                token: None,
+                idempotency_key: None,
+                background: Some(true),
+            })
+            .await;
+        if let Ok(BridgeResponse::Response { status, .. }) = answer {
+            if (200..300).contains(&status) {
+                autostart::reported();
+                return;
+            }
+        }
+        tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let emergency = emergency_mode();
+    let has = |flag: &str| std::env::args().skip(1).any(|arg| arg == flag);
+    let restarted = has("--restarted");
+    // Started by the sign-in task on every PC: only a point of sale stays open.
+    if has("--autostart") && !emergency && !enrolled_as_pos() {
+        return;
+    }
     let mut builder = tauri::Builder::default();
     // One copy per PC: starting it again brings the open window to the front. The emergency
     // window is a copy of its own, opened while the app may already be running.
@@ -530,6 +587,15 @@ pub fn run() {
             app.manage(Kiosk(AtomicBool::new(false)));
             app.manage(GoogleSignIn(Mutex::new(None)));
             app.manage(artepool_bridge::restore::RestoreRun::default());
+            // The watchdog's state for this run, and what happened to the previous one.
+            if !emergency {
+                if let Some(kind) = autostart::started(pos, restarted) {
+                    tauri::async_runtime::spawn(send_kiosk_report(app.handle().clone(), kind));
+                }
+                if pos {
+                    autostart::start_watchdog();
+                }
+            }
             apply_kiosk(app.handle(), pos);
             // Checked here every few seconds as well, whatever the screens do: a timed "off"
             // ends on time even if the screens stop asking.
@@ -582,6 +648,14 @@ pub fn run() {
             printer_print_image,
             printer_print_label
         ])
-        .run(tauri::generate_context!())
-        .expect("ARTÉPOOL ERP could not start");
+        .build(tauri::generate_context!())
+        .expect("ARTÉPOOL ERP could not start")
+        .run(move |_app, event| {
+            // A normal exit (the kiosk lock was off): the watchdog does not start it again.
+            if let tauri::RunEvent::Exit = event {
+                if !emergency {
+                    autostart::exited();
+                }
+            }
+        });
 }

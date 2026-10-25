@@ -15,6 +15,7 @@ pub mod rules;
 pub mod setup;
 pub mod store;
 pub mod tls;
+pub mod watchdog;
 
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;

@@ -7,6 +7,9 @@
 # The emergency tool (decision 0107): its launcher asks for administrator rights, its Start menu
 # shortcut, and its program's actions through the launcher (check, password reset, enrollment
 # code), recorded in the audit log.
+# The desktop app's start at sign-in (a scheduled task for every person, least privilege) and its
+# watchdog (it starts the app again only when it stopped while the kiosk lock was on), then the
+# desktop app's own uninstaller removes the task.
 # The install logs are searched for every secret (and the emergency temporary password): none
 # may appear.
 param([Parameter(Mandatory = $true)][string]$Installer)
@@ -144,6 +147,41 @@ Ok ([string]$rule.Profile -eq 'Private') "the firewall rule is for private netwo
 Ok ((($rule | Get-NetFirewallAddressFilter).RemoteAddress) -contains 'LocalSubnet') 'the firewall rule is for the local subnet only'
 Ok ((($rule | Get-NetFirewallPortFilter).LocalPort) -eq '3100') 'the firewall rule opens the API port only'
 
+# ---- The desktop app: start at sign-in and the watchdog (decisions 0082, 0083) ----
+$appDir = Join-Path $env:ProgramFiles 'ARTEPOOL ERP'
+$appExe = Join-Path $appDir 'artepool-erp.exe'
+$task = Get-ScheduledTask -TaskName 'ARTEPOOL ERP'
+Ok ($task.Triggers[0].CimClass.CimClassName -eq 'MSFT_TaskLogonTrigger') 'the app starts at sign-in'
+Ok (@('S-1-5-32-545', 'Users', 'BUILTIN\Users') -contains $task.Principal.GroupId) "for every person ($($task.Principal.GroupId))"
+Ok ($task.Principal.RunLevel -eq 'Limited') 'without administrator rights'
+Ok ($task.Actions[0].Execute -eq $appExe -and $task.Actions[0].Arguments -eq '--autostart') 'it runs the app with --autostart'
+$desktopLog = "$data\logs\install\desktop-app.log"
+Ok ((Get-Content $desktopLog -Raw) -match 'start at sign-in \(scheduled task "ARTEPOOL ERP"\): exit code 0') "the desktop app's installer wrote its log"
+
+$stateFile = Join-Path $env:LOCALAPPDATA 'ARTEPOOL\kiosk-state.json'
+New-Item -ItemType Directory -Force -Path (Split-Path $stateFile) | Out-Null
+function Watchdog-Restarts([bool]$locked, [bool]$running) {
+  $now = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+  Set-Content -Path $stateFile -Value (@{ locked = $locked; running = $running; seenAt = $now; pending = $null } | ConvertTo-Json) -Encoding utf8NoBOM
+  $gone = Start-Process -FilePath cmd.exe -ArgumentList '/c', 'exit' -PassThru -WindowStyle Hidden
+  $gone.WaitForExit()
+  $watchdog = Start-Process -FilePath $appExe -ArgumentList '--watchdog', $gone.Id -PassThru
+  $watchdog.WaitForExit(20000) | Out-Null
+  $seen = $false
+  for ($i = 0; $i -lt 40 -and -not $seen; $i++) {
+    $restarted = Get-CimInstance Win32_Process -Filter "Name='artepool-erp.exe'" | Where-Object { $_.CommandLine -like '*--restarted*' }
+    $state = Get-Content $stateFile -Raw -ErrorAction SilentlyContinue | ConvertFrom-Json -ErrorAction SilentlyContinue
+    $seen = ($null -ne $restarted) -or ($null -ne $state -and $state.pending -eq 'restarted')
+    if (-not $seen) { Start-Sleep -Milliseconds 250 }
+  }
+  & "$env:SystemRoot\System32\taskkill.exe" /F /T /IM artepool-erp.exe 2>$null | Out-Null
+  return $seen
+}
+Ok (-not (Watchdog-Restarts $false $true)) 'the watchdog leaves the app closed when the kiosk lock was off'
+Ok (-not (Watchdog-Restarts $true $false)) 'the watchdog leaves the app closed after a normal exit'
+Ok (Watchdog-Restarts $true $true) 'the watchdog starts the app again when it stopped while locked'
+Remove-Item $stateFile -Force -ErrorAction SilentlyContinue
+
 # ---- 2. A "reboot": the services stopped and started ----
 Stop-Service ArtepoolBackup, ArtepoolServer
 Stop-Service ArtepoolDatabase
@@ -206,6 +244,10 @@ Ok ((Psql "SELECT state FROM sys.setup_state") -eq 'complete') 'the first-run se
 Ok (-not (Test-Path "$data\setup\token")) 'the setup token is gone'
 Check-Logs-Hold-No-Secret 'after the restore:'
 
-# ---- 6. Uninstall again: the data stays ----
+# ---- 6. Uninstall again: the data stays; then the desktop app's own uninstaller ----
 Uninstall-Server 'second'
+$p = Start-Process -FilePath "$appDir\uninstall.exe" -ArgumentList '/S', "_?=$appDir" -Wait -PassThru
+Ok ($p.ExitCode -eq 0) "the desktop app's uninstaller (exit $($p.ExitCode))"
+Ok ($null -eq (Get-ScheduledTask -TaskName 'ARTEPOOL ERP' -ErrorAction SilentlyContinue)) 'the start at sign-in is removed'
+Ok ((Get-Content "$data\logs\install\desktop-app.log" -Raw) -match 'uninstalled; start at sign-in removed') "the desktop app's uninstaller wrote its log"
 Write-Host 'All installer checks passed.'

@@ -256,6 +256,7 @@ jobs:
           name: artepool-server-setup
           path: |
             dist/installer/ARTEPOOL-Server-Setup-*.exe
+            dist/installer/ARTEPOOL-Office-Setup-*.exe
             dist/installer/SHA256SUMS.txt
           retention-days: 14
       - name: Installation logs (for review; they hold no secret)
