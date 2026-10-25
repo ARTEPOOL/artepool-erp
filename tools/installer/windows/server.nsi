@@ -17,6 +17,9 @@
 ; If 2 fails nothing changed (exit code 5). If 4 fails the previous programs are put back and
 ; started (exit code 6); the database is unchanged or put back from the pre-upgrade copy.
 ; The same installer, run by hand from a USB drive or by the automatic updater (decision 0108).
+;
+; Over data an uninstall kept, with no program installed, it installs again and uses that data
+; (part G3): the secrets must open on this PC; no new database, no new CA; `run install --reattach`.
 
 Unicode true
 ManifestSupportedOS all
@@ -29,6 +32,7 @@ SetCompressor /SOLID lzma
 !include "WinVer.nsh"
 !include "FileFunc.nsh"
 !include "WordFunc.nsh"
+!include "nsDialogs.nsh"
 
 !ifndef VERSION
   !error "VERSION is required (/DVERSION=x.y.z)"
@@ -66,6 +70,7 @@ VIAddVersionKey /LANG=1033 "LegalCopyright" "ARTEPOOL"
 !insertmacro MUI_PAGE_INSTFILES
 !insertmacro MUI_PAGE_FINISH
 !insertmacro MUI_UNPAGE_CONFIRM
+UninstPage custom un.DeleteDataPage un.DeleteDataLeave
 !insertmacro MUI_UNPAGE_INSTFILES
 
 !insertmacro MUI_LANGUAGE "Arabic"
@@ -77,8 +82,6 @@ LangString Not64 ${LANG_ARABIC} "آرتيبول يحتاج Windows 64-bit."
 LangString Not64 ${LANG_ENGLISH} "ARTEPOOL needs a 64-bit Windows."
 LangString OldWindows ${LANG_ARABIC} "آرتيبول يحتاج Windows 10 (22H2) أو Windows 11."
 LangString OldWindows ${LANG_ENGLISH} "ARTEPOOL needs Windows 10 (22H2) or Windows 11."
-LangString Installed ${LANG_ARABIC} "آرتيبول متسطّب فعلًا على الجهاز ده (بياناته موجودة في C:\ProgramData\ARTEPOOL). مفيش حاجة اتغيرت."
-LangString Installed ${LANG_ENGLISH} "ARTEPOOL is already installed on this PC (its data is in C:\ProgramData\ARTEPOOL). Nothing was changed."
 LangString StepFailed ${LANG_ARABIC} "التسطيب ما كملش. السبب مكتوب في سجل التسطيب في C:\ProgramData\ARTEPOOL\logs\install. ابعته للدعم الفني."
 LangString StepFailed ${LANG_ENGLISH} "The installation did not finish. The reason is in the install log in C:\ProgramData\ARTEPOOL\logs\install. Send it to support."
 LangString NotNewer ${LANG_ARABIC} "النسخة دي مش أحدث من المتسطّبة. مفيش حاجة اتغيرت."
@@ -87,6 +90,14 @@ LangString UpgradeNotDone ${LANG_ARABIC} "التحديث ما اتعملش، و�
 LangString UpgradeNotDone ${LANG_ENGLISH} "The update was not done and nothing was changed. The reason is in the update log in C:\ProgramData\ARTEPOOL\logs\install."
 LangString UpgradeRolledBack ${LANG_ARABIC} "التحديث ما نجحش، فرجّعنا النسخة القديمة وهي شغالة دلوقتي. بياناتك زي ما هي. السبب في سجل التحديث في C:\ProgramData\ARTEPOOL\logs\install، والنسخة الاحتياطية في backups\pre-upgrade."
 LangString UpgradeRolledBack ${LANG_ENGLISH} "The update did not succeed, so the previous version was put back and is running. Your data is as it was. The reason is in the update log in C:\ProgramData\ARTEPOOL\logs\install; the backup is in backups\pre-upgrade."
+LangString DeleteDataTitle ${LANG_ARABIC} "البيانات"
+LangString DeleteDataTitle ${LANG_ENGLISH} "The data"
+LangString DeleteDataSub ${LANG_ARABIC} "البيانات بتفضل على الجهاز إلا لو اخترت تمسحها."
+LangString DeleteDataSub ${LANG_ENGLISH} "The data stays on this PC unless you choose to delete it."
+LangString DeleteDataText ${LANG_ARABIC} "إلغاء التسطيب بيشيل البرنامج بس. قاعدة البيانات والإعدادات بتفضل في C:\ProgramData\ARTEPOOL، ولو سطّبت تاني هتلاقيها زي ما هي.$\r$\n$\r$\nلو عايز تمسح البيانات نهائيًا: علّم على الاختيار ده، وهيطلب منك تكتب DELETE وكلمة سر المالك. فولدر النسخ الاحتياطية بيفضل دايمًا."
+LangString DeleteDataText ${LANG_ENGLISH} "Uninstalling removes the program only. The database and the settings stay in C:\ProgramData\ARTEPOOL, and a new installation finds them as they are.$\r$\n$\r$\nTo delete the data for good, tick this box: you will be asked to type DELETE and the owner's password. The backups folder always stays."
+LangString DeleteDataBox ${LANG_ARABIC} "امسح البيانات كمان (فولدر النسخ الاحتياطية بيفضل)"
+LangString DeleteDataBox ${LANG_ENGLISH} "Also delete the data (the backups folder stays)"
 LangString EmergencyTool ${LANG_ARABIC} "آرتيبول - أداة الطوارئ"
 LangString EmergencyTool ${LANG_ENGLISH} "ARTEPOOL - Emergency tool"
 
@@ -94,6 +105,8 @@ Var DataDir
 Var LogFile
 Var Mode
 Var OldVersion
+Var DeleteData
+Var DeleteBox
 
 ; One line in the setup's own log (the install program keeps a fuller one beside it).
 !macro Log text
@@ -147,9 +160,21 @@ Function .onInit
     ReadRegStr $OldVersion HKLM "${UNINSTALL_KEY}" "DisplayVersion"
     ${If} $OldVersion == ""
     ${OrIfNot} ${FileExists} "$INSTDIR\artepool-svc.exe"
-      MessageBox MB_ICONSTOP|MB_OK "$(Installed)" /SD IDOK
-      SetErrorLevel 4
-      Abort
+      ; The data of an earlier installation, the program uninstalled: install again with it,
+      ; unless that data comes from a newer version (its migrations would be unknown here).
+      ${If} ${FileExists} "$DataDir\config\version.txt"
+        FileOpen $1 "$DataDir\config\version.txt" r
+        FileRead $1 $OldVersion
+        FileClose $1
+        ${VersionCompare} "${VERSION}" "$OldVersion" $0
+        ${If} $0 == 2
+          MessageBox MB_ICONSTOP|MB_OK "$(NotNewer)" /SD IDOK
+          SetErrorLevel 4
+          Abort
+        ${EndIf}
+      ${EndIf}
+      StrCpy $Mode "reattach"
+      Return
     ${EndIf}
     ; 1: this setup is newer.
     ${VersionCompare} "${VERSION}" "$OldVersion" $0
@@ -259,6 +284,17 @@ Section "ARTEPOOL ERP Server" SecServer
 
   ${If} $Mode == "upgrade"
     Call Upgrade
+  ${ElseIf} $Mode == "reattach"
+    !insertmacro Log "Installing again with the data kept in $DataDir"
+    SetOutPath "$INSTDIR"
+    File /r "${STAGE}\*"
+    WriteUninstaller "$INSTDIR\uninstall.exe"
+    !insertmacro WriteUninstallKey
+    !insertmacro Step "The protected secrets of the kept data open on this PC" '"$INSTDIR\artepool-svc.exe" --data "$DataDir" secrets check'
+    ${IfNot} ${FileExists} "$DataDir\config\server.json"
+      !insertmacro Step "The settings file" '"$INSTDIR\artepool-svc.exe" --data "$DataDir" config init --port ${SERVER_PORT}'
+    ${EndIf}
+    !insertmacro Step "The database, the services and the certificates" '"$INSTDIR\artepool-svc.exe" --data "$DataDir" run install --reattach'
   ${Else}
     !insertmacro Log "Copying the programs to $INSTDIR"
     SetOutPath "$INSTDIR"
@@ -285,8 +321,14 @@ Section "ARTEPOOL ERP Server" SecServer
   ; "ARTEPOOL - Emergency tool" (decision 0107): its own manifest asks for administrator rights.
   CreateShortcut "$SMPROGRAMS\$(EmergencyTool).lnk" "$INSTDIR\artepool-emergency.exe"
 
+  ; The version the data now belongs to (a later reinstall never puts an older program over it).
+  FileOpen $1 "$DataDir\config\version.txt" w
+  FileWrite $1 "${VERSION}"
+  FileClose $1
   ${If} $Mode == "upgrade"
     !insertmacro Log "Upgraded to ${VERSION}."
+  ${ElseIf} $Mode == "reattach"
+    !insertmacro Log "Installed again with the kept data."
   ${Else}
     !insertmacro Log "Installed."
   ${EndIf}
@@ -319,10 +361,38 @@ FunctionEnd
   !insertmacro Log "  exit code $0"
 !macroend
 
+; "Also delete the data" (decision 0103, part G4): unticked; never in a silent uninstall.
+Function un.DeleteDataPage
+  !insertmacro MUI_HEADER_TEXT "$(DeleteDataTitle)" "$(DeleteDataSub)"
+  nsDialogs::Create 1018
+  Pop $0
+  ${NSD_CreateLabel} 0 0 100% 70u "$(DeleteDataText)"
+  Pop $0
+  ${NSD_CreateCheckbox} 0 80u 100% 14u "$(DeleteDataBox)"
+  Pop $DeleteBox
+  nsDialogs::Show
+FunctionEnd
+
+Function un.DeleteDataLeave
+  ${NSD_GetState} $DeleteBox $DeleteData
+FunctionEnd
+
 Section "Uninstall"
   SetShellVarContext all
   !insertmacro OpenLog "uninstall"
-  !insertmacro Log "The data in $DataDir is kept (database, backups, secrets, settings)."
+  ${If} $DeleteData == ${BST_CHECKED}
+    ; Its own window asks for DELETE and the owner's password (checked against the database),
+    ; then stops the services and deletes; the backups folder and the logs stay.
+    !insertmacro Log "The owner chose to delete the data: the confirmation window opens."
+    ExecWait '"$INSTDIR\artepool-svc.exe" --data "$DataDir" run delete-data' $0
+    ${If} $0 == 0
+      !insertmacro Log "The data was deleted; the backups folder and the logs are kept."
+    ${Else}
+      !insertmacro Log "The data was not deleted (exit code $0): it is kept."
+    ${EndIf}
+  ${Else}
+    !insertmacro Log "The data in $DataDir is kept (database, backups, secrets, settings)."
+  ${EndIf}
 
   !insertmacro UnStep "Stop ArtepoolBackup" '"$SYSDIR\sc.exe" stop ArtepoolBackup'
   !insertmacro UnStep "Stop ArtepoolServer" '"$SYSDIR\sc.exe" stop ArtepoolServer'

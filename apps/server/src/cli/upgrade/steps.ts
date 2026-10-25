@@ -91,6 +91,12 @@ export function preUpgradeFileName(from: string, to: string, now: Date): string 
   return `artepool-${stamp}Z-${from}-to-${to}.dump`;
 }
 
+/** `artepool-20261025-093000Z-before-reinstall.dump` (UTC): the copy before a reinstall (G3). */
+export function reinstallCopyName(now: Date): string {
+  const stamp = now.toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 15);
+  return `artepool-${stamp}Z-before-reinstall.dump`;
+}
+
 const PRE_UPGRADE_COPY = /^artepool-\d{8}-\d{6}Z-.+\.dump$/;
 
 async function openShifts(migrator: PgConnection, database: string): Promise<number> {
@@ -159,6 +165,49 @@ async function stopAll(platform: UpgradePlatform, log: InstallLog): Promise<void
   }
 }
 
+/**
+ * A copy of the whole database in `backups\pre-upgrade\<fileName>`, checked with pg_restore
+ * --list, its SHA-256 beside it; the oldest copies beyond KEEP_PRE_UPGRADE go. Used before an
+ * upgrade, and before a reinstall brings existing data up to its version (part G3).
+ */
+export async function preUpgradeCopy(input: {
+  fileName: string;
+  databaseName: string;
+  backupsDir: string;
+  pgBin: string;
+  connection: PgConnection;
+  log: InstallLog;
+}): Promise<PreparedUpgrade> {
+  const dir = join(input.backupsDir, 'pre-upgrade');
+  await mkdir(dir, { recursive: true });
+  const path = join(dir, input.fileName);
+  const partial = `${path}.partial`;
+  try {
+    await run(
+      pgTool(input.pgBin, 'pg_dump'),
+      [
+        ...connectionArgs(input.connection, input.databaseName),
+        '--format=custom',
+        '--compress=6',
+        `--file=${partial}`,
+      ],
+      input.connection,
+    );
+    // A copy that pg_restore cannot list is not a backup.
+    await run(pgTool(input.pgBin, 'pg_restore'), ['--list', partial], input.connection);
+  } catch (error) {
+    await unlink(partial).catch(() => undefined);
+    throw new UpgradeError('backup', message(error));
+  }
+  await rename(partial, path);
+  const sha256 = (await sha256File(path)).toString('hex');
+  await writeFile(`${path}.sha256`, `${sha256}  ${basename(path)}\n`);
+  const { size } = await stat(path);
+  input.log.line(`Pre-upgrade backup: ${path} (${size} bytes, SHA-256 ${sha256})`);
+  await removeOldPreUpgradeCopies(dir, basename(path));
+  return { backup: path, sha256 };
+}
+
 export async function prepareUpgrade(input: PrepareInput): Promise<PreparedUpgrade> {
   const { platform, log, connections } = input;
   const now = input.now ?? new Date();
@@ -190,33 +239,14 @@ export async function prepareUpgrade(input: PrepareInput): Promise<PreparedUpgra
     }
 
     log.line('Pre-upgrade backup');
-    const dir = join(input.backupsDir, 'pre-upgrade');
-    await mkdir(dir, { recursive: true });
-    const path = join(dir, preUpgradeFileName(input.from, input.to, now));
-    const partial = `${path}.partial`;
-    try {
-      await run(
-        pgTool(input.pgBin, 'pg_dump'),
-        [
-          ...connectionArgs(connections.backup, input.databaseName),
-          '--format=custom',
-          '--compress=6',
-          `--file=${partial}`,
-        ],
-        connections.backup,
-      );
-      // A copy that pg_restore cannot list is not a backup.
-      await run(pgTool(input.pgBin, 'pg_restore'), ['--list', partial], connections.backup);
-    } catch (error) {
-      await unlink(partial).catch(() => undefined);
-      throw new UpgradeError('backup', error instanceof Error ? error.message : String(error));
-    }
-    await rename(partial, path);
-    const sha256 = (await sha256File(path)).toString('hex');
-    await writeFile(`${path}.sha256`, `${sha256}  ${basename(path)}\n`);
-    const { size } = await stat(path);
-    log.line(`Pre-upgrade backup: ${path} (${size} bytes, SHA-256 ${sha256})`);
-    await removeOldPreUpgradeCopies(dir, basename(path));
+    const { backup: path, sha256 } = await preUpgradeCopy({
+      fileName: preUpgradeFileName(input.from, input.to, now),
+      databaseName: input.databaseName,
+      backupsDir: input.backupsDir,
+      pgBin: input.pgBin,
+      connection: connections.backup,
+      log,
+    });
 
     log.line('Stopping the database service');
     await platform.stopService('database');

@@ -5,6 +5,8 @@
  * the ARTÉPOOL CA and server certificate, the setup token and CA for the wizard, the services in
  * the right order, the firewall rule; the superuser's password file is gone and the log holds no
  * secret. An earlier installation, an old Windows or a busy port stop it before anything changes.
+ * A reinstall over the kept data (part G3) uses the same database and certificates, makes a
+ * checked copy first and keeps the finished first-run setup closed.
  */
 import { X509Certificate } from 'node:crypto';
 import { existsSync } from 'node:fs';
@@ -14,7 +16,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { configFromEnv } from '@artepool/backup';
 import { connectionFor, migrationsDir } from '@artepool/node-kit';
+import { inContext } from '@artepool/testing';
 import { InstallLog } from '../../src/cli/install/log';
 import { InstallError, runInstall, type InstallPaths } from '../../src/cli/install/steps';
 import type { Platform } from '../../src/cli/install/windows';
@@ -62,7 +66,7 @@ function fakePlatform() {
   return { platform, calls };
 }
 
-/** initdb as far as the installation sees it: the two settings files in the data folder. */
+/** initdb as far as the installation sees it: the settings files and PG_VERSION in the data folder. */
 function fakeInitdb(seen: { passwordFile?: string; password?: string }) {
   return async (file: string, args: string[]) => {
     if (!file.endsWith('initdb')) throw new Error(`unexpected ${file}`);
@@ -73,6 +77,7 @@ function fakeInitdb(seen: { passwordFile?: string; password?: string }) {
     await mkdir(pgdata, { recursive: true });
     await writeFile(join(pgdata, 'postgresql.conf'), "#listen_addresses = 'localhost'\n");
     await writeFile(join(pgdata, 'pg_hba.conf'), 'host all all all trust\n');
+    await writeFile(join(pgdata, 'PG_VERSION'), '18\n');
     return 'Success. You can now start the database server.\n';
   };
 }
@@ -177,6 +182,76 @@ describe('the server installation', () => {
       expect(lines.join('\n')).not.toContain(secret);
     }
   }, 120_000);
+
+  it('installs again over the kept data: same database and certificates, a copy first', async () => {
+    const paths = { ...pathsIn(join(root, 'pc1')), pgBin: configFromEnv(database).pgBin };
+    const caBefore = await readFile(join(paths.tls, 'ca.crt'), 'utf8');
+    const su = new pg.Client({ ...connectionFor('superuser'), database });
+    await su.connect();
+    try {
+      await inContext(su, async () => {
+        await su.query(`UPDATE sys.setup_state SET state = 'in_progress', path = 'new'`);
+        await su.query(`UPDATE sys.setup_state SET state = 'complete'`);
+      });
+    } finally {
+      await su.end();
+    }
+    const { platform, calls } = fakePlatform();
+    const lines: string[] = [];
+    let healthCa = '';
+
+    await runInstall({
+      paths,
+      serverPort: await freePort(),
+      databasePort: await freePort(),
+      databaseName: database,
+      platform,
+      exec: () => Promise.reject(new Error('initdb must not run on a reinstall')),
+      log: new InstallLog(null, (l) => lines.push(l)),
+      windowsBuild: null,
+      allowNonWindows: true,
+      reattach: true,
+      now: new Date('2026-10-27T08:00:00Z'),
+      waitHealthy: (ca) => Promise.resolve(void (healthCa = ca)),
+    });
+
+    expect(calls).toContain(`restrict ${paths.pgdata} 0`);
+    expect(calls).toContain(`database ${paths.pgdata}`);
+    expect(calls.slice(-3)).toEqual([
+      'start server',
+      'start backup',
+      expect.stringMatching(/^firewall /),
+    ]);
+    // The PCs keep trusting the same CA; the finished setup stays closed.
+    expect(await readFile(join(paths.tls, 'ca.crt'), 'utf8')).toBe(caBefore);
+    expect(healthCa).toBe(caBefore);
+    expect(existsSync(paths.tokenFile)).toBe(false);
+    const copy = join(
+      paths.backups,
+      'pre-upgrade',
+      'artepool-20261027-080000Z-before-reinstall.dump',
+    );
+    expect(existsSync(copy)).toBe(true);
+    expect(existsSync(`${copy}.sha256`)).toBe(true);
+    expect(lines.join('\n')).toContain('installed again with its data');
+  }, 120_000);
+
+  it('refuses a reinstall where there is no earlier data', async () => {
+    await expect(
+      runInstall({
+        paths: pathsIn(join(root, 'empty')),
+        serverPort: 1,
+        databasePort: 1,
+        databaseName: database,
+        platform: fakePlatform().platform,
+        exec: () => Promise.reject(new Error('nothing may run')),
+        log: new InstallLog(null, () => undefined),
+        windowsBuild: 26100,
+        reattach: true,
+        waitHealthy: () => Promise.resolve(),
+      }),
+    ).rejects.toThrow(/no earlier ARTEPOOL data/);
+  });
 
   it('refuses an earlier installation, an old Windows and a busy port, changing nothing', async () => {
     const run = (dir: string, patch: Partial<Parameters<typeof runInstall>[0]>) =>

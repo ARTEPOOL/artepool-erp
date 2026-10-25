@@ -53,6 +53,8 @@ try {
     exec,
     log,
     windowsBuild: windowsBuildOf(),
+    // The setup passes --reattach over the data an uninstall kept (decision 0103, part G3).
+    reattach: process.argv.includes('--reattach'),
     waitHealthy: waitHealthy(
       serverPort,
       () => new InstallError('The server did not answer within two minutes; see logs\\server.'),

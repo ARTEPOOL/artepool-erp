@@ -14,6 +14,9 @@
 # --test-upgrade` makes: one that works (data kept, its migration applied, a checked pre-upgrade
 # copy, the previous programs kept), an older setup refused, and one whose migration fails (the
 # database unchanged, the previous version back and answering).
+# Reinstall over the kept data (part G3): an older setup refused, the same version's setup uses
+# the database and the CA as they were, no wizard. Deleting the data (part G4): refused without
+# the owner's password; with it the database, secrets and settings go and the backups stay.
 # The install logs are searched for every secret (and the emergency temporary password): none
 # may appear.
 param([Parameter(Mandatory = $true)][string]$Installer)
@@ -50,7 +53,7 @@ function Install-Server([string]$label) {
   Ok ($p.ExitCode -eq 0) "$label silent install (exit $($p.ExitCode))"
 }
 
-function Uninstall-Server([string]$label) {
+function Uninstall-Server([string]$label, [bool]$dataKept = $true) {
   $p = Start-Process -FilePath "$pf\uninstall.exe" -ArgumentList '/S', "_?=$pf" -Wait -PassThru
   Ok ($p.ExitCode -eq 0) "$label uninstall (exit $($p.ExitCode))"
   Remove-Item -Recurse -Force $pf -ErrorAction SilentlyContinue
@@ -58,7 +61,7 @@ function Uninstall-Server([string]$label) {
     Ok ($null -eq (Get-Service -Name $name -ErrorAction SilentlyContinue)) "$label service $name removed"
   }
   Ok ($null -eq (Get-NetFirewallRule -DisplayName 'ARTEPOOL Server' -ErrorAction SilentlyContinue)) "$label firewall rule removed"
-  Ok (Test-Path "$data\pgdata\PG_VERSION") "$label the data is kept in ProgramData"
+  if ($dataKept) { Ok (Test-Path "$data\pgdata\PG_VERSION") "$label the data is kept in ProgramData" }
   Ok (@(Emergency-Shortcuts).Count -eq 0) "$label the emergency tool's shortcut is removed"
   Ok (-not (Test-Path "$pf.previous") -and -not (Test-Path "$pf.failed")) "$label the folders upgrades leave are removed"
 }
@@ -94,8 +97,11 @@ function Check-Health([string]$label) {
 $script:alsoSecret = @()
 
 function Check-Logs-Hold-No-Secret([string]$label) {
-  $secrets = @('master-key', 'migrator-password', 'api-password', 'backup-password', 'maint-password', 'pg-superuser-password') |
-    ForEach-Object { Secret $_ }
+  $secrets = @()
+  if (Test-Path "$data\secrets") {
+    $secrets += @('master-key', 'migrator-password', 'api-password', 'backup-password', 'maint-password', 'pg-superuser-password') |
+      ForEach-Object { Secret $_ }
+  }
   $secrets += $script:alsoSecret
   if (Test-Path "$data\setup\token") { $secrets += (Get-Content "$data\setup\token" -Raw).Trim() }
   $files = Get-ChildItem "$data\logs" -Recurse -File
@@ -223,6 +229,7 @@ Ok ($refused.ok -eq $false -and $refused.reason -eq 'reason_required') 'emergenc
 $reset = Emergency 'reset-password' '{"reason":"CI emergency test","phoneLost":false}'
 Ok ($reset.ok -eq $true -and $reset.result.temporaryPassword.Length -ge 10) 'emergency: a temporary password for the owner'
 $script:alsoSecret += $reset.result.temporaryPassword
+$ownerPassword = $reset.result.temporaryPassword
 Ok ((Psql "SELECT count(*) FROM audit.log WHERE action = 'event:auth.owner_password_reset' AND reason LIKE 'emergency tool % CI emergency test'") -eq '1') 'emergency: the reset is in the audit log with its reason'
 $code = Emergency 'device-code' '{}'
 Ok ($code.ok -eq $true -and $code.result.code.Length -ge 6) 'emergency: an enrollment code'
@@ -278,8 +285,43 @@ Ok ($result.ok -eq $false -and $result.step -eq 'migrate') "the failure is saved
 Ok (Test-Path "$pf.failed\artepool-svc.exe") 'the failed programs are kept aside for support'
 Check-Logs-Hold-No-Secret 'after the upgrades:'
 
-# ---- 4. Uninstall keeps the data; then a new PC ----
+# ---- 4. Uninstall keeps the data; reinstall uses it; then deleting the data ----
 Uninstall-Server 'first'
+$caHash = (Get-FileHash "$data\secrets\tls\ca.crt").Hash
+$exit = Run-Setup $Installer
+Ok ($exit -eq 4) "an older setup does not reinstall over data of a newer version (exit $exit)"
+Ok ($null -eq (Get-Service -Name 'ArtepoolDatabase' -ErrorAction SilentlyContinue)) 'and changes nothing'
+$exit = Run-Setup $tests[0].FullName
+if ($exit -ne 0) { Show-Logs }
+Ok ($exit -eq 0) "reinstall over the kept data (exit $exit)"
+Check-Health 'after the reinstall'
+Ok ((Psql "SELECT count(*) FROM auth.users WHERE username = 'ciowner'") -eq '1') 'the owner is still there'
+Ok ((Psql 'SELECT state FROM sys.setup_state') -eq 'complete') 'the first-run setup stays closed'
+Ok (-not (Test-Path "$data\setup\token")) 'no setup token'
+Ok ((Get-FileHash "$data\secrets\tls\ca.crt").Hash -eq $caHash) 'the PCs keep trusting the same CA'
+Ok (@(Get-ChildItem "$data\backups\pre-upgrade" -Filter '*-before-reinstall.dump').Count -eq 1) 'a checked copy was made before the reinstall'
+foreach ($name in 'ArtepoolDatabase', 'ArtepoolServer', 'ArtepoolBackup') {
+  Ok ((Get-Service $name).Status -eq 'Running') "$name runs after the reinstall"
+}
+Check-Logs-Hold-No-Secret 'after the reinstall:'
+
+$script:alsoSecret += @('master-key', 'migrator-password', 'api-password', 'backup-password', 'maint-password', 'pg-superuser-password') |
+  ForEach-Object { Secret $_ }
+"DELETE`nnot-the-owner-password`n" | & $svc run delete-data | Out-Null
+Ok ($LASTEXITCODE -eq 1) "delete data with a wrong owner's password is refused (exit $LASTEXITCODE)"
+Ok (Test-Path "$data\pgdata\PG_VERSION") 'nothing was deleted'
+Ok ((Psql "SELECT count(*) FROM audit.log WHERE action = 'event:system.data_delete_refused'") -eq '1') 'the refusal is in the audit log'
+"delete`n$ownerPassword`n" | & $svc run delete-data | Out-Null
+Ok ($LASTEXITCODE -eq 1 -and (Test-Path "$data\pgdata\PG_VERSION")) 'without the word DELETE nothing is deleted'
+"DELETE`n$ownerPassword`n" | & $svc run delete-data | Out-Null
+Ok ($LASTEXITCODE -eq 0) "delete data with DELETE and the owner's password (exit $LASTEXITCODE)"
+foreach ($folder in 'pgdata', 'wal', 'secrets', 'config', 'setup') {
+  Ok (-not (Test-Path "$data\$folder")) "$folder is deleted"
+}
+Ok (@(Get-ChildItem "$data\backups" -Recurse -Filter '*.dump').Count -ge 2) 'the backups folder stays'
+Ok (Test-Path "$data\logs\install") 'the logs stay'
+Check-Logs-Hold-No-Secret 'after deleting the data:'
+Uninstall-Server 'after deleting the data:' $false
 Remove-Item -Recurse -Force $data
 Ok (-not (Test-Path $data)) 'the data is wiped, as on a new PC'
 

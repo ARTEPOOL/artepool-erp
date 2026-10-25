@@ -36,6 +36,7 @@ export const ENTRY_POINTS: Record<string, string> = {
   install: 'apps/server/src/cli/install.ts',
   emergency: 'apps/server/src/cli/emergency.ts',
   upgrade: 'apps/server/src/cli/upgrade.ts',
+  'delete-data': 'apps/server/src/cli/delete-data.ts',
 };
 
 /** Packages kept as files: a native library, and the browser driver that loads its own files. */
