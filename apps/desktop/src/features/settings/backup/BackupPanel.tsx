@@ -39,6 +39,7 @@ import { CardHead, NoAccess, PanelHeader, settingsClasses } from '../parts';
 import styles from './backup.module.css';
 import { DriveDialog } from './DriveDialog';
 import { KeyDialog } from './KeyDialog';
+import { UpdatesCard } from './UpdatesCard';
 
 export const HEALTH_KEY = ['settings', 'health'] as const;
 
@@ -326,6 +327,8 @@ export function BackupPanel() {
               </div>
             </div>
           </Card>
+
+          <UpdatesCard />
 
           {h.integrity.last && Object.keys(h.integrity.last.checks).length > 0 && (
             <Card rise index={2}>

@@ -1,0 +1,22 @@
+/* The "new version ready" notice (decision 0108). Tokens and logical properties only. */
+.notice {
+  position: fixed;
+  inset-block-end: var(--space-4);
+  inset-inline-end: var(--space-4);
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  max-inline-size: min(36rem, calc(100% - var(--space-8)));
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.notes {
+  margin: var(--space-1) 0 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-caption);
+  white-space: pre-line;
+}

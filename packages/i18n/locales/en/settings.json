@@ -934,5 +934,55 @@
       "barcode_too_long": "The code is too long for its barcode to fit this width. Print these labels on 50 × 30.",
       "cannot_encode": "This code cannot be printed as a barcode."
     }
+  },
+  "updates": {
+    "title": "Updates",
+    "current": "Version running",
+    "checked": "Last checked {date}",
+    "notChecked": "Not checked yet",
+    "offline": "The internet could not be reached. Everything keeps working; updates wait.",
+    "upToDate": "Up to date",
+    "available": "New version",
+    "download": {
+      "none": "Not downloaded yet",
+      "downloading": "Downloading in the background…",
+      "ready": "Downloaded and checked",
+      "failed": "The download was refused; it is tried again later"
+    },
+    "waiting": {
+      "open_shift": "Waiting: a shift is open",
+      "outside_window": "Installs by itself in the night window",
+      "failed_before": "This version failed once and the previous version came back; it is tried again only with \"Install now\"",
+      "installing": "Installing now…"
+    },
+    "request": {
+      "pending": "Install now: starting within a few minutes",
+      "running": "Install now: installing",
+      "done": "Installed",
+      "failed": "Install now did not succeed"
+    },
+    "installNow": "Install now",
+    "asked": "The update starts within a few minutes, when no shift is open.",
+    "confirm": "Version {version} will be installed now. The system stops for a few minutes while it installs; a checked backup is made first, and if anything goes wrong the previous version comes back by itself. It never starts while a shift is open.",
+    "last": "Last update",
+    "lastOk": "Updated to {version} on {date}.",
+    "lastFailed": "The update to {version} on {date} did not succeed ({step}). The previous version came back and your data is as it was.",
+    "ok": "Succeeded",
+    "rolledBack": "Previous version back",
+    "step": {
+      "checks": "checks",
+      "open_shift": "a shift was open",
+      "backup": "the backup before the update",
+      "services": "starting the services",
+      "migrate": "the database changes",
+      "health": "the new version did not answer",
+      "put_back": "putting the database back — call support"
+    },
+    "window": "Night window",
+    "windowText": "Updates install by themselves between {start} and {end} (shop time), never during a shift.",
+    "changeWindow": "Change",
+    "from": "From",
+    "to": "To",
+    "automatic": "The server PC checks for updates by itself, downloads them in the background and installs them at a safe time. The office PCs update after the server."
   }
 }

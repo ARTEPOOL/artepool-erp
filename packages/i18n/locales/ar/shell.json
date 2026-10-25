@@ -21,5 +21,11 @@
   "device": {
     "label": "{name} · {code}",
     "notEnrolled": "هذا الجهاز غير مسجّل بعد"
+  },
+  "appUpdate": {
+    "ready": "آرتيبول {version} جاهزة",
+    "install": "سطّب وأعد التشغيل",
+    "installing": "بيتسطّب…",
+    "failed": "التحديث ما اتسطّبش دلوقتي؛ هنجرّب تاني بعدين."
   }
 }

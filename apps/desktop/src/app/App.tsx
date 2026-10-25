@@ -6,6 +6,7 @@ import { AuthGate } from '../features/auth/AuthGate';
 import { AuthProvider, useAuthState } from '../features/auth/context';
 import { AuthController } from '../features/auth/controller';
 import { KioskWatcher } from '../features/kiosk/KioskWatcher';
+import { AppUpdater } from '../features/updates/AppUpdater';
 import { ToastProvider } from '../ui';
 import { createAppRouter } from './router';
 
@@ -40,6 +41,7 @@ export function App({ bridge }: { bridge?: Bridge }) {
       <ToastProvider>
         <AuthProvider controller={controller}>
           <KioskWatcher />
+          <AppUpdater />
           <Root />
         </AuthProvider>
       </ToastProvider>
