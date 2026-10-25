@@ -4,7 +4,7 @@
  * on its standard input (never on the command line).
  */
 import { describe, expect, it } from 'vitest';
-import { windowsHooks, type Exec } from '../../src/cli/restore-from-backup';
+import { keyFromInput, windowsHooks, type Exec } from '../../src/cli/restore-from-backup';
 
 function fakeSc(states: Record<string, string[]>, missing: string[] = []) {
   const calls: { file: string; args: string[]; input?: string }[] = [];
@@ -88,5 +88,21 @@ describe('the restore on Windows', () => {
     ]);
     expect(sc.calls[0]!.input).toBe(key.toString('base64'));
     expect(sc.calls[0]!.args.join(' ')).not.toContain(key.toString('base64'));
+  });
+});
+
+describe("the restore program's input", () => {
+  const KEY = `AGE-SECRET-KEY-1${'Q'.repeat(58)}`;
+
+  it('takes the key line out of the whole key file, a paste or the line alone', () => {
+    expect(keyFromInput(`# created: 2026-10-25\n# public key: age1abc\n${KEY}\n`)).toBe(KEY);
+    expect(keyFromInput(`${KEY}\r\n`)).toBe(KEY);
+    expect(keyFromInput(`  key: ${KEY} (keep it safe)`)).toBe(KEY);
+  });
+
+  it('nothing means a plain copy; anything else goes on and is refused as a wrong key', () => {
+    expect(keyFromInput('\n')).toBeNull();
+    expect(keyFromInput('')).toBeNull();
+    expect(keyFromInput(' not a key \n')).toBe('not a key');
   });
 });

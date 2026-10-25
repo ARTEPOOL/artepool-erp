@@ -98,7 +98,7 @@ describe('removing the throwaway database', () => {
   const exists = async (name: string) =>
     (await admin.query('SELECT 1 FROM pg_database WHERE datname = $1', [name])).rowCount === 1;
 
-  it('drops it plainly, and with FORCE only when another session is still connected', async () => {
+  it('drops it plainly, ending its own sessions first when one is still connected', async () => {
     const backup = new pg.Client({ ...config.connection, database: 'postgres' });
     await backup.connect();
     try {
@@ -107,7 +107,7 @@ describe('removing the throwaway database', () => {
       await dropThrowaway(backup, name);
       expect(await exists(name)).toBe(false);
 
-      // Still connected (its own role): the plain DROP is refused, FORCE ends that session.
+      // Still connected (its own role): that session is ended, then the plain DROP runs.
       await backup.query(`CREATE DATABASE ${backup.escapeIdentifier(name)} TEMPLATE template0`);
       const inside = new pg.Client({ ...config.connection, database: name });
       inside.on('error', () => undefined);

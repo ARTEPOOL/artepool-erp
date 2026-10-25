@@ -32,6 +32,7 @@ import {
   type RestoreStep,
 } from '@artepool/backup';
 import { migrate } from '@artepool/migrate';
+import { privateKeyIn } from '@artepool/shared/contracts';
 import { SettingsCache } from '../platform/settings';
 import { createDb, createPool } from '../platform/db/pool';
 import { createConsoleCode } from './bootstrap';
@@ -170,6 +171,15 @@ function defaultHooks(): Pick<RestoreHooks, 'stopServices' | 'startServices' | '
   const source = masterKeySource();
   if (!('file' in source)) throw new Error('No master key file in development.');
   return developmentHooks(source.file);
+}
+
+/**
+ * The private key from the restore program's input: the key line alone, as the setup screen
+ * does, since the key file (or a paste) may hold comment lines around it. Text with no key in it
+ * goes on as typed, and is refused as a wrong key; nothing at all means a plain copy.
+ */
+export function keyFromInput(text: string): string | null {
+  return privateKeyIn(text) ?? (text.trim() || null);
 }
 
 export async function restoreFromBackup(input: RestoreFromBackupInput): Promise<RestoreOutcome> {
