@@ -259,6 +259,14 @@ jobs:
             dist/installer/ARTEPOOL-Office-Setup-*.exe
             dist/installer/SHA256SUMS.txt
           retention-days: 14
+      # For trying an upgrade by hand on a test PC or VM (never the shop PC): the next version
+      # (works) and the one after (its migration fails, so the previous version comes back).
+      - name: Test upgrades (for a test PC only, never published)
+        uses: actions/upload-artifact@v4
+        with:
+          name: artepool-test-upgrades
+          path: dist/installer/test/ARTEPOOL-Server-Setup-*.exe
+          retention-days: 14
       - name: Installation logs (for review; they hold no secret)
         if: always()
         uses: actions/upload-artifact@v4
