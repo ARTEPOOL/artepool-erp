@@ -7,14 +7,14 @@
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type pg from 'pg';
+import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestDatabase, type TestDatabase } from '@artepool/testing';
 import { configFromEnv, type BackupConfig } from '../../src/config';
 import { connect } from '../../src/db';
 import { nightlyIntegrity, runChecks } from '../../src/integrity';
 import { localBackup } from '../../src/local';
-import { restoreDatabaseName, restoreTest } from '../../src/restore';
+import { dropThrowaway, restoreDatabaseName, restoreTest } from '../../src/restore';
 
 let db: TestDatabase;
 let client: pg.Client;
@@ -91,5 +91,35 @@ describe('the integrity checks on the live database', () => {
     expect(results.audit_chain!.ok).toBe(false);
     const run = await nightlyIntegrity(client);
     expect(run.status).toBe('issues');
+  });
+});
+
+describe('removing the throwaway database', () => {
+  const exists = async (name: string) =>
+    (await admin.query('SELECT 1 FROM pg_database WHERE datname = $1', [name])).rowCount === 1;
+
+  it('drops it plainly, ending its own sessions first when one is still connected', async () => {
+    const backup = new pg.Client({ ...config.connection, database: 'postgres' });
+    await backup.connect();
+    try {
+      const name = restoreDatabaseName(`${db.name}_drop`);
+      await backup.query(`CREATE DATABASE ${backup.escapeIdentifier(name)} TEMPLATE template0`);
+      await dropThrowaway(backup, name);
+      expect(await exists(name)).toBe(false);
+
+      // Still connected (its own role): that session is ended, then the plain DROP runs.
+      await backup.query(`CREATE DATABASE ${backup.escapeIdentifier(name)} TEMPLATE template0`);
+      const inside = new pg.Client({ ...config.connection, database: name });
+      inside.on('error', () => undefined);
+      await inside.connect();
+      await dropThrowaway(backup, name);
+      expect(await exists(name)).toBe(false);
+      await inside.end().catch(() => undefined);
+
+      // Nothing there: nothing to do.
+      await dropThrowaway(backup, name);
+    } finally {
+      await backup.end();
+    }
   });
 });

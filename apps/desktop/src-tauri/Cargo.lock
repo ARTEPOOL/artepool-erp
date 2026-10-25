@@ -123,8 +123,13 @@ dependencies = [
  "tauri-build",
  "tauri-plugin-single-instance",
  "tauri-plugin-updater",
+ "time",
  "tokio",
 ]
+
+[[package]]
+name = "artepool-emergency"
+version = "0.1.0"
 
 [[package]]
 name = "artepool-printer"
@@ -139,6 +144,7 @@ version = "0.1.0"
 dependencies = [
  "base64 0.23.1",
  "getrandom 0.3.4",
+ "serde_json",
  "thiserror 2.0.21",
  "zeroize",
 ]

@@ -182,9 +182,9 @@ jobs:
       - name: Formatting
         run: cargo fmt --all --check
       - name: Lints
-        run: cargo clippy -p artepool-bridge -p artepool-printer -p artepool-svc --all-targets -- -D warnings
+        run: cargo clippy -p artepool-bridge -p artepool-printer -p artepool-svc -p artepool-emergency --all-targets -- -D warnings
       - name: Tests (protocol vectors, TLS rules, enrollment and renewal; the RAW receipt printer; the service launcher)
-        run: cargo test -p artepool-bridge -p artepool-printer -p artepool-svc
+        run: cargo test -p artepool-bridge -p artepool-printer -p artepool-svc -p artepool-emergency
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v5
         with:
@@ -222,12 +222,12 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Rust tests on Windows (including Windows Credential Manager, DPAPI and folder access rules)
         run: cargo test --workspace --manifest-path apps/desktop/src-tauri/Cargo.toml
-      - name: Service launcher lints on Windows
-        run: cargo clippy -p artepool-svc --all-targets --manifest-path apps/desktop/src-tauri/Cargo.toml -- -D warnings
+      - name: Service launcher and emergency tool lints on Windows
+        run: cargo clippy -p artepool-svc -p artepool-emergency --all-targets --manifest-path apps/desktop/src-tauri/Cargo.toml -- -D warnings
       - name: Build the packaged server (Windows Argon2 library included)
         run: pnpm build:server --windows
-      - name: Build the service launcher
-        run: cargo build --release -p artepool-svc --manifest-path apps/desktop/src-tauri/Cargo.toml
+      - name: Build the service launcher and the emergency tool
+        run: cargo build --release -p artepool-svc -p artepool-emergency --manifest-path apps/desktop/src-tauri/Cargo.toml
       - name: Packaged server
         uses: actions/upload-artifact@v4
         with:
@@ -235,6 +235,7 @@ jobs:
           path: |
             dist/server
             apps/desktop/src-tauri/target/release/artepool-svc.exe
+            apps/desktop/src-tauri/target/release/artepool-emergency.exe
           retention-days: 14
       - name: Build the installer
         run: pnpm build:desktop
@@ -244,3 +245,25 @@ jobs:
           name: artepool-erp-windows
           path: apps/desktop/src-tauri/target/release/bundle/nsis/*.exe
           retention-days: 14
+      - name: Server installer (pinned PostgreSQL, Node and WinSW, each checked by SHA-256)
+        run: pnpm build:installer
+      - name: Install, restore and uninstall the server as on a clean PC
+        shell: pwsh
+        run: ./tools/installer/windows/test-install.ps1 -Installer (Get-ChildItem dist/installer/ARTEPOOL-Server-Setup-*.exe).FullName
+      - name: Server installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: artepool-server-setup
+          path: |
+            dist/installer/ARTEPOOL-Server-Setup-*.exe
+            dist/installer/ARTEPOOL-Office-Setup-*.exe
+            dist/installer/SHA256SUMS.txt
+          retention-days: 14
+      - name: Installation logs (for review; they hold no secret)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: artepool-install-logs
+          path: C:/ProgramData/ARTEPOOL/logs
+          retention-days: 14
+          if-no-files-found: ignore

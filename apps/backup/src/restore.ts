@@ -11,6 +11,31 @@ import { latestLocalCopy, localBackup } from './local';
 import { failRun, finishRun, startRun } from './runs';
 import { connectionArgs, pgTool, run } from './tools';
 
+/**
+ * Removes the throwaway database, without `WITH (FORCE)`: for a role that is not a superuser,
+ * FORCE fails when autovacuum is working in that database ("permission denied to terminate
+ * process", common right after a large restore). A plain DROP stops autovacuum itself and waits
+ * for it. If one of this role's own sessions is still connected (55006, object in use), it is
+ * ended (a role may end its own sessions) and the plain DROP tried again.
+ */
+export async function dropThrowaway(admin: pg.Client, database: string): Promise<void> {
+  const name = admin.escapeIdentifier(database);
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await admin.query(`DROP DATABASE IF EXISTS ${name}`);
+      return;
+    } catch (error) {
+      if ((error as { code?: string }).code !== '55006' || attempt >= 5) throw error;
+      await admin.query(
+        `SELECT pg_terminate_backend(pid) FROM pg_stat_activity
+          WHERE datname = $1 AND usename = current_user AND pid <> pg_backend_pid()`,
+        [database],
+      );
+      await new Promise((resolve) => setTimeout(resolve, 200 * attempt));
+    }
+  }
+}
+
 export function restoreDatabaseName(live: string): string {
   return `${live.slice(0, 63 - '_restore_test'.length)}_restore_test`;
 }
@@ -39,7 +64,7 @@ export async function restoreTest(
     const copy = (await latestLocalCopy(config)) ?? (await localBackup(live, config)).path;
     await admin.connect();
     const name = admin.escapeIdentifier(target);
-    await admin.query(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`);
+    await dropThrowaway(admin, target);
     await admin.query(
       `CREATE DATABASE ${name} TEMPLATE template0 ENCODING 'UTF8' LOCALE_PROVIDER builtin BUILTIN_LOCALE 'C.UTF-8'`,
     );
@@ -89,8 +114,7 @@ export async function restoreTest(
     await failRun(live, runId, error);
     throw error;
   } finally {
-    if (created)
-      await admin.query(`DROP DATABASE IF EXISTS ${admin.escapeIdentifier(target)} WITH (FORCE)`);
+    if (created) await dropThrowaway(admin, target);
     await admin.end().catch(() => undefined);
   }
 }

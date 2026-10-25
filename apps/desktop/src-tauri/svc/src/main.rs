@@ -4,6 +4,7 @@
 //!   artepool-svc secrets init            new secrets (installation)
 //!   artepool-svc secrets set <name>      replace one secret, value read from the standard input
 //!   artepool-svc secrets check           every secret present, opening, well protected
+//!   artepool-svc config init [--port N] [--database-port N]   the settings file (installation)
 //!
 //! `--data <folder>` (before the command) replaces `C:\ProgramData\ARTEPOOL`.
 
@@ -13,7 +14,8 @@ const USAGE: &str = "Usage:
   artepool-svc [--data <folder>] run <program> [args...]
   artepool-svc [--data <folder>] secrets init
   artepool-svc [--data <folder>] secrets set <name>   (the value is read from the standard input)
-  artepool-svc [--data <folder>] secrets check";
+  artepool-svc [--data <folder>] secrets check
+  artepool-svc [--data <folder>] config init [--port <n>] [--database-port <n>]";
 
 #[cfg(windows)]
 fn main() -> ExitCode {
@@ -91,6 +93,23 @@ fn main() -> ExitCode {
             println!("The secret \"{}\" was replaced.", secret.name);
             Ok(0)
         }),
+        ["config", "init", options @ ..] => match config_choice(options) {
+            Some(choice) => artepool_svc::config::init(&layout, &choice).map(|written| {
+                if written {
+                    println!("Settings written: {}", layout.config_file().display());
+                } else {
+                    println!(
+                        "Settings already there, left unchanged: {}",
+                        layout.config_file().display()
+                    );
+                }
+                0
+            }),
+            None => {
+                eprintln!("{USAGE}");
+                return ExitCode::from(2);
+            }
+        },
         ["secrets", "check"] => load(&secrets_dir, &Dpapi, &WindowsAccess).map(|loaded| {
             println!(
                 "OK: {} secrets present, opening on this PC, and well protected.",
@@ -110,6 +129,22 @@ fn main() -> ExitCode {
             ExitCode::FAILURE
         }
     }
+}
+
+/// `--port <n>` and `--database-port <n>`, in any order; anything else is refused.
+#[cfg(windows)]
+fn config_choice(options: &[&str]) -> Option<artepool_svc::config::ConfigChoice> {
+    let mut choice = artepool_svc::config::ConfigChoice::default();
+    let mut rest = options.iter();
+    while let Some(option) = rest.next() {
+        let value: u16 = rest.next()?.parse().ok().filter(|p| *p > 0)?;
+        match *option {
+            "--port" => choice.server_port = value,
+            "--database-port" => choice.database_port = value,
+            _ => return None,
+        }
+    }
+    Some(choice)
 }
 
 #[cfg(not(windows))]

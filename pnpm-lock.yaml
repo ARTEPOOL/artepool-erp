@@ -169,6 +169,9 @@ importers:
       '@artepool/backup':
         specifier: workspace:*
         version: link:../backup
+      '@artepool/dev-db':
+        specifier: workspace:*
+        version: link:../../tools/dev-db
       '@artepool/migrate':
         specifier: workspace:*
         version: link:../../tools/migrate
@@ -371,6 +374,16 @@ importers:
       '@types/pg':
         specifier: 8.23.1
         version: 8.23.1
+
+  tools/installer:
+    dependencies:
+      '@artepool/node-kit':
+        specifier: workspace:*
+        version: link:../../packages/node-kit
+    devDependencies:
+      age-encryption:
+        specifier: 0.3.1
+        version: 0.3.1
 
   tools/lint: {}
 

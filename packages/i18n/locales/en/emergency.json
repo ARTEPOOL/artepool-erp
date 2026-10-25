@@ -1,0 +1,116 @@
+{
+  "frame": "Emergency tool · server PC",
+  "loading": "Opening the emergency tool…",
+  "notServer": {
+    "title": "This is not the server PC",
+    "body": "The emergency tool works only on the PC where ARTEPOOL's database and server are installed. Open it from the Start menu of the server PC.",
+    "close": "You can close this window."
+  },
+  "menu": {
+    "title": "ARTEPOOL – Emergency tool",
+    "subtitle": "For when the owner cannot sign in, or something does not work. Every action is written to the audit log.",
+    "password": {
+      "title": "Owner's password",
+      "body": "The owner forgot the password and \"Forgot your password?\" cannot be used. A temporary password is shown once.",
+      "open": "Reset the password"
+    },
+    "twoStep": {
+      "title": "Owner's phone code (2-step)",
+      "body": "Both the phone and the recovery codes are lost. The owner sets up the phone again at the next sign-in.",
+      "open": "Clear the phone code"
+    },
+    "code": {
+      "title": "Enrollment code for a PC",
+      "body": "A one-time code, valid for 10 minutes, to connect a PC to this server.",
+      "open": "Make a code"
+    },
+    "check": {
+      "title": "Check the system",
+      "body": "The database, the server, the backups, the protected secrets.",
+      "open": "Check now"
+    },
+    "logs": {
+      "title": "The logs folder",
+      "body": "C:\\ProgramData\\ARTEPOOL\\logs — send it to support when asked.",
+      "open": "Open the folder",
+      "failed": "The folder could not be opened."
+    }
+  },
+  "back": "Back",
+  "done": "Done",
+  "reason": {
+    "label": "Why is this needed?",
+    "hint": "Required, at least 3 characters. Kept in the audit log."
+  },
+  "password": {
+    "title": "Reset the owner's password",
+    "subtitle": "If the owner still has the phone and a recovery code, use \"Forgot your password?\" on the sign-in screen instead.",
+    "phoneLost": "The phone with the 2-step code is lost too (the phone code is cleared as well)",
+    "warning": "All the owner's sessions end and no PC stays trusted.",
+    "submit": "Reset the password",
+    "doneTitle": "The temporary password",
+    "doneFor": "For {username}. Write it down now: it is shown only this once.",
+    "temporary": "Temporary password",
+    "next": "Sign in with it on any PC; the app asks for a new password at once.",
+    "nextTwoStepCleared": "After the password, the app asks to set up the phone again.",
+    "nextTwoStepKept": "The 6-digit code from the phone is still needed."
+  },
+  "twoStep": {
+    "title": "Clear the owner's phone code",
+    "subtitle": "Use this only if the phone and the recovery codes are both lost.",
+    "warning": "All the owner's sessions end. At the next sign-in the owner sets up a new phone.",
+    "submit": "Clear the phone code",
+    "doneTitle": "The phone code was cleared",
+    "doneFor": "For {username}. At the next sign-in, the app asks to set up the phone again."
+  },
+  "code": {
+    "title": "Enrollment code for a PC",
+    "subtitle": "Type it on the new PC together with this server's address. Any earlier unused code stops working.",
+    "submit": "Make a code",
+    "label": "Enrollment code",
+    "until": "Valid once, until {time} (Al Ain time)."
+  },
+  "check": {
+    "title": "Check the system",
+    "again": "Check again",
+    "checking": "Checking…",
+    "services": {
+      "database": "Database service",
+      "server": "Server service",
+      "backup": "Backup service"
+    },
+    "state": {
+      "running": "Running",
+      "stopped": "Stopped",
+      "starting": "Starting",
+      "missing": "Not installed",
+      "unknown": "Unknown"
+    },
+    "secrets": "Protected secrets",
+    "secretsOk": "They open",
+    "secretsBad": "They do not open",
+    "database": "Database answers",
+    "databaseOk": "Yes",
+    "databaseBad": "No",
+    "setup": "First-run setup",
+    "setupDone": "Completed",
+    "setupNotDone": "Not completed yet",
+    "owner": "Owner",
+    "ownerNone": "No owner yet",
+    "ownerTwoStepOn": "{username} · phone code on",
+    "ownerTwoStepOff": "{username} · no phone code",
+    "allGood": "Everything works.",
+    "notAllGood": "Something does not work. Restart the PC; if it stays red, open the logs folder and send it to support."
+  },
+  "errors": {
+    "not_server_pc": "This is not the server PC.",
+    "launch_failed": "The emergency program could not run. Close this window, open the tool again from the Start menu and accept the administrator prompt.",
+    "unknown_action": "This action is not known.",
+    "bad_input": "Something is missing in the form.",
+    "reason_required": "Write why this is needed (at least 3 characters).",
+    "no_owner": "There is no owner yet. Finish the first-run setup first.",
+    "database_unreachable": "The database does not answer. Restart the PC and try again; if it still fails, send the logs folder to support.",
+    "failed": "It did not work. Nothing was changed.",
+    "detail": "Details for support: {detail}"
+  }
+}

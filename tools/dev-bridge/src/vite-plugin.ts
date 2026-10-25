@@ -10,6 +10,10 @@
  *   POST /__artepool/restore/copies → RestoreCopy[] (restore from a backup, decision 0102)
  *   POST /__artepool/restore/start  → { started } (the private key goes to the program's input)
  *   GET  /__artepool/restore/status → RestoreStatus
+ *   GET  /__artepool/emergency       → EmergencyInfo (the emergency window, decision 0107)
+ *   POST /__artepool/emergency/check → the system check
+ *   POST /__artepool/emergency/run   → one action's answer
+ *   POST /__artepool/emergency/logs  → {} (no folder to open in development)
  *
  * Only pages served by this dev server may call them (same origin), so another web page open in
  * the same browser cannot use this PC's device key.
@@ -20,12 +24,14 @@ import type { Plugin } from 'vite';
 import { repoRoot } from '@artepool/node-kit';
 import {
   BridgeRequest,
+  EmergencyRun,
   EnrollInput,
   RestoreLookup,
   RestoreStart,
   SetupRequest,
 } from '@artepool/shared/contracts';
 import { DevBridge } from './bridge';
+import { emergencyCheck, emergencyInfo, emergencyRun } from './emergency';
 import { restoreCopies, restoreStart, restoreStatus } from './restore';
 import { setupInfo, setupRequest } from './setup';
 
@@ -103,6 +109,7 @@ export function artepoolDevBridge(options: DevBridgePluginOptions): Plugin {
             if (route === 'GET /device') return reply(response, 200, await bridge.localDevice());
             if (route === 'GET /setup') return reply(response, 200, await setupInfo());
             if (route === 'GET /restore/status') return reply(response, 200, restoreStatus());
+            if (route === 'GET /emergency') return reply(response, 200, emergencyInfo());
             if (request.method !== 'POST' || !request.headers['content-type']?.includes('json')) {
               return reply(response, 404, { error: 'not found' });
             }
@@ -126,6 +133,15 @@ export function artepoolDevBridge(options: DevBridgePluginOptions): Plugin {
               if (!input.success) return reply(response, 400, { error: 'invalid' });
               return reply(response, 200, await restoreStart(input.data));
             }
+            if (route === 'POST /emergency/check') {
+              return reply(response, 200, await emergencyCheck());
+            }
+            if (route === 'POST /emergency/run') {
+              const input = EmergencyRun.safeParse(await readBody(request));
+              if (!input.success) return reply(response, 400, { error: 'invalid' });
+              return reply(response, 200, await emergencyRun(input.data));
+            }
+            if (route === 'POST /emergency/logs') return reply(response, 200, {});
             if (route === 'POST /request') {
               const input = BridgeRequest.safeParse(await readBody(request));
               if (!input.success) return reply(response, 400, { error: 'invalid' });

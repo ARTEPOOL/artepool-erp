@@ -536,14 +536,13 @@ describe('saves (one transaction, idempotent)', () => {
     expect(errorCode(other)).toBe('IDEMPOTENCY_MISMATCH');
   });
 
-  it('does the work once even when the same request arrives twice at the same moment', async () => {
+  it('does the work once even when the same request arrives many times at the same moment', async () => {
     const key = randomUUID();
-    const [a, b] = await Promise.all([
-      save(key, { code: 'AIN-5', name: 'Al Ain 5' }),
-      save(key, { code: 'AIN-5', name: 'Al Ain 5' }),
-    ]);
-    expect([a.statusCode, b.statusCode]).toEqual([201, 201]);
-    expect(a.json<{ id: string }>().id).toBe(b.json<{ id: string }>().id);
+    const answers = await Promise.all(
+      Array.from({ length: 8 }, () => save(key, { code: 'AIN-5', name: 'Al Ain 5' })),
+    );
+    expect(answers.map((a) => a.statusCode)).toEqual(Array(8).fill(201));
+    expect(new Set(answers.map((a) => a.json<{ id: string }>().id)).size).toBe(1);
     const rows = await server.db
       .selectFrom('sys.branches')
       .select('id')

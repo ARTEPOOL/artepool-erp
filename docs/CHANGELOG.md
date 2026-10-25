@@ -1,5 +1,42 @@
 # Changelog
 
+## Installation, part F: the installers, the emergency tool, start at sign-in and the watchdog (2026-10-25)
+
+**In plain words:** ARTÉPOOL now installs like any Windows program.
+
+- **`ARTEPOOL-Server-Setup`** goes on the server PC (the cashier PC). It installs everything by itself:
+  - the database and the server, each running in the background as its own Windows service;
+  - the backups and the security certificates;
+  - one firewall rule for the shop's network only.
+
+  Then it opens the app on the first-run setup. Uninstalling it removes the programs and keeps all the data and backups.
+- **`ARTEPOOL-Office-Setup`** goes on the office PCs and the laptop. It needs no internet.
+- **"ARTEPOOL – Emergency tool"** is in the server PC's Start menu, so nobody ever types a command at the shop. Windows asks for the administrator's permission first, so a cashier cannot open it. It can:
+  - give the owner a temporary password;
+  - clear the owner's phone code;
+  - make a code to connect a PC;
+  - check the system (services, protected secrets, database), line by line in green or red;
+  - open the logs folder for support.
+
+  Every change is written to the audit log with its reason. Guide: `docs/runbooks/emergency-tool.md`.
+- **On the cashier PC** the app starts by itself when someone signs in to Windows. If it is closed by force while the kiosk lock is on, it comes back within seconds, and the owner gets an alert ("restarted", or "not running" if nothing brought it back).
+- **Install and uninstall logs** are kept in `C:\ProgramData\ARTEPOOL\logs\install` for support. They never contain a password, key or token.
+
+**Still to do:** the owner or a technician tests this on clean Windows 11 Home, Windows 11 Pro and Windows 10 Home test machines, using `docs/runbooks/vm-test-part-f.md`. That test covers a real USB stick, the administrator prompt in front of a person, and the cashier PC's restart after it is closed by force. The list of emergency-tool actions in decision 0107 waits for the owner's confirmation.
+
+- Decision 0107. No database change.
+- Tests:
+  - the install program, end to end against a real database;
+  - the emergency actions against a real database, with the audit log and no secret in it;
+  - the emergency window in Arabic and English (screen tests and a real browser);
+  - the watchdog's rules and the sign-in task (Rust).
+- On a Windows runner, each push:
+  - builds the installers;
+  - installs silently and checks the three services and their own accounts, TLS 1.3, no database on the network, the folder rules, the firewall rule, the secrets, the sign-in task, the watchdog's three cases and the emergency tool's actions;
+  - restarts the services, makes the shop's encrypted copy, uninstalls, wipes, installs again and restores it;
+  - uninstalls the server and the desktop app;
+  - scans every log for every secret.
+
 ## Installation, part E (last piece): "Restore from backup" in the setup screen (2026-10-24)
 
 **In plain words:** the first-run setup now offers **Restore from backup** next to New setup. It finds the backup copies by itself on a USB stick or the external drive, and in Downloads, Desktop and Documents (a Google Drive copy is downloaded first from drive.google.com, then it shows up there), newest first; you can also type the file's path. For a Google Drive copy you give your private key, typed or loaded from the key file; it is used only to open the copy and is never saved. You confirm, the screen shows each step (opening, restoring, updating, checking everything, putting it in place, a fresh backup), and at the end it says your data is back, how many old PCs must be enrolled again, and to reconnect Google Drive. Then this PC is enrolled as the point of sale with one press, and everyone signs in with their old password and phone code. If anything is wrong (wrong key, damaged or changed copy), it says so and nothing is changed. The guide is `docs/runbooks/restore-on-new-pc.md`.

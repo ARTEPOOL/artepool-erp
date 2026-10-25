@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@artepool/backup": "workspace:*",
+    "@artepool/dev-db": "workspace:*",
     "@artepool/migrate": "workspace:*",
     "@artepool/node-kit": "workspace:*",
     "@artepool/shared": "workspace:*",

@@ -244,7 +244,7 @@ impl RestoreRun {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
 
     fn temp_dir(name: &str) -> PathBuf {
@@ -300,7 +300,7 @@ mod tests {
     /// Writing a script while another test thread starts a process can make running it fail
     /// ("text file busy"): the tests that start the fake launcher take turns.
     #[cfg(unix)]
-    static SPAWNING: Mutex<()> = Mutex::new(());
+    pub(crate) static SPAWNING: Mutex<()> = Mutex::new(());
 
     #[cfg(unix)]
     fn fake_launcher(dir: &Path, body: &str) -> PathBuf {
