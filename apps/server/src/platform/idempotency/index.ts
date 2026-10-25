@@ -1,4 +1,4 @@
-import type { Transaction } from 'kysely';
+import { sql, type Transaction } from 'kysely';
 import { sha256 } from '../crypto/tokens';
 import type { DB } from '../db/schema.generated';
 import { AppError } from '../errors/app-error';
@@ -33,11 +33,21 @@ export function requestHash(method: string, url: string, body: unknown): Buffer 
   return sha256(stableStringify({ method, url, body: body ?? null }));
 }
 
-/** The answer already stored for this key, or undefined. A different request → 409. */
+/**
+ * The answer already stored for this key, or undefined. A different request → 409.
+ *
+ * The same request arriving twice at once: the second waits here, on a lock for its key held
+ * until the first transaction ends, then reads the first one's stored answer (each statement
+ * sees what is committed). Without it, the second could run the work too and hit the business
+ * table's own unique rule before the key's, answering "duplicate" instead of the first answer.
+ */
 export async function findStored(
   trx: Transaction<DB>,
   scope: IdempotencyScope,
 ): Promise<StoredResponse | undefined> {
+  await sql`SELECT pg_advisory_xact_lock(hashtextextended(${`idempotency:${scope.key}`}, 0))`.execute(
+    trx,
+  );
   const row = await trx
     .selectFrom('sys.idempotency_keys')
     .selectAll()

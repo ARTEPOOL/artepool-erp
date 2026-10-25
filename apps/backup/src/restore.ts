@@ -11,6 +11,22 @@ import { latestLocalCopy, localBackup } from './local';
 import { failRun, finishRun, startRun } from './runs';
 import { connectionArgs, pgTool, run } from './tools';
 
+/**
+ * Removes the throwaway database. A plain DROP first: it stops autovacuum on that database and
+ * waits for it, which `WITH (FORCE)` refuses to do for a role that is not a superuser ("permission
+ * denied to terminate process", right after a large restore). FORCE only when another session
+ * is still connected (55006, object in use).
+ */
+export async function dropThrowaway(admin: pg.Client, database: string): Promise<void> {
+  const name = admin.escapeIdentifier(database);
+  try {
+    await admin.query(`DROP DATABASE IF EXISTS ${name}`);
+  } catch (error) {
+    if ((error as { code?: string }).code !== '55006') throw error;
+    await admin.query(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`);
+  }
+}
+
 export function restoreDatabaseName(live: string): string {
   return `${live.slice(0, 63 - '_restore_test'.length)}_restore_test`;
 }
@@ -39,7 +55,7 @@ export async function restoreTest(
     const copy = (await latestLocalCopy(config)) ?? (await localBackup(live, config)).path;
     await admin.connect();
     const name = admin.escapeIdentifier(target);
-    await admin.query(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`);
+    await dropThrowaway(admin, target);
     await admin.query(
       `CREATE DATABASE ${name} TEMPLATE template0 ENCODING 'UTF8' LOCALE_PROVIDER builtin BUILTIN_LOCALE 'C.UTF-8'`,
     );
@@ -89,8 +105,7 @@ export async function restoreTest(
     await failRun(live, runId, error);
     throw error;
   } finally {
-    if (created)
-      await admin.query(`DROP DATABASE IF EXISTS ${admin.escapeIdentifier(target)} WITH (FORCE)`);
+    if (created) await dropThrowaway(admin, target);
     await admin.end().catch(() => undefined);
   }
 }
