@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Accepted (2026-10-20) |
+| **Status** | Accepted (2026-10-20); the "updates without internet" part (USB → server → PCs, offline key) replaced by [0108](0108-automatic-online-updates.md) (automatic online updates); USB stays as a support fallback |
 | **Date** | 2026-10-20 |
 | **Decided by** | Owner |
 | **Related** | [0007](0007-no-code-signing-certificate-for-now.md) (extended), [0086](0086-backups-local-and-google-drive.md), [0085](0085-server-on-the-pos-pc.md) |
