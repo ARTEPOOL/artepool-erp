@@ -13,7 +13,7 @@ Updates are automatic and online, with no manual step for the owner except one c
 
 **Where updates come from**
 - The source code stays in the **private** repository.
-- A separate **public** repository, `adretaae-ctrl/artepool-releases`, holds **only** the signed installers, their signatures, the update list (`latest.json`, with release notes in Arabic and English) and `SHA256SUMS.txt`. No source code, no secrets, no shop data, no internal documents. A check in the release workflow refuses to publish any other kind of file.
+- A separate **public** repository, `ARTEPOOL/artepool-releases`, holds **only** the signed installers, their signatures, the update list (`latest.json`, with release notes in Arabic and English) and `SHA256SUMS.txt`. No source code, no secrets, no shop data, no internal documents. A check in the release workflow refuses to publish any other kind of file.
 - Shop PCs read that public list over HTTPS; they need no password or token.
 
 **How a release is made and signed**
@@ -43,4 +43,5 @@ The owner wants updates without manual work. Keeping the code private while publ
 - The server PC needs outgoing HTTPS to `github.com` and its download hosts. Nothing incoming; 0093 is unchanged.
 - One-time steps for the owner, in `docs/runbooks/updates-setup.md` (Arabic): turn on GitHub 2-step, create the empty public repository, create the `release` environment with the owner as the required reviewer, create the update key (`pnpm release keygen`) and the publish token, and save them as environment secrets.
 - A failed version that was rolled back is not tried again by itself; only the owner's "Install now" retries it.
+- 2026-10-25: the project moved to the `ARTEPOOL` organization of the owner's GitHub Enterprise (Actions billed there); the public repository is `ARTEPOOL/artepool-releases`.
 - Later step: the office PCs taking the update from the server PC when they have no internet of their own (until then they wait for the internet).

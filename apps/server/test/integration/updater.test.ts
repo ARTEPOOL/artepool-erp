@@ -39,7 +39,7 @@ function latest(version: string, overrides: Record<string, unknown> = {}) {
     notesAr: 'تحسينات',
     notesEn: 'Improvements',
     server: {
-      url: `https://github.com/adretaae-ctrl/artepool-releases/releases/download/v${version}/${setupFileName(version)}`,
+      url: `https://github.com/ARTEPOOL/artepool-releases/releases/download/v${version}/${setupFileName(version)}`,
       signature,
       sha256: setupSha,
     },

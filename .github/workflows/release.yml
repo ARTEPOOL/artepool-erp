@@ -2,7 +2,7 @@ name: Release
 
 # Decision 0108: a version tag (v1.2.3) on main builds the setups, signs them with the update key
 # and publishes ONLY the allowed release files to the public repository
-# adretaae-ctrl/artepool-releases. The job waits in the protected "release" environment until the
+# ARTEPOOL/artepool-releases. The job waits in the protected "release" environment until the
 # owner approves it (one click); the signing key and the publishing token are secrets of that
 # environment only. The source code never leaves this private repository.
 
@@ -68,7 +68,7 @@ jobs:
         run: pnpm --filter @artepool/desktop exec tauri signer sign "$env:GITHUB_WORKSPACE\dist\installer\ARTEPOOL-Server-Setup-$env:VERSION.exe"
       - name: Prepare the release files (only the allowed ones; anything else stops here)
         run: pnpm release prepare
-      - name: Publish to adretaae-ctrl/artepool-releases
+      - name: Publish to ARTEPOOL/artepool-releases
         env:
           RELEASES_TOKEN: ${{ secrets.RELEASES_TOKEN }}
         run: pnpm release publish

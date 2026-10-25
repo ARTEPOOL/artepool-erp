@@ -2,7 +2,7 @@
 
 التحديثات بتنزل لوحدها من الإنترنت، وبتتسطّب على جهاز السيرفر في وقت آمن (مفيش وردية مفتوحة، بعد نسخة احتياطية اتأكدنا منها، بالليل أو لما تدوس **ثبّت دلوقتي**). بعدين أجهزة المكتب بتتحدّث. القرار: [0108](../decisions/0108-automatic-online-updates.md).
 
-الكود بيفضل في المستودع الخاص. المستودع العام `adretaae-ctrl/artepool-releases` فيه **ملفات التسطيب الموقّعة وقايمة التحديثات بس**. مفيش أي حاجة تانية بتتنشر هناك: فيه فحص بيوقف النشر لو لقى أي ملف غير المسموح بيه.
+الكود بيفضل في المستودع الخاص. المستودع العام `ARTEPOOL/artepool-releases` فيه **ملفات التسطيب الموقّعة وقايمة التحديثات بس**. مفيش أي حاجة تانية بتتنشر هناك: فيه فحص بيوقف النشر لو لقى أي ملف غير المسموح بيه.
 
 > كل خطوة هنا بتتعمل **مرة واحدة بس**. بعد كده، كل اللي عليك إنك توافق على كل تحديث بضغطة زرار واحدة.
 
@@ -18,7 +18,7 @@
 ## 2. المستودع العام الفاضي
 
 1. فوق على اليمين **+** ← **New repository**.
-2. **Owner**: `adretaae-ctrl`، **Repository name**: `artepool-releases`.
+2. **Owner**: `ARTEPOOL` (المنظّمة)، **Repository name**: `artepool-releases`.
 3. اختار **Public**، وسيب كل الاختيارات التانية فاضية (من غير README).
 4. **Create repository**. خلاص، سيبه فاضي: الـ workflow هو اللي بيحط فيه الملفات.
 
@@ -43,14 +43,14 @@
 1. الصورة بتاعتك ← **Settings** ← تحت خالص **Developer settings** ← **Personal access tokens** ← **Fine-grained tokens** ← **Generate new token**.
 2. **Token name**: `artepool-releases publish`.
 3. **Expiration**: سنة (GitHub هيبعتلك إيميل قبل ما يخلص، وساعتها تعمل واحد جديد بنفس الخطوات).
-4. **Resource owner**: `adretaae-ctrl`.
+4. **Resource owner**: `ARTEPOOL` (المنظّمة). لو المنظّمة طالبة موافقة على التوكن، وافق عليه من **ARTEPOOL ← Settings ← Personal access tokens ← Pending requests**.
 5. **Repository access** ← **Only select repositories** ← اختار `artepool-releases` **بس**.
 6. **Permissions** ← **Repository permissions** ← **Contents** ← **Read and write**. سيب كل الباقي **No access**.
 7. **Generate token** وانسخه (بيظهر مرة واحدة).
 
 ## 5. بيئة الموافقة "release" والأسرار
 
-1. افتح المستودع الخاص `adretaae-ctrl/artepool-erp` ← **Settings** ← **Environments** ← **New environment** ← الاسم: `release` ← **Configure environment**.
+1. افتح المستودع الخاص `ARTEPOOL/artepool-erp` ← **Settings** ← **Environments** ← **New environment** ← الاسم: `release` ← **Configure environment**.
 2. علّم **Required reviewers** واكتب اسم حسابك. (سيب **Prevent self-review** من غير علامة، علشان انت اللي بتوافق.)
 3. **Deployment branches and tags** ← **Selected branches and tags** ← **Add deployment branch or tag rule** ← اختار **Tag** واكتب `v*`.
 4. تحت **Environment secrets** ← **Add environment secret**، 3 مرات:

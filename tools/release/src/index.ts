@@ -1,6 +1,6 @@
 /**
  * Releases (decision 0108): what the release workflow publishes to the public repository
- * `adretaae-ctrl/artepool-releases`, and the check that nothing else ever goes there.
+ * `ARTEPOOL/artepool-releases`, and the check that nothing else ever goes there.
  *
  * Published, and only this:
  *   ARTEPOOL-Server-Setup-<v>.exe (+ .sig)   the server PC's setup (also the upgrade)
@@ -14,7 +14,7 @@ import { createReadStream } from 'node:fs';
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 
-export const RELEASES_REPOSITORY = 'adretaae-ctrl/artepool-releases';
+export const RELEASES_REPOSITORY = 'ARTEPOOL/artepool-releases';
 
 /** Where the PCs read the update list: the newest release of the public repository. */
 export const LATEST_URL = `https://github.com/${RELEASES_REPOSITORY}/releases/latest/download/latest.json`;

@@ -77,7 +77,7 @@
 - **Clients hold no business data.** A client stores only its device secret (in Windows Credential Manager) and UI preferences.
 - **Server unreachable:** the app shows a clear "Server unreachable" screen. A POS cart in progress stays in memory so it can be completed when the server is back, but nothing is ever saved halfway.
 - **Idempotency keys:** every save request carries one. A retry after a network drop returns the original result and never creates a second sale.
-- **Version lock-step:** the server states the minimum client version. Clients update themselves from the public update list (`adretaae-ctrl/artepool-releases`), and the update signature is verified ([0007](decisions/0007-no-code-signing-certificate-for-now.md), [0108](decisions/0108-automatic-online-updates.md)).
+- **Version lock-step:** the server states the minimum client version. Clients update themselves from the public update list (`ARTEPOOL/artepool-releases`), and the update signature is verified ([0007](decisions/0007-no-code-signing-certificate-for-now.md), [0108](decisions/0108-automatic-online-updates.md)).
 
 ---
 

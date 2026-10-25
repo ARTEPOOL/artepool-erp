@@ -126,11 +126,11 @@ describe('the update list', () => {
       platforms: {
         'windows-x86_64': {
           signature: 'OSIG',
-          url: 'https://github.com/adretaae-ctrl/artepool-releases/releases/download/v1.2.3/ARTEPOOL-Office-Setup-1.2.3.exe',
+          url: 'https://github.com/ARTEPOOL/artepool-releases/releases/download/v1.2.3/ARTEPOOL-Office-Setup-1.2.3.exe',
         },
       },
       server: {
-        url: 'https://github.com/adretaae-ctrl/artepool-releases/releases/download/v1.2.3/ARTEPOOL-Server-Setup-1.2.3.exe',
+        url: 'https://github.com/ARTEPOOL/artepool-releases/releases/download/v1.2.3/ARTEPOOL-Server-Setup-1.2.3.exe',
         signature: 'SSIG',
         sha256: 's',
       },
