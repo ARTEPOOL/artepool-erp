@@ -5,3 +5,4 @@ export * from './device-store';
 export * from './enroll-client';
 export * from './setup';
 export * from './restore';
+export * from './emergency';

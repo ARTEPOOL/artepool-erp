@@ -127,6 +127,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "artepool-emergency"
+version = "0.1.0"
+
+[[package]]
 name = "artepool-printer"
 version = "0.1.0"
 dependencies = [

@@ -15,6 +15,7 @@ import arPos from '../locales/ar/pos.json';
 import arQuotations from '../locales/ar/quotations.json';
 import arInvoices from '../locales/ar/invoices.json';
 import arSales from '../locales/ar/sales.json';
+import arEmergency from '../locales/ar/emergency.json';
 import enAccounting from '../locales/en/accounting.json';
 import enAuth from '../locales/en/auth.json';
 import enCommon from '../locales/en/common.json';
@@ -32,6 +33,7 @@ import enPos from '../locales/en/pos.json';
 import enQuotations from '../locales/en/quotations.json';
 import enInvoices from '../locales/en/invoices.json';
 import enSales from '../locales/en/sales.json';
+import enEmergency from '../locales/en/emergency.json';
 
 export const LANGUAGES = ['ar', 'en'] as const;
 export type Language = (typeof LANGUAGES)[number];
@@ -58,6 +60,7 @@ export const resources = {
     quotations: arQuotations,
     receipts: arReceipts,
     pos: arPos,
+    emergency: arEmergency,
   },
   en: {
     common: enCommon,
@@ -77,6 +80,7 @@ export const resources = {
     quotations: enQuotations,
     receipts: enReceipts,
     pos: enPos,
+    emergency: enEmergency,
   },
 } as const;
 

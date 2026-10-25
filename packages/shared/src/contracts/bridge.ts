@@ -206,3 +206,68 @@ export interface RestoreStatus {
   step: RestoreStep | null;
   result: RestoreResult | null;
 }
+
+/**
+ * "ARTÉPOOL – Emergency tool" (decision 0107): the window opened through Windows' administrator
+ * prompt on the server PC. Each action is the console's own program, run by the native side.
+ */
+export interface EmergencyInfo {
+  /** The app was started as the emergency tool (`--emergency`). */
+  emergency: boolean;
+  /** This PC has the installation's launcher, settings file and protected secrets. */
+  serverPc: boolean;
+}
+
+export const EMERGENCY_ACTIONS = ['reset-password', 'reset-2fa', 'device-code'] as const;
+export type EmergencyAction = (typeof EMERGENCY_ACTIONS)[number];
+
+export const EmergencyRun = z.discriminatedUnion('action', [
+  z.object({
+    action: z.literal('reset-password'),
+    input: z.object({ reason: z.string().max(500), phoneLost: z.boolean() }),
+  }),
+  z.object({ action: z.literal('reset-2fa'), input: z.object({ reason: z.string().max(500) }) }),
+  z.object({ action: z.literal('device-code'), input: z.object({}) }),
+]);
+export type EmergencyRun = z.infer<typeof EmergencyRun>;
+
+export type EmergencyFailure =
+  | 'not_server_pc'
+  | 'launch_failed'
+  | 'unknown_action'
+  | 'bad_input'
+  | 'reason_required'
+  | 'no_owner'
+  | 'database_unreachable'
+  | 'failed';
+
+export type EmergencyAnswer<T> =
+  { ok: true; result: T } | { ok: false; reason: EmergencyFailure; detail?: string };
+
+export interface PasswordResetResult {
+  username: string;
+  /** Shown once in the window; never stored or logged. */
+  temporaryPassword: string;
+  twoStepCleared: boolean;
+}
+export interface TwoStepResetResult {
+  username: string;
+}
+export interface EmergencyDeviceCode {
+  code: string;
+  expiresAt: string;
+}
+
+export type ServiceState = 'running' | 'stopped' | 'starting' | 'missing' | 'unknown';
+
+export interface EmergencyDatabaseStatus {
+  setupComplete: boolean;
+  owner: { username: string; twoStep: boolean } | null;
+}
+
+/** "Check the system": each line green or red, never a value of a secret. */
+export interface EmergencyCheck {
+  services: { database: ServiceState; server: ServiceState; backup: ServiceState };
+  secrets: boolean;
+  database: EmergencyAnswer<EmergencyDatabaseStatus>;
+}

@@ -217,6 +217,76 @@ fn restore_status(
     state.status()
 }
 
+/// Started as "ARTÉPOOL – Emergency tool" (decision 0107): `artepool-emergency.exe`, which asks
+/// for administrator rights, starts the app with `--emergency`.
+fn emergency_mode() -> bool {
+    std::env::args().skip(1).any(|arg| arg == "--emergency")
+}
+
+/// The installation on the server PC: `C:\Program Files\ARTEPOOL` and `C:\ProgramData\ARTEPOOL`.
+fn installation() -> artepool_bridge::emergency::Installation {
+    let programs = std::env::var_os("ProgramFiles").unwrap_or_else(|| "C:\\Program Files".into());
+    let data = std::env::var_os("ProgramData").unwrap_or_else(|| "C:\\ProgramData".into());
+    artepool_bridge::emergency::Installation {
+        program_dir: std::path::Path::new(&programs).join("ARTEPOOL"),
+        data_dir: std::path::Path::new(&data).join("ARTEPOOL"),
+    }
+}
+
+#[tauri::command]
+fn emergency_info() -> serde_json::Value {
+    let emergency = emergency_mode();
+    serde_json::json!({
+        "emergency": emergency,
+        "serverPc": emergency && installation().is_server_pc(),
+    })
+}
+
+/// The installation of the emergency window, or why it cannot act on this PC.
+fn emergency_installation() -> Result<artepool_bridge::emergency::Installation, String> {
+    let installation = installation();
+    if emergency_mode() && installation.is_server_pc() {
+        Ok(installation)
+    } else {
+        Err("not_server_pc".into())
+    }
+}
+
+#[tauri::command]
+async fn emergency_check() -> Result<serde_json::Value, String> {
+    let installation = emergency_installation()?;
+    tauri::async_runtime::spawn_blocking(move || {
+        artepool_bridge::emergency::check(&installation, artepool_bridge::emergency::service_state)
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
+/// One action; the answer (it may hold a temporary password) goes to the window only.
+#[tauri::command]
+async fn emergency_run(
+    action: String,
+    input: serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    let installation = emergency_installation()?;
+    tauri::async_runtime::spawn_blocking(move || {
+        artepool_bridge::emergency::run_action(&installation.launcher(), &action, &input)
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
+/// Opens `C:\ProgramData\ARTEPOOL\logs` in File Explorer, to send to support.
+#[tauri::command]
+fn emergency_open_logs() -> Result<(), String> {
+    let installation = emergency_installation()?;
+    std::process::Command::new("explorer.exe")
+        .arg(installation.logs_dir())
+        .spawn()
+        .map(|_| ())
+        .map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 async fn bridge_request(
     state: tauri::State<'_, AppBridge>,
@@ -429,26 +499,33 @@ async fn printer_print_label(
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
-        // One copy per PC: starting it again brings the open window to the front.
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+    let emergency = emergency_mode();
+    let mut builder = tauri::Builder::default();
+    // One copy per PC: starting it again brings the open window to the front. The emergency
+    // window is a copy of its own, opened while the app may already be running.
+    if !emergency {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.unminimize();
                 let _ = window.set_focus();
             }
-        }))
+        }));
+    }
+    builder
         // Updates install only with a valid signature from the ARTÉPOOL key (created in M6;
         // until then the public key is empty, so no update can ever be accepted).
         .plugin(tauri_plugin_updater::Builder::new().build())
-        .setup(|app| {
+        .setup(move |app| {
             let store = open_store(app.handle())?;
             let bridge = Bridge::new(store, env!("CARGO_PKG_VERSION"), computer_name());
-            // A PC enrolled as POS starts locked, before the server has even answered.
-            let pos = bridge
-                .local_device()
-                .ok()
-                .and_then(|d| d.device)
-                .is_some_and(|d| d.kind == "pos");
+            // A PC enrolled as POS starts locked, before the server has even answered. The
+            // emergency window never locks: it signs nobody in and does no sales.
+            let pos = !emergency
+                && bridge
+                    .local_device()
+                    .ok()
+                    .and_then(|d| d.device)
+                    .is_some_and(|d| d.kind == "pos");
             app.manage(AppBridge(bridge));
             app.manage(Kiosk(AtomicBool::new(false)));
             app.manage(GoogleSignIn(Mutex::new(None)));
@@ -492,6 +569,10 @@ pub fn run() {
             restore_copies,
             restore_start,
             restore_status,
+            emergency_info,
+            emergency_check,
+            emergency_run,
+            emergency_open_logs,
             kiosk_refresh,
             google_signin_start,
             google_signin_open,

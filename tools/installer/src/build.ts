@@ -5,6 +5,7 @@
  * 2. everything the server PC needs is put in `dist/installer/stage`, laid out as in
  *    `C:\Program Files\ARTEPOOL`:
  *      artepool-svc.exe        the launcher (the restore screen starts it from there)
+ *      artepool-emergency.exe  "ARTÉPOOL – Emergency tool" (decision 0107), administrators only
  *      node\node.exe           Node 24
  *      server\                 the packaged server (`pnpm build:server --windows`)
  *      pgsql\                  PostgreSQL 18 (bin, lib, share; no pgAdmin, no docs)
@@ -97,6 +98,10 @@ export async function buildInstaller(): Promise<string> {
   await copyFile(
     join(repoRoot, 'apps', 'desktop', 'src-tauri', 'target', 'release', 'artepool-svc.exe'),
     join(stage, 'artepool-svc.exe'),
+  );
+  await copyFile(
+    join(repoRoot, 'apps', 'desktop', 'src-tauri', 'target', 'release', 'artepool-emergency.exe'),
+    join(stage, 'artepool-emergency.exe'),
   );
   await copyFile(await desktopInstaller(), join(stage, 'app', 'artepool-erp-setup.exe'));
   const google = googleJson();

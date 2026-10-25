@@ -4,7 +4,11 @@
 # "reboot" (services stopped and started); make the shop's encrypted off-site copy; uninstall
 # (the data stays); wipe the data as on a new PC; install again; restore the copy as
 # administrator through the launcher; check the restored data and the master key; uninstall.
-# The install logs are searched for every secret: none may appear.
+# The emergency tool (decision 0107): its launcher asks for administrator rights, its Start menu
+# shortcut, and its program's actions through the launcher (check, password reset, enrollment
+# code), recorded in the audit log.
+# The install logs are searched for every secret (and the emergency temporary password): none
+# may appear.
 param([Parameter(Mandatory = $true)][string]$Installer)
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -46,6 +50,7 @@ function Uninstall-Server([string]$label) {
   }
   Ok ($null -eq (Get-NetFirewallRule -DisplayName 'ARTEPOOL Server' -ErrorAction SilentlyContinue)) "$label firewall rule removed"
   Ok (Test-Path "$data\pgdata\PG_VERSION") "$label the data is kept in ProgramData"
+  Ok (@(Emergency-Shortcuts).Count -eq 0) "$label the emergency tool's shortcut is removed"
 }
 
 function Secret([string]$name) {
@@ -71,9 +76,12 @@ function Check-Health([string]$label) {
   Ok ($LASTEXITCODE -eq 0) "$label /health over TLS 1.3"
 }
 
+$script:alsoSecret = @()
+
 function Check-Logs-Hold-No-Secret([string]$label) {
   $secrets = @('master-key', 'migrator-password', 'api-password', 'backup-password', 'maint-password', 'pg-superuser-password') |
     ForEach-Object { Secret $_ }
+  $secrets += $script:alsoSecret
   if (Test-Path "$data\setup\token") { $secrets += (Get-Content "$data\setup\token" -Raw).Trim() }
   $files = Get-ChildItem "$data\logs" -Recurse -File
   Ok ($files.Count -gt 0) "$label there are logs to check"
@@ -85,6 +93,19 @@ function Check-Logs-Hold-No-Secret([string]$label) {
     }
   }
   Ok $true "$label no secret in the $($files.Count) log files"
+}
+
+# The Start menu shortcuts that open the emergency tool's launcher.
+function Emergency-Shortcuts {
+  $shell = New-Object -ComObject WScript.Shell
+  Get-ChildItem "$env:ProgramData\Microsoft\Windows\Start Menu\Programs" -Filter '*.lnk' |
+    Where-Object { $shell.CreateShortcut($_.FullName).TargetPath -like '*\artepool-emergency.exe' }
+}
+
+# One emergency action through the launcher, as the emergency window runs it: JSON in, JSON out.
+function Emergency([string]$action, [string]$json) {
+  $lines = $json | & $svc run emergency $action
+  return ($lines | Where-Object { $_ -like '{*' } | Select-Object -Last 1 | ConvertFrom-Json)
 }
 
 # ---- 1. A clean PC: install ----
@@ -137,6 +158,25 @@ Ok ($LASTEXITCODE -eq 0) 'the owner is created with the console tool'
 Psql "BEGIN; SELECT sys.set_context(1, NULL, NULL, gen_random_uuid(), NULL, NULL, 'CI: setup done', NULL); UPDATE sys.setup_state SET state = 'in_progress', path = 'new'; UPDATE sys.setup_state SET state = 'complete'; COMMIT;" | Out-Null
 & $svc run backup once
 Ok ($LASTEXITCODE -eq 0) 'a local copy is made by the backup program'
+
+# ---- The emergency tool (decision 0107) ----
+$emergencyExe = Join-Path $pf 'artepool-emergency.exe'
+Ok (Test-Path $emergencyExe) 'the emergency tool is installed beside the launcher'
+$manifest = [Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($emergencyExe))
+Ok ($manifest.Contains("requireAdministrator")) "the emergency tool's own manifest asks for administrator rights"
+Ok (@(Emergency-Shortcuts).Count -eq 1) 'the emergency tool is in the Start menu'
+$status = Emergency 'status' '{}'
+Ok ($status.ok -eq $true -and $status.result.setupComplete -eq $true) 'emergency: the database answers and the setup is complete'
+Ok ($status.result.owner.username -eq 'ciowner') 'emergency: the owner is shown'
+$refused = Emergency 'reset-password' '{"reason":"x","phoneLost":false}'
+Ok ($refused.ok -eq $false -and $refused.reason -eq 'reason_required') 'emergency: a reset without a reason is refused'
+$reset = Emergency 'reset-password' '{"reason":"CI emergency test","phoneLost":false}'
+Ok ($reset.ok -eq $true -and $reset.result.temporaryPassword.Length -ge 10) 'emergency: a temporary password for the owner'
+$script:alsoSecret += $reset.result.temporaryPassword
+Ok ((Psql "SELECT count(*) FROM audit.log WHERE action = 'event:auth.owner_password_reset' AND reason LIKE 'emergency tool % CI emergency test'") -eq '1') 'emergency: the reset is in the audit log with its reason'
+$code = Emergency 'device-code' '{}'
+Ok ($code.ok -eq $true -and $code.result.code.Length -ge 6) 'emergency: an enrollment code'
+Check-Logs-Hold-No-Secret 'after the emergency tool:'
 $copy = Get-ChildItem "$data\backups" -Recurse -Filter '*.dump' | Sort-Object LastWriteTime | Select-Object -Last 1
 Ok ($null -ne $copy) "the copy is $($copy.Name)"
 $oldKey = Secret 'master-key'

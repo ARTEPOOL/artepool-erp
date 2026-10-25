@@ -165,9 +165,8 @@ Section "ARTEPOOL ERP Server" SecServer
     Abort
   ${EndIf}
 
-  ${If} ${FileExists} "$INSTDIR\artepool-emergency.exe"
-    CreateShortcut "$SMPROGRAMS\$(EmergencyTool).lnk" "$INSTDIR\artepool-emergency.exe"
-  ${EndIf}
+  ; "ARTEPOOL - Emergency tool" (decision 0107): its own manifest asks for administrator rights.
+  CreateShortcut "$SMPROGRAMS\$(EmergencyTool).lnk" "$INSTDIR\artepool-emergency.exe"
 
   !insertmacro Log "Installed."
   FileClose $LogFile
@@ -206,7 +205,9 @@ Section "Uninstall"
   !insertmacro UnStep "Remove ArtepoolDatabase" '"$INSTDIR\pgsql\bin\pg_ctl.exe" unregister -N ArtepoolDatabase'
   !insertmacro UnStep "Remove the firewall rule" '"$SYSDIR\netsh.exe" advfirewall firewall delete rule "name=ARTEPOOL Server"'
 
-  Delete "$SMPROGRAMS\$(EmergencyTool).lnk"
+  ; Both names: the setup may have run in the other language.
+  Delete "$SMPROGRAMS\آرتيبول - أداة الطوارئ.lnk"
+  Delete "$SMPROGRAMS\ARTEPOOL - Emergency tool.lnk"
   RMDir /r "$INSTDIR"
   DeleteRegKey HKLM "${UNINSTALL_KEY}"
   !insertmacro Log "Uninstalled. The ARTEPOOL app has its own entry in Apps."

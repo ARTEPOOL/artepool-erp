@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "bridge", "printer", "svc"]
+members = [".", "bridge", "emergency", "printer", "svc"]
 resolver = "3"
 
 [package]

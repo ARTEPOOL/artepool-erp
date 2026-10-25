@@ -142,7 +142,7 @@ pub const SECRETS: [Secret; 6] = [
 ];
 
 /// The bundled programs `run` may start (`<name>.mjs` in the server folder).
-pub const PROGRAMS: [&str; 9] = [
+pub const PROGRAMS: [&str; 10] = [
     "server",
     "backup",
     "migrate",
@@ -152,6 +152,7 @@ pub const PROGRAMS: [&str; 9] = [
     "owner-reset-password",
     "restore",
     "install",
+    "emergency",
 ];
 
 pub fn secret_named(name: &str) -> Result<Secret, SvcError> {

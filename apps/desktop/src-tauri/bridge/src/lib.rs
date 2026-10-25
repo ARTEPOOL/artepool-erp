@@ -7,6 +7,7 @@
 //! (`tools/dev-bridge`) behaves the same way.
 
 pub mod connection;
+pub mod emergency;
 pub mod enroll;
 pub mod loopback;
 pub mod restore;
