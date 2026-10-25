@@ -77,7 +77,7 @@ describe('services', () => {
     });
     expect(xml).toContain('<id>ArtepoolBackup</id>');
     expect(xml).toContain('<executable>C:\\Program Files\\ARTEPOOL\\artepool-svc.exe</executable>');
-    expect(xml).toContain('<arguments>run backup</arguments>');
+    expect(xml).toContain('<arguments>run backup run</arguments>');
     expect(xml).toContain('<depend>ArtepoolDatabase</depend>');
     expect(xml).toContain('<description>Backups &amp; checks</description>');
     expect(xml).not.toMatch(/password/i);

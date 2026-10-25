@@ -16,9 +16,18 @@
  * its reason; nothing of the PC's other settings is touched.
  */
 import { randomBytes } from 'node:crypto';
-import { mkdir, readdir, readFile, statfs, unlink, writeFile, appendFile } from 'node:fs/promises';
+import {
+  appendFile,
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  rm,
+  statfs,
+  writeFile,
+} from 'node:fs/promises';
 import { createServer } from 'node:net';
-import { networkInterfaces, hostname, release } from 'node:os';
+import { hostname, networkInterfaces, release, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import pg from 'pg';
 import {
@@ -154,29 +163,16 @@ export async function runInstall(input: InstallInput): Promise<void> {
   );
 
   step(2, 'folders and their access rules');
-  for (const dir of [
-    paths.pgdata,
-    paths.wal,
-    paths.backups,
-    paths.logs,
-    paths.config,
-    paths.setup,
-    paths.tls,
-  ]) {
+  // pgdata is made by initdb itself (step 3): initdb drops administrator rights while it runs,
+  // so it could not write into a folder already closed to all but SYSTEM and Administrators.
+  for (const dir of [paths.wal, paths.backups, paths.logs, paths.config, paths.setup, paths.tls]) {
     await mkdir(dir, { recursive: true });
   }
   await mkdir(join(paths.logs, 'server'), { recursive: true });
   await mkdir(join(paths.logs, 'backup'), { recursive: true });
   await mkdir(join(paths.secrets, 'backup'), { recursive: true });
   // Until each service exists, only SYSTEM and Administrators.
-  for (const dir of [
-    paths.pgdata,
-    paths.wal,
-    paths.backups,
-    paths.logs,
-    paths.config,
-    paths.setup,
-  ]) {
+  for (const dir of [paths.wal, paths.backups, paths.logs, paths.config, paths.setup]) {
     await platform.restrictFolder(dir);
   }
 
@@ -184,7 +180,10 @@ export async function runInstall(input: InstallInput): Promise<void> {
   const password = process.env.PG_SUPERUSER_PASSWORD;
   if (!password)
     throw new InstallError('The database superuser password was not given by the launcher.');
-  const passwordFile = join(paths.setup, `initdb-${randomBytes(6).toString('hex')}.tmp`);
+  // In a private folder of the installing administrator (initdb, without administrator rights,
+  // must be able to read it), deleted at once.
+  const passwordDir = await mkdtemp(join(tmpdir(), 'artepool-initdb-'));
+  const passwordFile = join(passwordDir, 'pw');
   await writeFile(passwordFile, `${password}\n`, { mode: 0o600 });
   try {
     const out = await exec(
@@ -193,8 +192,9 @@ export async function runInstall(input: InstallInput): Promise<void> {
     );
     log.line(out.trim().split('\n').slice(-2).join(' '));
   } finally {
-    await unlink(passwordFile).catch(() => undefined);
+    await rm(passwordDir, { recursive: true, force: true });
   }
+  await platform.restrictFolder(paths.pgdata);
   await appendFile(
     join(paths.pgdata, 'postgresql.conf'),
     postgresqlSettings({ port: input.databasePort, walDir: paths.wal }),

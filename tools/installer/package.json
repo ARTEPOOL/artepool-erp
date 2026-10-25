@@ -1,0 +1,18 @@
+{
+  "name": "@artepool/installer",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/components.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@artepool/node-kit": "workspace:*"
+  },
+  "devDependencies": {
+    "age-encryption": "0.3.1"
+  }
+}

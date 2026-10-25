@@ -92,7 +92,8 @@ export function winswXml(options: {
     `  <name>${esc(display)}</name>`,
     `  <description>${esc(options.description)}</description>`,
     `  <executable>${esc(options.launcher)}</executable>`,
-    `  <arguments>run ${options.service}</arguments>`,
+    // The backup program's `run` is its service mode (alone it makes one copy and exits).
+    `  <arguments>${options.service === 'backup' ? 'run backup run' : 'run server'}</arguments>`,
     '  <startmode>Automatic</startmode>',
     `  <depend>${SERVICES.database.name}</depend>`,
     '  <onfailure action="restart" delay="10 sec"/>',

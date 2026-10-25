@@ -244,3 +244,24 @@ jobs:
           name: artepool-erp-windows
           path: apps/desktop/src-tauri/target/release/bundle/nsis/*.exe
           retention-days: 14
+      - name: Server installer (pinned PostgreSQL, Node and WinSW, each checked by SHA-256)
+        run: pnpm build:installer
+      - name: Install, restore and uninstall the server as on a clean PC
+        shell: pwsh
+        run: ./tools/installer/windows/test-install.ps1 -Installer (Get-ChildItem dist/installer/ARTEPOOL-Server-Setup-*.exe).FullName
+      - name: Server installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: artepool-server-setup
+          path: |
+            dist/installer/ARTEPOOL-Server-Setup-*.exe
+            dist/installer/SHA256SUMS.txt
+          retention-days: 14
+      - name: Installation logs (for review; they hold no secret)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: artepool-install-logs
+          path: C:/ProgramData/ARTEPOOL/logs
+          retention-days: 14
+          if-no-files-found: ignore
