@@ -169,7 +169,10 @@ Ok ((($rule | Get-NetFirewallPortFilter).LocalPort) -eq '3100') 'the firewall ru
 # ---- The server PC's updater (decision 0108) ----
 $updater = Get-ScheduledTask -TaskName 'ARTEPOOL Updater'
 Ok ($updater.Principal.UserId -in @('SYSTEM', 'NT AUTHORITY\SYSTEM', 'S-1-5-18')) "the updater runs as SYSTEM ($($updater.Principal.UserId))"
-Ok ($updater.Actions[0].Execute -like '*artepool-svc.exe' -and $updater.Actions[0].Arguments -eq 'run updater') 'the updater runs the launcher'
+# Task Scheduler keeps the quotes schtasks needs around a path with spaces (and may keep the
+# arguments with the program): compare the whole command line without them.
+$updaterCommand = "$($updater.Actions[0].Execute) $($updater.Actions[0].Arguments)".Replace('"', '').Trim()
+Ok ($updaterCommand -eq "$svc run updater") "the updater runs the launcher ($updaterCommand)"
 & $svc run updater
 Ok ($LASTEXITCODE -eq 0) 'the updater runs'
 Ok ((Psql 'SELECT current_version IS NOT NULL FROM ops.update_state') -eq 't') 'the updater records the version running'
