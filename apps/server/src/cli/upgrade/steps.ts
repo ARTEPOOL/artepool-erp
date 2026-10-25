@@ -54,6 +54,8 @@ export interface UpgradePlatform {
   stopService(service: ServiceKey): Promise<void>;
   /** Writes the new version's WinSW files for an existing service (no new registration). */
   refreshAppService(service: 'server' | 'backup'): Promise<void>;
+  /** The updater's scheduled task (installations older than decision 0108 get it here). */
+  registerUpdaterTask(): Promise<void>;
 }
 
 export interface UpgradeConnections {
@@ -407,6 +409,7 @@ export async function applyUpgrade(input: ApplyInput): Promise<UpgradeResult> {
   try {
     await platform.refreshAppService('server');
     await platform.refreshAppService('backup');
+    await platform.registerUpdaterTask();
     await platform.startService('database');
   } catch (error) {
     return fail('services', message(error), false);

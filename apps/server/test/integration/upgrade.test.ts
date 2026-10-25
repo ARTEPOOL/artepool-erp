@@ -39,6 +39,7 @@ function fakePlatform() {
     startService: (s: ServiceKey) => Promise.resolve(void calls.push(`start ${s}`)),
     stopService: (s: ServiceKey) => Promise.resolve(void calls.push(`stop ${s}`)),
     refreshAppService: (s) => Promise.resolve(void calls.push(`refresh ${s}`)),
+    registerUpdaterTask: () => Promise.resolve(void calls.push('updater task')),
   };
   return { platform, calls };
 }
@@ -211,6 +212,7 @@ describe('the server upgrade', () => {
     expect(calls).toEqual([
       'refresh server',
       'refresh backup',
+      'updater task',
       'start database',
       'start server',
       'start backup',

@@ -403,6 +403,7 @@ Section "Uninstall"
   Sleep 5000
   !insertmacro UnStep "Remove ArtepoolDatabase" '"$INSTDIR\pgsql\bin\pg_ctl.exe" unregister -N ArtepoolDatabase'
   !insertmacro UnStep "Remove the firewall rule" '"$SYSDIR\netsh.exe" advfirewall firewall delete rule "name=ARTEPOOL Server"'
+  !insertmacro UnStep "Remove the updater task" '"$SYSDIR\schtasks.exe" /Delete /TN "ARTEPOOL Updater" /F'
 
   ; Both names: the setup may have run in the other language.
   Delete "$SMPROGRAMS\آرتيبول - أداة الطوارئ.lnk"

@@ -61,6 +61,7 @@ function Uninstall-Server([string]$label, [bool]$dataKept = $true) {
     Ok ($null -eq (Get-Service -Name $name -ErrorAction SilentlyContinue)) "$label service $name removed"
   }
   Ok ($null -eq (Get-NetFirewallRule -DisplayName 'ARTEPOOL Server' -ErrorAction SilentlyContinue)) "$label firewall rule removed"
+  Ok ($null -eq (Get-ScheduledTask -TaskName 'ARTEPOOL Updater' -ErrorAction SilentlyContinue)) "$label updater task removed"
   if ($dataKept) { Ok (Test-Path "$data\pgdata\PG_VERSION") "$label the data is kept in ProgramData" }
   Ok (@(Emergency-Shortcuts).Count -eq 0) "$label the emergency tool's shortcut is removed"
   Ok (-not (Test-Path "$pf.previous") -and -not (Test-Path "$pf.failed")) "$label the folders upgrades leave are removed"
@@ -164,6 +165,15 @@ Ok ($rule.Direction -eq 'Inbound' -and $rule.Action -eq 'Allow') 'one inbound fi
 Ok ([string]$rule.Profile -eq 'Private') "the firewall rule is for private networks ($($rule.Profile))"
 Ok ((($rule | Get-NetFirewallAddressFilter).RemoteAddress) -contains 'LocalSubnet') 'the firewall rule is for the local subnet only'
 Ok ((($rule | Get-NetFirewallPortFilter).LocalPort) -eq '3100') 'the firewall rule opens the API port only'
+
+# ---- The server PC's updater (decision 0108) ----
+$updater = Get-ScheduledTask -TaskName 'ARTEPOOL Updater'
+Ok ($updater.Principal.UserId -in @('SYSTEM', 'NT AUTHORITY\SYSTEM', 'S-1-5-18')) "the updater runs as SYSTEM ($($updater.Principal.UserId))"
+Ok ($updater.Actions[0].Execute -like '*artepool-svc.exe' -and $updater.Actions[0].Arguments -eq 'run updater') 'the updater runs the launcher'
+& $svc run updater
+Ok ($LASTEXITCODE -eq 0) 'the updater runs'
+Ok ((Psql 'SELECT current_version IS NOT NULL FROM ops.update_state') -eq 't') 'the updater records the version running'
+Ok ((Psql 'SELECT check_error FROM ops.update_state') -like '*update key is not set*') 'without the update key no update is accepted'
 
 # ---- The desktop app: start at sign-in and the watchdog (decisions 0082, 0083) ----
 $appDir = Join-Path $env:ProgramFiles 'ARTEPOOL ERP'

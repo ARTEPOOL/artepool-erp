@@ -9,7 +9,7 @@
  *   5. roles and data  the ARTÉPOOL roles, the empty database, the migrations
  *   6. certificates    the ARTÉPOOL CA and the server certificate; setup\ca.crt, setup\token
  *   7. services        ArtepoolServer and ArtepoolBackup under their own accounts, started
- *   8. firewall        the API port, local subnet, private networks
+ *   8. firewall        the API port, local subnet, private networks; the updater's scheduled task
  *   9. ready           /health answers over TLS 1.3
  *
  * Every step is written to the install log (log.ts, secrets filtered). A failure stops at once with
@@ -351,8 +351,9 @@ export async function runInstall(input: InstallInput): Promise<void> {
   await platform.startService('server');
   await platform.startService('backup');
 
-  step(8, 'the firewall');
+  step(8, 'the firewall and the updater');
   await platform.addFirewallRule(input.serverPort);
+  await platform.registerUpdaterTask();
 
   step(9, 'the server answers');
   await input.waitHealthy(await readFile(join(paths.tls, TLS_FILES.caCert), 'utf8'));

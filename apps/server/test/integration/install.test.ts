@@ -62,6 +62,7 @@ function fakePlatform() {
     registerAppService: (service) => Promise.resolve(void calls.push(`register ${service}`)),
     startService: (service) => Promise.resolve(void calls.push(`start ${service}`)),
     addFirewallRule: (port) => Promise.resolve(void calls.push(`firewall ${port}`)),
+    registerUpdaterTask: () => Promise.resolve(void calls.push('updater task')),
   };
   return { platform, calls };
 }
@@ -125,12 +126,13 @@ describe('the server installation', () => {
     expect(calls.indexOf(`database ${paths.pgdata}`)).toBeLessThan(
       calls.indexOf('register server'),
     );
-    expect(calls.slice(-5)).toEqual([
+    expect(calls.slice(-6)).toEqual([
       `grant ${paths.wal} backup:read`,
       `grant ${paths.setup} server:modify`,
       'start server',
       'start backup',
       `firewall ${serverPort}`,
+      'updater task',
     ]);
     expect(calls).toContain(`grant ${join(paths.secrets, 'backup')} server:modify`);
     expect(calls.filter((c) => c.includes('Users') || c.includes('Everyone'))).toEqual([]);
@@ -217,10 +219,11 @@ describe('the server installation', () => {
 
     expect(calls).toContain(`restrict ${paths.pgdata} 0`);
     expect(calls).toContain(`database ${paths.pgdata}`);
-    expect(calls.slice(-3)).toEqual([
+    expect(calls.slice(-4)).toEqual([
       'start server',
       'start backup',
       expect.stringMatching(/^firewall /),
+      'updater task',
     ]);
     // The PCs keep trusting the same CA; the finished setup stays closed.
     expect(await readFile(join(paths.tls, 'ca.crt'), 'utf8')).toBe(caBefore);

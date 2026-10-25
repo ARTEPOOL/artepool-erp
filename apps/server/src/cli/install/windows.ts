@@ -138,6 +138,31 @@ export function firewallRule(port: number): string[][] {
   ];
 }
 
+export const UPDATER_TASK = 'ARTEPOOL Updater';
+
+/**
+ * The server PC's updater (decision 0108): every 5 minutes as SYSTEM, one at a time. It reads the
+ * update list only every few hours; the short interval is for the owner's "Install now".
+ */
+export function updaterTask(launcher: string): string[] {
+  return [
+    '/Create',
+    '/TN',
+    UPDATER_TASK,
+    '/RU',
+    'SYSTEM',
+    '/SC',
+    'MINUTE',
+    '/MO',
+    '5',
+    '/RL',
+    'HIGHEST',
+    '/F',
+    '/TR',
+    `"${launcher}" run updater`,
+  ];
+}
+
 /** The Windows things the installation does; a fake one in the tests. */
 export interface Platform {
   restrictFolder(folder: string, grants?: Grant[]): Promise<void>;
@@ -148,6 +173,8 @@ export interface Platform {
   registerAppService(service: 'server' | 'backup'): Promise<void>;
   startService(service: ServiceKey): Promise<void>;
   addFirewallRule(port: number): Promise<void>;
+  /** The scheduled task of the server PC's updater (decision 0108); replaced if it exists. */
+  registerUpdaterTask(): Promise<void>;
 }
 
 /** What an upgrade adds (M6.2 part G2). */
@@ -248,6 +275,9 @@ export function windowsPlatform(options: {
         if (!/1062|1060/.test(String(error))) throw error;
       });
       await waitStopped(service);
+    },
+    async registerUpdaterTask() {
+      await exec('schtasks.exe', updaterTask(join(options.programDir, 'artepool-svc.exe')));
     },
     async addFirewallRule(port) {
       const [remove, add] = firewallRule(port);

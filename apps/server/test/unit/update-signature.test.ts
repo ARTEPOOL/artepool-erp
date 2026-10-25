@@ -7,7 +7,11 @@ import { generateKeyPairSync, sign } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { SignatureError, verifySignature } from '../../src/cli/updater/signature';
+import {
+  SignatureError,
+  verifyFileSignature,
+  verifySignature,
+} from '../../src/cli/updater/signature';
 
 const dir = join(import.meta.dirname, '..', 'fixtures', 'update-signature');
 const publicKey = readFileSync(join(dir, 'test.key.pub'), 'utf8');
@@ -37,6 +41,15 @@ function otherKey(): { publicKey: string; signature: string } {
 describe('the update signature', () => {
   it("accepts a file signed by Tauri's signer with the update key", () => {
     expect(() => verifySignature(publicKey, signature, data)).not.toThrow();
+  });
+
+  it('checks a file read in pieces the same way', async () => {
+    await expect(
+      verifyFileSignature(publicKey, signature, join(dir, 'data.bin')),
+    ).resolves.toBeUndefined();
+    await expect(
+      verifyFileSignature(publicKey, signature, join(dir, 'test.key.pub')),
+    ).rejects.toThrow(SignatureError);
   });
 
   it('refuses a changed file', () => {

@@ -37,6 +37,7 @@ export const ENTRY_POINTS: Record<string, string> = {
   emergency: 'apps/server/src/cli/emergency.ts',
   upgrade: 'apps/server/src/cli/upgrade.ts',
   'delete-data': 'apps/server/src/cli/delete-data.ts',
+  updater: 'apps/server/src/cli/updater.ts',
 };
 
 /** Packages kept as files: a native library, and the browser driver that loads its own files. */
@@ -57,6 +58,8 @@ export const RESOURCES: string[] = [
     ),
   ),
   'apps/server/src/platform/auth/common-passwords.txt',
+  // The update key's public half (decision 0108): the server PC's updater checks with it.
+  'release/update-public-key.txt',
 ];
 
 /**

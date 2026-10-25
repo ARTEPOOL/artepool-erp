@@ -15,6 +15,7 @@
     "@artepool/dev-db": "workspace:*",
     "@artepool/migrate": "workspace:*",
     "@artepool/node-kit": "workspace:*",
+    "@artepool/release": "workspace:*",
     "@artepool/shared": "workspace:*",
     "@artepool/tls": "workspace:*",
     "@fontsource/ibm-plex-sans-arabic": "5.3.0",

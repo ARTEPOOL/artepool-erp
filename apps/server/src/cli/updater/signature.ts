@@ -9,6 +9,7 @@
  * its trusted comment is intact.
  */
 import { createHash, createPublicKey, verify } from 'node:crypto';
+import { createReadStream } from 'node:fs';
 
 /** Ed25519 public key as DER (SubjectPublicKeyInfo) = this prefix + the 32 raw bytes. */
 const ED25519_SPKI_PREFIX = Buffer.from('302a300506032b6570032100', 'hex');
@@ -48,6 +49,31 @@ export function parsePublicKey(base64Text: string): PublicKey {
 
 /** Throws a SignatureError unless `signature` is the update key's signature of `data`. */
 export function verifySignature(publicKey: string, signature: string, data: Buffer): void {
+  verifyWith(publicKey, signature, (algorithm) =>
+    algorithm === 'ED' ? createHash('blake2b512').update(data).digest() : data,
+  );
+}
+
+/** The same for a file (an installer), read in pieces: only the prehashed form ("ED"). */
+export async function verifyFileSignature(
+  publicKey: string,
+  signature: string,
+  path: string,
+): Promise<void> {
+  const hash = createHash('blake2b512');
+  for await (const chunk of createReadStream(path)) hash.update(chunk as Buffer);
+  const digest = hash.digest();
+  verifyWith(publicKey, signature, (algorithm) => {
+    if (algorithm !== 'ED') throw new SignatureError('The update signature is not valid.');
+    return digest;
+  });
+}
+
+function verifyWith(
+  publicKey: string,
+  signature: string,
+  messageFor: (algorithm: 'ED' | 'Ed') => Buffer,
+): void {
   const key = parsePublicKey(publicKey);
   const text = lines(signature);
   const sigLine = text.find((l) => !l.includes('comment:'));
@@ -62,10 +88,10 @@ export function verifySignature(publicKey: string, signature: string, data: Buff
     throw new SignatureError('The update was signed with another key.');
   }
   // "ED": the file's BLAKE2b-512 is signed (Tauri's signer); "Ed": the file itself.
-  let message: Buffer;
-  if (algorithm === 'ED') message = createHash('blake2b512').update(data).digest();
-  else if (algorithm === 'Ed') message = data;
-  else throw new SignatureError('The update signature is not valid.');
+  if (algorithm !== 'ED' && algorithm !== 'Ed') {
+    throw new SignatureError('The update signature is not valid.');
+  }
+  const message = messageFor(algorithm);
   const signatureBytes = sig.subarray(10);
   if (!verify(null, message, key.key, signatureBytes)) {
     throw new SignatureError('The update signature does not match the file.');

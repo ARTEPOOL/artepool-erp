@@ -178,6 +178,9 @@ importers:
       '@artepool/node-kit':
         specifier: workspace:*
         version: link:../../packages/node-kit
+      '@artepool/release':
+        specifier: workspace:*
+        version: link:../../tools/release
       '@artepool/shared':
         specifier: workspace:*
         version: link:../../packages/shared
