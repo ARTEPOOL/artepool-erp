@@ -19,8 +19,10 @@
 
 1. فوق على اليمين **+** ← **New repository**.
 2. **Owner**: `ARTEPOOL` (المنظّمة)، **Repository name**: `artepool-releases`.
-3. اختار **Public**، وسيب كل الاختيارات التانية فاضية (من غير README).
-4. **Create repository**. خلاص، سيبه فاضي: الـ workflow هو اللي بيحط فيه الملفات.
+3. اختار **Public**، وعلّم على **Add a README file** (لازم: GitHub مش بيقبل أول تحديث في مستودع فاضي خالص). سيب باقي الاختيارات زي ما هي.
+4. **Create repository**. خلاص، ما تحطش فيه أي حاجة تانية: الـ workflow هو اللي بيحط فيه ملفات التحديث.
+
+> لو عملته من غير README: افتح المستودع ← **Add a README** ← **Commit changes**.
 
 ## 3. مفتاح التحديثات (مع الفني أو معايا)
 
@@ -43,7 +45,9 @@
 1. الصورة بتاعتك ← **Settings** ← تحت خالص **Developer settings** ← **Personal access tokens** ← **Fine-grained tokens** ← **Generate new token**.
 2. **Token name**: `artepool-releases publish`.
 3. **Expiration**: سنة (GitHub هيبعتلك إيميل قبل ما يخلص، وساعتها تعمل واحد جديد بنفس الخطوات).
-4. **Resource owner**: `ARTEPOOL` (المنظّمة). لو المنظّمة طالبة موافقة على التوكن، وافق عليه من **ARTEPOOL ← Settings ← Personal access tokens ← Pending requests**.
+4. **Resource owner**: `ARTEPOOL` (المنظّمة).
+   - لو `ARTEPOOL` مش ظاهرة في القايمة: افتح المنظّمة ← **Settings** ← **Personal access tokens** ← **Settings** ← علّم **Allow access via fine-grained personal access tokens** ← **Save**، وارجع للخطوة دي.
+   - لو المنظّمة طالبة موافقة على التوكن بعد ما تعمله: وافق عليه من **ARTEPOOL ← Settings ← Personal access tokens ← Pending requests**.
 5. **Repository access** ← **Only select repositories** ← اختار `artepool-releases` **بس**.
 6. **Permissions** ← **Repository permissions** ← **Contents** ← **Read and write**. سيب كل الباقي **No access**.
 7. **Generate token** وانسخه (بيظهر مرة واحدة).
