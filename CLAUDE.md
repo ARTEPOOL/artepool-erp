@@ -222,6 +222,7 @@ Run from the repository root. Setup on a new PC: [`docs/runbooks/dev-setup-windo
 | Rust tests (the PC's secure side: enrollment, TLS rules, device key; the RAW receipt printer) | `pnpm test:rust` |
 | Server console (emergency tools since 0092): first owner / enrollment code / emergency owner 2-step reset / emergency owner password reset (decisions 0022, 0025, 0029) | `pnpm owner:create` / `pnpm device:code` / `pnpm owner:reset-2fa` / `pnpm owner:reset-password` |
 | Package the server PC's programs (bundle + resources + manifest, `dist/server`; `--windows` on Windows) | `pnpm build:server` |
+| Build the installers on Windows (after `pnpm build:server --windows`, the launcher and emergency tool in release, and `pnpm build:desktop`): `ARTEPOOL-Server-Setup` and `ARTEPOOL-Office-Setup` in `dist/installer` | `pnpm build:installer` |
 | On the installed server (elevated prompt): the console tools with the protected secrets / check the secrets / restore from a backup without the wizard (decision 0102) | `artepool-svc run owner-reset-password` (etc.) / `artepool-svc secrets check` / `artepool-svc run restore <copy>` |
 
 Rules for migrations: one file per change in `db/migrations/NNNN_name.sql`; no `BEGIN`/`COMMIT` inside (the runner wraps each file); every new table gets `sys.add_touch`/`sys.add_stamp`, `audit.enable_for`, `sys.forbid_delete` and explicit grants — `db/tests/privileges.test.ts` fails otherwise; run `pnpm db:codegen` and commit the regenerated types.

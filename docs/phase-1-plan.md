@@ -490,7 +490,7 @@ A milestone is done only when its tests pass in CI.
 
 #### M6.2 — Installers and the first-run setup wizard (0085, 0092)
 
-**Status (2026-10-20):** task plan **approved** ([`milestones/m6.2-installers-setup.md`](milestones/m6.2-installers-setup.md)); decisions 0102–0105 recorded; built part by part (A–J).
+**Status (2026-10-20):** task plan **approved** ([`milestones/m6.2-installers-setup.md`](milestones/m6.2-installers-setup.md)); decisions 0102–0105 recorded; built part by part (A–J). **Parts A–F built (2026-10-25):** the packaged server and launcher, the first-run wizard (new setup and restore), the server and office installers, the emergency tool (0107), start at sign-in and the POS watchdog. Still to come: G (upgrades and LAN updates) onwards; the VM test of Part F by the owner or a technician.
 
 **Delivers:**
 - The **server installer** (for the POS PC, which is also the server): PostgreSQL configuration (localhost only, WAL archiving), roles, CA and certificates, firewall (API port from the LAN only, 0093), the API and backup services under their own accounts, auto-start with Windows, restart on failure; the app starts with Windows and the kiosk watchdog restarts it if closed (0082). No developer tools on any PC.
