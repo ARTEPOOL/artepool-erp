@@ -82,7 +82,8 @@ function Secret([string]$name) {
 function Psql([string]$sql) {
   $env:PGPASSWORD = Secret 'pg-superuser-password'
   try {
-    $out = & "$pf\pgsql\bin\psql.exe" -h localhost -U postgres -d artepool -At -v ON_ERROR_STOP=1 -c $sql
+    $port = (Get-Content "$data\config\server.json" -Raw | ConvertFrom-Json).database.port
+    $out = & "$pf\pgsql\bin\psql.exe" -h localhost -p $port -U postgres -d artepool -At -v ON_ERROR_STOP=1 -c $sql
     if ($LASTEXITCODE -ne 0) { throw "psql failed: $sql" }
     return $out
   } finally {
@@ -130,8 +131,21 @@ function Emergency([string]$action, [string]$json) {
   return ($lines | Where-Object { $_ -like '{*' } | Select-Object -Last 1 | ConvertFrom-Json)
 }
 
-# ---- 1. A clean PC: install ----
+# ---- 1. A PC where another program already uses PostgreSQL's port 5432 ----
+# A first attempt with every database port taken stops (and leaves its secrets); with only 5432
+# taken, the setup runs again over what it left and gives the database the next free port.
+$listeners = @(5432..5442 | ForEach-Object {
+  $listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Any, $_)
+  $listener.Start()
+  $listener
+})
+$exit = Run-Setup $Installer
+Ok ($exit -ne 0) "the setup stops when every database port is taken (exit $exit)"
+Ok (Test-Path "$data\secrets\master-key.dpapi") 'the stopped attempt left its secrets'
+$listeners | Select-Object -Skip 1 | ForEach-Object { $_.Stop() }
 Install-Server 'first'
+$listeners[0].Stop()
+Ok ((Get-Content "$data\config\server.json" -Raw | ConvertFrom-Json).database.port -eq 5433) 'another program on 5432: the database takes 5433'
 foreach ($name in 'ArtepoolDatabase', 'ArtepoolServer', 'ArtepoolBackup') {
   $service = Get-CimInstance Win32_Service -Filter "Name='$name'"
   Ok ($service.State -eq 'Running') "$name is running"
@@ -147,7 +161,8 @@ $lan = Get-NetIPAddress -AddressFamily IPv4 |
   Select-Object -First 1 -ExpandProperty IPAddress
 $probe = New-Object Net.Sockets.TcpClient
 $reached = $false
-try { $probe.Connect($lan, 5432); $reached = $true } catch { } finally { $probe.Close() }
+$databasePort = (Get-Content "$data\config\server.json" -Raw | ConvertFrom-Json).database.port
+try { $probe.Connect($lan, $databasePort); $reached = $true } catch { } finally { $probe.Close() }
 Ok (-not $reached) "the database is not reachable on the LAN address $lan"
 
 $allowed = @('S-1-5-18', 'S-1-5-32-544')

@@ -26,6 +26,21 @@ impl Default for ConfigChoice {
     }
 }
 
+/// The ports the installation may give its database (localhost only): PostgreSQL's usual 5432,
+/// or the next free one when another PostgreSQL or program already uses it.
+pub const DATABASE_PORTS: std::ops::RangeInclusive<u16> = 5432..=5442;
+
+/// The first free port of `DATABASE_PORTS`, by `is_free`.
+pub fn free_database_port(is_free: impl Fn(u16) -> bool) -> Option<u16> {
+    DATABASE_PORTS.into_iter().find(|port| is_free(*port))
+}
+
+/// Nothing listens on the port, on any address of this PC.
+pub fn port_free(port: u16) -> bool {
+    use std::net::TcpListener;
+    TcpListener::bind(("0.0.0.0", port)).is_ok() && TcpListener::bind(("127.0.0.1", port)).is_ok()
+}
+
 /// The app's registration at Google (decision 0095), shipped next to the launcher as
 /// `google.json` when the publisher built the installer with it; not secret.
 fn google_clients(program_dir: &Path) -> Result<Option<Value>, SvcError> {
@@ -118,6 +133,17 @@ mod tests {
             data_dir: root.join("pd"),
             program_dir: root.join("pf"),
         }
+    }
+
+    #[test]
+    fn takes_the_first_free_database_port() {
+        assert_eq!(free_database_port(|_| true), Some(5432));
+        assert_eq!(free_database_port(|p| p != 5432), Some(5433));
+        assert_eq!(free_database_port(|p| p > 5440), Some(5441));
+        assert_eq!(free_database_port(|_| false), None);
+        // A port in use is seen as taken.
+        let taken = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        assert!(!port_free(taken.local_addr().unwrap().port()));
     }
 
     #[test]

@@ -292,7 +292,7 @@ Section "ARTEPOOL ERP Server" SecServer
     !insertmacro WriteUninstallKey
     !insertmacro Step "The protected secrets of the kept data open on this PC" '"$INSTDIR\artepool-svc.exe" --data "$DataDir" secrets check'
     ${IfNot} ${FileExists} "$DataDir\config\server.json"
-      !insertmacro Step "The settings file" '"$INSTDIR\artepool-svc.exe" --data "$DataDir" config init --port ${SERVER_PORT}'
+      !insertmacro Step "The settings file" '"$INSTDIR\artepool-svc.exe" --data "$DataDir" config init --port ${SERVER_PORT} --database-port auto'
     ${EndIf}
     !insertmacro Step "The database, the services and the certificates" '"$INSTDIR\artepool-svc.exe" --data "$DataDir" run install --reattach'
   ${Else}
@@ -303,8 +303,16 @@ Section "ARTEPOOL ERP Server" SecServer
     !insertmacro WriteUninstallKey
 
     CreateDirectory "$DataDir"
-    !insertmacro Step "The protected secrets" '"$INSTDIR\artepool-svc.exe" --data "$DataDir" secrets init'
-    !insertmacro Step "The settings file" '"$INSTDIR\artepool-svc.exe" --data "$DataDir" config init --port ${SERVER_PORT}'
+    ; An earlier attempt that stopped before the database was made leaves its secrets and settings
+    ; (no data uses them yet): the secrets are used again, the settings made afresh.
+    ${If} ${FileExists} "$DataDir\secrets\master-key.dpapi"
+      !insertmacro Step "The protected secrets of the earlier attempt open on this PC" '"$INSTDIR\artepool-svc.exe" --data "$DataDir" secrets check'
+    ${Else}
+      !insertmacro Step "The protected secrets" '"$INSTDIR\artepool-svc.exe" --data "$DataDir" secrets init'
+    ${EndIf}
+    Delete "$DataDir\config\server.json"
+    ; The database's port: 5432, or the next free one if another PostgreSQL already uses it.
+    !insertmacro Step "The settings file" '"$INSTDIR\artepool-svc.exe" --data "$DataDir" config init --port ${SERVER_PORT} --database-port auto'
     !insertmacro Step "The database, the services and the certificates" '"$INSTDIR\artepool-svc.exe" --data "$DataDir" run install'
   ${EndIf}
 
