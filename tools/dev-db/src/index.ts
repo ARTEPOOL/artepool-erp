@@ -1,4 +1,4 @@
-/** Development database setup: roles and databases. The production installer comes in M6. */
+/** Database roles and databases: development setup, and the installed server's installation program. */
 import type { Client } from 'pg';
 import { assertDevOrTestDatabase, ROLES, rolePasswords } from '@artepool/node-kit';
 
@@ -48,6 +48,7 @@ export async function databaseExists(admin: Client, name: string): Promise<boole
 /**
  * Creates an empty ARTÉPOOL database owned by artepool_owner, or a copy of `template`.
  * Uses PostgreSQL's built-in C.UTF-8 locale so behaviour is identical on Windows and Linux.
+ * Development and test databases only (names ending in _dev or _test).
  */
 export async function createDatabase(
   admin: Client,
@@ -55,6 +56,18 @@ export async function createDatabase(
   template?: string,
 ): Promise<void> {
   assertDevOrTestDatabase(name);
+  await createAppDatabase(admin, name, template);
+}
+
+/**
+ * The same for the installed server (M6.2 part F): only the installation program calls it, once,
+ * on a fresh PostgreSQL that holds no ARTÉPOOL database yet.
+ */
+export async function createAppDatabase(
+  admin: Client,
+  name: string,
+  template?: string,
+): Promise<void> {
   const source = template
     ? `TEMPLATE ${admin.escapeIdentifier(template)}`
     : `TEMPLATE template0 ENCODING 'UTF8' LOCALE_PROVIDER builtin BUILTIN_LOCALE 'C.UTF-8'`;

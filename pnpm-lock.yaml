@@ -169,6 +169,9 @@ importers:
       '@artepool/backup':
         specifier: workspace:*
         version: link:../backup
+      '@artepool/dev-db':
+        specifier: workspace:*
+        version: link:../../tools/dev-db
       '@artepool/migrate':
         specifier: workspace:*
         version: link:../../tools/migrate

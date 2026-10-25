@@ -26,6 +26,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use zeroize::Zeroizing;
 
+pub mod config;
 #[cfg(windows)]
 pub mod windows;
 
@@ -128,19 +129,20 @@ pub const SECRETS: [Secret; 6] = [
         kind: SecretKind::Password,
         programs: None,
     },
-    // The installer sets PostgreSQL's superuser password to this value. Only the restore from a
-    // backup needs it (it creates and renames databases); the services never get it.
+    // The installation sets PostgreSQL's superuser password to this value. Only the installation
+    // program and the restore from a backup need it (they create databases and roles, or rename
+    // databases); the services never get it.
     Secret {
         name: "pg-superuser-password",
         file: "pg-superuser-password.dpapi",
         env: "PG_SUPERUSER_PASSWORD",
         kind: SecretKind::Password,
-        programs: Some(&["restore"]),
+        programs: Some(&["install", "restore"]),
     },
 ];
 
 /// The bundled programs `run` may start (`<name>.mjs` in the server folder).
-pub const PROGRAMS: [&str; 8] = [
+pub const PROGRAMS: [&str; 9] = [
     "server",
     "backup",
     "migrate",
@@ -149,6 +151,7 @@ pub const PROGRAMS: [&str; 8] = [
     "owner-reset-2fa",
     "owner-reset-password",
     "restore",
+    "install",
 ];
 
 pub fn secret_named(name: &str) -> Result<Secret, SvcError> {

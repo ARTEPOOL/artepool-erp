@@ -33,6 +33,7 @@ export const ENTRY_POINTS: Record<string, string> = {
   'owner-reset-2fa': 'apps/server/src/cli/owner-reset-2fa.ts',
   'owner-reset-password': 'apps/server/src/cli/owner-reset-password.ts',
   restore: 'apps/server/src/cli/restore.ts',
+  install: 'apps/server/src/cli/install.ts',
 };
 
 /** Packages kept as files: a native library, and the browser driver that loads its own files. */
