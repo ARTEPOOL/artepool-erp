@@ -107,7 +107,7 @@ Var LogFile
 
 Function .onInit
   SetShellVarContext all
-  StrCpy $DataDir "$COMMONAPPDATA\ARTEPOOL"
+  StrCpy $DataDir "$APPDATA\ARTEPOOL"
   ${IfNot} ${Silent}
     !insertmacro MUI_LANGDLL_DISPLAY
   ${EndIf}
@@ -179,7 +179,7 @@ FunctionEnd
 
 Function un.onInit
   SetShellVarContext all
-  StrCpy $DataDir "$COMMONAPPDATA\ARTEPOOL"
+  StrCpy $DataDir "$APPDATA\ARTEPOOL"
   SetRegView 64
 FunctionEnd
 
