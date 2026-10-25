@@ -36,6 +36,9 @@ export class TestDatabase {
       application_name: `artepool-test-${role}`,
     });
     await client.connect();
+    // A connection the database closes while idle (a test that renames or replaces this database,
+    // as the restore from a backup does) must not stop the test run; queries still fail loudly.
+    client.on('error', () => undefined);
     this.clients.push(client);
     return client;
   }

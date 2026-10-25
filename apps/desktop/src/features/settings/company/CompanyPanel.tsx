@@ -3,6 +3,7 @@ import { Alert, Card } from '../../../ui';
 import { useCan, useErrorText } from '../../auth/context';
 import { useCompany } from '../../masterdata/refs';
 import { CardHead, NoAccess, PanelHeader, Section, settingsClasses } from '../parts';
+import { BankAccountsCard } from './BankAccountsCard';
 import { LegalDetailsCard } from './LegalDetailsCard';
 import { LockedField, LockedList } from './LockedField';
 import { LogoCard } from './LogoCard';
@@ -52,6 +53,7 @@ export function CompanyPanel() {
               </LockedList>
             </Section>
           </div>
+          <BankAccountsCard index={4} />
         </>
       )}
     </>

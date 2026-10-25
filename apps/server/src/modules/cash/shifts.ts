@@ -15,6 +15,7 @@ import type {
   CashCountDetail,
   CountLines,
   CountResult,
+  ForceCloseShiftRequest,
   NoSaleRequest,
   OpenShiftRequest,
   RecountRequest,
@@ -110,6 +111,20 @@ export async function openShift(
   const registerId = await ensureRegister(trx, device);
   if (await openShiftOnDevice(trx, device.id)) {
     throw ruleError('SHIFT_ALREADY_OPEN', 'This drawer already has an open shift');
+  }
+  // One open shift per cashier (decision 0004): name the PC it is open on, so it can be closed there.
+  const elsewhere = await trx
+    .selectFrom('cash.shifts as s')
+    .innerJoin('cash.registers as r', 'r.id', 's.register_id')
+    .innerJoin('auth.devices as d', 'd.id', 'r.device_id')
+    .select(['d.code'])
+    .where('s.cashier_id', '=', request.auth!.userId)
+    .where('s.status', '=', 'open')
+    .executeTakeFirst();
+  if (elsewhere) {
+    throw ruleError('SHIFT_OPEN_ELSEWHERE', 'The cashier has an open shift on another PC', {
+      deviceCode: elsewhere.code,
+    });
   }
   const float = BigInt(body.openingFloatFils);
   const shift = await trx
@@ -609,6 +624,31 @@ export async function listShifts(db: Db, auth: Auth, query: ShiftsQuery): Promis
           .orderBy('s.id', 'desc')
           .execute();
   const accepted = new Map(ids.map((i) => [i.id.toString(), i.accepted]));
+  const extra = new Map(
+    rows.length === 0
+      ? []
+      : (
+          await db
+            .selectFrom('cash.shifts as s')
+            .innerJoin('cash.registers as r', 'r.id', 's.register_id')
+            .leftJoin('auth.devices as d', 'd.id', 'r.device_id')
+            .leftJoin('auth.users as f', 'f.id', 's.force_closed_by')
+            .select([
+              's.id',
+              'd.code',
+              'd.status',
+              's.force_close_reason',
+              'f.display_name_ar',
+              'f.display_name_en',
+            ])
+            .where(
+              's.id',
+              'in',
+              rows.map((r) => r.id),
+            )
+            .execute()
+        ).map((e) => [e.id.toString(), e]),
+  );
   const shifts: ShiftListItem[] = rows.map((r) => ({
     ...summaryOf(r),
     // Hidden while open: the blind count (0006).
@@ -616,8 +656,83 @@ export async function listShifts(db: Db, auth: Auth, query: ShiftsQuery): Promis
     countedCashFils: r.counted_cash_fils?.toString() ?? null,
     varianceFils: r.variance_fils?.toString() ?? null,
     accepted: accepted.get(r.id.toString()) ?? false,
+    ...stuckInfo(extra.get(r.id.toString())),
   }));
   return { total: Number(total.n), shifts };
+}
+
+function stuckInfo(
+  e:
+    | {
+        code: string | null;
+        status: string | null;
+        force_close_reason: string | null;
+        display_name_ar: string | null;
+        display_name_en: string | null;
+      }
+    | undefined,
+) {
+  return {
+    deviceCode: e?.code ?? null,
+    deviceRevoked: e?.status === 'revoked',
+    forceClosedBy:
+      e?.force_close_reason != null
+        ? { displayNameAr: e.display_name_ar ?? '', displayNameEn: e.display_name_en ?? '' }
+        : null,
+    forceCloseReason: e?.force_close_reason ?? null,
+  };
+}
+
+/**
+ * Decision 0069: a shift that can no longer be closed on its own PC (the PC was enrolled again,
+ * broke or is gone) is closed from another PC by the owner or the accountant, in one
+ * transaction: the reason, the count of the drawer's cash, the closing transfer to the safe and
+ * the close. The over/short stays the shift's cashier's and is accepted as usual (0058).
+ */
+export async function forceCloseShift(
+  trx: Transaction<DB>,
+  request: FastifyRequest,
+  id: bigint,
+  body: ForceCloseShiftRequest,
+): Promise<ShiftReport> {
+  const shift = await trx
+    .selectFrom('cash.shifts as s')
+    .innerJoin('cash.registers as r', 'r.id', 's.register_id')
+    .select(['s.id', 's.status', 's.cashier_id', 'r.device_id'])
+    .where('s.id', '=', id)
+    .forUpdate('s')
+    .executeTakeFirst();
+  if (!shift) throw new AppError('NOT_FOUND', 'No such shift');
+  if (shift.status !== 'open') throw ruleError('SHIFT_NOT_OPEN', 'This shift is not open');
+  if (request.device && shift.device_id === request.device.id) {
+    throw ruleError('SHIFT_NOT_STUCK', 'This shift is open on this PC: close it at the POS');
+  }
+  await trx
+    .updateTable('cash.shifts')
+    .set({ force_closed_by: request.auth!.userId, force_close_reason: body.reason })
+    .where('id', '=', id)
+    .execute();
+  const count = await insertCount(trx, id, body, null);
+  if (count.total > 0n) {
+    await addCashMovement(trx, { shiftId: id, type: 'closing_transfer', amountFils: count.total });
+  }
+  const figures = await shiftReport(trx, id, { reveal: true });
+  await trx
+    .updateTable('cash.shifts')
+    .set({
+      status: 'closed',
+      variance_note: body.varianceNote ?? null,
+      z_snapshot: JSON.stringify(figures),
+      // Placeholders: the database sets the real figures (cash.shift_close_rules).
+      closing_count_id: count.id,
+      expected_cash_fils: 0n,
+      counted_cash_fils: 0n,
+      variance_fils: 0n,
+    })
+    .where('id', '=', id)
+    .execute();
+  await checkRepeatedVariance(trx, shift.cashier_id);
+  return shiftReport(trx, id, { reveal: true });
 }
 
 /** Decision 0058: the owner or the accountant accepts a closed shift's over/short (row 19). */
@@ -655,7 +770,11 @@ export async function acceptVariance(
   return shiftReport(trx, shiftId, { reveal: auth?.permissions.has('shifts.view_all') ?? true });
 }
 
-/** Open cash alerts (drops due, repeated variances), for whoever sees all shifts. */
+/**
+ * Open cash alerts (drops due, repeated variances), for whoever sees all shifts. A "drop due"
+ * alert shows only while it is still true: its shift is open and the drawer still holds more than
+ * the alert amount (after a transfer to the safe or the shift's close it disappears by itself).
+ */
 export async function cashAlerts(db: Db): Promise<CashAlert[]> {
   const rows = await db
     .selectFrom('sys.alerts')
@@ -665,7 +784,26 @@ export async function cashAlerts(db: Db): Promise<CashAlert[]> {
     .orderBy('id', 'desc')
     .limit(100)
     .execute();
-  return rows.map((r) => ({
+  const limit = await settingBigint(db, 'cash.drop_alert_fils');
+  const stillDue = async (shiftId: unknown): Promise<boolean> => {
+    if (limit === null || typeof shiftId !== 'string') return false;
+    const open = await db
+      .selectFrom('cash.shifts')
+      .select('id')
+      .where('id', '=', BigInt(shiftId))
+      .where('status', '=', 'open')
+      .executeTakeFirst();
+    return open !== undefined && (await expectedCash(db, open.id)) > limit;
+  };
+  const shown = [];
+  for (const r of rows) {
+    if (r.alert_type === 'cash_drop_due') {
+      const params = r.params as Record<string, unknown>;
+      if (!(await stillDue(params.shiftId))) continue;
+    }
+    shown.push(r);
+  }
+  return shown.map((r) => ({
     id: r.id.toString(),
     alertType: r.alert_type as CashAlert['alertType'],
     createdAt: r.created_at.toISOString(),

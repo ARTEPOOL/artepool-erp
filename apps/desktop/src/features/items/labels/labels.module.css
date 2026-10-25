@@ -1,6 +1,6 @@
-/* Barcode labels (design 07 "ملصقات باركود", decision 0043). A label is drawn at its real size in
-   millimetres: the sizes arrive as custom properties (--label-w, --label-h) set from the chosen
-   size. Tokens and logical properties only. */
+/* Barcode labels (design 07 "ملصقات باركود", decisions 0043, 0096). The label is an image drawn at
+   the printer's dots, shown at its real size in millimetres: the sizes arrive as custom properties
+   (--label-w, --label-h) set from the chosen size. Tokens and logical properties only. */
 
 .muted {
   color: var(--color-text-secondary);
@@ -22,48 +22,20 @@
 }
 
 .label {
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: calc(var(--label-h) * 0.03);
+  /* The drawn label (an image at the printer's dots) shown at its real size in millimetres. */
+  display: block;
   inline-size: var(--label-w);
   block-size: var(--label-h);
-  padding: calc(var(--label-h) * 0.06);
-  overflow: hidden;
-  background: var(--color-surface);
-  color: var(--color-text);
   border: 1px dashed var(--color-border);
-  font-size: calc(var(--label-h) * 0.12);
-  line-height: 1.15;
-  text-align: center;
+  image-rendering: pixelated;
 }
 
-.name {
+/* The preview: twice the real size, so small letters can be checked on the screen. */
+.zoomed {
+  inline-size: calc(var(--label-w) * 2);
+  block-size: calc(var(--label-h) * 2);
   max-inline-size: 100%;
-  overflow: hidden;
-  font-weight: 600;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.bars {
-  display: block;
-  inline-size: 100%;
-  block-size: auto;
-  flex: 1 1 auto;
-  min-block-size: 0;
-}
-
-.code {
-  font-family: var(--font-mono);
-  direction: ltr;
-  letter-spacing: 0.05em;
-}
-
-.price {
-  font-weight: 700;
+  object-fit: contain;
 }
 
 /* Print-only containers: hidden on screen. */
@@ -94,13 +66,67 @@
   .printRoll .label {
     border: none;
     break-inside: avoid;
-    /* Black on white paper, whatever the screen theme: a light bar in dark mode cannot be scanned. */
-    color-scheme: light;
-    background: Canvas;
-    color: CanvasText;
   }
 
   .printRoll .label {
     break-after: page;
   }
+}
+
+/* Labels for many items (decision 0099) */
+.searchLabel {
+  display: grid;
+  gap: var(--space-1);
+  font-size: var(--text-label);
+}
+
+.cellInput {
+  inline-size: 100%;
+  min-inline-size: 6rem;
+  min-block-size: var(--control-md);
+  padding-inline: var(--space-3);
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--text-label);
+}
+
+.cellInput:focus-visible {
+  border-color: var(--color-primary);
+  outline: 3px solid var(--color-primary-soft);
+}
+
+.cellInput.bad {
+  border-color: var(--color-danger);
+}
+
+.batchTable td .cellInput {
+  inline-size: 6rem;
+}
+
+.results {
+  display: grid;
+  gap: var(--space-1);
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.results li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.batchTable {
+  max-block-size: 22rem;
+  overflow: auto;
+}
+
+.total {
+  margin: 0;
+  font-weight: 700;
 }

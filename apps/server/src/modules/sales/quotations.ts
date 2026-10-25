@@ -103,6 +103,7 @@ export async function saveQuotation(
     quotation_date: date,
     valid_until: body.validUntil ?? addDays(date, await validDays(trx)),
     subject: body.subject ?? null,
+    customer_po: body.customerPo ?? null,
     terms_ar: body.termsAr ?? null,
     terms_en: body.termsEn ?? null,
     notes: body.notes ?? null,
@@ -244,6 +245,8 @@ export async function convertQuotation(
         customer_id: q.customer_id,
         ...(await billTo(trx, q.customer_id)),
         quotation_id: q.id,
+        // The customer's PO number comes too (decision 0066).
+        customer_po: q.customer_po,
         notes: q.notes,
         // The whole-document discount comes too; its shares are already on the lines.
         doc_discount_fils: q.doc_discount_fils,
@@ -375,6 +378,7 @@ export async function getQuotation(db: Db, id: bigint): Promise<QuotationDetail>
       'q.bill_to_trn',
       'q.terms_ar',
       'q.terms_en',
+      'q.customer_po',
       'q.notes',
       'q.doc_discount_fils',
       'q.revised_from_id',
@@ -416,6 +420,7 @@ export async function getQuotation(db: Db, id: bigint): Promise<QuotationDetail>
     billToTrn: row.bill_to_trn,
     termsAr: row.terms_ar,
     termsEn: row.terms_en,
+    customerPo: row.customer_po,
     notes: row.notes,
     docDiscountFils: row.doc_discount_fils.toString(),
     revisedFromId: row.revised_from_id?.toString() ?? null,

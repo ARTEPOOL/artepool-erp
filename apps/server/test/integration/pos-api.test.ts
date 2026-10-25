@@ -8,10 +8,12 @@
  * with approval, the close (Z) and the variance accepted by the accountant (0006, 0056–0058).
  */
 import { randomUUID } from 'node:crypto';
+import { periodRange } from '../../src/modules/reports/dashboard';
 import { sql } from 'kysely';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type {
   CashMovementItem,
+  DashboardResponse,
   CountResult,
   CustomerDetail,
   DocumentDetail,
@@ -210,6 +212,45 @@ beforeAll(async () => {
 afterAll(() => server.close());
 
 describe('the POS PC and its shift (decisions 0004, 0021)', () => {
+  it('a PC enrolled again under the same name gets a drawer of its own', async () => {
+    // The old enrollment made drawer REG-TWIN-PC; its shift is closed, then the PC is revoked.
+    const first = await addDevice(server, { code: 'TWIN-PC', kind: 'pos' });
+    const oldCashier = await addUser(server, {
+      username: 'cash.twin0',
+      roles: ['cashier'],
+      pin: '4829',
+    });
+    const oldShift = await open(
+      asActor(
+        first,
+        oldCashier,
+        (await openSession(server, { userId: oldCashier, deviceId: first.id })).token,
+      ),
+      '0',
+    );
+    await ok(
+      owner('POST', `/api/v1/shifts/${oldShift.id}/force-close`, {
+        ...countBody(0),
+        reason: 'PC replaced',
+      }),
+    );
+    await ok(owner('POST', `/api/v1/devices/${first.id}/revoke`, { reason: 'Enrolled again' }));
+    // The same PC enrolled again, before the drawer is moved: a drawer of its own, no clash.
+    const again = await addDevice(server, { code: 'TWIN-PC', kind: 'pos' });
+    const id = await addUser(server, { username: 'cash.twin', roles: ['cashier'], pin: '4829' });
+    await open(
+      asActor(again, id, (await openSession(server, { userId: id, deviceId: again.id })).token),
+      '0',
+    );
+    const codes = await server.db
+      .selectFrom('cash.registers')
+      .select('code')
+      .where('device_id', 'in', [first.id, again.id])
+      .orderBy('id')
+      .execute();
+    expect(codes.map((r) => r.code)).toEqual(['REG-TWIN-PC', 'REG-TWIN-PC-2']);
+  });
+
   it('shifts open only on a POS PC; one open shift per drawer; only its cashier sells on it', async () => {
     const office = await signedIn('cash.office', ['cashier'], 'office');
     expect(
@@ -222,6 +263,22 @@ describe('the POS PC and its shift (decisions 0004, 0021)', () => {
     expect(await refusal(b('POST', '/api/v1/shifts', { openingFloatFils: '0' }))).toMatchObject({
       rule: 'SHIFT_ALREADY_OPEN',
     });
+    // The same cashier on another POS PC: refused, naming the PC the shift is open on.
+    const aPc = await server.db
+      .selectFrom('auth.devices')
+      .select('code')
+      .where('id', '=', a.pc.id)
+      .executeTakeFirstOrThrow();
+    pcNo += 1;
+    const other = await addDevice(server, { code: `PC-${pcNo}`, kind: 'pos' });
+    const aThere = asActor(
+      other,
+      a.id,
+      (await openSession(server, { userId: a.id, deviceId: other.id })).token,
+    );
+    expect(
+      await refusal(aThere('POST', '/api/v1/shifts', { openingFloatFils: '0' })),
+    ).toMatchObject({ rule: 'SHIFT_OPEN_ELSEWHERE', deviceCode: aPc.code });
     const state = await ok<PosState>(b('GET', '/api/v1/pos/state'));
     expect(state.shift).toBeNull();
     expect(state.drawerBusyWith).not.toBeNull();
@@ -419,6 +476,7 @@ describe('POS sales', () => {
         phone: `050 ${phone}`,
         isVatRegistered: true,
         trn: '100987654321003',
+        addressLine: 'Sanaiya, Al Ain',
       }),
       201,
     );
@@ -528,6 +586,110 @@ describe('returns at the POS (decision 0060)', () => {
       expect.objectContaining({ methodKind: 'card', amountFils: '10500' }),
     ]);
     expect(cardBack.opensDrawer).toBe(false);
+  });
+});
+
+describe('the owner dashboard (decisions 0039, 0081)', () => {
+  const dashboard = (who: Actor = owner, query = 'period=today') =>
+    ok<DashboardResponse>(who('GET', `/api/v1/reports/owner-dashboard?${query}`));
+  const minus = (a: string, b: string) => (BigInt(a) - BigInt(b)).toString();
+
+  it('counts sales after returns, with VAT, cost and profit, per item, cashier and method', async () => {
+    expect((await accountant('GET', '/api/v1/reports/owner-dashboard')).statusCode).toBe(403);
+    const before = await dashboard();
+    const cashier = await signedIn('cash.dash', ['cashier']);
+    const shift = await open(cashier, '0');
+    const a = await item('DASH-1', '1050000', '9000'); // 105.00 incl. VAT, cost 5.00
+    const sold = await ok<PosSaleResponse>(
+      sale(cashier, {
+        lines: [{ itemId: a, quantityMilli: '3000' }],
+        payments: [cashPart('31500')],
+      }),
+      201,
+    );
+    await ok(
+      cashier('POST', '/api/v1/pos/returns', {
+        originalDocumentId: sold.document.id,
+        reasonCodeId: ids.cnReturn,
+        reasonText: 'Returned one',
+        lines: [
+          {
+            originalLineId: sold.document.lines[0]!.id,
+            quantityMilli: '1000',
+            returnStockStatus: 'available',
+          },
+        ],
+        approvalId: await approval(cashier, 'credit_notes.issue'),
+      }),
+      201,
+    );
+    const after = await dashboard();
+    // 3 sold − 1 returned = 2 × 105.00: net 200.00, VAT 10.00, cost 10.00, profit 190.00.
+    expect({
+      total: minus(after.current.totalFils, before.current.totalFils),
+      net: minus(after.current.netFils, before.current.netFils),
+      vat: minus(after.current.vatFils, before.current.vatFils),
+      cost: minus(after.current.costFils, before.current.costFils),
+      profit: minus(after.current.profitFils, before.current.profitFils),
+      documents: after.current.documents - before.current.documents,
+    }).toEqual({
+      total: '21000',
+      net: '20000',
+      vat: '1000',
+      cost: '1000',
+      profit: '19000',
+      documents: 1,
+    });
+    expect(minus(after.byChannel.posFils, before.byChannel.posFils)).toBe('21000');
+    const cashOf = (d: DashboardResponse) =>
+      d.byMethod.find((m) => m.kind === 'cash')?.amountFils ?? '0';
+    expect(minus(cashOf(after), cashOf(before))).toBe('21000');
+    expect(after.topItems.find((i) => i.code === 'DASH-1')).toMatchObject({
+      quantityMilli: '2000',
+      netFils: '20000',
+      profitFils: '19000',
+    });
+    expect(after.byCashier.find((c) => c.userId === cashier.id.toString())).toMatchObject({
+      totalFils: '21000',
+      documents: 1,
+    });
+    expect(after.cash.openShifts.find((x) => x.shiftId === shift.id)?.expectedFils).toBe('21000');
+    expect(after.from).toBe(after.to);
+    expect(after.previousTo < after.from).toBe(true);
+  });
+
+  it('periods: weeks start on Monday; a custom range must be in order', async () => {
+    expect(periodRange({ period: 'week' }, '2026-10-18')).toEqual({
+      from: '2026-10-12',
+      to: '2026-10-18',
+    });
+    expect(periodRange({ period: 'week' }, '2026-10-12')).toEqual({
+      from: '2026-10-12',
+      to: '2026-10-12',
+    });
+    expect(periodRange({ period: 'month' }, '2026-10-18')).toEqual({
+      from: '2026-10-01',
+      to: '2026-10-18',
+    });
+    expect(periodRange({ period: 'year' }, '2026-10-18')).toEqual({
+      from: '2026-01-01',
+      to: '2026-10-18',
+    });
+    const custom = await dashboard(owner, 'period=custom&from=2026-09-01&to=2026-09-30');
+    expect(custom).toMatchObject({
+      from: '2026-09-01',
+      to: '2026-09-30',
+      previousFrom: '2026-08-02',
+      previousTo: '2026-08-31',
+    });
+    expect(
+      (
+        await owner(
+          'GET',
+          '/api/v1/reports/owner-dashboard?period=custom&from=2026-10-02&to=2026-10-01',
+        )
+      ).statusCode,
+    ).toBe(422);
   });
 });
 
@@ -707,7 +869,38 @@ describe('the shift (decisions 0004, 0006, 0056–0058)', () => {
       201,
     );
     expect(r.dropDue).toBe(true);
-    expect((await ok<PosState>(cashier('GET', '/api/v1/pos/state'))).dropDue).toBe(true);
+    const state = await ok<PosState>(cashier('GET', '/api/v1/pos/state'));
+    expect(state.dropDue).toBe(true);
+    // The cashier counts blind: no expected cash on "My shift" (0006, 0080).
+    expect(state.expectedCashFils).toBeNull();
+    const dueFor = async (shiftId: string) =>
+      (
+        await ok<{ alertType: string; params: Record<string, string> }[]>(
+          accountant('GET', '/api/v1/shifts/alerts'),
+        )
+      ).some((x) => x.alertType === 'cash_drop_due' && x.params.shiftId === shiftId);
+    expect(await dueFor(state.shift!.id)).toBe(true);
+    // A transfer to the safe below the limit: the alert disappears by itself (0080).
+    await ok(
+      cashier('POST', '/api/v1/shifts/current/movements', {
+        movementType: 'cash_drop',
+        amountFils: '100000',
+      }),
+      201,
+    );
+    expect(await dueFor(state.shift!.id)).toBe(false);
+  });
+
+  it('the owner sees the expected cash on "My shift" (0080)', async () => {
+    const pc = await addDevice(server, { code: 'OWNER-COUNTER', kind: 'pos' });
+    const me = asActor(
+      pc,
+      owner.id,
+      (await openSession(server, { userId: owner.id, deviceId: pc.id, method: 'password_totp' }))
+        .token,
+    );
+    await open(me, '12345');
+    expect((await ok<PosState>(me('GET', '/api/v1/pos/state'))).expectedCashFils).toBe('12345');
   });
 });
 
@@ -723,6 +916,7 @@ describe('A4 cash taken on the drawer (decision 0063)', () => {
         name: 'Villa owner',
         isVatRegistered: false,
         phone: `050 ${phone}`,
+        addressLine: 'Falaj Hazza',
       }),
       201,
     );
@@ -791,5 +985,118 @@ describe('A4 cash taken on the drawer (decision 0063)', () => {
     expect(
       (await ok<ShiftReport>(seller('GET', '/api/v1/shifts/current/x-report'))).expectedCashFils,
     ).toBe('20500');
+  });
+});
+
+describe('stuck shifts (decision 0069)', () => {
+  it('a PC with an open shift is not revoked; the owner closes the shift from another PC', async () => {
+    const cashier = await signedIn('cash.stuck', ['cashier']);
+    const shift = await open(cashier, '50000');
+    expect(
+      await refusal(
+        owner('POST', `/api/v1/devices/${cashier.pc.id}/revoke`, { reason: 'PC broken' }),
+      ),
+    ).toMatchObject({ rule: 'DEVICE_HAS_OPEN_SHIFT' });
+    // Not for a cashier; not on the shift's own PC; a reason is required.
+    const other = await signedIn('cash.other', ['cashier']);
+    expect(
+      (
+        await other('POST', `/api/v1/shifts/${shift.id}/force-close`, {
+          ...countBody(4),
+          reason: 'Stuck',
+        })
+      ).statusCode,
+    ).toBe(403);
+    expect(
+      (await owner('POST', `/api/v1/shifts/${shift.id}/force-close`, countBody(4))).statusCode,
+    ).toBe(422);
+    // The owner counts 450.00 of the expected 500.00: the 50.00 short stays the cashier's.
+    const safe = await balance('1120');
+    const report = await ok<ShiftReport>(
+      owner('POST', `/api/v1/shifts/${shift.id}/force-close`, {
+        ...countBody(4, '5000'),
+        reason: 'The PC was enrolled again',
+      }),
+    );
+    expect(report.shift.status).toBe('closed');
+    expect(report.varianceFils).toBe('-5000');
+    expect(await balance('1120')).toBe(safe + 45_000n);
+    const row = await server.db
+      .selectFrom('cash.shifts')
+      .select(['cashier_id', 'closed_by', 'force_closed_by', 'force_close_reason'])
+      .where('id', '=', BigInt(shift.id))
+      .executeTakeFirstOrThrow();
+    expect(row).toMatchObject({
+      cashier_id: cashier.id,
+      force_close_reason: 'The PC was enrolled again',
+    });
+    expect(row.force_closed_by).toBe(owner.id);
+    expect(row.closed_by).toBe(owner.id);
+    const listed = await ok<ShiftsResponse>(owner('GET', '/api/v1/shifts?status=closed'));
+    expect(listed.shifts.find((s) => s.id === shift.id)).toMatchObject({
+      forceCloseReason: 'The PC was enrolled again',
+      deviceRevoked: false,
+    });
+    // Once closed it stays closed; the PC may now be revoked.
+    expect(
+      await refusal(
+        owner('POST', `/api/v1/shifts/${shift.id}/force-close`, {
+          ...countBody(0),
+          reason: 'Again',
+        }),
+      ),
+    ).toMatchObject({ rule: 'SHIFT_NOT_OPEN' });
+    await ok(owner('POST', `/api/v1/devices/${cashier.pc.id}/revoke`, { reason: 'PC broken' }));
+  });
+
+  it('the owner moves a revoked PC’s drawer to the PC enrolled in its place', async () => {
+    const old = await signedIn('cash.move', ['cashier']);
+    const shift = await open(old, '0');
+    await ok(
+      owner('POST', `/api/v1/shifts/${shift.id}/force-close`, {
+        ...countBody(0),
+        reason: 'Moving',
+      }),
+    );
+    const oldDrawer = shift.registerCode;
+    // Only from a revoked PC.
+    const fresh = await addDevice(server, { code: `PC-NEW-${shift.id}`, kind: 'pos' });
+    expect(
+      await refusal(
+        owner('POST', `/api/v1/devices/${old.pc.id}/move-drawer`, {
+          targetDeviceId: fresh.id.toString(),
+          reason: 'Enrolled again',
+        }),
+      ),
+    ).toMatchObject({ rule: 'DRAWER_MOVE_INVALID' });
+    await ok(owner('POST', `/api/v1/devices/${old.pc.id}/revoke`, { reason: 'Enrolled again' }));
+    // Not by the accountant (devices are the owner's).
+    expect(
+      (
+        await accountant('POST', `/api/v1/devices/${old.pc.id}/move-drawer`, {
+          targetDeviceId: fresh.id.toString(),
+          reason: 'Enrolled again',
+        })
+      ).statusCode,
+    ).toBe(403);
+    await ok(
+      owner('POST', `/api/v1/devices/${old.pc.id}/move-drawer`, {
+        targetDeviceId: fresh.id.toString(),
+        reason: 'Enrolled again',
+      }),
+    );
+    // The same cashier opens the next shift on the new PC, on the old drawer.
+    const there = asActor(
+      fresh,
+      old.id,
+      (await openSession(server, { userId: old.id, deviceId: fresh.id })).token,
+    );
+    const next = await open(there, '0');
+    expect(next.registerCode).toBe(oldDrawer);
+    const devices = await ok<{ devices: { id: string; drawer: { code: string } | null }[] }>(
+      owner('GET', '/api/v1/devices'),
+    );
+    expect(devices.devices.find((d) => d.id === fresh.id.toString())?.drawer?.code).toBe(oldDrawer);
+    expect(devices.devices.find((d) => d.id === old.pc.id.toString())?.drawer).toBeNull();
   });
 });

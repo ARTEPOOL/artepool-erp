@@ -1,0 +1,22 @@
+{
+  "name": "@artepool/backup",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@artepool/node-kit": "workspace:*",
+    "age-encryption": "0.3.1",
+    "pg": "8.23.1"
+  },
+  "devDependencies": {
+    "@artepool/migrate": "workspace:*",
+    "@artepool/testing": "workspace:*",
+    "@types/pg": "8.23.1"
+  }
+}

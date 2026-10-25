@@ -48,7 +48,7 @@ Phase 1 has **68 tables in 9 schemas**, plus reporting views and the functions a
 | `artepool_owner` | no | Owns every object | — |
 | `artepool_migrator` | yes (server only) | Migration runner | Member of `artepool_owner` |
 | `artepool_api` | yes (server only) | API service | See below |
-| `artepool_backup` | yes (server only) | Backup agent | `pg_read_all_data`, `REPLICATION`; write `ops.backup_runs`, `ops.integrity_runs`; `audit.add_anchor()` |
+| `artepool_backup` | yes (server only) | Backup service | `pg_read_all_data`, `REPLICATION`, `CREATEDB` (only for the throwaway restore-test database); write `ops.backup_runs`, `ops.integrity_runs`, move `ops.backup_requests` forward; `audit.add_anchor()`, `audit.verify_chain()`; never changes business data |
 | `artepool_maint` | yes (server only) | Nightly maintenance | `DELETE` only on `sys.idempotency_keys` older than 30 days (a trigger enforces both the role and the age). Sessions are never deleted ([0026](decisions/0026-users-and-devices-never-deleted.md)). |
 
 **`artepool_api` privileges:**
@@ -88,6 +88,7 @@ Phase 1 has **68 tables in 9 schemas**, plus reporting views and the functions a
      ▲     auth.devices (+ device_activity) · auth.enrollment_codes · auth.sessions
      │     auth.approvals (single-use supervisor approvals) · auth.recovery_codes (owner 2-step)
      │     auth.device_trust ("trust this PC" for the 2-step code, 0006)
+     │     auth.kiosk_lock_changes · auth.kiosk_code_failures (POS kiosk lock, 0034)
      │
  sys.company_profile · sys.settings · sys.branches · sys.document_series (POS-, INV-, CN-, …)
 
@@ -109,7 +110,7 @@ Phase 1 has **68 tables in 9 schemas**, plus reporting views and the functions a
         │                               cash.drawer_events                                  (incl. oversell, pending review)
         └── every financial event ─► gl.journal_entries ─► gl.journal_lines ─► gl.accounts      gl.periods (monthly)
 
- audit.log (hash-chained) ◄─ every table + explicit events         ops.outbox · ops.backup_runs · ops.integrity_runs
+ audit.log (hash-chained) ◄─ every table + explicit events         ops.outbox · ops.backup_runs · ops.integrity_runs · ops.backup_requests
 ```
 
 ---
@@ -229,7 +230,7 @@ Written in the same transaction as the operation. Insert-only (a trigger stamps 
 | Column | Type | Rules |
 |---|---|---|
 | id | bigint PK | |
-| alert_type | text | `CHECK IN ('low_stock','oversell_review','cash_drop_due','cash_variance','repeated_variance','drawer_left_open','backup_failed','backup_stale','restore_test_due','integrity_issue','audit_chain_broken','clock_skew','clock_backwards','period_missing')` |
+| alert_type | text | `CHECK IN ('low_stock','oversell_review','cash_drop_due','cash_variance','repeated_variance','drawer_left_open','backup_failed','backup_stale','restore_test_due','integrity_issue','audit_chain_broken','clock_skew','clock_backwards','period_missing','kiosk_lock_off','kiosk_lock_on','kiosk_exit_attempt','kiosk_code_blocked','offline_copy_due')` (kiosk types: migration 0034; `offline_copy_due`: 0036) |
 | severity | text | `CHECK IN ('info','warning','critical')` |
 | entity_type, entity_id | text? | |
 | params | jsonb | Values for the translated message |
@@ -275,9 +276,39 @@ Written in the same transaction as the operation. Insert-only (a trigger stamps 
 | note | text? | |
 | [ins] | | Never updated or deleted (`sys.forbid_update`, `sys.forbid_delete`) |
 
-Every issued document (`sales.documents`, receipts, Z reports) stores `print_template_version_id` at issue, and reprints use that version. Permission: `print_templates.manage` (Owner only).
+Every issued document (`sales.documents`, receipts, Z reports) stores `print_template_version_id` at issue, and reprints use that version. Office receipts store the A4 invoice template's version (they print with its design, decision 0064). `sys.print_templates.current_version_id` must be one of the template's own versions and is changed by the owner only (migration 0023). Permission: `print_templates.manage` (Owner only). The `settings` shape and the fields locked per document type are in `packages/shared/src/contracts/printing.ts` and decision 0064.
+
+### 4.12 `sys.company_bank_accounts` (migration 0023, decision 0065)
+
+| Column | Type | Rules |
+|---|---|---|
+| id | bigint PK | |
+| bank_name | text | 1–100 characters |
+| account_name | text | 1–150 characters |
+| iban | text | `sys.valid_uae_iban()`: `AE` + 21 digits, ISO 13616 checksum; unique among active accounts |
+| swift | text? | 8 or 11 characters |
+| sort_order | smallint | |
+| is_active | boolean | Deactivated with a reason (`sys.add_deactivation_reason`) |
+| [touch] | | Audited; never deleted; written by the owner only (`system.company.edit`, checked by a trigger) |
+
+Which account prints is the template's `bankAccountId` setting, so a reprint shows the account printed originally.
 
 ---
+
+### 4.13 `sys.setup_state` (exactly one row; migration 0043, decision 0102)
+
+The first-run wizard on the server PC. Forward only, one step at a time; never deleted; audited.
+
+| Column | Type | Notes |
+|---|---|---|
+| id | smallint PK | Always 1 |
+| state | text | `not_started` → `in_progress` → `complete`; nothing changes once complete (`SETUP_ALREADY_DONE`) |
+| path | text? | `new` / `restore`, chosen once with `in_progress`; empty on databases that existed before the wizard |
+| installation_id | uuid | Names the installation; never changes |
+| started_at, completed_at | timestamptz? | Set by the trigger from the server clock |
+| created_*, updated_*, row_version | | `sys.add_touch` |
+
+Migration 0043 marks it `complete` on any database that already has an active owner. The API may update `state` and `path` only.
 
 ## 5. Schema `auth`
 
@@ -392,7 +423,7 @@ Enrolled PCs only ([0024](decisions/0024-device-enrollment-proves-the-server.md)
 | key_renewed_at | timestamptz? | Server time, set by trigger when `key_hash` changes |
 | enrolled_at | timestamptz | Server time, set by trigger |
 | enrolled_by | bigint → auth.users | The user who created the enrollment code |
-| printer_config | jsonb | `DEFAULT '{}'`: thermal / label / A4 printer names, receipt width and language |
+| printer_config | jsonb | `DEFAULT '{}'`. Key `label` (migration 0038, decision 0096): this PC's label printer `{printer, dpi (203/300), printableWidthMm (20–120), offsetXMm, offsetYMm (−10–10)}` plus, since 0039, optional `darkness` (0–15), `speed` (1–6), `mode` (`driver`/`tspl`), checked by `auth.valid_label_printer`; set by the owner through `PUT /api/v1/devices/me/label-printer` (audited). The receipt printer stays on the PC (decision 0070) |
 | revoked_at, revoked_by | timestamptz?, bigint? | Set by trigger from the server clock and the request context |
 | revoke_reason | text? | Required (3+ characters) when revoked |
 | [std] | | |
@@ -493,6 +524,28 @@ Also used, together with the 6-digit code, to recover a forgotten password in th
 - **Automatic ending** (triggers):
   - on `auth.users`: a new password (`password_changed_at` changes, or a reset sets `must_change_password` with a new hash), a 2-step change (`totp_enabled` or `totp_secret_enc`), or deactivation;
   - on `auth.devices`: revoke, or the type changing to `pos`.
+
+### 5.11 `auth.kiosk_lock_changes` (migration 0034, append-only)
+
+The "Kiosk lock" of each POS PC ([0082](decisions/0082-app-mode-by-device-kind-and-pos-kiosk.md), [0083](decisions/0083-exiting-kiosk-mode-owner-only.md), [0089](decisions/0089-kiosk-lock-switch-per-pos-device.md)). Every change is a row; the latest row of a PC is its state; no row = on. Row-audited, immutable, never deleted.
+
+| Column | Type | Rules |
+|---|---|---|
+| id | bigint PK | |
+| device_id | bigint → auth.devices | An active `pos` PC |
+| lock_on | boolean | |
+| off_until | timestamptz? | Off: until when (empty = until turned back on); on: always empty (`kiosk_lock_on_ck`) |
+| via | text | `CHECK IN ('settings','owner_code')`; `owner_code` is always off with an end time (`kiosk_lock_code_ck`), at most 15 minutes ahead (0091) |
+| reason | text? | 3–500 characters; required from Settings |
+| created_at, created_by | timestamptz, bigint → auth.users | Stamped |
+
+**Insert rules** (trigger): the user in the request context is the owner (`auth.is_owner`, `AP010`); the PC is an active POS PC; a reason when `via = 'settings'`; `off_until` later than now; by owner code at most 15 minutes ahead (5 in migration 0034, 15 from 0035). The API also checks the owner's fresh 2-step code (claimed once, shared with sign-in and approvals).
+
+`auth.kiosk_state(device_id) → (locked, off_until, change_id, owner_signed_in)`: locked unless the latest change is "off" and its time has not passed, or the owner is signed in on that PC (`auth.owner_signed_in_on`: an open, full, unlocked, unexpired owner session there; migration 0035, [0091](decisions/0091-kiosk-lock-off-while-the-owner-is-signed-in.md)).
+
+### 5.12 `auth.kiosk_code_failures` (migration 0034, append-only)
+
+Wrong owner codes typed on a POS PC's lock screen: 5 within 15 minutes close the owner-code unlock on that PC for 15 minutes and raise `kiosk_code_blocked`. Columns: id, device_id → auth.devices, created_at, created_by. Row-audited, immutable, never deleted.
 
 ---
 
@@ -636,6 +689,7 @@ Lines of business ([0018](decisions/0018-chart-of-accounts-and-posting-map.md)).
 | reorder_level | numeric(14,3)? | `>= 0`; stock items only |
 | reorder_qty | numeric(14,3)? | `> 0` |
 | fallback_unit_cost_4dp | bigint? | `>= 0`. **The item's purchase price, without VAT** ([0038](decisions/0038-item-purchase-price-owner-only.md)): stock items and services only (a kit's cost is the sum of its components). Setting or changing it needs `items.cost` (owner-only; trigger `c_item_cost_rules`, migration 0010). It values sales and approved oversells until a weighted-average cost exists. |
+| pack_ar, pack_en | text? | 1–40 characters (migration 0040, decision [0097](decisions/0097-label-designer-and-print-quality.md)): the sale pack printed on labels ("كيس 25 كجم" / "25 kg bag"); empty = the unit's name |
 | is_sellable | boolean | `DEFAULT true` |
 | [active], [std] | | |
 
@@ -782,19 +836,19 @@ One level (`STANDARD`) in P1. A second level (for example "Contractors & compani
 | sort_order | integer | |
 | [active], [std] | | |
 
-### 7.16 `md.label_sizes` (decision [0043](decisions/0043-barcode-label-sizes.md), migration 0011)
+### 7.16 `md.label_sizes` (decisions [0043](decisions/0043-barcode-label-sizes.md), [0096](decisions/0096-barcode-labels-2-inch-printer.md); migrations 0011, 0037)
 
 | Column | Type | Rules |
 |---|---|---|
 | id | bigint PK | |
 | code | text | unique (case-insensitive); fixed after creation |
 | name_ar, name_en | text | |
-| width_mm | smallint | 10–210 |
+| width_mm | smallint | 10–210; an active size is never wider than the setting `labels.max_width_mm` (50 mm, the label roll; trigger `b_label_size_fits_roll`, rule `LABEL_TOO_WIDE`) |
 | height_mm | smallint | 10–297 |
 | sort_order | smallint | |
 | [active], [std] | | Deactivated with a reason, never deleted |
 
-Seeded: 25×15, 30×20, 38×25, 40×30, 50×25, 50×30, 58×40, 100×50 mm. Writes need `system.settings.edit` (owner).
+Seeded: 25×15, 30×20, 38×25, 40×30, 50×25, 50×30, 58×40, 100×50 mm. Since 0037 (decision 0096) the active ones are 50×30 (first = default), 50×25, 40×30 and 38×25; 25×15, 30×20, 58×40 and 100×50 are deactivated. Writes need `system.settings.edit` (owner).
 
 ---
 
@@ -948,6 +1002,27 @@ As built (migration 0011): a count is created straight in `counting` (the snapsh
 | reason_code_id | bigint? → sys.reason_codes | Required when variance ≠ 0 |
 | note | text? | |
 
+### 8.7 `inv.label_prints` (append-only; migration 0041, decision [0099](decisions/0099-batch-labels-and-price-changed-list.md))
+
+Every barcode label print, one row per item, with the price on the label. The "price changed, label is old" list compares each active item's last row (when it had a price) with its price today.
+
+| Column | Type | Rules |
+|---|---|---|
+| id | bigint PK | |
+| item_id | bigint → md.items | Index `(item_id, id DESC)` |
+| label_size_id | bigint → md.label_sizes | |
+| design_version_id | bigint → sys.print_template_versions | The label design used |
+| copies | integer | `1..10000` |
+| source | text | `CHECK IN ('item','list','price_changed','stock_document')` |
+| price_4dp | bigint? | The sale price on the label; all four price columns empty when the label had no price |
+| includes_vat | boolean? | |
+| vat_rate_bp | integer? | `0..10000`: the rate of the item's VAT category at printing |
+| gross_fils | bigint? | The price with VAT on the label (shared rounding helper) |
+| device_id | bigint? → auth.devices | `DEFAULT sys.ctx_device_id()`: the PC that printed |
+| created_at, created_by | | Who and when |
+
+Trigger `b_label_print_rules`: refuses (`AP011`, `LABEL_PRICE_CHANGED`) a row whose price, "includes VAT" or rate is not the item's today. Never changed or deleted; audited. The API may insert only the columns above (never `device_id` or the stamps).
+
 ---
 
 ## 9. Schema `sales`
@@ -969,6 +1044,7 @@ As built (migration 0011): a count is created straight in `counting` (the snapsh
 | customer_id | bigint → md.customers | |
 | bill_to_name | text | Snapshot |
 | bill_to_name_alt, bill_to_trn, bill_to_address, bill_to_phone | text? | Snapshot |
+| customer_po | text? | Customer PO number, up to 50 characters (decision 0066) |
 | quotation_date | date | |
 | valid_until | date | `>= quotation_date` |
 | price_level_id | bigint → md.price_levels | Level used to price the lines ([0032](decisions/0032-one-sale-price-with-vat-flag-and-customer-types.md)) |
@@ -1029,7 +1105,8 @@ The money columns work exactly as in `sales.document_lines` (item lines only).
 | pos_cart_id | uuid? | Links the cart-removal audit events ([0005](decisions/0005-cart-removals-logged-without-approval.md)) |
 | customer_id | bigint → md.customers | |
 | bill_to_name | text | Snapshot at issue |
-| bill_to_name_alt, bill_to_trn, bill_to_address, bill_to_phone | text? | Snapshot; the TRN is copied only if the customer is VAT-registered |
+| bill_to_name_alt, bill_to_trn, bill_to_address, bill_to_phone | text? | Snapshot; the TRN is copied only if the customer is VAT-registered; a full tax invoice needs the address (taken from the customer at issue when empty, refused when there is none, decision 0064) |
+| customer_po | text? | Customer PO number, up to 50 characters (decision 0066) |
 | seller_snapshot | jsonb? | |
 | issue_date | date? | |
 | supply_date | date? | |
@@ -1253,6 +1330,8 @@ The money columns work exactly as in `sales.document_lines` (item lines only).
 | variance_note | text? | |
 | approval_id | bigint? → auth.approvals | Accepting a variance above threshold |
 | z_snapshot | jsonb? | Frozen totals per tender, VAT, discounts, refunds, no-sales, paid-in/out, drops, **both counts** |
+| force_closed_by | bigint? → auth.users | Closed from another PC as a stuck shift; set once by someone with `shifts.force_close` ([0069](decisions/0069-stuck-shifts.md)) |
+| force_close_reason | text? | Required with `force_closed_by` |
 | audit_anchor_seq | bigint? | |
 | audit_anchor_hash | bytea? | |
 | [std] | | |
@@ -1472,35 +1551,51 @@ See the one-page [posting map](accounting/posting-map.md) (**pending accountant 
 
 **P1:** a row is written for every issued tax document: `not_required` before `einvoice.mandatory_from`, `pending` after it ([0019](decisions/0019-einvoicing-via-accredited-provider.md)).
 
-### 12.2 `ops.backup_runs`
+### 12.2 `ops.backup_runs` (migration 0036)
+
+Every local copy, off-site upload, external-drive copy and restore test ([0086](decisions/0086-backups-local-and-google-drive.md)). Written by the backup service as the SYSTEM user; final once finished; audited; never deleted.
 
 | Column | Type | Rules |
 |---|---|---|
 | id | bigint PK | |
 | kind | text | `CHECK IN ('wal_archive','base_backup','logical_dump','offsite_upload','offline_copy','restore_test')` |
-| status | text | `CHECK IN ('running','success','failed')` |
-| started_at | timestamptz | |
-| finished_at | timestamptz? | |
-| target, file_name | text? | Never credentials |
+| status | text | `CHECK IN ('running','success','failed')`; `finished_at` set exactly when not running; a failure needs `error_message` |
+| request_id | bigint? → ops.backup_requests | When the owner asked for it |
+| started_at, finished_at | timestamptz | |
+| target, file_name | text? | A folder, `google_drive` or the restore database; never credentials |
 | size_bytes | bigint? | |
-| sha256 | bytea? | |
-| encrypted | boolean | |
-| audit_chain_seq | bigint? | |
-| audit_chain_hash | bytea? | |
-| details | jsonb? | |
-| error_message | text? | |
+| sha256 | bytea? | 32 bytes |
+| encrypted | boolean | `true` for off-site copies (age) |
+| audit_chain_seq, audit_chain_hash | bigint?, bytea? | The chain head when the copy was taken (also an `audit.anchors` row of kind `backup`) |
+| details | jsonb? | E.g. the Drive file id, the source copy |
+| error_message | text? | ≤ 2000 characters |
+| [upd] | | |
 
-### 12.3 `ops.integrity_runs`
+### 12.3 `ops.integrity_runs` (migration 0036)
 
 | Column | Type | Rules |
 |---|---|---|
 | id | bigint PK | |
-| database_name | text | |
-| triggered_by | bigint → auth.users | |
-| started_at | timestamptz | |
-| finished_at | timestamptz? | |
-| status | text | `CHECK IN ('ok','issues','error')` |
-| results | jsonb | `audit_chain`, `stock_vs_ledger`, `journals_balanced`, `documents_vs_journals`, `numbering_gaps`, `document_totals`, `settlement_totals`, `advance_balances`, `payments_fully_allocated`, `shift_cash`, `period_integrity` |
+| run_kind | text | `CHECK IN ('nightly','restore_test','manual')` |
+| database_name | text | The live database or the throwaway restore database |
+| backup_run_id | bigint? → ops.backup_runs | For a restore test |
+| started_at, finished_at | timestamptz | |
+| status | text | `CHECK IN ('running','ok','issues','error')` |
+| results | jsonb | One entry per check: `{ ok, problems, examples }` for `audit_chain`, `journals_balanced`, `trial_balance`, `stock_vs_ledger`, `numbering_gaps` (more checks may be added) |
+| [upd] | | |
+
+### 12.4 `ops.backup_requests` (migration 0036)
+
+The owner asks the backup service for something now. Inserted by the API (owner only, enforced by a trigger, `AP010`); moved forward by the backup service only: `pending → running → done/failed`; one open request per kind (partial unique index).
+
+| Column | Type | Rules |
+|---|---|---|
+| id | bigint PK | |
+| kind | text | `CHECK IN ('backup_now','offsite_now','restore_test','offline_copy')` |
+| target | text? | The external drive's folder, `offline_copy` only |
+| status | text | `CHECK IN ('pending','running','done','failed')` |
+| error_message | text? | |
+| [upd] | | |
 
 ---
 
@@ -1549,7 +1644,8 @@ See the one-page [posting map](accounting/posting-map.md) (**pending accountant 
 | `sales.check_note_quantities()` | trigger | Notes ≤ original quantities / remaining advance |
 | `gl.check_entry_balanced()` | deferred constraint trigger | Balanced, ≥ 2 lines |
 | `gl.check_period_open()` | trigger | Journal entries, document issue, stock and cash postings |
-| `sys.clock_guard()` | function | Detects the server clock going backwards |
+| `sys.clock_guard()` | trigger on `audit.log`, security definer | Refuses any write (every write is audited) whose server time is more than 2 minutes (`sys.clock_tolerance()`) before the latest audit row: `CLOCK_BACKWARDS`. Checked once per transaction. Only the `clock_backwards` alert itself gets through (migration 0043) |
+| `sys.clock_status()` | security definer | Server time, latest record, behind or not: the server checks it every 5 minutes and raises one critical `clock_backwards` alert per day |
 | `sys.require_reason_to_deactivate()` | trigger | Deactivating master data or an account needs a reason in the request context ([0037](decisions/0037-master-data-defaults.md)) |
 | `gl.account_in_use(id)` | function | Why an account is in use (event link, line of business, payment method, reason code; postings from 0011), or NULL |
 | `gl.ensure_periods(n)` | security definer | Creates the missing months up to n months ahead ([0035](decisions/0035-fiscal-year-and-provisional-chart.md)) |
@@ -1569,7 +1665,7 @@ See the one-page [posting map](accounting/posting-map.md) (**pending accountant 
 
 | Module | Codes |
 |---|---|
-| system | `system.company.edit`, `system.settings.edit`, `system.series.manage`, `system.devices.manage`, `system.health.view`, `system.backup.restore_test`, `system.integrity.run` |
+| system | `system.company.edit`, `system.settings.edit`, `system.series.manage`, `system.devices.manage`, `system.health.view`, `system.backup.restore_test`, `system.integrity.run`, `system.backup.manage` (the last four owner only, 0036) |
 | users | `users.view`, `users.manage`, `users.reset_credentials`, `roles.manage` |
 | audit | `audit.view`, `audit.verify`, `audit.export` |
 | master data | `items.view`, `items.manage`, `prices.manage`, `customers.view`, `customers.manage`, `customers.credit`*, `suppliers.manage`, `technicians.manage`, `payment_methods.manage`, `warehouses.manage`, `data.import` |
@@ -1664,8 +1760,10 @@ All series use 6 digits and continuous numbering ([0011](decisions/0011-document
 | `cash.drop_alert_fils` | `300000` | A drawer above AED 3,000 raises the cash-drop alert ([0057](decisions/0057-cash-drop-alert.md)) |
 | `sales.quotation_validity_days` | `30` | |
 | `einvoice.mandatory_from` | `null` | **Pending accountant** ([0019](decisions/0019-einvoicing-via-accredited-provider.md)) |
-| `backup.max_age_minutes.local` / `backup.max_age_hours.offsite` | `90` / `30` | |
-| `backup.restore_test_interval_days` | `30` | |
+| `backup.max_age_minutes.local` / `backup.max_age_hours.offsite` | `90` / `30` | Ranges 30–1440 / 24–168 (0036) |
+| `backup.restore_test_interval_days` | `30` | Range 7–90 |
+| `backup.offline_copy_interval_days` | `7` | External-drive reminder, range 1–60 (0036) |
+| `backup.age_recipient` | `null` | The age public key of the off-site copies; only `age1…` accepted (0036). The private key is never stored |
 
 ---
 
@@ -1702,9 +1800,26 @@ Migrations are written **in build order** (milestones in [`phase-1-plan.md`](pha
 | 0020 | `storekeeper_items` | M4 | — (`items.manage` for the storekeeper role, decision 0053) | — |
 | 0021 | `no_adjustment_approval` | M4 | — (the adjustment approval limit setting is emptied, decision 0054) | — |
 | 0022 | `cash_events` | M5 | `cash.movements`, `cash.drawer_events`, `cash.variance_acceptances`, `cash.expected_cash()`, count other amount, 0.10/0.05 coins, cash alert settings, cashier 5% discount | `gl.journal_entries.cash_movement_id`, `shift_id` |
-| 0023 | `ops_backup` | M6 | `ops.backup_runs`, `ops.integrity_runs` + backup role grants | — |
+| 0023 | `print_designer` | M4b | `sys.company_bank_accounts`, `sys.valid_uae_iban()`, `customer_po` on documents and quotations, the full-invoice address rule, the current-template rule, receipts stamped with the invoice template, the receipt language into its template | — |
+| 0024 | `stuck_shifts` | M5 fix | `shifts.force_close`, closing a stuck shift from another PC, moving a drawer to a re-enrolled PC, no revoking a PC with an open shift (0069) | — |
+| 0025 | `a4_full_invoices` | M4 fix | A4 invoices always full tax invoices; the cash customer's typed name required (0071) | — |
+| 0026 | `invoice_cancel` | M4 fix | `invoices.cancel` (owner only), credit-note reasons for cancelled and edited invoices (0072) | — |
+| 0027 | `a4_format_from_customer` | M4 fix | A4 invoice format from the customer only: full when registered or named with an address, else simplified (0071) | — |
+| 0028 | `approval_codes` | M5 fix | Approval-code failure count and block on users (0074) | — |
+| 0029 | `receipt_logo` | M4b fix | `sys.receipt_logo`: the thermal receipt's own logo, owner only (0075) | — |
+| 0030 | `trust_until_password_change` | M1 fix | `security.trusted_device_days` 3650 (until the password changes), range 0–3650; trust expiry check up to 3650 days (0077) | — |
+| 0031 | `owner_trust_on_pos` | M1 fix | `auth.is_owner()`; the owner may trust a POS PC; a PC turned POS keeps only the owner's trust (0078) | — |
+| 0032 | `screen_lock_optional` | M1 fix | `security.idle_lock_minutes.office/pos` may be 0 (never lock) and are set to 0 (0079) | — |
+| 0033 | `owner_dashboard` | Reports | `reports.owner_dashboard` (owner only), index on issued documents by day (0081) | — |
+| 0034 | `kiosk_lock` | M5c | `auth.kiosk_lock_changes`, `auth.kiosk_code_failures`, `auth.kiosk_state()`, four kiosk alert types (0082, 0083, 0089) | — |
+| 0035 | `kiosk_owner_session` | M5c | `auth.owner_signed_in_on()`, `auth.kiosk_state()` with `owner_signed_in`; owner code at most 15 minutes (0091) | — |
+| 0036 | `ops_backup` | M6.1 | `ops.backup_runs`, `ops.integrity_runs`, `ops.backup_requests`; backup settings; `offline_copy_due` alert; `system.backup.manage` and owner-only health/restore/integrity permissions; backup role grants | — |
+| 0040 | `label_design` | Labels | `md.items.pack_ar` / `pack_en` (sale pack for labels, ≤ 40 characters); the default label design as a version of the `barcode_label` print template (read by `GET /api/v1/label-design`, saved by the owner via `POST /api/v1/label-design/versions`); decision 0097 | — |
+| 0039 | `label_printer_quality` | Labels | `auth.valid_label_printer` also takes optional `darkness` (0–15), `speed` (1–6) and `mode` (`driver` / `tspl`); decision 0097 | — |
+| 0038 | `device_label_printer` | Labels | Check on `auth.devices.printer_config -> 'label'` (`auth.valid_label_printer`); decision 0096 | — |
+| 0037 | `label_sizes_two_inch` | Labels | Setting `labels.max_width_mm` (50); label sizes for the 2-inch roll (50×30 first; 25×15, 30×20, 58×40, 100×50 deactivated); trigger: no active size wider than the roll; decision 0096 | — |
 
-After 0023, a final check asserts that every business table has the audit trigger, the no-delete guard and the expected grants. The same check runs as an automated test.
+After 0036, a final check asserts that every business table has the audit trigger, the no-delete guard and the expected grants. The same check runs as an automated test.
 
 ---
 

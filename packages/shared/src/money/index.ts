@@ -5,3 +5,4 @@ export * from './parse';
 export * from './round';
 export * from './units';
 export * from './vat';
+export * from './words';

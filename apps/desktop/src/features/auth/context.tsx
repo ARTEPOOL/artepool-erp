@@ -61,7 +61,7 @@ export function useErrorText(): (error: unknown) => string {
       // A broken business rule names itself (e.g. ACCOUNT_IN_USE), with its own message.
       const rule = error.details.rule;
       if (typeof rule === 'string' && i18n.exists(`common:errors.rules.${rule}`)) {
-        return t(`common:errors.rules.${rule}`);
+        return t(`common:errors.rules.${rule}`, error.details);
       }
       const key = `common:errors.${error.code}`;
       return i18n.exists(key) ? t(key, error.details) : t('common:errors.INTERNAL');

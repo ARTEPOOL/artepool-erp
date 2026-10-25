@@ -51,7 +51,7 @@
 ## 2. Topology and runtime components
 
 ```
-┌──────────────────────────── MAIN SERVER PC (BitLocker, UPS) ────────────────────────────┐
+┌───────────────────── MAIN SERVER PC (any Windows 10/11 edition, UPS) ───────────────────┐
 │  PostgreSQL 18 ── listens on 127.0.0.1 only                                              │
 │        ▲ role artepool_api                ▲ role artepool_backup                         │
 │  ┌─────┴──────────────────────┐   ┌───────┴──────────────────────────────────┐           │
@@ -80,6 +80,17 @@
 - **Version lock-step:** the server states the minimum client version. Clients update themselves from the server over the LAN, and the update signature is verified ([0007](decisions/0007-no-code-signing-certificate-for-now.md)).
 
 ---
+
+### Installation layout (M6.2, decisions [0102](decisions/0102-first-run-new-setup-or-restore.md)–[0105](decisions/0105-server-address-and-name.md))
+
+- **Program:** `C:\Program Files\ARTEPOOL\` (the bundled `node.exe` + server bundle, PostgreSQL binaries, WinSW, the launcher, the desktop app). Replaced by upgrades; the previous version is kept until the new one answers.
+- **Data:** `C:\ProgramData\ARTEPOOL\` — `pgdata`, `wal` (archive), `backups` (always kept), `logs`, `secrets` (master key and database passwords, DPAPI LocalMachine, ACL: SYSTEM, Administrators, the service accounts), `config\server.json` (no secrets), `setup` (the one-time wizard token).
+- **Services:** `ARTEPOOL Database`, `ARTEPOOL Server`, `ARTEPOOL Backup`, each under its own virtual service account, automatic start, restart on failure. The launcher unprotects the secrets in memory and starts Node with them; nothing is written in clear.
+- **The packaged server** (`pnpm build:server`): `server.mjs`, `backup.mjs`, `migrate.mjs` and the console tools bundled by esbuild; only the Argon2 native library and the PDF browser driver stay as packages; the files read at run time (migrations, fonts, the common-passwords list) in `resources\` at their repository paths (`resourcePath()`); `manifest.json` with the SHA-256 of every file. It runs only as the installed server: without `ARTEPOOL_CONFIG` it refuses to start and never reads a `.env`.
+- **Settings and secrets on the installed server:** `config\server.json` (strict: an unknown key, such as a password, is refused) is turned into the same settings the programs read in development. The launcher `artepool-svc.exe` (Rust) keeps six secrets (master key, four role passwords, and PostgreSQL's superuser password, which only the restore program receives) as DPAPI machine blobs bound to their names, refuses to start when one is missing or does not open, or when the folder or a file can be opened by anyone but SYSTEM, Administrators and `NT SERVICE\…` accounts, and gives them to Node in its environment. The server takes the master key out of its environment once read, and pg_dump and the PDF browser never inherit a secret. `artepool-svc run <tool>` is also how an administrator runs the console tools there. The restore from a backup (`run restore`, started by the setup wizard) restores into a separate database, runs every integrity check, and swaps it in only if all pass, keeping the empty database aside.
+- **First-run wizard (0102):** the installer leaves `setup\token` (32 random bytes) and `setup\ca.crt` in ProgramData, readable by administrators only. The app opens the wizard by itself when it can read them and setup is not complete; its Rust side sends only `/api/v1/setup/*` with the token (`x-artepool-setup`) to `127.0.0.1` over TLS 1.3 pinned to that CA; the token never reaches the screens. The server answers only from the socket's own loopback address, compares the token in constant time, refuses everything once `sys.setup_state` is complete, and deletes the token at the end. Steps run as SYSTEM with reason "setup wizard"; this PC is enrolled as the POS through the normal protocol (0024).
+- **Network:** PostgreSQL on localhost only; one firewall rule for the API port from the local subnet (private profile). The PCs reach the server **by its name**; the server PC keeps its address by a router reservation; the app never changes network settings.
+- **Upgrades** back up first and migrate all-or-nothing; **uninstall** keeps `ProgramData`. Updates for the other PCs are served by the server PC on the LAN and checked against the update signature.
 
 ## 3. How the integrity rules are enforced
 
@@ -304,14 +315,14 @@ App (POS section)                     API                                       
   - Lockout after N failures (15 minutes), with a separate PIN failure counter (blocked until the owner unblocks it) and per-device rate limits.
   - Each user has one sign-in method: **PIN** (4 digits, **POS PCs only**), **password**, or **password + TOTP** (mandatory for roles flagged `requires_2fa`) ([0021](decisions/0021-cashier-pin-sign-in-on-pos-pcs.md)). Office PCs always need a password. A password user's PIN is used only for approvals.
   - TOTP replay is blocked. 10 one-time recovery codes; an emergency 2-step reset works only on the server PC ([0022](decisions/0022-owner-2-step-recovery.md)).
-  - **Trusted PCs** ([0027](decisions/0027-trust-this-pc-for-the-2-step-code.md)): after the 6-digit code, a 2-step user may trust that PC for `security.trusted_device_days` (30). There, the password alone gives a full session (sign-in method `trusted_device`). The database enforces it: only the person, on that PC, never on a POS PC. The trust ends by itself on a new password, a 2-step change, deactivation, revoke or the PC becoming POS. The owner can end it in Settings → Devices.
+  - **Trusted PCs** ([0027](decisions/0027-trust-this-pc-for-the-2-step-code.md)): after the 6-digit code, that PC is remembered (box ticked by default) for `security.trusted_device_days` (3650, in practice until the password changes, [0077](decisions/0077-two-step-code-once-per-pc.md)). There, the password alone gives a full session (sign-in method `trusted_device`). The database enforces it: only the person, on that PC, and on a POS PC only the owner ([0078](decisions/0078-owner-remembered-on-pos-pcs.md)). The trust ends by itself on a new password, a 2-step change, deactivation, revoke or the PC becoming POS. The owner can end it in Settings → Devices.
   - **Last resort** ([0029](decisions/0029-owner-password-reset-on-the-server-pc.md)): `pnpm owner:reset-password` on the server PC. A reason is required. It gives a temporary password shown once, unlocks, ends all owner sessions and trusted PCs, and optionally clears the 2-step setup. It is audited, and the owner sees a notice with the time and reason when choosing their own password.
   - **Forgot password** ([0028](decisions/0028-forgot-password-with-phone-and-recovery-code.md)): username + phone code + one recovery code + a new password, from the sign-in screen. Both codes are claimed in one transaction. It works while locked and unlocks the account. It ends every session and trusted PC of that person, then signs them in. The same answer is given for any wrong part.
   - The first owner is created with `pnpm owner:create` on the server PC. There is exactly one active owner; it cannot be deactivated.
   - Users are deactivated with a reason, never deleted ([0026](decisions/0026-users-and-devices-never-deleted.md)).
 - **Sessions:**
   - Random 256-bit tokens; only their SHA-256 is stored.
-  - Server-side idle lock and absolute expiry; instant revoke.
+  - Server-side idle lock (per kind of PC, can be off: [0079](decisions/0079-screen-lock-optional.md)) and absolute expiry; instant revoke.
   - A password change, user deactivation or device revoke ends the affected sessions. Sessions are ended with a reason, never deleted.
   - A password + TOTP sign-in first gets a short "second factor" session; after the code it is replaced by a new full session with a new token.
 - **Permissions:**
@@ -320,7 +331,7 @@ App (POS section)                     API                                       
   - Default roles: Owner, Accountant, Cashier, Storekeeper, Technician. Custom roles are allowed.
   - Owner-only permissions (users, roles, devices, settings, numbering series and, from [0030](decisions/0030-company-details-owner-only.md), company details) can never be given to another role; the database refuses it.
 - **Secrets:**
-  - TOTP and future integration secrets use AES-256-GCM, with the master key protected by Windows DPAPI. The key is never in the database or its backups; the owner keeps an offline copy.
+  - TOTP and future integration secrets use AES-256-GCM, with the master key protected by Windows DPAPI. The key is never in the database. It travels only inside the **age-encrypted** backups (Google Drive, encrypted USB copy), which only the owner's offline private key opens, so a restore on a new server PC keeps passwords and 2-step working ([0102](decisions/0102-first-run-new-setup-or-restore.md)); the hourly local copies never carry it.
   - Only card last 4 digits and auth codes are stored.
 - **TLS:**
   - A local CA with **name constraints**, so it can only vouch for the ARTÉPOOL server.
@@ -347,7 +358,7 @@ App (POS section)                     API                                       
 | **Invoices (A4) section** | A separate area of the app. The server renders a PDF from bilingual templates, and the app opens the **Windows print dialog**. Covers A4 invoices, payment invoices, credit notes, quotations and statements. |
 | **A4 reprint of a POS sale** | Opened from the A4 section and printed in A4: same document, same `POS-` number. `print_count` is incremented and the reprint is logged. Prints after the first are marked "Copy / نسخة" (setting). |
 | **Barcode scanner** | Keyboard wedge: a fast burst of keys + Enter is treated as a scan. Pack barcodes carry their own quantity. |
-| **Label printer** | Raw ZPL/TSPL or raster, decided once the model is known. |
+| **Label printer** | Decision [0096](decisions/0096-barcode-labels-2-inch-printer.md): the label is laid out in mm zones and drawn by the app at the printer's dots (203/300 dpi), then sent silently through the Windows driver with the label's exact paper size, one page per label (Rust `printer_print_label`); per-PC settings (printer, dpi, printable width, X/Y offset) in `auth.devices.printer_config`. RAW TSPL next (the LV-275 speaks TSPL). Print dialog only as a fallback and for A4 sheets. Runbook: [label-printer.md](runbooks/label-printer.md). |
 
 - **Fonts:** a free Arabic + Latin font is bundled until the custom design arrives.
 - **WebView2:** the offline WebView2 installer is bundled.
@@ -366,5 +377,7 @@ App (POS section)                     API                                       
 | Offline copy | External drive filled, then unplugged | Weekly | Office safe |
 | Restore test | Restore into `artepool_restore_test`, then run all integrity checks | Monthly reminder + before every upgrade | Server |
 | Health | `ops.backup_runs` / `ops.integrity_runs` → "System health" screen + alerts | Continuous | — |
+
+Built in M6.1 (decision [0086](decisions/0086-backups-local-and-google-drive.md)): the hourly logical backup, the daily age-encrypted Google Drive copy (`drive.file` only, refresh token sealed in `.secrets`), the external-drive copy, the restore test and the nightly checks, run by `apps/backup`; WAL archiving and the nightly base backup come with the installer (M6.2). Runbook: [backup-and-restore.md](runbooks/backup-and-restore.md).
 
 **Upgrades:** backup → rehearse the migrations on a restored copy → stop the API → migrate → start → clients update themselves.

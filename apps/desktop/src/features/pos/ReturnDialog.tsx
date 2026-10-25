@@ -30,6 +30,7 @@ import { ApprovalDialog } from '../masterdata/ApprovalDialog';
 import { money } from '../masterdata/format';
 import { localName, useReasonCodes } from '../masterdata/refs';
 import { POS_INVALIDATE, POS_PATHS } from './api';
+import { useReceiptLogo } from './receipt/logo';
 import { printReceipt, type PrintOutcome } from './receipt/printer';
 import styles from './pos.module.css';
 
@@ -45,6 +46,7 @@ const readMilli = (text: string): bigint | null => {
 export function ReturnDialog(props: { state: PosState; onClose: () => void }) {
   const { t, i18n } = useTranslation('pos');
   const api = useApi();
+  const logo = useReceiptLogo();
   const errorText = useErrorText();
   const name = localName(i18n.language);
   const reasons = (useReasonCodes().data ?? []).filter(
@@ -123,7 +125,7 @@ export function ReturnDialog(props: { state: PosState; onClose: () => void }) {
 
   const showDone = async (result: PosReturnResponse) => {
     const printed = await printReceipt(result.receipt, {
-      language: props.state.receiptLanguage,
+      logo,
       i18n,
       kickDrawer: result.opensDrawer,
     });

@@ -6,7 +6,7 @@
 import { randomUUID } from 'node:crypto';
 import { sql } from 'kysely';
 import { recordEvent } from '../platform/audit/events';
-import { checkPassword } from '../platform/auth/password-policy';
+import { checkPassword, type PasswordProblem } from '../platform/auth/password-policy';
 import { newTemporaryPassword } from '../platform/crypto/codes';
 import type { SecretHasher } from '../platform/crypto/hashing';
 import type { Db } from '../platform/db/pool';
@@ -22,7 +22,7 @@ export class ConsoleError extends Error {
 
 const consoleContext = (reason: string) => ({ userId: 1n, requestId: randomUUID(), reason });
 
-async function activeOwner(db: Db) {
+export async function activeOwner(db: Db) {
   return db
     .selectFrom('auth.users as u')
     .innerJoin('auth.user_roles as ur', 'ur.user_id', 'u.id')
@@ -40,22 +40,44 @@ export interface FirstOwnerInput {
   password: string;
 }
 
+export interface FirstOwnerProblems {
+  username: boolean;
+  names: boolean;
+  password: PasswordProblem[];
+  minLength: number;
+}
+
+/** What is wrong with the first owner's details, for the console and the setup wizard. */
+export async function firstOwnerProblems(
+  settings: SettingsCache,
+  input: FirstOwnerInput,
+): Promise<FirstOwnerProblems> {
+  const minLength = await settings.number('security.password_min_length');
+  return {
+    username: !/^[a-z0-9._-]{3,32}$/.test(input.username),
+    names: !input.displayNameAr.trim() || !input.displayNameEn.trim(),
+    password: checkPassword(input.password, { minLength, username: input.username }),
+    minLength,
+  };
+}
+
 /** Problems with the input, in plain English for the console (empty = fine). */
 export async function checkFirstOwner(
   settings: SettingsCache,
   input: FirstOwnerInput,
 ): Promise<string[]> {
   const problems: string[] = [];
-  if (!/^[a-z0-9._-]{3,32}$/.test(input.username)) {
+  const found = await firstOwnerProblems(settings, input);
+  if (found.username) {
     problems.push(
       'The username must be 3–32 lower-case letters, digits, dots, dashes or underscores.',
     );
   }
-  if (!input.displayNameAr.trim() || !input.displayNameEn.trim()) {
+  if (found.names) {
     problems.push('Both names (Arabic and English) are required.');
   }
-  const minLength = await settings.number('security.password_min_length');
-  for (const problem of checkPassword(input.password, { minLength, username: input.username })) {
+  const minLength = found.minLength;
+  for (const problem of found.password) {
     problems.push(
       {
         too_short: `The password must have at least ${minLength} characters.`,
@@ -75,6 +97,7 @@ export async function createFirstOwner(
   hasher: SecretHasher,
   settings: SettingsCache,
   input: FirstOwnerInput,
+  reason = 'server console: first owner',
 ): Promise<bigint> {
   const problems = await checkFirstOwner(settings, input);
   if (problems.length > 0) throw new ConsoleError(problems.join('\n'));
@@ -84,7 +107,7 @@ export async function createFirstOwner(
     );
   }
   const passwordHash = await hasher.hash(input.password);
-  return withBusinessTx(db, consoleContext('server console: first owner'), async (trx) => {
+  return withBusinessTx(db, consoleContext(reason), async (trx) => {
     const user = await trx
       .insertInto('auth.users')
       .values(
@@ -111,8 +134,9 @@ export async function createFirstOwner(
 export function createConsoleCode(
   db: Db,
   settings: SettingsCache,
+  reason = 'server console: enrollment code',
 ): Promise<{ code: string; expiresAt: Date }> {
-  return withBusinessTx(db, consoleContext('server console: enrollment code'), (trx) =>
+  return withBusinessTx(db, consoleContext(reason), (trx) =>
     createEnrollmentCode(trx, { settings }, 'console'),
   );
 }

@@ -2,9 +2,11 @@
 
 | | |
 |---|---|
-| **Status** | Accepted |
+| **Status** | Accepted; updated by [0092](0092-first-run-setup-wizard.md) |
 | **Date** | 2026-10-07 |
 | **Decided by** | Owner |
+
+> **Updated by [0092](0092-first-run-setup-wizard.md):** on an installed system the first owner, company details and the first PC are created by the one-time setup wizard. These commands stay as emergency tools, documented in a runbook.
 
 ## Decision
 On a new installation nobody can sign in yet, so two commands run **on the server PC itself**:

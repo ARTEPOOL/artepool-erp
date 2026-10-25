@@ -27,12 +27,15 @@ import { ListsPanel } from '../features/settings/lists/ListsPanel';
 import { TaxPanel } from '../features/settings/tax/TaxPanel';
 import { SuppliersPage } from '../features/suppliers/SuppliersPage';
 import { AuditPanel } from '../features/settings/audit/AuditPanel';
+import { PrintDesignerPanel } from '../features/settings/print/PrintDesignerPanel';
+import { BackupPanel } from '../features/settings/backup/BackupPanel';
 import { DevicesPanel } from '../features/settings/devices/DevicesPanel';
 import { SettingsIndex, SettingsPage } from '../features/settings/SettingsPage';
 import { UsersPanel } from '../features/settings/users/UsersPanel';
 import { PosPage } from '../features/pos/PosPage';
 import { ShiftPage } from '../features/pos/shift/ShiftPage';
 import { ShiftsPage } from '../features/pos/shift/ShiftsPage';
+import { OwnerDashboard } from '../features/reports/OwnerDashboard';
 import { Shell } from './Shell';
 
 const root = createRootRoute({ component: Shell });
@@ -80,6 +83,11 @@ const posShift = createRoute({
   component: ShiftPage,
 });
 const shifts = createRoute({ getParentRoute: () => root, path: 'shifts', component: ShiftsPage });
+const reports = createRoute({
+  getParentRoute: () => root,
+  path: 'reports',
+  component: OwnerDashboard,
+});
 const items = createRoute({ getParentRoute: () => root, path: 'items', component: ItemsPage });
 // Stock pages reached from Items & stock (design 07) and the dashboard alerts.
 const openingStock = createRoute({
@@ -134,6 +142,11 @@ const devices = createRoute({
   component: DevicesPanel,
 });
 const audit = createRoute({ getParentRoute: () => settings, path: 'audit', component: AuditPanel });
+const backup = createRoute({
+  getParentRoute: () => settings,
+  path: 'backup',
+  component: BackupPanel,
+});
 const company = createRoute({
   getParentRoute: () => settings,
   path: 'company',
@@ -141,8 +154,14 @@ const company = createRoute({
 });
 const tax = createRoute({ getParentRoute: () => settings, path: 'tax', component: TaxPanel });
 const lists = createRoute({ getParentRoute: () => settings, path: 'lists', component: ListsPanel });
+const print = createRoute({
+  getParentRoute: () => settings,
+  path: 'print',
+  component: PrintDesignerPanel,
+});
 
 const routeTree = root.addChildren([
+  reports,
   home,
   pos,
   posShift,
@@ -161,7 +180,7 @@ const routeTree = root.addChildren([
   customers,
   suppliers,
   accounting,
-  settings.addChildren([settingsIndex, company, users, tax, lists, devices, audit]),
+  settings.addChildren([settingsIndex, company, users, tax, lists, devices, print, backup, audit]),
 ]);
 
 export function createAppRouter(initialPath = '/') {

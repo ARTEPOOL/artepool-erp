@@ -5,6 +5,7 @@
  */
 import type { Kysely, Transaction } from 'kysely';
 import type {
+  ScreenLockSettings,
   SeriesItem,
   UpdateSeriesRequest,
   UpdateVatRateRequest,
@@ -95,4 +96,38 @@ export async function updateSeries(
   const series = (await listSeries(trx)).find((s) => s.id === id.toString());
   if (!series) throw new AppError('NOT_FOUND', 'No such series');
   return series;
+}
+
+// ---------------------------------------------------------------------------------------------
+// The idle screen lock (decision 0079): minutes per kind of PC, 0 = never. Owner only.
+// ---------------------------------------------------------------------------------------------
+
+const LOCK_KEYS = {
+  officeMinutes: 'security.idle_lock_minutes.office',
+  posMinutes: 'security.idle_lock_minutes.pos',
+} as const;
+
+export async function getScreenLock(db: Kysely<DB>): Promise<ScreenLockSettings> {
+  const rows = await db
+    .selectFrom('sys.settings')
+    .select(['key', 'value'])
+    .where('key', 'in', Object.values(LOCK_KEYS))
+    .execute();
+  const value = (key: string) => Number(rows.find((r) => r.key === key)?.value ?? 0);
+  return { officeMinutes: value(LOCK_KEYS.officeMinutes), posMinutes: value(LOCK_KEYS.posMinutes) };
+}
+
+/** Saves both values; new sign-ins use them (the database checks the 0–240 range). */
+export async function saveScreenLock(
+  trx: Transaction<DB>,
+  body: ScreenLockSettings,
+): Promise<ScreenLockSettings> {
+  for (const [field, key] of Object.entries(LOCK_KEYS) as [keyof ScreenLockSettings, string][]) {
+    await trx
+      .updateTable('sys.settings')
+      .set({ value: JSON.stringify(body[field]) })
+      .where('key', '=', key)
+      .execute();
+  }
+  return getScreenLock(trx);
 }

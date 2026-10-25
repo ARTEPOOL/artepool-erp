@@ -30,13 +30,17 @@ const SESSION_OPTIONS = [
 ].join(' ');
 
 export function createPool(connection: PgConnection, max = 20): pg.Pool {
-  return new pg.Pool({
+  const pool = new pg.Pool({
     ...connection,
     application_name: 'artepool-api',
     options: SESSION_OPTIONS,
     max,
     types,
   });
+  // An idle connection closed by the database (PostgreSQL restarted, the restore's swap): the pool
+  // drops it and opens a new one when needed. Without a listener the process would stop.
+  pool.on('error', () => undefined);
+  return pool;
 }
 
 export function createDb(pool: pg.Pool): Kysely<DB> {

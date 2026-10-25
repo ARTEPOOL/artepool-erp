@@ -64,7 +64,15 @@ jobs:
         run: pnpm db:codegen:check
       - name: Chromium for the A4 PDF renderer
         run: pnpm --filter @artepool/server exec playwright-core install --with-deps chromium-headless-shell
-      - name: Integration tests (database rules, concurrency, server)
+      - name: PostgreSQL 18 client tools (pg_dump / pg_restore for the backup tests)
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSo /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt noble-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client-18
+          echo "ARTEPOOL_PG_BIN=/usr/lib/postgresql/18/bin" >> "$GITHUB_ENV"
+      - name: Integration tests (database rules, concurrency, server, backups)
         run: pnpm test:integration
       - name: Audit chain check
         run: pnpm audit:verify
@@ -74,7 +82,8 @@ jobs:
   screens:
     name: Screen tests (Playwright, Arabic + English)
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    # 86 flows in two languages, one at a time: about 30 minutes on the runner.
+    timeout-minutes: 45
     services:
       postgres:
         image: postgres:18
@@ -110,6 +119,14 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Chromium for Playwright
         run: pnpm --filter @artepool/desktop exec playwright install --with-deps chromium
+      - name: PostgreSQL 18 client tools (pg_dump / pg_restore for the restore flow)
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSo /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt noble-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client-18
+          echo "ARTEPOOL_PG_BIN=/usr/lib/postgresql/18/bin" >> "$GITHUB_ENV"
       - name: Screen flows against the real API (throwaway database)
         run: pnpm test:e2e
       - name: Screenshots and report
@@ -165,9 +182,9 @@ jobs:
       - name: Formatting
         run: cargo fmt --all --check
       - name: Lints
-        run: cargo clippy -p artepool-bridge -p artepool-printer --all-targets -- -D warnings
-      - name: Tests (protocol vectors, TLS rules, enrollment and renewal; the RAW receipt printer)
-        run: cargo test -p artepool-bridge -p artepool-printer
+        run: cargo clippy -p artepool-bridge -p artepool-printer -p artepool-svc --all-targets -- -D warnings
+      - name: Tests (protocol vectors, TLS rules, enrollment and renewal; the RAW receipt printer; the service launcher)
+        run: cargo test -p artepool-bridge -p artepool-printer -p artepool-svc
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v5
         with:
@@ -196,13 +213,29 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: apps/desktop/src-tauri
       - name: Install
         run: pnpm install --frozen-lockfile
-      - name: Rust tests on Windows (including Windows Credential Manager)
+      - name: Rust tests on Windows (including Windows Credential Manager, DPAPI and folder access rules)
         run: cargo test --workspace --manifest-path apps/desktop/src-tauri/Cargo.toml
+      - name: Service launcher lints on Windows
+        run: cargo clippy -p artepool-svc --all-targets --manifest-path apps/desktop/src-tauri/Cargo.toml -- -D warnings
+      - name: Build the packaged server (Windows Argon2 library included)
+        run: pnpm build:server --windows
+      - name: Build the service launcher
+        run: cargo build --release -p artepool-svc --manifest-path apps/desktop/src-tauri/Cargo.toml
+      - name: Packaged server
+        uses: actions/upload-artifact@v4
+        with:
+          name: artepool-server-windows
+          path: |
+            dist/server
+            apps/desktop/src-tauri/target/release/artepool-svc.exe
+          retention-days: 14
       - name: Build the installer
         run: pnpm build:desktop
       - name: Installer

@@ -8,6 +8,8 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type {
+  BridgeRequest,
+  BridgeResponse,
   CountResult,
   ItemListItem,
   PosSaleResponse,
@@ -103,6 +105,7 @@ const STATE: PosState = {
   ],
   receiptLanguage: 'both',
   dropDue: false,
+  expectedCashFils: null,
 };
 
 const TABLETS: ItemListItem = {
@@ -130,6 +133,7 @@ const SOLD = {
   opensDrawer: true,
   oversellAdjustmentNumber: null,
   dropDue: false,
+  expectedCashFils: null,
 } as unknown as PosSaleResponse;
 
 const CASHIER = [
@@ -144,7 +148,21 @@ const CASHIER = [
   'invoices.view',
 ];
 
-function bridgeFor(path: string, state: PosState = STATE) {
+/** The catalog: the tablets, or (`hidden`) only when their barcode is searched. */
+const catalogAnswer =
+  (hidden: boolean) =>
+  (request: BridgeRequest): BridgeResponse => {
+    const q = new URLSearchParams(request.path.split('?')[1]).get('q') ?? '';
+    const found = !hidden || q === '6281000000017';
+    return ok({
+      items: found ? [TABLETS] : [],
+      total: found ? 1 : 0,
+      counts: { active: 1, stock: 1, service: 0, bundle: 0 },
+      exactMatchId: hidden && found ? '7' : null,
+    });
+  };
+
+function bridgeFor(path: string, state: PosState = STATE, options: { hidden?: boolean } = {}) {
   start.path = path;
   return new FakeBridge(POS)
     .on(
@@ -174,16 +192,7 @@ function bridgeFor(path: string, state: PosState = STATE) {
     )
     .on('GET', '/api/v1/pos/state', ok(state))
     .on('GET', '/api/v1/pos/held-carts', ok([]))
-    .on(
-      'GET',
-      '/api/v1/items',
-      ok({
-        items: [TABLETS],
-        total: 1,
-        counts: { active: 1, stock: 1, service: 0, bundle: 0 },
-        exactMatchId: null,
-      }),
-    )
+    .on('GET', '/api/v1/items', catalogAnswer(options.hidden ?? false))
     .on('GET', '/api/v1/item-categories', ok({ categories: [] }))
     .on(
       'GET',
@@ -293,6 +302,25 @@ describe('POS sale', () => {
     expect(screen.getByRole('img', { name: 'Receipt preview' })).toBeTruthy();
   });
 
+  it('a scan with the cursor anywhere: found by its barcode and into the cart, no click', async () => {
+    // The tablets are not among the items shown: they come only from the search for the barcode.
+    await signIn(bridgeFor('/pos', STATE, { hidden: true }), 'Z-000042');
+    await screen.findByRole('textbox', { name: 'Search items' });
+    expect(screen.queryByRole('button', { name: /Chlorine tablets/ })).toBeNull();
+    // The cursor on the page, not in the search box: the scanner types and presses Enter.
+    (document.activeElement as HTMLElement | null)?.blur();
+    for (const key of '6281000000017') fireEvent.keyDown(document.body, { key });
+    fireEvent.keyDown(document.body, { key: 'Enter' });
+    const cart = screen.getByLabelText('Cart');
+    expect(await within(cart).findByText('Chlorine tablets')).toBeTruthy();
+    // The search is empty again, ready for the next scan.
+    await waitFor(() =>
+      expect(screen.getByRole<HTMLInputElement>('textbox', { name: 'Search items' }).value).toBe(
+        '',
+      ),
+    );
+  });
+
   it('selling beyond stock asks a supervisor, then sends the same sale with the approval', async () => {
     const bridge = bridgeFor('/pos').on(
       'POST',
@@ -323,8 +351,8 @@ describe('POS sale', () => {
     expect(within(approval).getByText(/needed 5, in stock 3/)).toBeTruthy();
     await within(approval).findByRole('option', { name: 'Khalid Salem' });
     fireEvent.change(within(approval).getByLabelText('Supervisor'), { target: { value: '8' } });
-    fireEvent.change(within(approval).getByLabelText(/Supervisor's PIN/), {
-      target: { value: '4826' },
+    fireEvent.change(within(approval).getByLabelText(/Code from the approver/), {
+      target: { value: '482611' },
     });
     fireEvent.change(within(approval).getByLabelText(/^Reason/), {
       target: { value: 'Customer is waiting' },

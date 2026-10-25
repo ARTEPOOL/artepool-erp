@@ -1,11 +1,11 @@
 /**
  * The point of sale (M5) against the real server, on the POS PC, in Arabic and English. A cashier
  * signs in with the PIN and opens the shift with 500; scans a barcode and sells two pieces for
- * cash (change given, POS- receipt); sells beyond stock with the supervisor's PIN (the oversell
+ * cash (change given, POS- receipt); sells beyond stock with the supervisor's phone code (the oversell
  * adjustment is pending review); then closes the shift with a blind count that is short, recounts
  * with the supervisor, and the Z report shows both counts.
  */
-import { control, expect, snap, test, unique } from './fixtures';
+import { control, expect, scanAnywhere, snap, test, unique } from './fixtures';
 import type { Page } from '@playwright/test';
 
 test.describe.configure({ mode: 'serial' });
@@ -18,12 +18,13 @@ async function pinSignIn(page: Page, name: string) {
   await page.keyboard.type('4829');
 }
 
-async function approve(page: Page, t: T, supervisor: string) {
+/** The supervisor approves with the code shown now on their phone (decision 0074). */
+async function approve(page: Page, t: T, supervisor: string, supervisorId: string) {
   const dialog = page.getByRole('dialog').last();
   await dialog
     .getByLabel(t('masterdata:approval.approver'), { exact: true })
     .selectOption({ label: supervisor });
-  await dialog.getByLabel(t('masterdata:approval.pin')).fill('5173');
+  await dialog.getByLabel(t('masterdata:approval.code')).fill(await control.codeFor(supervisorId));
   await dialog.getByLabel(t('masterdata:approval.reason')).fill('Checked at the counter');
   await dialog.getByRole('button', { name: t('masterdata:approval.approve') }).click();
 }
@@ -45,11 +46,10 @@ test('sell, oversell with approval, close the shift with a recount', async ({
     displayNameAr: `كاشير ${n}`,
     displayNameEn: `Cashier ${n}`,
   });
-  await control.addUser({
+  const { id: supervisorId } = await control.addTwoStepUser({
     username: unique('supervisor'),
-    method: 'pin',
-    pin: '5173',
-    roles: ['accountant'],
+    password: 'supervisor-pool-water',
+    recoveryCodes: [],
     displayNameAr: `مشرف ${n}`,
     displayNameEn: `Supervisor ${n}`,
   });
@@ -72,13 +72,15 @@ test('sell, oversell with approval, close the shift with a recount', async ({
   await snap(page, '50-pos-open-shift');
   await page.getByRole('button', { name: t('pos:shiftOpen.open') }).click();
 
-  // Scan the barcode twice: one line of two pieces (252.00).
+  // Scan the barcode twice: one line of two pieces (252.00). The second time the cursor is not
+  // in the search box: the scan goes to the cart all the same, with no click.
   const search = page.getByRole('textbox', { name: t('pos:search') });
-  for (let i = 0; i < 2; i += 1) {
-    await search.fill(barcode);
-    await expect(page.getByRole('button', { name: new RegExp(`TAB-${n}`) })).toBeVisible();
-    await search.press('Enter');
-  }
+  await search.fill(barcode);
+  await expect(page.getByRole('button', { name: new RegExp(`TAB-${n}`) })).toBeVisible();
+  await search.press('Enter');
+  await expect(page.getByLabel(t('pos:cart')).getByText('126.00').first()).toBeVisible();
+  await search.blur();
+  await scanAnywhere(page, barcode);
   await expect(page.getByLabel(t('pos:cart')).getByText('252.00').first()).toBeVisible();
   await snap(page, '51-pos-cart');
 
@@ -109,7 +111,7 @@ test('sell, oversell with approval, close the shift with a recount', async ({
     page.getByRole('dialog', { name: t('pos:approval.pos.oversell.title') }),
   ).toBeVisible();
   await snap(page, '54-pos-oversell');
-  await approve(page, t, supervisor);
+  await approve(page, t, supervisor, supervisorId);
   await expect(page.getByText(/ADJ-/)).toBeVisible();
   await page.getByRole('button', { name: new RegExp(t('pos:done.newSale')) }).click();
 
@@ -128,7 +130,7 @@ test('sell, oversell with approval, close the shift with a recount', async ({
   await close.getByLabel(t('pos:closeShift.countOf', { value: '100.00' })).fill('10');
   await close.getByLabel(t('pos:closeShift.other')).fill('4');
   await close.getByRole('button', { name: t('pos:closeShift.saveCount') }).click();
-  await approve(page, t, supervisor);
+  await approve(page, t, supervisor, supervisorId);
   await expect(close.getByTestId('variance')).toHaveText('0.00');
   await close.getByRole('button', { name: t('pos:closeShift.close') }).click();
 

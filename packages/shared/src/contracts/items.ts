@@ -178,6 +178,9 @@ export interface ItemDetail extends ItemListItem {
   purchaseCost4dp?: string | null;
   descriptionAr: string | null;
   descriptionEn: string | null;
+  /** The sale pack for labels ("كيس 25 كجم" / "25 kg bag"), decision 0097; null = the unit. */
+  packAr: string | null;
+  packEn: string | null;
   defaultBusinessLineId: string | null;
   reorderLevelMilli: string | null;
   reorderQtyMilli: string | null;
@@ -194,6 +197,8 @@ const ItemFields = z.object({
   nameEn: Name,
   descriptionAr: OptionalText(1000),
   descriptionEn: OptionalText(1000),
+  packAr: OptionalText(40),
+  packEn: OptionalText(40),
   categoryId: IdText,
   unitId: IdText,
   vatCategoryId: IdText,

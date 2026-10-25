@@ -11,11 +11,14 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@artepool/backup": "workspace:*",
+    "@artepool/migrate": "workspace:*",
     "@artepool/node-kit": "workspace:*",
     "@artepool/shared": "workspace:*",
     "@artepool/tls": "workspace:*",
     "@fontsource/ibm-plex-sans-arabic": "5.3.0",
     "@node-rs/argon2": "2.2.2",
+    "age-encryption": "0.3.1",
     "exceljs": "4.4.0",
     "fastify": "5.12.5",
     "kysely": "0.29.6",

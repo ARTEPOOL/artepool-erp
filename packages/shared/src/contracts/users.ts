@@ -131,7 +131,11 @@ export type UpdateRoleRequest = z.infer<typeof UpdateRoleRequest>;
 export const ApprovalRequest = z.object({
   permission: z.string().regex(/^[a-z_]+(\.[a-z_]+)+$/),
   approverId: IdText,
-  pin: z.string().min(1).max(16),
+  /** The current 6-digit code from the approver's 2-step app (decision 0074). */
+  code: z
+    .string()
+    .trim()
+    .regex(/^\d{6}$/),
   reason: z.string().trim().min(3).max(500),
   context: z.record(z.string(), z.unknown()).default({}),
 });

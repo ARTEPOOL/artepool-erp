@@ -35,12 +35,18 @@ const HTTP_STATUS: Record<ErrorCode, number> = {
   ACCOUNT_LOCKED: 423,
   INVALID_PIN: 401,
   PIN_BLOCKED: 403,
+  APPROVAL_BLOCKED: 403,
+  KIOSK_CODE_BLOCKED: 429,
+  BACKUP_REQUEST_OPEN: 409,
+  GOOGLE_FAILED: 502,
+  GOOGLE_NOT_CONFIGURED: 409,
   INVALID_TWO_STEP_CODE: 401,
   RECOVERY_REFUSED: 401,
   PASSWORD_REJECTED: 422,
   PIN_REJECTED: 422,
   ENROLLMENT_FAILED: 401,
   ENROLLMENT_UNAVAILABLE: 503,
+  SETUP_UNAVAILABLE: 403,
   DEVICE_CODE_TAKEN: 409,
   DEVICE_PROTECTED: 409,
   VALIDATION_FAILED: 422,
@@ -103,6 +109,7 @@ const DUPLICATE_FIELDS: Readonly<Record<string, string>> = {
   warehouses_code_uq: 'code',
   reason_codes_code_uq: 'code',
   series_prefix_uq: 'prefix',
+  company_bank_accounts_iban_uq: 'iban',
 };
 
 /** Extra, safe details of a database error: the broken rule, or the duplicate field. */

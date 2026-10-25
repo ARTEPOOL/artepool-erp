@@ -22,15 +22,25 @@ beforeAll(async () => {
 afterAll(() => server.close());
 
 describe('every route', () => {
-  it('declares its access, and the only public ones are health and enrollment', () => {
+  it('declares its access; the only public ones are health, enrollment and the setup wizard', async () => {
     const table = server.app.accessTable;
     expect(table.length).toBeGreaterThan(25);
+    const open = table.filter((r) => r.access.kind === 'public');
     expect(
-      table
-        .filter((r) => r.access.kind === 'public')
+      open
         .map((r) => r.url)
+        .filter((url) => !url.startsWith('/api/v1/setup/'))
         .sort(),
     ).toEqual(['/api/v1/enroll/complete', '/api/v1/enroll/hello', '/health']);
+    // The setup wizard's routes check the installer's token themselves (decision 0102).
+    const setup = open.filter((r) => r.url.startsWith('/api/v1/setup/'));
+    expect(setup.length).toBe(9);
+    for (const route of setup) {
+      const response = await call(server, route.method as 'GET' | 'POST' | 'PUT', route.url, {
+        body: route.method === 'GET' ? undefined : {},
+      });
+      expect(errorCode(response), route.url).toBe('SETUP_UNAVAILABLE');
+    }
   });
 
   it('refuses a user who lacks the route permission, before doing anything', async () => {

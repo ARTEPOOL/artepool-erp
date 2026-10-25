@@ -310,6 +310,8 @@ export async function getItem(db: Kysely<DB>, id: bigint, showCost = false): Pro
     nameEn: item.name_en,
     descriptionAr: item.description_ar,
     descriptionEn: item.description_en,
+    packAr: item.pack_ar,
+    packEn: item.pack_en,
     categoryId: item.category_id.toString(),
     unitId: item.unit_id.toString(),
     vatCategoryId: item.vat_category_id.toString(),
@@ -422,6 +424,9 @@ function itemValues(body: ItemInput) {
     name_en: body.nameEn,
     description_ar: body.descriptionAr ?? null,
     description_en: body.descriptionEn ?? null,
+    // The sale pack (decision 0097): left out = unchanged (an Excel import does not send it).
+    ...(body.packAr !== undefined ? { pack_ar: body.packAr } : {}),
+    ...(body.packEn !== undefined ? { pack_en: body.packEn } : {}),
     category_id: BigInt(body.categoryId),
     unit_id: BigInt(body.unitId),
     vat_category_id: BigInt(body.vatCategoryId),

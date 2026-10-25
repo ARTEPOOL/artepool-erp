@@ -1,5 +1,13 @@
 /** The owner's 2-step code (decision 0022): setup, daily sign-in, and a recovery code. */
-import { authenticatorCode, control, expect, snap, test, typeCode } from './fixtures';
+import {
+  authenticatorCode,
+  control,
+  dontRememberThisPc,
+  expect,
+  snap,
+  test,
+  typeCode,
+} from './fixtures';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -48,6 +56,7 @@ test('daily sign-in: a wrong code shows the design message, the right one opens 
   await open('office');
   await signInAsOwner(page, t);
   await expect(page.getByRole('heading', { name: t('auth:secondFactor.title') })).toBeVisible();
+  await dontRememberThisPc(page, t);
   await typeCode(page, '000000');
   await page.getByRole('button', { name: t('auth:secondFactor.confirm') }).click();
   await expect(page.getByText(t('common:errors.INVALID_TWO_STEP_CODE'))).toBeVisible();

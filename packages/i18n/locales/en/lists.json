@@ -195,6 +195,7 @@
     "height": "Height (mm)",
     "mmRule": "A whole number from {min} to {max} mm.",
     "mmHint": "From {min} to {max} mm.",
-    "note": "These sizes are offered when printing barcode labels, through the print dialog. Only the owner adds, changes or deactivates a size; a size is never deleted."
+    "widthHint": "From {min} to {max} mm: the label printer's roll is {max} mm wide.",
+    "note": "These sizes are offered when printing barcode labels. A size is never wider than the label printer's roll; the label printer of each PC is set in Settings → Devices. Only the owner adds, changes or deactivates a size; a size is never deleted."
   }
 }

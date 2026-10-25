@@ -7,10 +7,13 @@ import type { FastifyRequest } from 'fastify';
 import { sql, type Kysely, type Transaction } from 'kysely';
 import {
   clientProofMessage,
+  DEFAULT_LABEL_PRINTER,
   ENROLL_PROTOCOL,
+  LabelPrinterConfig,
   enrollTranscript,
   serverProofMessage,
   type DeviceKind,
+  type DeviceDrawer,
   type DeviceListItem,
   type DevicesResponse,
   type EnrollCompleteRequest,
@@ -20,6 +23,7 @@ import {
   type EnrollmentCodeResponse,
   type RenewKeyResponse,
   type ThisDeviceResponse,
+  type MoveDrawerRequest,
 } from '@artepool/shared/contracts';
 import { recordEvent } from '../../platform/audit/events';
 import { newEnrollmentCode } from '../../platform/crypto/codes';
@@ -27,11 +31,12 @@ import { safeEqual } from '../../platform/crypto/tokens';
 import type { DB } from '../../platform/db/schema.generated';
 import { stamped } from '../../platform/db/stamped';
 import { withBusinessTx } from '../../platform/db/tx';
-import { AppError } from '../../platform/errors/app-error';
+import { AppError, ruleError } from '../../platform/errors/app-error';
 import { contextOf } from '../../platform/http/context';
 import type { AppDeps } from '../../platform/http/deps';
 import { endSessions } from '../auth/sessions';
 import { caFingerprint, deriveCodeKey, proof } from './enrollment-crypto';
+import { kioskLockOf, publicLock } from './kiosk';
 
 /** Keys are renewed when less than this many days are left. */
 const RENEW_WITHIN_DAYS = 30;
@@ -297,13 +302,30 @@ export async function thisDevice(
   const device = request.device!;
   const row = await deps.db
     .selectFrom('auth.devices')
-    .select('name')
+    .select(['name', 'printer_config'])
     .where('id', '=', device.id)
     .executeTakeFirstOrThrow();
+  const label = LabelPrinterConfig.safeParse((row.printer_config as { label?: unknown }).label);
   return {
     device: { id: device.id.toString(), code: device.code, name: row.name, kind: device.kind },
     keyExpiresAt: device.keyExpiresAt.toISOString(),
+    labelPrinter: label.success ? label.data : DEFAULT_LABEL_PRINTER,
   };
+}
+
+/** Sets THIS PC's label printer (decision 0096): the owner, on the PC the printer is attached to. */
+export async function setLabelPrinter(
+  trx: Transaction<DB>,
+  deviceId: bigint,
+  config: LabelPrinterConfig,
+): Promise<void> {
+  await trx
+    .updateTable('auth.devices')
+    .set({
+      printer_config: sql`printer_config || jsonb_build_object('label', ${JSON.stringify(config)}::jsonb)`,
+    })
+    .where('id', '=', deviceId)
+    .executeTakeFirstOrThrow();
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -356,6 +378,22 @@ export async function listDevices(
       .orderBy('t.expires_at')
       .execute(),
   ]);
+  const drawers = await deps.db
+    .selectFrom('cash.registers as r')
+    .leftJoin('cash.shifts as s', (j) =>
+      j.onRef('s.register_id', '=', 'r.id').on('s.status', '=', 'open'),
+    )
+    .leftJoin('auth.users as u', 'u.id', 's.cashier_id')
+    .select([
+      'r.id',
+      'r.code',
+      'r.device_id',
+      's.shift_number',
+      'u.display_name_ar',
+      'u.display_name_en',
+    ])
+    .where('r.device_id', 'is not', null)
+    .execute();
   const devices: DeviceListItem[] = rows.map((r) => ({
     id: r.id.toString(),
     code: r.code,
@@ -379,8 +417,90 @@ export async function listDevices(
         displayNameEn: t.display_name_en,
         expiresAt: t.expires_at.toISOString(),
       })),
+    drawer: drawerOf(drawers.find((d) => d.device_id === r.id)),
+    kioskLock: null,
   }));
+  for (const d of devices) {
+    if (d.kind !== 'pos' || d.status !== 'active') continue;
+    d.kioskLock = publicLock(await kioskLockOf(deps.db, BigInt(d.id)));
+  }
   return { devices, openCode: open ? { expiresAt: open.expires_at.toISOString() } : null };
+}
+
+function drawerOf(
+  d:
+    | {
+        id: bigint;
+        code: string;
+        shift_number: string | null;
+        display_name_ar: string | null;
+        display_name_en: string | null;
+      }
+    | undefined,
+): DeviceDrawer | null {
+  if (!d) return null;
+  return {
+    id: d.id.toString(),
+    code: d.code,
+    openShift: d.shift_number
+      ? {
+          number: d.shift_number,
+          displayNameAr: d.display_name_ar ?? '',
+          displayNameEn: d.display_name_en ?? '',
+        }
+      : null,
+  };
+}
+
+/**
+ * Settings → Devices → Move drawer (decision 0069): a PC enrolled again keeps its drawer. The
+ * revoked enrollment's drawer, with its open shift if any, moves to the active POS PC; a drawer
+ * the new PC already made (with no open shift) is set aside. The database checks it again.
+ */
+export async function moveDrawer(
+  trx: Transaction<DB>,
+  fromDeviceId: bigint,
+  body: MoveDrawerRequest,
+): Promise<void> {
+  const target = BigInt(body.targetDeviceId);
+  const [from, to] = await Promise.all(
+    [fromDeviceId, target].map((id) =>
+      trx
+        .selectFrom('auth.devices')
+        .select(['id', 'status', 'device_kind'])
+        .where('id', '=', id)
+        .executeTakeFirst(),
+    ),
+  );
+  if (!from || !to) throw new AppError('NOT_FOUND', 'No such device');
+  if (from.status !== 'revoked' || to.status !== 'active' || to.device_kind !== 'pos') {
+    throw ruleError('DRAWER_MOVE_INVALID', 'A drawer moves from a revoked PC to an active POS PC');
+  }
+  const drawer = await trx
+    .selectFrom('cash.registers')
+    .select('id')
+    .where('device_id', '=', fromDeviceId)
+    .forUpdate()
+    .executeTakeFirst();
+  if (!drawer) throw ruleError('DRAWER_MOVE_INVALID', 'The revoked PC has no drawer');
+  const existing = await trx
+    .selectFrom('cash.registers')
+    .select('id')
+    .where('device_id', '=', target)
+    .forUpdate()
+    .executeTakeFirst();
+  if (existing) {
+    await trx
+      .updateTable('cash.registers')
+      .set({ device_id: null, is_active: false, deactivation_reason: body.reason })
+      .where('id', '=', existing.id)
+      .execute();
+  }
+  await trx
+    .updateTable('cash.registers')
+    .set({ device_id: target, is_active: true, deactivation_reason: null })
+    .where('id', '=', drawer.id)
+    .execute();
 }
 
 /**

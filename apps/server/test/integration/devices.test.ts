@@ -17,6 +17,7 @@ import {
   type ThisDeviceResponse,
 } from '@artepool/shared/contracts';
 import { buildApp } from '../../src/app';
+import { withBusinessTx } from '../../src/platform/db/tx';
 import {
   ConsoleError,
   createConsoleCode,
@@ -283,6 +284,116 @@ describe('this PC', () => {
     expect(errorCode(await call(server, 'GET', '/api/v1/devices/me', {}))).toBe(
       'DEVICE_NOT_ENROLLED',
     );
+  });
+});
+
+describe("this PC's label printer (decision 0096)", () => {
+  it('the owner sets it on this PC; it is checked, audited and read back by anyone on the PC', async () => {
+    const before = (
+      await call(server, 'GET', '/api/v1/devices/me', { device: office })
+    ).json<ThisDeviceResponse>();
+    expect(before.labelPrinter).toEqual({
+      printer: null,
+      dpi: 203,
+      printableWidthMm: 48,
+      offsetXMm: 0,
+      offsetYMm: 0,
+      darkness: 8,
+      speed: 3,
+      mode: 'driver',
+      gapMm: 2,
+      flip: false,
+    });
+    const config = {
+      printer: 'LV-275 Label',
+      dpi: 203,
+      printableWidthMm: 48,
+      offsetXMm: 1.5,
+      offsetYMm: -0.5,
+    };
+    const put = (body: unknown, token = ownerToken) =>
+      call(server, 'PUT', '/api/v1/devices/me/label-printer', {
+        device: office,
+        token,
+        body,
+        idempotencyKey: randomUUID(),
+      });
+    expect((await put(config)).statusCode).toBe(200);
+    const after = (
+      await call(server, 'GET', '/api/v1/devices/me', { device: office })
+    ).json<ThisDeviceResponse>();
+    // Darkness, speed, mode, gap and direction not sent: their defaults (decisions 0097, 0100).
+    expect(after.labelPrinter).toEqual({
+      ...config,
+      darkness: 8,
+      speed: 3,
+      mode: 'driver',
+      gapMm: 2,
+      flip: false,
+    });
+    expect(
+      (await put({ ...config, darkness: 12, speed: 2, mode: 'tspl', gapMm: 2.5, flip: true }))
+        .statusCode,
+    ).toBe(200);
+    expect(
+      (
+        await call(server, 'GET', '/api/v1/devices/me', { device: office })
+      ).json<ThisDeviceResponse>().labelPrinter,
+    ).toMatchObject({ darkness: 12, speed: 2, mode: 'tspl', gapMm: 2.5, flip: true });
+    // Out of range, wrong dpi, more than one decimal: refused.
+    for (const bad of [
+      { ...config, offsetXMm: 12 },
+      { ...config, dpi: 600 },
+      { ...config, printableWidthMm: 48.25 },
+      { ...config, printer: '../x' },
+      { ...config, darkness: 16 },
+      { ...config, speed: 0 },
+      { ...config, mode: 'zpl' },
+      { ...config, gapMm: 11 },
+      { ...config, gapMm: 2.25 },
+      { ...config, flip: 'yes' },
+    ]) {
+      expect(errorCode(await put(bad))).toBe('VALIDATION_FAILED');
+    }
+    // Not the owner: refused.
+    const storekeeper = await addUser(server, { username: 'store.lbl', roles: ['storekeeper'] });
+    const session = await openSession(server, { userId: storekeeper, deviceId: office.id });
+    expect(errorCode(await put(config, session.token))).toBe('PERMISSION_DENIED');
+    // Audited, with the reason.
+    const audit = await server.db
+      .selectFrom('audit.log')
+      .select(['reason', 'new_values'])
+      .where('entity_type', '=', 'auth.devices')
+      .where('entity_id', '=', office.id.toString())
+      .orderBy('id', 'desc')
+      .executeTakeFirstOrThrow();
+    expect(audit.reason).toBe('label printer of this PC');
+    // The database refuses a broken setting even without the API.
+    await expect(
+      withBusinessTx(server.db, { userId: 1n, requestId: randomUUID(), reason: 'test' }, (trx) =>
+        trx
+          .updateTable('auth.devices')
+          .set({ printer_config: JSON.stringify({ label: { printer: 'x', dpi: 203 } }) })
+          .where('id', '=', office.id)
+          .execute(),
+      ),
+    ).rejects.toMatchObject({ code: 'VALIDATION_FAILED', details: { sqlState: '23514' } });
+    // ... and a gap out of range or a direction that is not yes/no (decision 0100).
+    for (const label of [
+      { ...config, gapMm: 11 },
+      { ...config, gapMm: 2.25 },
+      { ...config, flip: 'yes' },
+    ]) {
+      await expect(
+        withBusinessTx(server.db, { userId: 1n, requestId: randomUUID(), reason: 'test' }, (trx) =>
+          trx
+            .updateTable('auth.devices')
+            .set({ printer_config: JSON.stringify({ label }) })
+            .where('id', '=', office.id)
+            .execute(),
+        ),
+      ).rejects.toMatchObject({ code: 'VALIDATION_FAILED', details: { sqlState: '23514' } });
+    }
   });
 });
 

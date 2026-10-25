@@ -20,6 +20,7 @@ import {
 import styles from './auth.module.css';
 import { useAuthController, useAuthState, useDisplayName, useErrorText } from './context';
 import { toAsciiDigits } from './OtpInput';
+import { OwnerCodeUnlock } from '../kiosk/OwnerCodeUnlock';
 import { AuthFrame, Hello, ServerChip, ServerDown } from './parts';
 
 const USERNAME_KEY = 'artepool.username';
@@ -79,6 +80,7 @@ export function SignInScreen() {
         {usePin ? <PinForm /> : <PasswordForm />}
       </div>
       <ServerChip />
+      <OwnerCodeUnlock />
     </AuthFrame>
   );
 }

@@ -8,7 +8,7 @@ import type {
   BusinessLineItem,
   CategoryItem,
   CompanyResponse,
-  LabelSizeItem,
+  LabelSizesResponse,
   ReasonCodeItem,
   StockSummary,
   UnitItem,
@@ -119,13 +119,25 @@ export function useReasonCodes() {
 }
 
 /** Barcode label sizes (decision 0043). */
-export function useLabelSizes() {
+function useLabelSizesResponse<T>(select: (response: LabelSizesResponse) => T) {
   const api = useApi();
   return useQuery({
     queryKey: MD_KEYS.labelSizes,
-    queryFn: async () =>
-      (await api.get<{ labelSizes: LabelSizeItem[] }>('/api/v1/label-sizes')).labelSizes,
+    queryFn: () => api.get<LabelSizesResponse>('/api/v1/label-sizes'),
+    select,
   });
+}
+
+const pickSizes = (r: LabelSizesResponse) => r.labelSizes;
+const pickMaxWidth = (r: LabelSizesResponse) => r.maxWidthMm;
+
+export function useLabelSizes() {
+  return useLabelSizesResponse(pickSizes);
+}
+
+/** The widest label the label printer's roll takes (setting labels.max_width_mm, decision 0096). */
+export function useLabelMaxWidth() {
+  return useLabelSizesResponse(pickMaxWidth);
 }
 
 /** The stock tiles: value (owner and accountant only), to reorder, defective, pending reviews. */

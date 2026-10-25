@@ -1,28 +1,22 @@
 /**
- * Bilingual A4 templates (design 09; PRD §10.2). One HTML per document, rendered to PDF by the
- * server's headless Chromium. Tax-required content is always printed and cannot be switched off
- * (decision 0020): the title and type, the seller's name, address and TRN, the number and dates,
- * the customer's TRN on a full tax invoice, and per line the price, discount, net, VAT rate, VAT and
- * total, with the taxable amount, VAT and total payable. The template version's settings only
- * choose the language, logo, optional fields and texts.
+ * Bilingual A4 templates (design 09; PRD §10.2; decisions 0020, 0064). One HTML per document,
+ * rendered to PDF by the server's headless Chromium. The template version's settings choose the
+ * look (language, logo, colour, text size, margins, texts) and the optional fields. Fields that
+ * UAE VAT law requires on a tax document (decision 0064) are printed whatever the settings say:
+ * the title, the seller's name, address and TRN, the customer's name, address and TRN on a full
+ * tax invoice, the number and dates, per line the description, quantity, unit price, discount
+ * (when any), taxable amount, VAT rate, VAT and total, the totals, earlier payments deducted, and
+ * on a credit note the original invoice and the reason.
  */
 import { readFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
-import { dirname, join } from 'node:path';
-
-export interface TemplateSettings {
-  language?: 'both' | 'ar' | 'en';
-  showLogo?: boolean;
-  optional?: Partial<
-    Record<
-      'salesperson' | 'dueDate' | 'customerPhone' | 'lineDiscount' | 'notes' | 'bankDetails',
-      boolean
-    >
-  >;
-  texts?: Partial<
-    Record<'welcomeAr' | 'welcomeEn' | 'termsAr' | 'termsEn' | 'footerAr' | 'footerEn', string>
-  >;
-}
+import { resourcePath } from '@artepool/node-kit';
+import { amountInWordsAr, amountInWordsEn, formatIban } from '@artepool/shared';
+import {
+  shows,
+  type DesignedKind,
+  type OptionalField,
+  type TemplateSettings,
+} from '@artepool/shared/contracts';
 
 export interface Seller {
   legal_name_ar: string;
@@ -37,6 +31,7 @@ export interface Seller {
 export interface PrintLine {
   descriptionAr: string;
   descriptionEn: string;
+  itemCode?: string | null;
   quantityMilli: string;
   unitPrice4dp: string;
   discountFils: string;
@@ -45,6 +40,13 @@ export interface PrintLine {
   vatFils: string;
   grossFils: string;
   deduction?: boolean;
+}
+
+export interface PrintBankAccount {
+  bankName: string;
+  accountName: string;
+  iban: string;
+  swift: string | null;
 }
 
 export interface PrintDocument {
@@ -61,6 +63,8 @@ export interface PrintDocument {
   status: 'draft' | 'final';
   copy: boolean;
   dates: { label: [string, string]; value: string }[];
+  /** Printed only when the template's "Due date" field is on. */
+  dueDate?: string | null;
   customer: {
     name: string;
     nameAlt?: string | null;
@@ -68,32 +72,64 @@ export interface PrintDocument {
     address?: string | null;
     phone?: string | null;
   };
+  customerPo?: string | null;
+  salesperson?: string | null;
   reference?: { label: [string, string]; value: string } | null;
+  /** A credit or debit note: the original tax invoice (number and date) and the reason. Locked. */
+  original?: { number: string; date: string | null } | null;
+  reason?: string | null;
   lines: PrintLine[];
   totals: { label: [string, string]; fils: string; strong?: boolean }[];
+  /** The amount written in words (the total payable or received). */
+  wordsFils?: string | null;
   /** Extra tables (a receipt's allocations, a statement's movements). */
   table?: { head: [string, string][]; rows: string[][] } | null;
   notes?: string | null;
   logoDataUri?: string | null;
 }
 
-const fontFile = (name: string): string => {
-  const require = createRequire(import.meta.url);
-  const dir = dirname(require.resolve('@fontsource/ibm-plex-sans-arabic/package.json'));
-  return readFileSync(join(dir, 'files', name)).toString('base64');
-};
+export interface RenderOptions {
+  /** Which template's fields apply: receipts and statements use the A4 invoice's. */
+  kind: DesignedKind;
+  settings: TemplateSettings;
+  bankAccount?: PrintBankAccount | null;
+}
+
+const TAX_KINDS = new Set(['invoice', 'advance_invoice', 'credit_note', 'debit_note']);
+const MARGINS_MM = { narrow: 8, normal: 12, wide: 18 } as const;
+const TEXT_PT = { small: 8.5, normal: 9.5, large: 10.5 } as const;
+
+/** The fonts' files are found through `resourcePath`, so the packaged server finds them too. */
+const FONTSOURCE_DIR = ['apps', 'server', 'node_modules', '@fontsource', 'ibm-plex-sans-arabic'];
+
+const fontFile = (name: string): string =>
+  readFileSync(resourcePath(...FONTSOURCE_DIR, 'files', name)).toString('base64');
+
+/** The owner's Arabic font (decision 0068), for Arabic letters only (it draws 0-9 as Arabic-Indic). */
+const ARABIC_FONT = resourcePath('assets', 'fonts', 'ge-ss-tv-medium.otf');
+const ARABIC_LETTERS =
+  'U+0600-065F, U+066A-06EF, U+06FA-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF';
+
+/** English headings (decision 0068): Tw Cen MT Condensed Extra Bold, Latin letters and digits only. */
+const HEADING_FONT = resourcePath('assets', 'fonts', 'tw-cen-mt-condensed-extra-bold.ttf');
+const LATIN = 'U+0020-007E, U+00A0-00FF, U+2013-2014, U+2018-201E, U+2022, U+2026, U+20AC';
 
 let fontsCss: string | null = null;
-/** The app's font, embedded, so Arabic is shaped the same on every server. */
+/** The app's fonts, embedded, so Arabic is shaped the same on every server. */
 function fonts(): string {
-  fontsCss ??= ['arabic', 'latin']
-    .flatMap((subset) =>
-      [400, 700].map(
-        (weight) => `@font-face { font-family: 'Plex Arabic'; font-weight: ${weight};
+  fontsCss ??=
+    `@font-face { font-family: 'ARTEPOOL Arabic'; font-weight: 100 900; unicode-range: ${ARABIC_LETTERS};
+      src: url(data:font/otf;base64,${readFileSync(ARABIC_FONT).toString('base64')}) format('opentype'); }\n` +
+    `@font-face { font-family: 'ARTEPOOL Heading'; font-weight: 100 900; unicode-range: ${LATIN};
+      src: url(data:font/ttf;base64,${readFileSync(HEADING_FONT).toString('base64')}) format('truetype'); }\n` +
+    ['arabic', 'latin']
+      .flatMap((subset) =>
+        [400, 700].map(
+          (weight) => `@font-face { font-family: 'Plex Arabic'; font-weight: ${weight};
           src: url(data:font/woff2;base64,${fontFile(`ibm-plex-sans-arabic-${subset}-${weight}-normal.woff2`)}) format('woff2'); }`,
-      ),
-    )
-    .join('\n');
+        ),
+      )
+      .join('\n');
   return fontsCss;
 }
 
@@ -134,6 +170,14 @@ export function quantity(milli: string | bigint): string {
 /** yyyy-mm-dd → dd/mm/yyyy. */
 export const date = (d: string): string => `${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(0, 4)}`;
 
+/** "ضريبة القيمة المضافة 5% · VAT 5%": the VAT total with its rate when every line has the same one. */
+export function vatLabel(lines: { vatRateBp: number }[]): [string, string] {
+  const rates = [...new Set(lines.map((l) => l.vatRateBp))];
+  if (rates.length !== 1) return ['ضريبة القيمة المضافة', 'VAT'];
+  const pct = `${(rates[0]! / 100).toFixed(rates[0]! % 100 === 0 ? 0 : 2)}%`;
+  return [`ضريبة القيمة المضافة ${pct}`, `VAT ${pct}`];
+}
+
 const TITLES: Record<string, [string, string]> = {
   'invoice:full': ['فاتورة ضريبية', 'Tax Invoice'],
   'invoice:simplified': ['فاتورة ضريبية مبسطة', 'Simplified Tax Invoice'],
@@ -151,14 +195,20 @@ const TITLES: Record<string, [string, string]> = {
   statement: ['كشف حساب', 'Statement of Account'],
 };
 
-export function renderHtml(doc: PrintDocument, seller: Seller, settings: TemplateSettings): string {
-  const lang = settings.language ?? 'both';
-  const opt = {
-    lineDiscount: true,
-    customerPhone: true,
-    notes: true,
-    ...(settings.optional ?? {}),
-  };
+export function renderHtml(doc: PrintDocument, seller: Seller, options: RenderOptions): string {
+  const { kind, settings } = options;
+  const lang = settings.language;
+  const isTax = TAX_KINDS.has(doc.kind);
+  const full = isTax && doc.format === 'full';
+  const on = (field: OptionalField) => shows(kind, settings, field);
+
+  // Locked on tax documents (decision 0064); optional elsewhere.
+  const sellerAddress = isTax || on('sellerAddress');
+  const sellerTrn = isTax || on('sellerTrn');
+  const customerAddress = full || on('customerAddress');
+  const anyDiscount = doc.lines.some((l) => BigInt(l.discountFils) !== 0n);
+  const discountColumn = (isTax && anyDiscount) || on('lineDiscount');
+
   const t = (pair: [string, string]): string =>
     lang === 'ar'
       ? escapeHtml(pair[0])
@@ -172,6 +222,22 @@ export function renderHtml(doc: PrintDocument, seller: Seller, settings: Templat
       : lang === 'en'
         ? escapeHtml(pair[1])
         : `${escapeHtml(pair[0])} · ${escapeHtml(pair[1])}`;
+  /** A heading on one line, both languages the same size: "ملاحظات • Notes". */
+  const heading = (pair: [string, string]): string =>
+    lang === 'ar'
+      ? escapeHtml(pair[0])
+      : lang === 'en'
+        ? escapeHtml(pair[1])
+        : `${escapeHtml(pair[0])} <span class="sep">•</span> <bdi>${escapeHtml(pair[1])}</bdi>`;
+  /**
+   * The TRN line. In both languages the Arabic label stays on the right and "TRN:" on the left,
+   * with the number between them: "TRN: 100… :الرقم الضريبي". The parts are isolated, so the
+   * number never jumps around them.
+   */
+  const trnLine = (trn: string): string =>
+    lang === 'both'
+      ? `<span class="pair">الرقم الضريبي:</span> <span class="ltr">TRN: ${escapeHtml(trn)}</span>`
+      : `<span class="pair">${inline(['الرقم الضريبي', 'TRN'])}</span> <span class="ltr">${escapeHtml(trn)}</span>`;
   const title = TITLES[doc.format ? `${doc.kind}:${doc.format}` : doc.kind] ?? TITLES[doc.kind]!;
   const dir = lang === 'en' ? 'ltr' : 'rtl';
   const text = (ar?: string, en?: string) =>
@@ -179,15 +245,56 @@ export function renderHtml(doc: PrintDocument, seller: Seller, settings: Templat
       .filter(Boolean)
       .map((s) => `<p>${escapeHtml(s!)}</p>`)
       .join('');
+  const row = (label: [string, string], value: string) =>
+    `<div class="row"><span>${t(label)}</span><span class="ltr">${escapeHtml(value)}</span></div>`;
+
+  const logo =
+    on('logo') && doc.logoDataUri
+      ? `<img class="logo" src="${doc.logoDataUri}" alt="" style="max-block-size:${settings.logoSizeMm}mm">`
+      : '';
+  // Seller lines in the owner's order: the name alone, then labelled address, phone, email, TRN.
+  const showContact = on('sellerContact');
+  const sellerRows = (side: 'ar' | 'en'): string => {
+    const pick = (pair: [string, string]) => (side === 'ar' ? pair[0] : pair[1]);
+    const row = (label: [string, string], value: string | null | undefined, ltr = false) =>
+      value
+        ? `<p><span class="label">${escapeHtml(pick(label))}:</span> ${ltr ? `<span class="ltr">${escapeHtml(value)}</span>` : escapeHtml(value)}</p>`
+        : '';
+    return [
+      // The name stands alone, without a label, so it stands out.
+      `<h1>${escapeHtml(side === 'ar' ? seller.legal_name_ar : seller.legal_name_en)}</h1>`,
+      sellerAddress
+        ? row(['العنوان', 'Address'], side === 'ar' ? seller.address_ar : seller.address_en)
+        : '',
+      showContact ? row(['رقم الهاتف', 'Phone'], seller.phone, true) : '',
+      showContact ? row(['البريد', 'Email'], seller.email, true) : '',
+      sellerTrn ? row(['الرقم الضريبي', 'TRN'], seller.trn, true) : '',
+    ].join('');
+  };
+  /**
+   * Logo beside, both languages: the owner's earlier block (names, addresses, "الرقم الضريبي ·
+   * TRN", phone · email), without labels.
+   */
+  const sellerBlockBoth = (): string => {
+    const contact = showContact
+      ? [seller.phone, seller.email].filter(Boolean).map((v) => escapeHtml(v!))
+      : [];
+    return [
+      `<h1>${escapeHtml(seller.legal_name_ar)}<span class="en">${escapeHtml(seller.legal_name_en)}</span></h1>`,
+      sellerAddress ? text(seller.address_ar, seller.address_en) : '',
+      sellerTrn && seller.trn ? `<p>${trnLine(seller.trn)}</p>` : '',
+      contact.length > 0 ? `<p><span class="ltr">${contact.join(' · ')}</span></p>` : '',
+    ].join('');
+  };
 
   const lineRows = doc.lines
     .map(
       (l, i) => `<tr class="${l.deduction ? 'deduction' : ''}">
         <td class="num">${i + 1}</td>
-        <td>${lang !== 'en' ? `<div>${escapeHtml(l.descriptionAr)}</div>` : ''}${lang !== 'ar' ? `<div class="en">${escapeHtml(l.descriptionEn)}</div>` : ''}</td>
+        <td>${lang !== 'en' ? `<div>${escapeHtml(l.descriptionAr)}</div>` : ''}${lang !== 'ar' ? `<div class="en">${escapeHtml(l.descriptionEn)}</div>` : ''}${on('itemCode') && l.itemCode ? `<div class="code ltr">${escapeHtml(l.itemCode)}</div>` : ''}</td>
         <td class="num">${quantity(l.quantityMilli)}</td>
         <td class="num">${price(l.unitPrice4dp)}</td>
-        ${opt.lineDiscount ? `<td class="num">${money(l.discountFils)}</td>` : ''}
+        ${discountColumn ? `<td class="num">${money(l.discountFils)}</td>` : ''}
         <td class="num">${money(l.netFils)}</td>
         <td class="num">${(l.vatRateBp / 100).toFixed(l.vatRateBp % 100 === 0 ? 0 : 2)}%</td>
         <td class="num">${money(l.vatFils)}</td>
@@ -196,64 +303,109 @@ export function renderHtml(doc: PrintDocument, seller: Seller, settings: Templat
     )
     .join('');
 
+  const bank = on('bankDetails') ? options.bankAccount : null;
+  const words =
+    on('amountInWords') && doc.wordsFils != null && BigInt(doc.wordsFils) >= 0n
+      ? text(amountInWordsAr(BigInt(doc.wordsFils)), amountInWordsEn(BigInt(doc.wordsFils)))
+      : '';
+
   return `<!doctype html>
 <html lang="${lang === 'en' ? 'en' : 'ar'}" dir="${dir}">
 <head><meta charset="utf-8"><title>${escapeHtml(doc.number ?? title[1])}</title>
 <style>
 ${fonts()}
-@page { size: A4; margin: 12mm; }
+@page { size: A4; margin: ${MARGINS_MM[settings.margins]}mm; }
+:root { --main: ${escapeHtml(settings.color)}; }
 * { box-sizing: border-box; }
-body { font-family: 'Plex Arabic', sans-serif; font-size: 9.5pt; color: #111; margin: 0; }
+html { background: #fff; }
+body { font-family: 'ARTEPOOL Arabic', 'Plex Arabic', sans-serif; font-size: ${TEXT_PT[settings.textSize]}pt; color: #111; margin: 0; }
 .en { display: block; font-size: 0.85em; color: #444; direction: ltr; unicode-bidi: isolate; }
-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 8mm; border-block-end: 1.5pt solid #111; padding-block-end: 4mm; }
-header img { max-block-size: 22mm; max-inline-size: 45mm; }
-.seller h1 { font-size: 13pt; margin: 0; }
+header { display: flex; justify-content: space-between; align-items: flex-start; gap: 8mm; border-block-end: 1.5pt solid var(--main); padding-block-end: 4mm; }
+header.opposite { flex-direction: row-reverse; }
+header.center { flex-direction: column; align-items: center; text-align: center; }
+header.center .logo { order: -1; }
+/* Logo in the middle, both languages: Arabic details on the right, English on the left, like a letterhead. */
+header.split { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; direction: ltr; }
+header.split .seller-en { text-align: left; direction: ltr; }
+header.split .seller-ar { text-align: right; direction: rtl; }
+header.split .seller-en h1 { font-family: 'ARTEPOOL Heading', 'Plex Arabic', sans-serif; }
+header.split .logo { justify-self: center; }
+.logo { max-inline-size: 60mm; }
+h1, h2, h3, .heading { font-family: 'ARTEPOOL Arabic', 'ARTEPOOL Heading', 'Plex Arabic', sans-serif; }
+.seller h1 { font-size: 1.35em; margin: 0; color: #111; }
 .seller p { margin: 0.5mm 0; }
+.seller .label { color: #555; font-weight: 400; font-size: 0.85em; }
+.seller .seller-en { direction: ltr; margin-block-start: 1.5mm; }
+header:not(.center):not(.split) .seller .seller-en { text-align: ${dir === 'rtl' ? 'right' : 'left'}; }
+/* Every seller line on the same side as the Arabic name (English lines would otherwise start at their own left). */
+header:not(.center):not(.split) .seller { text-align: ${dir === 'rtl' ? 'right' : 'left'}; }
 .title { text-align: center; margin: 5mm 0 3mm; }
-.title h2 { font-size: 15pt; margin: 0; }
+.title h2 { font-size: 1.55em; margin: 0; color: #111; }
+.welcome { text-align: center; color: #333; }
+.sep { color: #888; font-weight: 400; }
 .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 3mm 8mm; margin-block-end: 4mm; }
 .box { border: 0.8pt solid #999; border-radius: 2mm; padding: 2.5mm 3mm; }
-.box h3 { font-size: 9pt; margin: 0 0 1mm; color: #333; }
+.box h3 { font-size: 1em; margin: 0 0 1.5mm; color: #111; }
 .row { display: flex; justify-content: space-between; gap: 4mm; }
 .ltr { direction: ltr; unicode-bidi: isolate; }
+.code { font-size: 0.85em; color: #555; }
 table { inline-size: 100%; border-collapse: collapse; }
 th, td { border: 0.6pt solid #bbb; padding: 1.5mm 1.8mm; vertical-align: top; }
-th { background: #f0f0f0; font-weight: 700; font-size: 8.5pt; }
+th { background: var(--main); color: #fff; font-weight: 700; font-size: 0.9em; }
+th .en { color: #eee; }
 td.num, th.num { text-align: end; white-space: nowrap; direction: ltr; unicode-bidi: isolate; }
 tr.deduction td { color: #333; font-style: italic; }
-.totals { margin-block-start: 3mm; margin-inline-start: auto; inline-size: 75mm; }
+.after { display: flex; gap: 8mm; align-items: flex-start; margin-block-start: 3mm; }
+.after .side { flex: 1; }
+.totals { margin-inline-start: auto; inline-size: 75mm; }
 .totals .row { padding: 1mm 0; border-block-end: 0.5pt solid #ddd; }
-.totals .strong { font-weight: 700; font-size: 11pt; border-block-end: 1.5pt solid #111; }
-.notes { margin-block-start: 5mm; }
-footer { margin-block-start: 8mm; text-align: center; color: #555; font-size: 8.5pt; }
+.totals .strong { font-weight: 700; font-size: 1.15em; border-block-end: 1.5pt solid var(--main); color: #111; }
+.words, .bank, .notes { margin-block-start: 3mm; }
+.notes h3, .bank h3 { font-size: 1em; margin: 0 0 1mm; color: #111; }
+.notes p, .bank p { margin: 0.5mm 0; }
+.notes, .bank, .words { border-block-start: 0.5pt solid #ddd; padding-block-start: 2mm; }
+.pair { unicode-bidi: isolate; }
+.sign { display: grid; grid-template-columns: 1fr 1fr; gap: 12mm; margin-block-start: 12mm; }
+.sign div { border-block-start: 0.8pt solid #555; padding-block-start: 1.5mm; text-align: center; }
+footer { margin-block-start: 8mm; text-align: center; color: #555; font-size: 0.9em; }
 .stamp { position: fixed; inset-block-start: 40%; inset-inline: 0; text-align: center; font-size: 60pt; color: rgba(0,0,0,0.08); transform: rotate(-20deg); font-weight: 700; }
 </style></head>
 <body>
 ${doc.status === 'draft' ? `<div class="stamp">${t(['مسودة', 'DRAFT'])}</div>` : doc.copy ? `<div class="stamp">${t(['نسخة', 'COPY'])}</div>` : ''}
-<header>
+${
+  settings.logoPosition === 'center' && lang === 'both'
+    ? `<header class="split">
+  <div class="seller seller-en">${sellerRows('en')}</div>
+  ${logo || '<div></div>'}
+  <div class="seller seller-ar">${sellerRows('ar')}</div>
+</header>`
+    : `<header class="${settings.logoPosition}">
   <div class="seller">
-    <h1>${lang !== 'en' ? escapeHtml(seller.legal_name_ar) : ''}${lang !== 'ar' ? `<span class="en">${escapeHtml(seller.legal_name_en)}</span>` : ''}</h1>
-    ${text(seller.address_ar, seller.address_en)}
-    ${seller.trn ? `<p>${inline(['الرقم الضريبي', 'TRN'])}: <span class="ltr">${escapeHtml(seller.trn)}</span></p>` : ''}
-    ${seller.phone ? `<p class="ltr">${escapeHtml(seller.phone)}</p>` : ''}
+    ${lang === 'both' ? sellerBlockBoth() : sellerRows(lang)}
   </div>
-  ${settings.showLogo !== false && doc.logoDataUri ? `<img src="${doc.logoDataUri}" alt="">` : ''}
-</header>
-<div class="title"><h2>${t(title)}</h2>${doc.copy && doc.status === 'final' ? `<div>${t(['نسخة', 'Copy'])}</div>` : ''}</div>
-${text(settings.texts?.welcomeAr, settings.texts?.welcomeEn)}
+  ${logo}
+</header>`
+}
+<div class="title"><h2>${heading(title)}</h2>${doc.copy && doc.status === 'final' ? `<div>${t(['نسخة', 'Copy'])}</div>` : ''}</div>
+${on('welcome') ? `<div class="welcome">${text(settings.texts.welcomeAr, settings.texts.welcomeEn)}</div>` : ''}
 <section class="meta">
   <div class="box">
-    <h3>${t(['العميل', 'Bill to'])}</h3>
+    <h3>${heading(['العميل', 'Bill to'])}</h3>
     <div><strong>${escapeHtml(doc.customer.name)}</strong></div>
     ${doc.customer.nameAlt ? `<div>${escapeHtml(doc.customer.nameAlt)}</div>` : ''}
-    ${doc.customer.address ? `<div>${escapeHtml(doc.customer.address)}</div>` : ''}
-    ${doc.customer.trn ? `<div>${inline(['الرقم الضريبي', 'TRN'])}: <span class="ltr">${escapeHtml(doc.customer.trn)}</span></div>` : ''}
-    ${opt.customerPhone && doc.customer.phone ? `<div class="ltr">${escapeHtml(doc.customer.phone)}</div>` : ''}
+    ${customerAddress && doc.customer.address ? `<div>${escapeHtml(doc.customer.address)}</div>` : ''}
+    ${doc.customer.trn ? `<div>${trnLine(doc.customer.trn)}</div>` : ''}
+    ${on('customerPhone') && doc.customer.phone ? `<div><span class="ltr">${escapeHtml(doc.customer.phone)}</span></div>` : ''}
   </div>
   <div class="box">
-    <div class="row"><span>${t(['الرقم', 'Number'])}</span><strong class="ltr">${escapeHtml(doc.number ?? '—')}</strong></div>
-    ${doc.dates.map((d) => `<div class="row"><span>${t(d.label)}</span><span class="ltr">${escapeHtml(d.value)}</span></div>`).join('')}
-    ${doc.reference ? `<div class="row"><span>${t(doc.reference.label)}</span><span class="ltr">${escapeHtml(doc.reference.value)}</span></div>` : ''}
+    ${row(['الرقم', 'Number'], doc.number ?? '—')}
+    ${doc.dates.map((d) => row(d.label, d.value)).join('')}
+    ${on('dueDate') && doc.dueDate ? row(['تاريخ الاستحقاق', 'Due date'], doc.dueDate) : ''}
+    ${doc.original ? row(['الفاتورة الأصلية', 'Original invoice'], doc.original.number) : ''}
+    ${doc.original?.date ? row(['تاريخ الفاتورة الأصلية', 'Original invoice date'], doc.original.date) : ''}
+    ${on('poNumber') && doc.customerPo ? row(['أمر شراء العميل', 'Customer PO'], doc.customerPo) : ''}
+    ${on('salesperson') && doc.salesperson ? row(['مندوب المبيعات', 'Salesperson'], doc.salesperson) : ''}
+    ${doc.reference ? row(doc.reference.label, doc.reference.value) : ''}
   </div>
 </section>
 ${
@@ -261,7 +413,7 @@ ${
     ? `<table>
   <thead><tr>
     <th class="num">#</th><th>${t(['الوصف', 'Description'])}</th><th class="num">${t(['الكمية', 'Qty'])}</th>
-    <th class="num">${t(['سعر الوحدة', 'Unit price'])}</th>${opt.lineDiscount ? `<th class="num">${t(['الخصم', 'Discount'])}</th>` : ''}
+    <th class="num">${t(['سعر الوحدة', 'Unit price'])}</th>${discountColumn ? `<th class="num">${t(['الخصم', 'Discount'])}</th>` : ''}
     <th class="num">${t(['المبلغ الخاضع', 'Taxable'])}</th><th class="num">${t(['النسبة', 'VAT %'])}</th>
     <th class="num">${t(['الضريبة', 'VAT'])}</th><th class="num">${t(['الإجمالي', 'Total'])}</th>
   </tr></thead>
@@ -275,11 +427,25 @@ ${
   <tbody>${doc.table.rows.map((r) => `<tr>${r.map((c, i) => `<td class="${i > 0 ? 'num' : ''}">${escapeHtml(c)}</td>`).join('')}</tr>`).join('')}</tbody></table>`
     : ''
 }
-<section class="totals">
-  ${doc.totals.map((x) => `<div class="row ${x.strong ? 'strong' : ''}"><span>${t(x.label)}</span><span class="ltr">${money(x.fils)} AED</span></div>`).join('')}
+<section class="after">
+  <div class="side">
+    ${words ? `<div class="words">${words}</div>` : ''}
+    ${
+      bank
+        ? `<div class="bank"><h3>${heading(['بيانات البنك', 'Bank details'])}</h3>
+      <p>${escapeHtml(bank.bankName)} · ${escapeHtml(bank.accountName)}</p>
+      <p><span class="ltr">IBAN: ${escapeHtml(formatIban(bank.iban))}${bank.swift ? ` · SWIFT: ${escapeHtml(bank.swift)}` : ''}</span></p></div>`
+        : ''
+    }
+  </div>
+  <div class="totals">
+    ${doc.totals.map((x) => `<div class="row ${x.strong ? 'strong' : ''}"><span>${t(x.label)}</span><span class="ltr">${money(x.fils)} AED</span></div>`).join('')}
+  </div>
 </section>
-${opt.notes && doc.notes ? `<section class="notes"><h3>${t(['ملاحظات', 'Notes'])}</h3><p>${escapeHtml(doc.notes)}</p></section>` : ''}
-${settings.texts?.termsAr || settings.texts?.termsEn ? `<section class="notes">${text(settings.texts?.termsAr, settings.texts?.termsEn)}</section>` : ''}
-<footer>${text(settings.texts?.footerAr, settings.texts?.footerEn)}</footer>
+${doc.reason ? `<section class="notes"><h3>${heading(['سبب الإشعار', 'Reason'])}</h3><p>${escapeHtml(doc.reason)}</p></section>` : ''}
+${on('notes') && doc.notes ? `<section class="notes"><h3>${heading(['ملاحظات', 'Notes'])}</h3><p>${escapeHtml(doc.notes)}</p></section>` : ''}
+${on('terms') && (settings.texts.termsAr || settings.texts.termsEn) ? `<section class="notes">${text(settings.texts.termsAr, settings.texts.termsEn)}</section>` : ''}
+${on('signature') ? `<section class="sign"><div>${t(['استلمت البضاعة', 'Received by'])}</div><div>${t(['الختم والتوقيع', 'Stamp & signature'])}</div></section>` : ''}
+<footer>${text(settings.texts.footerAr, settings.texts.footerEn)}</footer>
 </body></html>`;
 }

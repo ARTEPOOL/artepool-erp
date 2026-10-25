@@ -5,7 +5,7 @@ edition = "2024"
 rust-version = "1.85"
 publish = false
 license = "LicenseRef-ARTEPOOL-internal"
-description = "Silent receipt printing for ARTÉPOOL ERP: RAW bytes to a Windows printer (decisions 0008, 0055)."
+description = "Silent receipt and label printing for ARTÉPOOL ERP: RAW bytes or images to a Windows printer (decisions 0008, 0055, 0070, 0096)."
 
 [dependencies]
 thiserror = "2"

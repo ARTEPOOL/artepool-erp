@@ -59,6 +59,8 @@ async function newCustomer(page: Page, t: T, n: string) {
   await dialog.getByRole('button', { name: t('parties:types.individual') }).click();
   await dialog.getByLabel(t('parties:form.name'), { exact: true }).fill(name);
   await dialog.getByLabel(t('parties:form.phone'), { exact: true }).fill(`050${n}2`);
+  // An A4 invoice is a full tax invoice: the customer's address is printed (decision 0071).
+  await dialog.getByLabel(t('parties:form.address'), { exact: true }).fill('Al Jimi, Al Ain');
   await dialog.getByRole('button', { name: t('parties:form.save') }).click();
   await expect(dialog).toHaveCount(0);
   return name;

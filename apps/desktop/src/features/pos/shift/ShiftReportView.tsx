@@ -12,8 +12,7 @@ import { useDisplayName } from '../../auth/context';
 import { money } from '../../masterdata/format';
 import { localName } from '../../masterdata/refs';
 import { renderReceipt } from '../receipt/render';
-import { receiptJob } from '../receipt/escpos';
-import { sendJob } from '../receipt/printer';
+import { printImage } from '../receipt/printer';
 import type { ReceiptLine } from '../receipt/layout';
 import styles from '../pos.module.css';
 
@@ -87,7 +86,7 @@ export function ShiftReportView({
       { kind: 'rule', heavy: true },
     ];
     const image = renderReceipt({ dir: i18n.language === 'en' ? 'ltr' : 'rtl', lines });
-    await sendJob(receiptJob({ ...image, kickDrawer: false }), report.shift.shiftNumber);
+    await printImage(image, report.shift.shiftNumber);
   };
 
   return (

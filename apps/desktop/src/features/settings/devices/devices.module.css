@@ -21,3 +21,44 @@
   outline: 3px solid var(--color-primary-soft);
   border-color: var(--color-primary);
 }
+
+/* The kiosk lock switch (decision 0089): its state chip and button under the PC's status. */
+.kiosk {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-block-start: var(--space-2);
+}
+
+.kioskForm {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.kioskAlerts {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.kioskAlerts li {
+  display: grid;
+  gap: var(--space-1);
+}
+
+/* The label printer's test label (decision 0096): the preview at its real size in millimetres. */
+.labelTest {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+}
+
+.labelPreview {
+  inline-size: var(--label-w);
+  block-size: var(--label-h);
+  border: 1px dashed var(--color-border);
+  image-rendering: pixelated;
+}

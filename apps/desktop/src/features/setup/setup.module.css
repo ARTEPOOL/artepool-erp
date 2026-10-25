@@ -1,0 +1,105 @@
+/* The first-run wizard (decision 0102): the two path cards and the step line. */
+.step {
+  font-size: var(--text-label);
+  color: var(--color-text-secondary);
+}
+
+.path {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.path h2 {
+  font-size: var(--text-h2);
+  font-weight: 600;
+}
+
+.path p {
+  color: var(--color-text-secondary);
+}
+
+.muted {
+  background: var(--color-surface-muted);
+}
+
+.file {
+  display: grid;
+  gap: var(--space-1);
+  font-size: var(--text-label);
+}
+
+.file small {
+  color: var(--color-text-secondary);
+}
+
+/* Restore from backup: the copies found, and the steps while it runs. */
+.copies {
+  display: grid;
+  gap: var(--space-2);
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.copies legend {
+  font-size: var(--text-label);
+  color: var(--color-text-secondary);
+  margin-block-end: var(--space-2);
+}
+
+.copy {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  cursor: pointer;
+}
+
+.copy:has(input:checked) {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+
+.copy input {
+  margin-block-start: var(--space-1);
+  accent-color: var(--color-primary);
+}
+
+.copyText {
+  display: grid;
+  gap: var(--space-1);
+  min-inline-size: 0;
+}
+
+.copyName {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.copyText small {
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+}
+
+.steps {
+  display: grid;
+  gap: var(--space-2);
+  padding-inline-start: var(--space-5);
+  color: var(--color-text-secondary);
+}
+
+.steps .done {
+  color: var(--color-success);
+}
+
+.steps .current {
+  color: var(--color-text);
+  font-weight: 600;
+}

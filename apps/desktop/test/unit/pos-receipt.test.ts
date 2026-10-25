@@ -4,7 +4,12 @@
  * simplified vs full tax invoice, net / VAT / total, change, the card approval code, copies.
  */
 import { describe, expect, it } from 'vitest';
-import type { DocumentDetail, ReceiptData, SalesLine } from '@artepool/shared/contracts';
+import {
+  defaultTemplateSettings,
+  type DocumentDetail,
+  type ReceiptData,
+  type SalesLine,
+} from '@artepool/shared/contracts';
 import i18n from 'i18next';
 import {
   DRAWER_KICK,
@@ -53,6 +58,7 @@ function receipt(over: Partial<ReceiptData> = {}, doc: Partial<DocumentDetail> =
       addressEn: 'Al Ain',
       trn: '100987654300003',
       phone: '+971 3 000 0000',
+      email: null,
     },
     document: {
       id: '9',
@@ -89,14 +95,23 @@ function receipt(over: Partial<ReceiptData> = {}, doc: Partial<DocumentDetail> =
     deviceCode: 'COUNTER-01',
     printCount: 0,
     markCopies: true,
+    template: defaultTemplateSettings('receipt_thermal'),
     ...over,
   };
 }
 
 const t = () => ({ ar: i18n.getFixedT('ar', 'pos'), en: i18n.getFixedT('en', 'pos') });
 const texts = (lines: ReceiptLine[]) =>
-  lines.map((l) =>
-    l.kind === 'text' ? l.text : l.kind === 'pair' ? `${l.label} = ${l.value}` : l.kind,
+  lines.flatMap((l) =>
+    l.kind === 'text'
+      ? [l.text]
+      : l.kind === 'pair'
+        ? [`${l.label} = ${l.value}`]
+        : l.kind === 'item'
+          ? [...l.names, `${l.detail} = ${l.value}`]
+          : l.kind === 'box'
+            ? [`[${l.text}]`]
+            : [l.kind],
   );
 
 describe('ESC/POS', () => {
@@ -151,7 +166,12 @@ describe('receipt content', () => {
     const all = texts(m.lines);
     expect(all).toContain('فاتورة ضريبية مبسطة');
     expect(all).toContain('Simplified Tax Invoice');
-    expect(all).toContain('رقم / No. = POS-000124');
+    expect(all.some((x) => x.startsWith('\u2066#POS-000124\u2069 = '))).toBe(true);
+    expect(all).toContain('العميل / Customer = Cash customer');
+    expect(all).toContain('الصنف / Item = المبلغ / Amount');
+    expect(all).toContain('كلور أقراص');
+    expect(all).toContain('TCCA tablets');
+    expect(all).toContain('[مدفوع / PAID]');
     expect(all).toContain('الإجمالي قبل الضريبة / Total excl. VAT = 240.00');
     expect(all).toContain('ضريبة القيمة المضافة 5% / VAT 5% = 12.00');
     expect(all).toContain('الإجمالي / TOTAL = 252.00 AED');
@@ -160,6 +180,29 @@ describe('receipt content', () => {
     expect(all).toContain('TCCA90-05 · 2 × 126.00 = 252.00');
     expect(all).toContain('عدد القطع / Items = 2');
     expect(all.some((x) => x.includes('COPY'))).toBe(false);
+  });
+
+  it('a separator between items, none before the first; an unpaid credit note has no box', () => {
+    const m = receiptModel(
+      receipt(
+        {},
+        {
+          lines: [line({}), line({ id: '2', itemCode: 'ALG-1L', descriptionEn: 'Algaecide' })],
+          netFils: '48000',
+          vatFils: '2400',
+          totalFils: '50400',
+        },
+      ),
+      'en',
+      t(),
+    );
+    const kinds = m.lines.map((l) => (l.kind === 'rule' ? `rule:${l.style ?? 'dashed'}` : l.kind));
+    const firstItem = kinds.indexOf('item');
+    expect(kinds[firstItem - 1]).toBe('rule:solid');
+    expect(kinds.slice(firstItem, firstItem + 3)).toEqual(['item', 'rule:dotted', 'item']);
+    expect(kinds.filter((k) => k === 'rule:dotted')).toHaveLength(1);
+    // 252.00 paid of 504.00: not marked paid.
+    expect(kinds).not.toContain('box');
   });
 
   it('English only reads left to right; Arabic only uses dirhams', () => {
@@ -172,6 +215,22 @@ describe('receipt content', () => {
     expect(texts(ar.lines)).not.toContain('Simplified Tax Invoice');
   });
 
+  it('seller lines in both languages: Arabic label right, English left, value between', () => {
+    const m = receiptModel(
+      receipt({ seller: { ...receipt().seller, email: 'info@artepool.com' } }),
+      'both',
+      t(),
+    );
+    const all = m.lines.flatMap((l) => (l.kind === 'text' ? [l.text] : []));
+    expect(all).toContain('هاتف: \u2066Tel: +971 3 000 0000\u2069');
+    expect(all).toContain('البريد: \u2066Email: info@artepool.com\u2069');
+    expect(all).toContain('الرقم الضريبي: \u2066TRN: 100987654300003\u2069');
+    const en = receiptModel(receipt(), 'en', t()).lines.flatMap((l) =>
+      l.kind === 'text' ? [l.text] : [],
+    );
+    expect(en).toContain('TRN: 100987654300003');
+  });
+
   it('a VAT-registered customer: full tax invoice with their name and TRN (0010, 0062)', () => {
     const m = receiptModel(
       receipt({}, { invoiceFormat: 'full', billToName: 'Pool LLC', billToTrn: '100111222333003' }),
@@ -182,6 +241,52 @@ describe('receipt content', () => {
     expect(all).toContain('Tax Invoice');
     expect(all).toContain('Customer = Pool LLC');
     expect(all).toContain('Customer TRN = 100111222333003');
+  });
+
+  it('follows its template: the customer address stays on a full invoice even when switched off (0064)', () => {
+    const base = defaultTemplateSettings('receipt_thermal');
+    const off: typeof base = {
+      ...base,
+      paperWidthMm: 58,
+      fields: { ...base.fields, customerAddress: false, cashierName: false, itemCode: false },
+      texts: { ...base.texts, footerAr: '', footerEn: 'See you soon' },
+    };
+    const m = receiptModel(
+      receipt(
+        { template: off },
+        {
+          invoiceFormat: 'full',
+          billToName: 'Pool LLC',
+          billToTrn: '100111222333003',
+          billToAddress: 'Sanaiya, Al Ain',
+        },
+      ),
+      'en',
+      t(),
+    );
+    const all = texts(m.lines);
+    expect(all).toContain('Customer address = Sanaiya, Al Ain');
+    expect(all.some((x) => x.startsWith('Cashier'))).toBe(false);
+    expect(all).toContain('2 × 126.00 = 252.00');
+    expect(all).toContain('See you soon');
+    expect(m.paperWidthMm).toBe(58);
+    // A simplified invoice for a named customer leaves the address out when it is switched off.
+    const simple = receiptModel(
+      receipt({ template: off }, { billToTrn: '100111222333003', billToAddress: 'Sanaiya' }),
+      'en',
+      t(),
+    );
+    expect(texts(simple.lines).some((x) => x.startsWith('Customer address'))).toBe(false);
+  });
+
+  it('writes the amount in words when the template asks for it', () => {
+    const base = defaultTemplateSettings('receipt_thermal');
+    const m = receiptModel(
+      receipt({ template: { ...base, fields: { ...base.fields, amountInWords: true } } }),
+      'en',
+      t(),
+    );
+    expect(texts(m.lines)).toContain('Two hundred fifty-two UAE dirhams only');
   });
 
   it('a card payment shows the approval code only; a reprint is marked as a copy', () => {

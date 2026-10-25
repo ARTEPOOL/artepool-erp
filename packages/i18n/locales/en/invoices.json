@@ -148,5 +148,24 @@
       "decimals": "This unit does not take this many decimals.",
       "price": "Type a valid price."
     }
+  },
+  "cancel": {
+    "editButton": "Edit invoice",
+    "cancelButton": "Cancel invoice",
+    "editTitle": "Edit an issued invoice",
+    "cancelTitle": "Cancel an issued invoice",
+    "editHelp": "Invoice {number} cannot change: it is cancelled by a credit note for all of it (goods back in stock, VAT reversed), and a new draft copied from it opens for you to change the customer and the items. The new invoice gets a new number.",
+    "cancelHelp": "Invoice {number} cannot be deleted: it is cancelled by a credit note for all of it (goods back in stock, VAT reversed). Both stay in the records.",
+    "reason": "Reason (required)",
+    "reasonRequired": "Write the reason (3 characters or more).",
+    "refundHelp": "The customer paid {amount}: it is refunded now.",
+    "refundAll": "Refund exactly what the customer paid: {amount}.",
+    "ownerApproves": "Only the owner cancels or edits an issued invoice: the owner approves it here.",
+    "approvalTitle": "Owner’s approval",
+    "editConfirm": "Cancel and edit",
+    "cancelConfirm": "Cancel the invoice",
+    "done": "Credit note {number} issued.",
+    "cancelledBy": "Cancelled · {number}",
+    "replacedBy": "Replaced (edited) · {number}"
   }
 }

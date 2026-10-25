@@ -41,7 +41,8 @@ export class ApiClient {
   private token: string | null = null;
   private readonly listeners = new Set<(error: ApiError) => void>();
 
-  constructor(private readonly bridge: Bridge) {}
+  /** Any channel with `request`: the bridge, or the first-run wizard's setup channel. */
+  constructor(private readonly bridge: Pick<Bridge, 'request'>) {}
 
   setToken(token: string | null): void {
     this.token = token;

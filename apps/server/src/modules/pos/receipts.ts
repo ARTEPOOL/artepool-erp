@@ -9,6 +9,7 @@ import type { PosPaymentResult, ReceiptData } from '@artepool/shared/contracts';
 import type { DB } from '../../platform/db/schema.generated';
 import { AppError } from '../../platform/errors/app-error';
 import { requireAlso } from '../../platform/permissions';
+import { settingsOf } from '../printing/service';
 import { countPrint, getDocument } from '../sales/documents';
 
 type Db = Kysely<DB> | Transaction<DB>;
@@ -74,6 +75,7 @@ export async function receiptData(db: Db, documentId: bigint): Promise<ReceiptDa
       addressEn: seller.address_en ?? '',
       trn: seller.trn ?? null,
       phone: seller.phone ?? null,
+      email: seller.email ?? null,
     },
     document: await getDocument(db, documentId),
     payments,
@@ -85,6 +87,8 @@ export async function receiptData(db: Db, documentId: bigint): Promise<ReceiptDa
     deviceCode: d.device_code,
     printCount: d.print_count,
     markCopies: markCopies?.v ?? true,
+    // Today's receipt design, also for a reprint (decision 0071).
+    template: await settingsOf(db, null, 'receipt_thermal'),
   };
 }
 

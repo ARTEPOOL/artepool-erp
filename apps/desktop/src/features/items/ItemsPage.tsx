@@ -52,7 +52,9 @@ import { useItem, useItemList, type ItemsFilter } from './api';
 import { quantityText } from './form';
 import { ItemCard } from './ItemCard';
 import { ItemDialog } from './ItemDialog';
+import { BatchLabelsDialog } from './labels/BatchLabelsDialog';
 import { LabelsDialog } from './labels/LabelsDialog';
+import { useGlobalScan, useScanInput } from './scan';
 import { ItemIcon, StatusChip, TypeLabel } from './parts';
 import { canAdjustAny } from './stock';
 import styles from './items.module.css';
@@ -62,7 +64,8 @@ type Dialog =
   | { kind: 'edit'; item: ItemDetail }
   | { kind: 'import'; entity: 'items' | 'item_prices' }
   | { kind: 'adjust'; item: AdjustTarget }
-  | { kind: 'labels'; item: ItemDetail };
+  | { kind: 'labels'; item: ItemDetail }
+  | { kind: 'batchLabels' };
 
 const ALL = 'all';
 const TO_REORDER = 'toReorder';
@@ -72,13 +75,13 @@ const INACTIVE = 'inactive';
  * Waits until the person stops typing before searching (about a quarter of a second). `now()`
  * searches at once: a barcode scanner ends every scan with Enter.
  */
-function useDebounced(value: string, ms = 250): [string, () => void] {
+function useDebounced(value: string, ms = 250): [string, (now?: string) => void] {
   const [debounced, setDebounced] = useState(value);
   useEffect(() => {
     const timer = setTimeout(() => setDebounced(value), ms);
     return () => clearTimeout(timer);
   }, [value, ms]);
-  return [debounced, () => setDebounced(value)];
+  return [debounced, (now?: string) => setDebounced(now ?? value)];
 }
 
 /** The list's price cell: with VAT in bold, without VAT under it (decision 0032). */
@@ -140,6 +143,17 @@ export function ItemsPage() {
   const searchRef = useRef<HTMLInputElement>(null);
   const [search, setSearch] = useState('');
   const [q, searchNow] = useDebounced(search.trim());
+  // A scan replaces the code scanned before; letters come back in Latin with an Arabic keyboard.
+  const scan = useScanInput((code) => {
+    setSearch(code);
+    searchNow(code);
+  });
+  // A scan with the cursor anywhere else on the screen lands in the search too, and its item opens.
+  useGlobalScan((code) => {
+    setSearch(code);
+    searchNow(code);
+    searchRef.current?.focus();
+  });
   const [segment, setSegment] = useState<string>(ALL);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dialog, setDialog] = useState<Dialog | null>(null);
@@ -280,6 +294,12 @@ export function ItemsPage() {
           {t('labels.button')}
         </Button>
       )}
+      {can('labels.print') && (
+        <Button onPress={() => setDialog({ kind: 'batchLabels' })}>
+          <Barcode className={iconClass.sm} aria-hidden="true" />
+          {t('labels.batchButton')}
+        </Button>
+      )}
       {canImport && can('items.manage') && can('prices.manage') && (
         <Button onPress={() => setDialog({ kind: 'import', entity: 'items' })}>
           <FileSpreadsheet className={iconClass.sm} aria-hidden="true" />
@@ -315,9 +335,14 @@ export function ItemsPage() {
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             onKeyDown={(event) => {
+              scan.onKeyDown(event);
               if (event.key === 'Enter') {
                 event.preventDefault();
-                searchNow();
+                // What is in the field now: a scanner's Enter can come before the screen catches up.
+                const raw = event.currentTarget.value.trim();
+                const typed = scan.read(raw);
+                if (typed !== raw) setSearch(typed);
+                searchNow(typed);
               }
             }}
           />
@@ -536,6 +561,7 @@ export function ItemsPage() {
           onClose={() => setDialog(null)}
         />
       )}
+      {dialog?.kind === 'batchLabels' && <BatchLabelsDialog onClose={() => setDialog(null)} />}
       {dialog?.kind === 'import' && (
         <ImportDialog
           entity={dialog.entity}

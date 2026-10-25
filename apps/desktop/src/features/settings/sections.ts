@@ -31,8 +31,10 @@ export const SECTIONS: Section[] = [
     ],
   },
   { id: 'devices', permissions: ['system.devices.manage'] },
-  { id: 'print' },
-  { id: 'backup', dividerBefore: true },
+  // The owner alone designs print templates (decision 0020).
+  { id: 'print', permissions: ['print_templates.manage'] },
+  // Backups and the health of the system: the owner's alone (decision 0086, M6.1).
+  { id: 'backup', permissions: ['system.health.view'], dividerBefore: true },
   { id: 'audit', permissions: ['audit.view'] },
 ];
 

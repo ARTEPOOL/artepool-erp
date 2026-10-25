@@ -1,0 +1,246 @@
+/* From design/screens/11-print-designer.html: controls beside a live preview */
+.layout {
+  display: grid;
+  grid-template-columns: minmax(18rem, 26rem) minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+  margin-block-start: var(--space-4);
+}
+
+@media (width < 1100px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.controls {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.card {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.version {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: var(--text-label);
+  color: var(--color-text-secondary);
+}
+
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.color {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-label);
+}
+
+.color small {
+  grid-column: 1 / -1;
+  color: var(--color-text-secondary);
+}
+
+.color input {
+  inline-size: 2.75rem;
+  block-size: 2rem;
+  padding: 0;
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+}
+
+.locked {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.locked li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding-block: var(--space-1);
+  padding-inline: var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-muted);
+  font-size: var(--text-label);
+}
+
+.locked li span {
+  flex: 1;
+}
+
+.switches {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.why {
+  display: block;
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+}
+
+.texts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.previewCard {
+  position: sticky;
+  inset-block-start: var(--space-4);
+  display: grid;
+  gap: var(--space-3);
+}
+
+.pageBox {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 1px 4px var(--color-shadow);
+}
+
+/* Laid out at A4 size (794 × 1123 px), scaled by the screen to the card's width. */
+.page {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  inline-size: 794px;
+  block-size: 1123px;
+  border: 0;
+  transform-origin: top left;
+}
+
+[dir='rtl'] .page {
+  transform-origin: top right;
+}
+
+.receipt {
+  justify-self: center;
+  inline-size: min(100%, 22rem);
+  border: 1px solid var(--color-border);
+  box-shadow: 0 1px 4px var(--color-shadow);
+  image-rendering: pixelated;
+}
+
+.receipt[data-width='58'] {
+  inline-size: min(100%, 15rem);
+}
+
+.loading {
+  color: var(--color-text-secondary);
+}
+
+.slider {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--text-label);
+}
+
+.slider input {
+  inline-size: 100%;
+  accent-color: var(--color-primary);
+}
+
+/* The barcode label designer (decision 0097): one row per element, the per-size changes, and the
+   previews of every size side by side. */
+.elementList,
+.overrideList {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.elementRow {
+  display: grid;
+  gap: var(--space-2);
+  padding-block-end: var(--space-2);
+  border-block-end: 1px solid var(--color-border);
+}
+
+.elementHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.elementMove {
+  display: inline-flex;
+  gap: var(--space-1);
+}
+
+.elementStyle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.overrideList li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-label);
+}
+
+.overrideList select {
+  min-block-size: var(--control-sm);
+  padding-inline: var(--space-2);
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.labelPreviews {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  align-items: flex-start;
+}
+
+.labelPreview {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.labelPreview figcaption {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-label);
+}
+
+/* Twice the real size, so small letters can be checked; exactly the printed dots. */
+.labelPreview img {
+  inline-size: calc(var(--label-w) * 2);
+  block-size: calc(var(--label-h) * 2);
+  max-inline-size: 100%;
+  object-fit: contain;
+  border: 1px dashed var(--color-border);
+  image-rendering: pixelated;
+}

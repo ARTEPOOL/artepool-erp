@@ -5,7 +5,13 @@ import type {
   EnrollInput,
   EnrollOutcome,
   LocalDevice,
+  RestoreCopy,
+  RestoreFailure,
+  RestoreStart,
+  RestoreStatus,
   SessionView,
+  SetupInfo,
+  SetupRequest,
   SignInResponse,
   UserView,
 } from '@artepool/shared/contracts';
@@ -64,6 +70,15 @@ export class FakeBridge implements Bridge {
   enrollOutcome: EnrollOutcome = { ok: false, reason: 'not_genuine' };
   readonly calls: BridgeRequest[] = [];
   readonly enrollCalls: EnrollInput[] = [];
+  /** The first-run wizard: off unless a test turns it on. */
+  setup: SetupInfo = { available: false, serverAddress: null, windowsBuild: null };
+  readonly setupCalls: SetupRequest[] = [];
+  /** Restore from a backup: the copies found, the start answer, the statuses in turn. */
+  restoreFound: RestoreCopy[] = [];
+  restoreRefusal: RestoreFailure | null = null;
+  restoreStatuses: RestoreStatus[] = [{ running: false, step: null, result: null }];
+  readonly restoreLookups: (string | undefined)[] = [];
+  readonly restoreStarts: RestoreStart[] = [];
   private readonly answers = new Map<string, Answer[]>();
 
   constructor(device: typeof OFFICE | null = OFFICE) {
@@ -98,8 +113,44 @@ export class FakeBridge implements Bridge {
     return Promise.resolve(this.enrollOutcome);
   }
 
+  setupInfo(): Promise<SetupInfo> {
+    return Promise.resolve(this.setup);
+  }
+
+  /** Setup steps share the scripted answers (their paths are /api/v1/setup/…). */
+  setupRequest(request: SetupRequest): Promise<BridgeResponse> {
+    this.setupCalls.push(request);
+    return this.answer(request);
+  }
+
+  restoreCopies(path?: string): Promise<RestoreCopy[]> {
+    this.restoreLookups.push(path);
+    return Promise.resolve(
+      path ? this.restoreFound.filter((copy) => copy.path === path) : this.restoreFound,
+    );
+  }
+
+  restoreStart(
+    request: RestoreStart,
+  ): Promise<{ started: true } | { started: false; reason: RestoreFailure }> {
+    this.restoreStarts.push(request);
+    return Promise.resolve(
+      this.restoreRefusal ? { started: false, reason: this.restoreRefusal } : { started: true },
+    );
+  }
+
+  /** The scripted statuses, in order; the last one repeats. */
+  restoreStatus(): Promise<RestoreStatus> {
+    const list = this.restoreStatuses;
+    return Promise.resolve(list.length > 1 ? list.shift()! : list[0]!);
+  }
+
   request(request: BridgeRequest): Promise<BridgeResponse> {
     this.calls.push(request);
+    return this.answer(request);
+  }
+
+  private answer(request: BridgeRequest): Promise<BridgeResponse> {
     // An exact path first, then the same path without its query (?limit=…).
     const list =
       this.answers.get(`${request.method} ${request.path}`) ??

@@ -45,6 +45,7 @@ import {
   type ItemForm,
 } from './form';
 import { marginOf, percentText } from './margin';
+import { fromArabicKeyboard } from './scan';
 import { ItemIcon, TypeLabel } from './parts';
 import styles from './items.module.css';
 
@@ -255,7 +256,11 @@ function BarcodesEditor(props: {
                 autoComplete="off"
                 aria-label={t('barcodes.barcodeN', { n: index + 1 })}
                 value={row.barcode}
-                onChange={(event) => update(index, { barcode: event.target.value })}
+                // A barcode is never Arabic: letters a scanner typed with the Arabic keyboard on
+                // come back as the keys pressed.
+                onChange={(event) =>
+                  update(index, { barcode: fromArabicKeyboard(event.target.value) })
+                }
               />
               <input
                 className={styles.input}
@@ -617,6 +622,23 @@ export function ItemDialog(props: {
               isRequired
               maxLength={200}
               error={fieldText('nameEn')}
+            />
+          </div>
+
+          <div className={mdStyles.grid2}>
+            <TextField
+              label={t('fields.packAr')}
+              value={form.packAr}
+              onChange={(packAr) => set({ packAr })}
+              maxLength={40}
+              hint={t('fields.packHint')}
+            />
+            <TextField
+              label={t('fields.packEn')}
+              value={form.packEn}
+              onChange={(packEn) => set({ packEn })}
+              ltr
+              maxLength={40}
             />
           </div>
 

@@ -194,12 +194,18 @@ describe('the owner is protected (decisions 0025, 0026)', () => {
     );
     expect(rows.map((r) => r.code)).toEqual([
       'customers.opening', // customer opening balances are entered by the owner only (decision 0051)
+      'invoices.cancel', // cancelling or editing an issued invoice (decision 0072)
       'items.cost', // purchase prices are for the owner only (decision 0038)
       'print_templates.manage', // print designer (decision 0020)
+      'reports.owner_dashboard', // sales, cost and profit are the owner's (decision 0081)
       'roles.manage',
       'stock.opening', // opening stock is posted by the owner only (decision 0042)
+      'system.backup.manage', // backups: key, Google Drive (decision 0086, M6.1)
+      'system.backup.restore_test', // the health screen and its tools are the owner's (M6.1)
       'system.company.edit', // company details are printed on tax invoices (decision 0030)
       'system.devices.manage',
+      'system.health.view',
+      'system.integrity.run',
       'system.series.manage',
       'system.settings.edit',
       'users.manage',

@@ -31,9 +31,9 @@ There is one short file per decision, numbered in order.
 | [0022](0022-owner-2-step-recovery.md) | Owner 2-step code: recovery codes and server-only emergency reset | Accepted |
 | [0023](0023-password-rules.md) | Password rules (10+ characters, common ones refused, no expiry) | Accepted |
 | [0024](0024-device-enrollment-proves-the-server.md) | Device enrollment: 10-minute one-time code that also proves the server | Accepted |
-| [0025](0025-first-owner-and-pc-from-server-commands.md) | First owner and first PC created by server commands | Accepted |
+| [0025](0025-first-owner-and-pc-from-server-commands.md) | First owner and first PC created by server commands (emergency tools since 0092) | Accepted |
 | [0026](0026-users-and-devices-never-deleted.md) | Users and devices never deleted: deactivate or revoke with a reason | Accepted |
-| [0027](0027-trust-this-pc-for-the-2-step-code.md) | "Trust this PC" for the 2-step code (30 days, never on POS PCs) | Accepted |
+| [0027](0027-trust-this-pc-for-the-2-step-code.md) | "Trust this PC" for the 2-step code (30 days, never on POS PCs) | Changed by 0077 |
 | [0028](0028-forgot-password-with-phone-and-recovery-code.md) | Forgot password: recover it in the app with the phone code and one recovery code | Accepted |
 | [0029](0029-owner-password-reset-on-the-server-pc.md) | Emergency owner password reset on the server PC (`pnpm owner:reset-password`) | Accepted |
 | [0030](0030-company-details-owner-only.md) | Company details owner-only; the accountant keeps the audit log | Accepted |
@@ -70,6 +70,49 @@ There is one short file per decision, numbered in order.
 | [0061](0061-card-payments-no-card-data.md) | Card payments: amount and approval code only | Accepted |
 | [0062](0062-pos-receipt-and-customer.md) | POS receipt in Arabic and English; cash customer by default | Accepted |
 | [0063](0063-a4-cash-on-the-drawer.md) | A4 cash taken by the cashier goes into their drawer; A4 invoices in the shift's sales | Accepted |
+| [0064](0064-print-designer-and-locked-fields.md) | The print designer (M4b) and the fields that can never be hidden | Accepted (locked fields pending accountant review) |
+| [0065](0065-company-bank-accounts.md) | Company bank accounts, and which one prints | Accepted |
+| [0066](0066-customer-po-number.md) | Customer PO number on A4 invoices and quotations | Accepted |
+| [0067](0067-qr-code-deferred.md) | No QR code on printed documents until e-invoicing | Accepted |
+| [0068](0068-fonts.md) | The app's fonts: GE SS TV for Arabic, Tw Cen MT for English | Accepted |
+| [0069](0069-stuck-shifts.md) | Stuck shifts: close from another PC; the drawer moves with its PC; no revoking a PC with an open shift | Accepted |
+| [0070](0070-receipt-printer-modes-and-layout.md) | Receipt printer: ESC/POS or any printer through its Windows driver; the new receipt look with a separator between items | Accepted |
+| [0071](0071-a4-invoices-full-and-reprints-current-design.md) | A4 invoices are full tax invoices when the customer is registered or has an address on file (else simplified); reprints use today's design | Accepted (pending accountant review) |
+| [0072](0072-cancel-or-edit-issued-invoice.md) | Cancel or edit an issued A4 invoice with the owner's approval: a full credit note, refund at once, a new draft for edits | Accepted |
+| [0073](0073-approval-pin-for-password-users.md) | Supervisors who sign in with a password set their own approval PIN (account menu); it never signs anyone in | Replaced by 0074 |
+| [0074](0074-approvals-with-the-phone-code.md) | Supervisor approvals with the one-time code from the approver's 2-step app; approval PINs removed | Accepted |
+| [0075](0075-separate-receipt-logo.md) | The thermal receipt can have its own logo (Print designer → Thermal receipt); empty = the company logo; A4 keeps the company logo | Accepted |
+| [0076](0076-centre-logo-letterhead.md) | Logo in the middle (A4, both languages): Arabic details on the right, English on the left | Accepted |
+| [0077](0077-two-step-code-once-per-pc.md) | The 2-step code once per PC: the PC is remembered (ticked by default) until the password changes; never on POS PCs | Accepted |
+| [0078](0078-owner-remembered-on-pos-pcs.md) | The owner (only) may be remembered on POS PCs too, until the password changes | Accepted |
+| [0079](0079-screen-lock-optional.md) | The idle screen lock can be turned off per kind of PC (Settings → Devices); off on every PC at the owner's request | Accepted |
+| [0080](0080-owner-sees-expected-cash.md) | The owner sees the expected cash on "My shift" (others count blind); drop alerts clear themselves once no longer true | Accepted |
+| [0081](0081-owner-dashboard.md) | Owner dashboard: sales, VAT, profit with comparison; daily chart; splits; top items/customers; cash, receivables and stock now | Accepted (VAT/profit pending accountant) |
+| [0082](0082-app-mode-by-device-kind-and-pos-kiosk.md) | One app; the device kind decides the mode; POS PCs start in app-level kiosk mode (no closing, watchdog restart, exits audited and alerted) | Accepted |
+| [0083](0083-exiting-kiosk-mode-owner-only.md) | Leaving kiosk mode: owner only; from the owner's Office PC with 2-step, or the owner's code on the lock screen (at most 5 minutes) | Accepted |
+| [0084](0084-remote-access-through-private-vpn.md) | Remote access only through Tailscale (WireGuard), ACL: owner's laptop → API port only; never an open port; outside the LAN always password + 2-step | Deferred (0093) |
+| [0085](0085-server-on-the-pos-pc.md) | The server runs on the POS PC: services under their own accounts, restrictive permissions, standard cashier account, UPS reminder | Accepted |
+| [0086](0086-backups-local-and-google-drive.md) | Backups: hourly local, daily age-encrypted to Google Drive (private key offline), weekly external drive, restore test | Accepted |
+| [0087](0087-cashiers-and-drawers-growth.md) | One cashier now; two cashiers on one PC and a second POS PC later, without redesign | Accepted |
+| [0088](0088-no-cloud-database-outbox-for-mobile.md) | No cloud database in Phase 1; an outbox for a read-only mobile dashboard in Phase 2 | Accepted |
+| [0089](0089-kiosk-lock-switch-per-pos-device.md) | A "Kiosk lock" switch per POS PC (default on), owner only with 2-step and a reason; off for 15 min / 1 hour / until turned on; banner and alerts; kept on the server | Accepted |
+| [0090](0090-pos-idle-behaviour.md) | POS idle: no automatic return to the PIN screen; a "Lock screen" button for the cashier; owner-only auto-lock after N minutes, off by default | Accepted |
+| [0091](0091-kiosk-lock-off-while-the-owner-is-signed-in.md) | The kiosk lock is off while the owner is signed in on the POS PC (back on at sign-out or screen lock); owner code on the lock screen 15 minutes | Accepted |
+| [0092](0092-first-run-setup-wizard.md) | First-run setup wizard on the server PC: company, owner, 2-step, recovery codes, enroll this PC; once only, locked in the database | Accepted |
+| [0093](0093-no-remote-access-in-phase-1.md) | No remote access in Phase 1 (no VPN, no open ports, no remote-desktop tools); VPN-agnostic design; laptop on the shop LAN | Accepted |
+| [0094](0094-adding-the-cashier-and-the-owner-laptop.md) | Adding the cashier (Settings → Users, PIN; kind decides the mode, no separate icon) and the owner's laptop (enrollment code, LAN only) | Accepted |
+| [0095](0095-google-drive-connect-by-choosing-the-account.md) | Google Drive connected by choosing the account in the browser (PKCE + loopback); one built-in registration of the app for every installation; code at google.com/device as fallback | Accepted |
+| [0106](0106-every-windows-edition.md) | Every Windows 10/11 edition (Home, Pro, Enterprise); nothing depends on a Pro-only feature (registry instead of Group Policy, `net user`, disk encryption recommended not required, VirtualBox); installer, services, secrets and restore tested on Home; Windows 10 warning in setup, never blocking | Accepted |
+| [0105](0105-server-address-and-name.md) | The server PC keeps its address by a router reservation (guide); the app never changes network settings; PCs find the server by its name; a clear message when it cannot be reached or moved | Accepted |
+| [0104](0104-windows-and-hardware-test-on-a-vm-first.md) | Minimum Windows (10 22H2 / 11, 64-bit) and hardware; what needs Pro (BitLocker, update-restart control) and what works on Home; test on a clean Windows 11 VM before the shop PC; SmartScreen steps in the guide | Accepted (Pro-only parts amended by 0106) |
+| [0103](0103-upgrades-and-uninstall-never-touch-data.md) | Upgrades and uninstall never touch the data: pre-upgrade backup, all-or-nothing migrations, previous version back on failure; delete data only with the owner's password + DELETE, backups folder always kept; updates USB → server → PCs over the LAN, signature-checked | Accepted |
+| [0102](0102-first-run-new-setup-or-restore.md) | First-run wizard: "New setup" or "Restore from backup" (copy from PC/USB, a Google Drive copy downloaded first; private key, checks before replacing); master key inside the encrypted backups; other PCs enroll again after a restore | Accepted |
+| [0101](0101-label-language-per-element.md) | A language for each label element (as the design / Arabic / English / both), also per size; "both" = the English line under the Arabic one (shop name, sale pack, price, incl. VAT, expiry, batch) | Accepted |
+| [0100](0100-direct-tspl-label-printing.md) | Direct (RAW TSPL) label printing per PC, the Windows driver kept as the other way; gap and "turn the print round" settings; label centred under the head; a failed direct print is never re-sent through the driver by itself | Accepted |
+| [0099](0099-batch-labels-and-price-changed-list.md) | Labels for many items at once (by search/scan, from a stock increase or opening stock, or the "price changed" list); every label print recorded with the price printed; price, "includes VAT", VAT category or rate changes count; default counts (on hand for unit items, 1 for kg/m), total shown, confirm above 100; filter by category | Accepted |
+| [0098](0098-barcode-quiet-zones-may-use-the-label-margin.md) | Barcode quiet zones may use the label's side margin, at least 0.5 mm from the edge (inside the border if any); bars stay in the content area; minimum barcode unchanged; 40 × 30 takes 10-character codes | Accepted |
+| [0097](0097-label-designer-and-print-quality.md) | Label designer (elements with show/hide, order, size, bold, alignment; sale pack, expiry, batch, print date; minimum barcode size; one base design + optional per-size override; live preview at every size, test label, reset); crisp 1-bit printing with darkness and speed; next: batch labels + "price changed" list, then RAW TSPL, later in-store EAN-13 | Accepted |
+| [0096](0096-barcode-labels-2-inch-printer.md) | Barcode labels for the 2-inch label printer: 50 × 30 default (50 × 25, 40 × 30), no size wider than the roll, content within the printable width; fixed zones in mm (Arabic name 2 lines, optional English, EAN/Code 128 on whole dots, price order, incl. VAT); silent printing at exact size, per-PC label printer with offset and test label; RAW TSPL next (updates 0043) | Accepted |
 
 ## Template
 

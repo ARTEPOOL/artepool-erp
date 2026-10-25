@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Accepted |
+| **Status** | Accepted; sizes, layout and printing updated by [0096](0096-barcode-labels-2-inch-printer.md) |
 | **Date** | 2026-10-11 |
 | **Decided by** | Owner |
 

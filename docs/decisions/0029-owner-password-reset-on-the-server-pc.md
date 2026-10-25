@@ -23,7 +23,7 @@
 
 ## Why
 - Without it, losing the password, the phone and the recovery codes together would lock the owner out for good. Settings are owner-only, and once real invoices and accounts exist, starting the database again is not an option.
-- The command adds no back door from the network. Anyone who can use the server PC as an administrator is already close to the data. The real protection is the server PC itself: a locked room, a Windows password, and BitLocker (PRD security requirements).
+- The command adds no back door from the network. Anyone who can use the server PC as an administrator is already close to the data. The real protection is the server PC itself: a locked room, a Windows password, and disk encryption where Windows offers it (PRD security requirements, 0106).
 
 ## How it works
 - **Same shape as `pnpm owner:reset-2fa`** (decision 0022). It runs as SYSTEM with a "server console" reason, in one transaction.
@@ -32,5 +32,5 @@
 - **The notice** is read from the audit log: the latest "owner password reset" entry that is newer than the owner's last own password change.
 
 ## Consequences
-- Keep the server PC physically safe: locked room, a Windows password, BitLocker.
+- Keep the server PC physically safe: locked room, a Windows password, disk encryption where available (0106).
 - Every use is visible in the audit log, and the hash chain detects any later tampering with it.

@@ -3,10 +3,15 @@
 //! only the pinned ARTÉPOOL CA, and the device key kept in Windows Credential Manager. The
 //! screens never see the key and cannot open a connection themselves (see tauri.conf.json CSP).
 
+use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
+
+use artepool_bridge::loopback::{Callback, Loopback, is_google_sign_in};
+use artepool_bridge::rules::{KioskView, kiosk_view};
 use artepool_bridge::{
     Bridge, BridgeRequest, BridgeResponse, EnrollInput, EnrollOutcome, LocalDevice,
 };
-use tauri::Manager as _;
+use tauri::{Emitter as _, Manager as _};
 
 #[cfg(windows)]
 type Store = artepool_bridge::store::CredentialStore;
@@ -14,6 +19,12 @@ type Store = artepool_bridge::store::CredentialStore;
 type Store = artepool_bridge::store::FileStore;
 
 struct AppBridge(Bridge<Store>);
+
+/// Whether this window is held in POS kiosk mode now (decisions 0082, 0089).
+struct Kiosk(AtomicBool);
+
+/// The listener waiting for Google's answer while the owner connects Google Drive (0095).
+struct GoogleSignIn(Mutex<Option<Loopback>>);
 
 /// The Windows computer name, suggested as the device code when enrolling.
 fn computer_name() -> String {
@@ -52,12 +63,274 @@ async fn bridge_enroll(
     state.0.enroll(input).await.map_err(|e| e.to_string())
 }
 
+/// The installer's files on the server PC (decision 0102): `C:\ProgramData\ARTEPOOL`.
+fn setup_access() -> Option<artepool_bridge::setup::SetupAccess> {
+    let base = std::env::var_os("ProgramData")?;
+    artepool_bridge::setup::SetupAccess::from_data_dir(
+        &std::path::Path::new(&base).join("ARTEPOOL"),
+    )
+}
+
+/// This PC's Windows build (decision 0106: Windows 10 gets a warning in the setup screen).
+#[cfg(windows)]
+fn windows_build() -> Option<u32> {
+    #[repr(C)]
+    struct OsVersionInfo {
+        size: u32,
+        major: u32,
+        minor: u32,
+        build: u32,
+        platform: u32,
+        service_pack: [u16; 128],
+    }
+    #[link(name = "ntdll")]
+    unsafe extern "system" {
+        // Unlike GetVersionEx, it reports the real version whatever the app's manifest says.
+        fn RtlGetVersion(info: *mut OsVersionInfo) -> i32;
+    }
+    let mut info = OsVersionInfo {
+        size: std::mem::size_of::<OsVersionInfo>() as u32,
+        major: 0,
+        minor: 0,
+        build: 0,
+        platform: 0,
+        service_pack: [0; 128],
+    };
+    (unsafe { RtlGetVersion(&mut info) } == 0).then_some(info.build)
+}
+
+#[cfg(not(windows))]
+fn windows_build() -> Option<u32> {
+    None
+}
+
+#[tauri::command]
+fn setup_info() -> artepool_bridge::setup::SetupInfo {
+    artepool_bridge::setup::SetupAccess::info(setup_access().as_ref(), windows_build())
+}
+
+#[tauri::command]
+async fn setup_request(
+    app: tauri::AppHandle,
+    request: artepool_bridge::setup::SetupRequest,
+) -> Result<BridgeResponse, String> {
+    let Some(access) = setup_access() else {
+        return Ok(BridgeResponse::Unreachable);
+    };
+    let version = app.package_info().version.to_string();
+    artepool_bridge::setup::setup_request(&access, request, &version)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Where the restore looks for backup copies (decision 0102): USB drives, the person's Downloads,
+/// Desktop and Documents, and this PC's local backups folder.
+fn restore_places() -> Vec<(std::path::PathBuf, artepool_bridge::restore::Place)> {
+    use artepool_bridge::restore::Place;
+    use std::path::PathBuf;
+    let mut places = removable_drives()
+        .into_iter()
+        .map(|drive| (drive, Place::Removable))
+        .collect::<Vec<_>>();
+    if let Some(home) = std::env::var_os("USERPROFILE") {
+        let home = PathBuf::from(home);
+        places.push((home.join("Downloads"), Place::Downloads));
+        places.push((home.join("Desktop"), Place::Desktop));
+        places.push((home.join("Documents"), Place::Documents));
+    }
+    if let Some(data) = std::env::var_os("ProgramData") {
+        places.push((
+            PathBuf::from(data).join("ARTEPOOL").join("backups"),
+            Place::Backups,
+        ));
+    }
+    places
+}
+
+/// The roots of the USB drives and memory cards plugged in now.
+#[cfg(windows)]
+fn removable_drives() -> Vec<std::path::PathBuf> {
+    #[link(name = "kernel32")]
+    unsafe extern "system" {
+        fn GetLogicalDrives() -> u32;
+        fn GetDriveTypeW(root: *const u16) -> u32;
+    }
+    const DRIVE_REMOVABLE: u32 = 2;
+    let mask = unsafe { GetLogicalDrives() };
+    (0..26u8)
+        .filter(|i| mask & (1 << i) != 0)
+        .filter_map(|i| {
+            let root = format!("{}:\\", char::from(b'A' + i));
+            let wide: Vec<u16> = root.encode_utf16().chain(Some(0)).collect();
+            (unsafe { GetDriveTypeW(wide.as_ptr()) } == DRIVE_REMOVABLE)
+                .then(|| std::path::PathBuf::from(root))
+        })
+        .collect()
+}
+
+#[cfg(not(windows))]
+fn removable_drives() -> Vec<std::path::PathBuf> {
+    Vec::new()
+}
+
+/// The launcher the installer puts in `C:\Program Files\ARTEPOOL` (M6.2 part F).
+fn restore_launcher() -> std::path::PathBuf {
+    let base = std::env::var_os("ProgramFiles").unwrap_or_else(|| "C:\\Program Files".into());
+    std::path::Path::new(&base)
+        .join("ARTEPOOL")
+        .join("artepool-svc.exe")
+}
+
+/// The copies in the usual places, or the one file whose full path the person typed. Only while
+/// the setup token is on this PC (right after installation, administrators only).
+#[tauri::command]
+fn restore_copies(path: Option<String>) -> Vec<artepool_bridge::restore::RestoreCopy> {
+    use artepool_bridge::restore::{Place, copy_at, find_copies};
+    if setup_access().is_none() {
+        return Vec::new();
+    }
+    match path {
+        Some(path) => copy_at(std::path::Path::new(path.trim()), Place::Typed)
+            .into_iter()
+            .collect(),
+        None => find_copies(&restore_places()),
+    }
+}
+
+#[tauri::command]
+fn restore_start(
+    state: tauri::State<'_, artepool_bridge::restore::RestoreRun>,
+    request: artepool_bridge::restore::RestoreStart,
+) -> Result<(), String> {
+    if setup_access().is_none() {
+        return Err("unavailable".into());
+    }
+    state
+        .start(&restore_launcher(), &request)
+        .map_err(str::to_string)
+}
+
+#[tauri::command]
+fn restore_status(
+    state: tauri::State<'_, artepool_bridge::restore::RestoreRun>,
+) -> artepool_bridge::restore::RestoreStatus {
+    state.status()
+}
+
 #[tauri::command]
 async fn bridge_request(
     state: tauri::State<'_, AppBridge>,
     request: BridgeRequest,
 ) -> Result<BridgeResponse, String> {
     state.0.request(request).await.map_err(|e| e.to_string())
+}
+
+/// Kiosk mode: full screen, no title bar or window buttons, and closing is refused (see
+/// `run`). Lifted, the window is a normal window that may be minimised or closed.
+fn apply_kiosk(app: &tauri::AppHandle, locked: bool) {
+    app.state::<Kiosk>().0.store(locked, Ordering::SeqCst);
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.set_decorations(!locked);
+        let _ = window.set_fullscreen(locked);
+        let _ = window.set_closable(!locked);
+        let _ = window.set_minimizable(!locked);
+        if locked {
+            let _ = window.unminimize();
+            let _ = window.set_focus();
+        }
+    }
+}
+
+/// How often this PC asks the server for its kiosk lock on its own (decision 0089).
+const KIOSK_POLL: std::time::Duration = std::time::Duration::from_secs(5);
+
+/// Asks the server for this PC's kiosk lock and applies it. The answer is read here, never
+/// taken from the screens, and it fails closed: a POS PC that cannot reach the server stays
+/// locked (decision 0089).
+async fn refresh_kiosk(app: &tauri::AppHandle) -> Result<KioskView, String> {
+    let state = app.state::<AppBridge>();
+    let local = state.0.local_device().map_err(|e| e.to_string())?;
+    let kind = local.device.as_ref().map(|d| d.kind.as_str());
+    let answer = state
+        .0
+        .request(BridgeRequest {
+            method: "GET".into(),
+            path: "/api/v1/kiosk/state".into(),
+            body: None,
+            token: None,
+            idempotency_key: None,
+            background: Some(true),
+        })
+        .await;
+    let view = match &answer {
+        Ok(BridgeResponse::Response { status, body, .. }) => {
+            kiosk_view(kind, Some(*status), Some(body))
+        }
+        _ => kiosk_view(kind, None, None),
+    };
+    apply_kiosk(app, view.locked);
+    Ok(view)
+}
+
+/// The screens ask right after an owner-code unlock, so the window changes at once.
+#[tauri::command]
+async fn kiosk_refresh(app: tauri::AppHandle) -> Result<KioskView, String> {
+    refresh_kiosk(&app).await
+}
+
+/// Connecting Google Drive (decision 0095), step 1: a one-time listener on this PC; its port
+/// goes into the address Google sends the answer to.
+#[tauri::command]
+fn google_signin_start(state: tauri::State<'_, GoogleSignIn>) -> Result<u16, String> {
+    let loopback = Loopback::bind().map_err(|e| e.to_string())?;
+    let port = loopback.port();
+    *state.0.lock().map_err(|_| "busy".to_string())? = Some(loopback);
+    Ok(port)
+}
+
+/// Step 2: Google's page in the PC's own browser (only Google's sign-in page may be opened).
+#[tauri::command]
+fn google_signin_open(url: String) -> Result<(), String> {
+    if !is_google_sign_in(&url) {
+        return Err("Only Google's sign-in page can be opened".into());
+    }
+    #[cfg(windows)]
+    let mut command = {
+        let mut c = std::process::Command::new("rundll32");
+        c.args(["url.dll,FileProtocolHandler", &url]);
+        c
+    };
+    #[cfg(target_os = "macos")]
+    let mut command = {
+        let mut c = std::process::Command::new("open");
+        c.arg(&url);
+        c
+    };
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let mut command = {
+        let mut c = std::process::Command::new("xdg-open");
+        c.arg(&url);
+        c
+    };
+    command.spawn().map(|_| ()).map_err(|e| e.to_string())
+}
+
+/// Step 3: waits (at most 5 minutes) for Google's one-time code and returns it to the screens,
+/// which pass it to the server; the listener then closes.
+#[tauri::command]
+async fn google_signin_wait(state: tauri::State<'_, GoogleSignIn>) -> Result<Callback, String> {
+    let loopback = state
+        .0
+        .lock()
+        .map_err(|_| "busy".to_string())?
+        .take()
+        .ok_or_else(|| "No Google sign-in in progress".to_string())?;
+    tauri::async_runtime::spawn_blocking(move || {
+        loopback.wait(std::time::Duration::from_secs(5 * 60))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())
 }
 
 /// The printers of this PC, for choosing the receipt printer (Settings → Devices).
@@ -89,6 +362,71 @@ async fn printer_print(
     .map_err(|e| e.to_string())
 }
 
+/// Prints a receipt image (1 bit per dot, base64) through the printer's own Windows driver,
+/// silently: for printers that do not take ESC/POS bytes (decision 0070).
+#[tauri::command]
+async fn printer_print_image(
+    printer: String,
+    document_name: String,
+    width_dots: u32,
+    height: u32,
+    bits_base64: String,
+) -> Result<(), String> {
+    use base64::Engine as _;
+    let bits = base64::engine::general_purpose::STANDARD
+        .decode(bits_base64.as_bytes())
+        .map_err(|_| "The print job is not valid".to_string())?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let image = artepool_printer::ReceiptBitmap {
+            width_dots,
+            height,
+            bits: &bits,
+        };
+        artepool_printer::send_image(&printer, &document_name, &image)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())
+}
+
+/// Prints barcode labels (an image at the label printer's dots, base64) through the printer's own
+/// Windows driver at the label's exact size, one page per label, silently (decision 0096).
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+async fn printer_print_label(
+    printer: String,
+    document_name: String,
+    width_dots: u32,
+    height: u32,
+    bits_base64: String,
+    dpi: u32,
+    width_mm10: u32,
+    height_mm10: u32,
+    copies: u32,
+) -> Result<(), String> {
+    use base64::Engine as _;
+    let bits = base64::engine::general_purpose::STANDARD
+        .decode(bits_base64.as_bytes())
+        .map_err(|_| "The print job is not valid".to_string())?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let job = artepool_printer::LabelJob {
+            bitmap: artepool_printer::ReceiptBitmap {
+                width_dots,
+                height,
+                bits: &bits,
+            },
+            dpi,
+            width_mm10,
+            height_mm10,
+            copies,
+        };
+        artepool_printer::send_label(&printer, &document_name, &job)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -105,15 +443,63 @@ pub fn run() {
         .setup(|app| {
             let store = open_store(app.handle())?;
             let bridge = Bridge::new(store, env!("CARGO_PKG_VERSION"), computer_name());
+            // A PC enrolled as POS starts locked, before the server has even answered.
+            let pos = bridge
+                .local_device()
+                .ok()
+                .and_then(|d| d.device)
+                .is_some_and(|d| d.kind == "pos");
             app.manage(AppBridge(bridge));
+            app.manage(Kiosk(AtomicBool::new(false)));
+            app.manage(GoogleSignIn(Mutex::new(None)));
+            app.manage(artepool_bridge::restore::RestoreRun::default());
+            apply_kiosk(app.handle(), pos);
+            // Checked here every few seconds as well, whatever the screens do: a timed "off"
+            // ends on time even if the screens stop asking.
+            // Office PCs are not asked (the screens ask when the server says the PC is a POS).
+            if pos {
+                let handle = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    loop {
+                        let _ = refresh_kiosk(&handle).await;
+                        tokio::time::sleep(KIOSK_POLL).await;
+                    }
+                });
+            }
             Ok(())
+        })
+        // Closing from inside the app (Alt+F4, the close message) is refused while locked; the
+        // screens report it to the server, which alerts the owner (decision 0082).
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if window
+                    .app_handle()
+                    .state::<Kiosk>()
+                    .0
+                    .load(Ordering::SeqCst)
+                {
+                    api.prevent_close();
+                    let _ = window.emit("kiosk-close-refused", ());
+                }
+            }
         })
         .invoke_handler(tauri::generate_handler![
             bridge_local_device,
             bridge_enroll,
             bridge_request,
+            setup_info,
+            setup_request,
+            restore_copies,
+            restore_start,
+            restore_status,
+            kiosk_refresh,
+            google_signin_start,
+            google_signin_open,
+            google_signin_wait,
             printer_list,
-            printer_print
+            printer_print,
+            printer_print_image,
+            printer_print_label
         ])
         .run(tauri::generate_context!())
         .expect("ARTÉPOOL ERP could not start");

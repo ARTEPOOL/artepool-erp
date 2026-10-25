@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Accepted (to be built with sales, stock and expenses) |
+| **Status** | Accepted; the dashboard is built in [0081](0081-owner-dashboard.md), net profit after expenses waits for the expenses screen |
 | **Date** | 2026-10-11 |
 | **Decided by** | Owner |
 

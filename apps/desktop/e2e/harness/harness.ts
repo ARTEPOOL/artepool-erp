@@ -8,9 +8,10 @@
  *
  * Everything is removed when the run ends. It never touches the development database.
  */
-import { mkdir, rm } from 'node:fs/promises';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { loadEnv } from '@artepool/node-kit';
 
 loadEnv();
@@ -20,7 +21,9 @@ process.env.ARTEPOOL_TEST_DB = `${process.env.ARTEPOOL_TEST_DB ?? 'artepool_test
 if (process.env.ARTEPOOL_E2E_CHROMIUM)
   process.env.ARTEPOOL_CHROMIUM ??= process.env.ARTEPOOL_E2E_CHROMIUM;
 
-const { prepareTestTemplate } = await import('@artepool/testing');
+const { inContext, prepareTestTemplate } = await import('@artepool/testing');
+const backup = await import('@artepool/backup');
+const age = await import('age-encryption');
 const support = await import('@artepool/server/test-support');
 const { DevBridge } = await import('@artepool/dev-bridge');
 const { E2E } = await import('../paths');
@@ -100,7 +103,103 @@ function send(response: ServerResponse, status: number, value: unknown): void {
   response.end(JSON.stringify(value, (_k, v: unknown) => (typeof v === 'bigint' ? String(v) : v)));
 }
 
+/**
+ * The server PC right after installation (decision 0102): a server of its own on a fresh,
+ * empty database, the installer's setup token, and the "setup" PC pointed at it, not enrolled.
+ * Made again for each wizard test (the wizard deletes the token when it completes).
+ */
+let setupServer: { server: typeof server; https: typeof https } | null = null;
+
+/**
+ * Restore from a backup (decision 0102): the "USB drive" the setup PC finds copies on, and the
+ * restore program's settings for the setup server (its database, its backups folder, the master
+ * key file it puts the copy's key into). Every test server uses the same master key.
+ */
+const RESTORE = {
+  usb: join(E2E.stateDir, 'restore', 'usb'),
+  backups: join(E2E.stateDir, 'restore', 'backups'),
+  old: join(E2E.stateDir, 'restore', 'old'),
+  masterKey: join(E2E.stateDir, 'restore', 'master.key'),
+  keyFile: join(E2E.stateDir, 'restore', 'artepool-backup-key.txt'),
+};
+const TEST_MASTER_KEY = Buffer.alloc(32, 42);
+async function newSetupServer(): Promise<void> {
+  if (setupServer) {
+    await setupServer.https.close();
+    await setupServer.server.close();
+  }
+  const tokenFile = join(E2E.stateDir, 'setup-token');
+  const caFile = join(E2E.stateDir, 'setup-ca.crt');
+  await writeFile(tokenFile, randomBytes(32).toString('base64url'), { mode: 0o600 });
+  const fresh = await support.startTestServer(undefined, {
+    limits: generous(),
+    setupTokenFile: tokenFile,
+  });
+  const listening = await support.listenHttps(fresh);
+  await writeFile(caFile, listening.ca.certPem);
+  await rm(RESTORE.usb, { recursive: true, force: true });
+  await mkdir(RESTORE.usb, { recursive: true });
+  await writeFile(RESTORE.masterKey, TEST_MASTER_KEY.toString('base64'), { mode: 0o600 });
+  await writeFile(
+    E2E.setupFile,
+    JSON.stringify({
+      serverAddress: listening.url,
+      caFile,
+      tokenFile,
+      restore: {
+        places: [RESTORE.usb],
+        env: {
+          ARTEPOOL_DB: fresh.testDb.name,
+          ARTEPOOL_BACKUP_DIR: RESTORE.backups,
+          ARTEPOOL_MASTER_KEY_FILE: RESTORE.masterKey,
+        },
+      },
+    }),
+  );
+  await rm(E2E.pcs.setup.deviceFile, { force: true });
+  setupServer = { server: fresh, https: listening };
+}
+
 const routes: Record<string, (input: Record<string, unknown>) => Promise<unknown>> = {
+  'POST /setup-server': async () => {
+    await newSetupServer();
+    return {};
+  },
+  /**
+   * The shop's off-site copy: the main server's data (its setup finished), encrypted with its
+   * master key for a new backup key, put on the setup PC's "USB drive"; the key file beside it.
+   */
+  'POST /restore-copy': async () => {
+    const { rows } = await server.admin.query<{ state: string }>(
+      'SELECT state FROM sys.setup_state',
+    );
+    if (rows[0]?.state !== 'complete') {
+      await inContext(server.admin, async () => {
+        await server.admin.query(`UPDATE sys.setup_state SET state = 'in_progress', path = 'new'`);
+        await server.admin.query(`UPDATE sys.setup_state SET state = 'complete'`);
+      });
+    }
+    const config = { ...backup.configFromEnv(server.testDb.name), backupDir: RESTORE.old };
+    const client = await backup.connect(config.connection);
+    const copy = await backup.localBackup(client, config).finally(() => client.end());
+    const identity = await age.generateX25519Identity();
+    const recipient = await age.identityToRecipient(identity);
+    const name = `${copy.fileName}.age`;
+    await writeFile(
+      join(RESTORE.usb, name),
+      await backup.encryptBundle(
+        await readFile(copy.path),
+        copy.fileName,
+        TEST_MASTER_KEY,
+        recipient,
+      ),
+    );
+    await writeFile(
+      RESTORE.keyFile,
+      `# created: ${new Date().toISOString()}\n# public key: ${recipient}\n${identity}\n`,
+    );
+    return { name, keyFile: RESTORE.keyFile };
+  },
   'GET /ready': () => Promise.resolve({ ready: true, api: https.url }),
   'GET /owner': () => Promise.resolve({ username: OWNER.username, password: OWNER.password }),
   'POST /owner/code': async () => ({ code: await currentCode() }),
@@ -146,6 +245,27 @@ const routes: Record<string, (input: Record<string, unknown>) => Promise<unknown
     if (!outcome.ok) throw new Error(`Could not enroll ${deviceCode}: ${outcome.reason}`);
     return outcome.device;
   },
+  /** A cashier's open shift on a POS PC of its own, to close from another PC (decision 0069). */
+  'POST /stuck-shift': async (input) => {
+    const code = String(input.code);
+    const pc = await support.addDevice(server, { code, kind: 'pos' });
+    const userId = await support.addUser(server, {
+      username: String(input.username),
+      displayNameAr: String(input.displayName),
+      displayNameEn: String(input.displayName),
+      roles: ['cashier'],
+      pin: '4829',
+    });
+    const { token } = await support.openSession(server, { userId, deviceId: pc.id });
+    const opened = await support.call(server, 'POST', '/api/v1/shifts', {
+      device: pc,
+      token,
+      idempotencyKey: randomUUID(),
+      body: { openingFloatFils: String(input.floatFils) },
+    });
+    if (opened.statusCode !== 201) throw new Error(`Could not open the shift: ${opened.body}`);
+    return opened.json<{ shiftNumber: string }>();
+  },
   'POST /server/stop': async () => {
     await https.stop();
     return {};
@@ -172,6 +292,10 @@ async function close(): Promise<void> {
   if (closing) return;
   closing = true;
   control.close();
+  if (setupServer) {
+    await setupServer.https.close();
+    await setupServer.server.close();
+  }
   await https.close();
   await server.close();
   await dropTemplate();

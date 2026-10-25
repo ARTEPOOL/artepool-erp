@@ -11,7 +11,8 @@
   },
   "formatHint": {
     "full": "The customer is VAT-registered: a full tax invoice with their TRN.",
-    "simplified": "The customer is not VAT-registered: a simplified tax invoice."
+    "simplified": "The customer is not VAT-registered: a simplified tax invoice.",
+    "a4": "A full tax invoice with the customer’s saved name and address. Without a saved address, a simplified tax invoice (the customer is not VAT-registered)."
   },
   "statuses": {
     "draft": "Draft",
@@ -59,7 +60,9 @@
     "businessLine": "Line of business",
     "reference": "Reference",
     "method": "Payment method",
-    "amount": "Amount"
+    "amount": "Amount",
+    "customerPo": "Customer PO number",
+    "customerPoHint": "Optional. The customer's own purchase order number; printed when filled."
   },
   "lines": {
     "title": "Lines",

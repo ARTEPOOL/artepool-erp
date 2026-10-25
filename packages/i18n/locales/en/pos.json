@@ -23,7 +23,15 @@
     "change": "Change",
     "items": "Items",
     "pricesIncludeVat": "Prices include VAT",
-    "thanks": "Thank you"
+    "thanks": "Thank you",
+    "customerAddress": "Customer address",
+    "customerPhone": "Customer phone",
+    "phone": "Tel",
+    "item": "Item",
+    "amount": "Amount",
+    "paid": "PAID",
+    "refunded": "REFUNDED",
+    "email": "Email"
   },
   "title": "Point of sale",
   "subtitle": "Sell at the counter on your own shift.",
@@ -200,7 +208,8 @@
     "xReport": "X report",
     "close": "Close the shift",
     "closeHelp": "Count the cash without seeing the expected amount. The difference shows after counting.",
-    "zTitle": "Z report"
+    "zTitle": "Z report",
+    "expected": "Cash expected in the drawer now"
   },
   "movement": {
     "paid_in": "Paid-in",
@@ -298,7 +307,13 @@
     "alert": {
       "cash_drop_due": "A drawer holds more cash than the limit: a cash drop is due.",
       "repeated_variance": "A cashier had {times} differences above the limit within {days} days."
-    }
+    },
+    "forceClose": "Close as stuck shift",
+    "forceCloseTitle": "Close a stuck shift",
+    "forceCloseHelp": "Shift {number} of {name} is open on the PC “{pc}”, where it can no longer be closed. Count the cash of its drawer and write why. The over/short stays {name}’s.",
+    "forceCloseReason": "Why it is closed from here",
+    "forceClosed": "Closed from another PC",
+    "onRevokedPc": "On a revoked PC"
   },
   "keys": {
     "f2": "F2",
@@ -320,5 +335,6 @@
   "scan": "Scan barcode",
   "products": "Products",
   "productsCount": "{count} items",
-  "lowStock": "{qty} left"
+  "lowStock": "{qty} left",
+  "lockScreen": "Lock screen"
 }

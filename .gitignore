@@ -20,3 +20,6 @@ apps/desktop/src-tauri/target/
 apps/desktop/src-tauri/gen/
 apps/desktop/src-tauri/bridge/target/
 .claude/worktrees/
+
+# Local backups made in development (pnpm backup:run)
+.backups/

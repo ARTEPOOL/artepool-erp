@@ -45,7 +45,8 @@ It runs client–server on the local network: PostgreSQL and the API service on 
 
 **VAT and invoices**
 - **VAT** is calculated per line, and the invoice VAT is the sum of the line VAT. It is shown per line and in the total. Every customer pays VAT; the rate comes from the item's VAT category (standard 5%). (0009)
-- **Invoice format** follows the customer's VAT registration: not registered → simplified tax invoice; registered → full tax invoice with the customer's TRN. (0010)
+- **Invoice format** follows the customer's VAT registration at the POS: not registered → simplified tax invoice; registered → full tax invoice with the customer's TRN. (0010)
+- **A4 invoices (INV-)** are full tax invoices for a registered customer (address required) or a named customer with an address on file; the walk-in or a customer without an address gets a simplified one. Nothing is typed on the invoice. Advance invoices and debit notes follow 0010. (0071)
 - **Numbering:**
   - `POS-` for POS sales; `INV-` for A4 invoices and advance/progress payment tax invoices. Both are gapless.
   - Credit notes, receipts and the rest each have their own series.
@@ -79,24 +80,41 @@ It runs client–server on the local network: PostgreSQL and the API service on 
 - **Cart removals** before the invoice is issued need no approval. They are always written to the audit log as events. (0005)
 - **Shift-close recount:** at most one, with supervisor approval. Both counts are kept. (0006)
 - **Hardware:** standard 80 mm ESC/POS printers (Epson TM-T20III / TM-T82 and compatible); the drawer is on the printer's kick port. (0055)
+- **Receipt printer modes:** per PC, ESC/POS thermal (RAW, cut, drawer) or any printer through its Windows driver (image at real width, no drawer). The receipt follows the owner's sample: Item / Amount table, a dotted separator between items, a large total, a Paid box. (0070)
 - **Blind count:** notes 1000–5, coins 1–0.05, plus "other amount"; exact to the fils. (0056)
-- **Cash drop alert** above AED 3,000 (setting). (0057)
+- **Cash drop alert** above AED 3,000 (setting); it clears itself once the drawer is back under the limit or the shift is closed. The owner sees the expected cash on "My shift"; everyone else counts blind. (0057, 0080)
+- **POS kiosk:** one app; the device kind decides the mode. POS PCs start full screen in an app-level kiosk lock (no closing, watchdog restart; no shell replacement or Assigned Access); exits and unlocks audited and alerted. Per-PC **Kiosk lock** switch on the server (default on; owner only, 2-step step-up + reason; off 15 min / 1 h / until on; owner code on the lock screen = 15 min; off by itself while the owner is signed in on that PC, back at sign-out or screen lock; banner "القفل متوقف"). PIN, shifts and permissions never change with the lock. (0082, 0083, 0089, 0091)
+- **POS idle:** the cashier's session stays open; a "Lock screen" button (same cashier resumes with the PIN); owner-only auto-lock, off by default. (0090)
+- **Growth:** two cashiers on one POS PC (close the open shift first) or a second POS PC with its own drawer, no redesign. (0087)
+- **Stuck shifts:** owner/accountant close a shift stuck on another PC (reason + count; over/short stays the cashier's); the owner moves a re-enrolled PC's drawer to it; a PC with an open shift cannot be revoked. (0069)
 - **Over/short** accepted by owner or accountant (posts to 6910); alert after 3 differences above AED 20 within 30 days (settings). (0058)
 - **POS discounts/prices** as A4: cashier limit 5% by default, above it a supervisor; any unit-price change needs a supervisor; oversell stays supervisor-approved. (0059)
 - **POS returns:** supervisor approval; a credit note linked to the original invoice; stock back; refund from the currently open shift (card as card). (0060)
 - **Card:** amount + terminal approval code only; never any card digits. (0061)
 - **Receipt** in Arabic and English; cash customer by default, a VAT-registered customer → full invoice with TRN. (0062)
 - **Printing:** the POS prints thermal receipts silently. The "Invoices (A4)" section prints through the print dialog. A POS sale can be reprinted in A4 with the same number. (0008)
-- **Print designer:** the owner customises print templates (logo, colour, language, optional fields, texts, margins). Tax-required fields are locked. Templates are versioned; each document stores its template version and reprints with it. (0020)
+- **Print designer:** the owner customises print templates (logo, colour, language, optional fields, texts, margins) in Settings → Print designer. Tax-required fields are locked (list per document type in 0064, pending accountant review); seller address on every tax invoice and customer address on full tax invoices are locked, and a full tax invoice is refused without the customer's address. Receipts and statements use the A4 invoice design; the thermal receipt's language is set there too. Templates are versioned; each document stores its template version, but a reprint uses today's design (content unchanged, 0071). No QR code until e-invoicing. The thermal receipt can have its own logo (Print designer → Thermal receipt; empty = the company logo). Logo in the middle on a bilingual A4 document: Arabic details right, logo centre, English left. (0020, 0064, 0067, 0075, 0076)
+- **Bank accounts:** several per company (bank, account name, UAE IBAN with checksum, optional SWIFT), owner only, audited; the template chooses which one prints. (0065)
+- **Customer PO number:** optional on A4 invoices and quotations; prints only when filled. (0066)
+- **Fonts:** GE SS TV for Arabic letters only (screens, A4, receipt); digits and English never use it (it draws Arabic-Indic digits); Tw Cen MT Condensed Extra Bold for English headings only (`--font-heading`); body English and digits stay IBM Plex Sans Arabic. Files in `assets/fonts/`. (0068)
 
 **Security and access**
 - **Sign-in:** cashiers use a 4-digit PIN **only on PCs enrolled as POS** (weak PINs refused; 5 wrong → blocked until the owner unblocks). Office PCs always need a password. (0021)
+- **Approvals:** every supervisor approval is given with the one-time 6-digit code from the approver's 2-step app (accepted once); only 2-step users approve; 5 wrong codes block that person's approvals (not their sign-in) until the owner unblocks. (0074)
+- **Server and remote:** the POS PC is also the server (services under own accounts, ACLs, standard cashier Windows account whose Windows restrictions stay when the kiosk lock is off, UPS reminder). **No remote access in Phase 1:** no VPN, no open router ports, no remote-desktop tools; the laptop works on the shop LAN; keep the design VPN-agnostic (0084 deferred). No cloud database in Phase 1; outbox for a Phase 2 read-only mobile dashboard. (0085, 0088, 0093)
+- **First-run setup:** a one-time wizard on the server PC after install, locked in the database, only on the server PC with the installer's token:
+  - **New setup**: company, owner, 2-step, recovery codes, enroll this PC as POS;
+  - **Restore from backup**: copy from PC/USB (a Google Drive copy is downloaded first) + private key, all integrity checks pass before it replaces anything; the master key travels inside the age-encrypted copies; the other PCs enroll again.
+  - Console commands are emergency tools. Cashier added in Settings → Users; the laptop enrolled with a code; the PC kind decides the mode. (0092, 0094, 0102)
+- **Install, upgrade, uninstall:** program in Program Files, data in `ProgramData\ARTEPOOL`; an upgrade backs up first, migrates all-or-nothing and puts the old version back on failure; uninstall keeps the data (deleting it needs the owner's password + DELETE; backups always kept); updates USB → server → PCs over the LAN, signature-checked. Windows 10 22H2/11 64-bit, every edition (Home too; nothing Pro-only: registry not Group Policy, disk encryption recommended not required; Windows 10 warning in setup, never blocking; 0106); test on clean VMs (Windows 11 Home and Pro, Windows 10 Home) before the shop PC; SmartScreen "More info → Run anyway" in the guide. The server keeps its address by a router reservation; PCs find it by name; the app never changes network settings. (0103, 0104, 0105, 0106)
+- **Backups:** hourly local + WAL; daily age-encrypted to a dedicated Google Drive account (private key offline); weekly external drive; restore test. Google Drive is connected by choosing the account (PKCE + loopback; the app's Google registration is built into the installation, never typed; code at google.com/device as fallback). (0086, 0095)
+- **Screen lock:** per kind of PC, off or after 1–240 idle minutes, in Settings → Devices (owner only); off on every PC at the owner's request; the session still ends after its maximum length. (0079)
 - **Owner 2-step:** TOTP, 10 one-time recovery codes, and an audited emergency reset that works only on the server PC. (0022)
 - **Passwords:** 10+ characters, common ones refused, no forced symbols or expiry; a change ends the user's other sessions. (0023)
 - **Devices:** a 10-minute one-time enrollment code that also proves the server is genuine; the PC then trusts only the ARTÉPOOL CA. (0024)
 - **First owner / first PC:** `pnpm owner:create` and `pnpm device:code` on the server PC. (0025)
 - **Never deleted:** users are deactivated and devices revoked, always with a reason; revoking a device is final. (0026)
-- **Trust this PC:** after the phone code, a 2-step user may trust that PC for 30 days (password alone there); never on POS PCs; ends on a password/2-step change, deactivation, revoke; the owner can end it in Settings → Devices. Enforced in the database. (0027)
+- **Trust this PC:** after the phone code, that PC is remembered (box ticked by default) until the password changes (password alone there; setting 3650 days); on POS PCs only for the owner (0078); ends on a password/2-step change, deactivation, revoke; the owner can end it in Settings → Devices. Enforced in the database. (0027, 0077, 0078)
 - **Forgot password:** 2-step users recover it in the app with the phone code + one recovery code; ends all their sessions and trusted PCs. (0028)
 - **Last resort:** `pnpm owner:reset-password` on the server PC only — reason required, temporary password shown once, optional 2-step reset if the phone is lost, audited; the owner sees a notice when choosing their own password. (0029)
 - **Company details** (name, TRN, address, logo) are edited by the owner only (`system.company.edit` is owner-only); the accountant keeps viewing/verifying/exporting the audit log. (0030)
@@ -106,11 +124,20 @@ It runs client–server on the local network: PostgreSQL and the API service on 
 - **Adjustments** need no supervisor's approval (the limit setting is empty; a value turns it back on). (0054, replaces 0041)
 - **Opening stock:** once at go-live, owner only (`stock.opening`); empty cost → the item's purchase price. (0042)
 - **Item quantity in the item window:** a new stock item's quantity is posted as its opening stock (owner, accountant, storekeeper: `stock.new_item_quantity`); editing shows the current quantity and a change becomes a "Data correction" adjustment (`stock.adjust`, approval above the limit). No cost is typed there: the purchase price is used. The storekeeper manages items. (0053)
-- **Labels:** preset sizes + custom sizes (`md.label_sizes`), printed through the print dialog for now. (0043)
+- **Labels** for the 2-inch label printer (LV-275, 203 dpi, TSPL):
+  - 50 × 30 default, 50 × 25, 40 × 30; no size wider than the roll (`labels.max_width_mm`); content within the printable width (48 mm, per PC).
+  - Drawn by the app at printer dots in fixed mm zones: Arabic name (2 lines, shrink, "…"; English optional), EAN/UPC or Code 128 on whole dots with quiet zones, "120.00 درهم" / "AED 120.00", "incl. VAT" when the price includes VAT.
+  - Printed silently at exact size (per-PC label printer, offset, test label in Settings → Devices); the print dialog is only a fallback and for A4 sheets. (0043, 0096)
+  - The owner designs the label (print designer): elements with show/hide, order, size, bold, alignment (sale pack, expiry/batch at print time, print date); never below the minimum barcode (5 mm bars, 2 dots/module, quiet zones); base design + optional per-size override. Pure 1-bit at printer dots; darkness/speed. (0097)
+  - Quiet zones may use the side margin, ≥ 0.5 mm from the label edge (inside the border if any); bars stay in the content area. (0098)
+  - Labels for many items (search/scan, from a stock increase or opening stock, "price changed" list filterable by category); every print recorded in `inv.label_prints` with the price printed (no record if the price changed meanwhile); price, includes-VAT, VAT category or rate changes count; default counts: on hand for unit items (0 if ≤ 0), 1 for kg/m; total shown, confirm above 100. (0099)
+  - Printing way per PC: Windows driver (default) or Direct TSPL (SIZE/GAP/DIRECTION/DENSITY/SPEED/BITMAP/PRINT; gap and "turn round" settings; label centred under the head); a failed direct print is never re-sent through the driver by itself. (0100)
+  - Language per element (shop name, sale pack, price, incl. VAT, expiry, batch): as the design / Arabic / English / both, also per size; "both" = English line under the Arabic one, never "ar / en" on one line. Later: in-store EAN-13. (0101)
 - **Counts** are blind while counting; one warehouse in Phase 1. (0044)
 
 **Sales (A4)**
 - **Sections:** Invoices (A4), Quotations and Receipts each have their own side-menu entry. (0045)
+- **Cancel / edit an issued A4 invoice:** owner only (`invoices.cancel`, others need the owner's approval), with a reason: a credit note for the whole invoice (stock back, VAT reversed, paid money refunded at once); "edit" then opens a new draft copied from it. Not when a note exists already or earlier payments are deducted. (0072)
 - **Cash customers:** an unpaid invoice for a cash customer (or above a credit limit) needs a supervisor's approval (`sales.credit_over_limit`). (0046)
 - **Office cash** posts to Cash in safe (1120) by default, set per payment method. (0047)
 - **A4 cash on the drawer:** cash taken in the A4 sections by a user with their own shift open on that PC goes into that drawer (shift, expected cash, drawers account), and card taken that way joins the shift's card total; the X/Z report shows POS sales, A4 invoices and total sales (A4 never in the expected cash). (0063)
@@ -119,6 +146,9 @@ It runs client–server on the local network: PostgreSQL and the API service on 
 - **Printing:** M4 uses a default A4 design and stores the template version; the designer screen is M4b. (0050)
 - **Customer opening balances:** once at go-live, owner only (`customers.opening`). (0051)
 - **Payments** without chosen invoices settle the oldest first; the rest is an advance with its own tax invoice. (0052)
+
+**Reports**
+- **Owner dashboard** (side menu → Reports, owner only): total sales, sales without VAT, VAT due (no input VAT until purchases exist), gross profit from the cost stored on each line; period with comparison; daily chart; POS/A4, payment methods, unpaid, per employee; top items/customers; cash in drawers and safe, receivables and overdue, stock value and reorder. (0039, 0081)
 
 **Accounting**
 - **Defective returns** are held at cost in "Inventory – defective" until written off. (0015)
@@ -181,16 +211,18 @@ Run from the repository root. Setup on a new PC: [`docs/runbooks/dev-setup-windo
 | Unit tests / integration tests (real PostgreSQL) / all | `pnpm test:unit` / `pnpm test:integration` / `pnpm test` |
 | Screen tests in a real browser (Playwright, Arabic + English, light + dark; real API on a throwaway database) | `pnpm test:e2e` (once: `pnpm --filter @artepool/desktop exec playwright install chromium`) |
 | Verify the audit hash chain | `pnpm audit:verify` |
+| Backups (decision 0086): the service / one local copy now / restore test / integrity checks / external-drive copy / open an encrypted copy with the private key (emergency manual restore) | `pnpm backup:run` / `pnpm backup:once` / `pnpm backup:restore-test` / `pnpm backup:check` / `pnpm backup:offline <folder>` / `pnpm backup:open <copy.age> <key file> <out.dump>` |
 | Tamper demonstration (throwaway database) | `pnpm demo:audit-tamper` |
 | Create the development master key (`.secrets/`, once per dev PC) | `pnpm dev:secrets` |
+| Try the first-run wizard in a browser (a setup token in `.secrets/setup/`; database without a completed setup) | `pnpm dev:setup-token` |
 | Create the ARTÉPOOL CA + server certificate (HTTPS, TLS 1.3); `--renew-server` for a new server certificate | `pnpm tls:init [--name host] [--ip address]` |
 | Run the API in dev mode (HTTPS: `https://localhost:3100/health`, trust `.secrets/tls/ca.crt`) | `pnpm dev:server` |
 | Run the screens in a browser (`http://localhost:1420`; the dev server plays the PC's secure side, device file `.secrets/dev-device.json`) | `pnpm dev:desktop:web` |
 | Run the Windows app (Tauri; Rust + Microsoft C++ Build Tools needed) / build its installer | `pnpm dev:desktop` / `pnpm build:desktop` |
 | Rust tests (the PC's secure side: enrollment, TLS rules, device key; the RAW receipt printer) | `pnpm test:rust` |
-| Server console: first owner / enrollment code / emergency owner 2-step reset / emergency owner password reset (decisions 0022, 0025, 0029) | `pnpm owner:create` / `pnpm device:code` / `pnpm owner:reset-2fa` / `pnpm owner:reset-password` |
-
-Not yet available: `pnpm build:server` (M6), `pnpm backup:run` / `pnpm backup:restore-test` (M6).
+| Server console (emergency tools since 0092): first owner / enrollment code / emergency owner 2-step reset / emergency owner password reset (decisions 0022, 0025, 0029) | `pnpm owner:create` / `pnpm device:code` / `pnpm owner:reset-2fa` / `pnpm owner:reset-password` |
+| Package the server PC's programs (bundle + resources + manifest, `dist/server`; `--windows` on Windows) | `pnpm build:server` |
+| On the installed server (elevated prompt): the console tools with the protected secrets / check the secrets / restore from a backup without the wizard (decision 0102) | `artepool-svc run owner-reset-password` (etc.) / `artepool-svc secrets check` / `artepool-svc run restore <copy>` |
 
 Rules for migrations: one file per change in `db/migrations/NNNN_name.sql`; no `BEGIN`/`COMMIT` inside (the runner wraps each file); every new table gets `sys.add_touch`/`sys.add_stamp`, `audit.enable_for`, `sys.forbid_delete` and explicit grants — `db/tests/privileges.test.ts` fails otherwise; run `pnpm db:codegen` and commit the regenerated types.
 

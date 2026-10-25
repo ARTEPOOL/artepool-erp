@@ -9,13 +9,40 @@ import type {
   EnrollInput,
   EnrollOutcome,
   LocalDevice,
+  RestoreCopy,
+  RestoreFailure,
+  RestoreStart,
+  RestoreStatus,
+  SetupInfo,
+  SetupRequest,
 } from '@artepool/shared/contracts';
 
 export interface Bridge {
   localDevice(): Promise<LocalDevice>;
   enroll(input: EnrollInput): Promise<EnrollOutcome>;
   request(request: BridgeRequest): Promise<BridgeResponse>;
+  /** The first-run wizard (decision 0102): is the setup token on this PC? */
+  setupInfo(): Promise<SetupInfo>;
+  /** A setup step, sent with the setup token by the native side. */
+  setupRequest(request: SetupRequest): Promise<BridgeResponse>;
+  /** Restore from a backup (decision 0102): the copies found, or the one at a typed path. */
+  restoreCopies(path?: string): Promise<RestoreCopy[]>;
+  /** Starts the restore program; the private key goes to it only. */
+  restoreStart(
+    request: RestoreStart,
+  ): Promise<{ started: true } | { started: false; reason: RestoreFailure }>;
+  restoreStatus(): Promise<RestoreStatus>;
 }
+
+const NOT_RUNNING: RestoreStatus = { running: false, step: null, result: null };
+
+const failureReason = (error: unknown): RestoreFailure => {
+  const text = String(error);
+  const known: RestoreFailure[] = ['busy', 'unavailable', 'wrong_key', 'not_a_copy'];
+  return known.find((reason) => text.includes(reason)) ?? 'launch_failed';
+};
+
+const NO_SETUP: SetupInfo = { available: false, serverAddress: null, windowsBuild: null };
 
 async function post<T>(path: string, body: unknown): Promise<T> {
   const response = await fetch(path, {
@@ -49,6 +76,43 @@ export const devServerBridge: Bridge = {
       return { kind: 'unreachable' };
     }
   },
+  async setupInfo() {
+    try {
+      const response = await fetch('/__artepool/setup', { credentials: 'same-origin' });
+      return response.ok ? ((await response.json()) as SetupInfo) : NO_SETUP;
+    } catch {
+      return NO_SETUP;
+    }
+  },
+  async setupRequest(request) {
+    try {
+      return await post<BridgeResponse>('/__artepool/setup/request', request);
+    } catch {
+      return { kind: 'unreachable' };
+    }
+  },
+  async restoreCopies(path) {
+    try {
+      return await post<RestoreCopy[]>('/__artepool/restore/copies', path ? { path } : {});
+    } catch {
+      return [];
+    }
+  },
+  async restoreStart(request) {
+    try {
+      return await post('/__artepool/restore/start', request);
+    } catch (error) {
+      return { started: false, reason: failureReason(error) };
+    }
+  },
+  async restoreStatus() {
+    try {
+      const response = await fetch('/__artepool/restore/status', { credentials: 'same-origin' });
+      return response.ok ? ((await response.json()) as RestoreStatus) : NOT_RUNNING;
+    } catch {
+      return NOT_RUNNING;
+    }
+  },
 };
 
 /**
@@ -69,6 +133,42 @@ export const tauriBridge: Bridge = {
       return await invoke<BridgeResponse>('bridge_request', { request });
     } catch {
       return { kind: 'unreachable' };
+    }
+  },
+  async setupInfo() {
+    try {
+      return await invoke<SetupInfo>('setup_info');
+    } catch {
+      return NO_SETUP;
+    }
+  },
+  async setupRequest(request) {
+    try {
+      return await invoke<BridgeResponse>('setup_request', { request });
+    } catch {
+      return { kind: 'unreachable' };
+    }
+  },
+  async restoreCopies(path) {
+    try {
+      return await invoke<RestoreCopy[]>('restore_copies', { path: path ?? null });
+    } catch {
+      return [];
+    }
+  },
+  async restoreStart(request) {
+    try {
+      await invoke('restore_start', { request });
+      return { started: true };
+    } catch (error) {
+      return { started: false, reason: failureReason(error) };
+    }
+  },
+  async restoreStatus() {
+    try {
+      return await invoke<RestoreStatus>('restore_status');
+    } catch {
+      return NOT_RUNNING;
     }
   },
 };

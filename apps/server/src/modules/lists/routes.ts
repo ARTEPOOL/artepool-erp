@@ -22,13 +22,17 @@ const Params = z.object({ id: IdText });
 export function registerListRoutes(app: FastifyInstance): void {
   const db = app.deps.db;
 
-  // Barcode label sizes (decision 0043): everyone signed in reads them; the owner manages them
+  // Barcode label sizes (decisions 0043, 0096): everyone signed in reads them, with the widest the
+  // label roll takes; the owner manages them
   const labelSizes = { kind: 'permission', permission: 'system.settings.edit' } as const;
   defineRoute(app, {
     method: 'GET',
     url: '/api/v1/label-sizes',
     access: { kind: 'session' },
-    handler: async () => ({ labelSizes: await lists.listLabelSizes(db) }),
+    handler: async () => ({
+      labelSizes: await lists.listLabelSizes(db),
+      maxWidthMm: await lists.labelMaxWidthMm(db),
+    }),
   });
   defineWrite(app, {
     method: 'POST',

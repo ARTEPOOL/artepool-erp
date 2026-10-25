@@ -5,6 +5,11 @@
  *   GET  /__artepool/device   → LocalDevice
  *   POST /__artepool/enroll   → EnrollOutcome
  *   POST /__artepool/request  → BridgeResponse
+ *   GET  /__artepool/setup    → SetupInfo (the first-run wizard, decision 0102)
+ *   POST /__artepool/setup/request → BridgeResponse (setup steps only, with the setup token)
+ *   POST /__artepool/restore/copies → RestoreCopy[] (restore from a backup, decision 0102)
+ *   POST /__artepool/restore/start  → { started } (the private key goes to the program's input)
+ *   GET  /__artepool/restore/status → RestoreStatus
  *
  * Only pages served by this dev server may call them (same origin), so another web page open in
  * the same browser cannot use this PC's device key.
@@ -13,8 +18,16 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { join } from 'node:path';
 import type { Plugin } from 'vite';
 import { repoRoot } from '@artepool/node-kit';
-import { BridgeRequest, EnrollInput } from '@artepool/shared/contracts';
+import {
+  BridgeRequest,
+  EnrollInput,
+  RestoreLookup,
+  RestoreStart,
+  SetupRequest,
+} from '@artepool/shared/contracts';
 import { DevBridge } from './bridge';
+import { restoreCopies, restoreStart, restoreStatus } from './restore';
+import { setupInfo, setupRequest } from './setup';
 
 export interface DevBridgePluginOptions {
   clientVersion: string;
@@ -88,6 +101,8 @@ export function artepoolDevBridge(options: DevBridgePluginOptions): Plugin {
           const route = `${request.method} ${request.url?.split('?')[0]}`;
           try {
             if (route === 'GET /device') return reply(response, 200, await bridge.localDevice());
+            if (route === 'GET /setup') return reply(response, 200, await setupInfo());
+            if (route === 'GET /restore/status') return reply(response, 200, restoreStatus());
             if (request.method !== 'POST' || !request.headers['content-type']?.includes('json')) {
               return reply(response, 404, { error: 'not found' });
             }
@@ -95,6 +110,21 @@ export function artepoolDevBridge(options: DevBridgePluginOptions): Plugin {
               const input = EnrollInput.safeParse(await readBody(request));
               if (!input.success) return reply(response, 400, { error: 'invalid' });
               return reply(response, 200, await bridge.enroll(input.data));
+            }
+            if (route === 'POST /setup/request') {
+              const input = SetupRequest.safeParse(await readBody(request));
+              if (!input.success) return reply(response, 400, { error: 'invalid' });
+              return reply(response, 200, await setupRequest(input.data, options.clientVersion));
+            }
+            if (route === 'POST /restore/copies') {
+              const input = RestoreLookup.safeParse(await readBody(request));
+              if (!input.success) return reply(response, 400, { error: 'invalid' });
+              return reply(response, 200, await restoreCopies(input.data.path));
+            }
+            if (route === 'POST /restore/start') {
+              const input = RestoreStart.safeParse(await readBody(request));
+              if (!input.success) return reply(response, 400, { error: 'invalid' });
+              return reply(response, 200, await restoreStart(input.data));
             }
             if (route === 'POST /request') {
               const input = BridgeRequest.safeParse(await readBody(request));

@@ -1,0 +1,30 @@
+/* The "Kiosk lock is off" banner (decision 0089): always visible on top while the lock is off. */
+.banner {
+  position: fixed;
+  inset-block-start: var(--space-2);
+  inset-inline: 0;
+  margin-inline: auto;
+  inline-size: fit-content;
+  max-inline-size: calc(100% - var(--space-8));
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-pill);
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+  font-size: var(--text-label);
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.owner {
+  display: flex;
+  justify-content: center;
+}
+
+.form {
+  display: grid;
+  gap: var(--space-4);
+}

@@ -1,6 +1,6 @@
 # ARTÉPOOL ERP — Product Requirements Document (PRD)
 
-**Version:** 1.9
+**Version:** 1.16
 **Date:** 2026-10-07
 **Owner:** Mohammed Yasser Al Huraidi (partner, ARTÉPOOL)
 **Status:** Scope approved. Owner and accountant decisions applied (see `docs/decisions/`). **Phase 1 plan approved (2026-10-07).**
@@ -83,6 +83,8 @@ Full detail: [`docs/architecture.md`](docs/architecture.md).
   Showroom POS   Showroom POS    Office PC     Warehouse PC   … (unlimited)
 ```
 
+- **ARTÉPOOL now ([0085](docs/decisions/0085-server-on-the-pos-pc.md)):** the POS PC is also the Main Server (PostgreSQL + API as Windows services); the owner's laptop is the only Office PC and works on the shop LAN only; no remote access in Phase 1 ([0093](docs/decisions/0093-no-remote-access-in-phase-1.md); the VPN plan of [0084](docs/decisions/0084-remote-access-through-private-vpn.md) is deferred). One cashier now; two cashiers on the same POS PC or a second POS PC later without redesign ([0087](docs/decisions/0087-cashiers-and-drawers-growth.md)).
+- **One app for every PC:** the kind a PC is enrolled as decides the mode. POS PCs start in an app-level kiosk mode that only the owner can unlock, for a limited time ([0082](docs/decisions/0082-app-mode-by-device-kind-and-pos-kiosk.md), [0083](docs/decisions/0083-exiting-kiosk-mode-owner-only.md)).
 - The Main Server PC can also be used as a normal workstation.
 - Clients find the server through a configured address, with optional auto-discovery on the LAN.
 - If a client loses the connection, it shows a clear "server unreachable" state and never saves partial data.
@@ -92,6 +94,7 @@ Full detail: [`docs/architecture.md`](docs/architecture.md).
 - **Standby server:** a second PC can hold a near-real-time replica and be promoted if the main one fails.
 - **Multi-warehouse / branch:** the schema is ready now; the UI comes later.
 - **E-invoicing (UAE):** see section 10.4. Invoices are stored in a structured, transmittable form, and an outbox queues them for later sync.
+- **Mobile dashboard (Phase 2):** no cloud database in Phase 1; summary figures go through an outbox to a read-only mobile dashboard later, nothing flows back ([0088](docs/decisions/0088-no-cloud-database-outbox-for-mobile.md)).
 
 ---
 
@@ -120,19 +123,23 @@ These rules apply to every table and every feature.
 
 | Area | Requirement |
 |---|---|
-| Disk | BitLocker on the Main Server and on any PC holding backups |
+| Disk | Disk encryption recommended on the Main Server and on any PC holding backups (BitLocker, or Device encryption on Home); never required: every Windows edition is supported ([0106](docs/decisions/0106-every-windows-edition.md)) |
 | Database | Sensitive columns encrypted. The database listens on localhost only, and the firewall allows only the API port from the LAN. |
 | Transport | TLS between clients and the API |
 | Passwords | Argon2id hashes; never stored or logged in plain text |
 | Passwords (rules) | At least 10 characters, common passwords refused, no forced symbols, no forced expiry. A password change ends the user's other sessions ([0023](docs/decisions/0023-password-rules.md)). |
-| Login | Lockout after repeated failures. Idle sessions lock automatically. Cashiers sign in with a 4-digit PIN **only on PCs enrolled as POS**; weak PINs refused; 5 wrong PINs block the PIN until the owner unblocks it. Office PCs always need a password. A user's PIN is also used for supervisor approvals ([0021](docs/decisions/0021-cashier-pin-sign-in-on-pos-pcs.md)). |
-| Owner 2FA | TOTP (authenticator app) for owner/admin accounts; works offline. 10 one-time recovery codes, plus an audited emergency reset that works only on the server PC ([0022](docs/decisions/0022-owner-2-step-recovery.md)). On a PC the person chooses to trust, the phone code is asked once every 30 days; never on POS PCs; the owner can end it at any time ([0027](docs/decisions/0027-trust-this-pc-for-the-2-step-code.md)). A forgotten password is recovered in the app with the phone code and one recovery code ([0028](docs/decisions/0028-forgot-password-with-phone-and-recovery-code.md)). If the phone or the recovery codes are lost too, an audited emergency password reset works only on the server PC ([0029](docs/decisions/0029-owner-password-reset-on-the-server-pc.md)). |
+| Login | Lockout after repeated failures. Idle lock per kind of PC, off by default ([0079](docs/decisions/0079-screen-lock-optional.md)); on POS PCs the cashier's session stays open, with a "Lock screen" button and an owner-only auto-lock, off by default ([0090](docs/decisions/0090-pos-idle-behaviour.md)). Cashiers sign in with a 4-digit PIN **only on PCs enrolled as POS**; weak PINs refused; 5 wrong PINs block the PIN until the owner unblocks it. Office PCs always need a password. A user's PIN is also used for supervisor approvals ([0021](docs/decisions/0021-cashier-pin-sign-in-on-pos-pcs.md)). |
+| Owner 2FA | TOTP (authenticator app) for owner/admin accounts; works offline. 10 one-time recovery codes, plus an audited emergency reset that works only on the server PC ([0022](docs/decisions/0022-owner-2-step-recovery.md)). The phone code is asked once per PC: the PC is then remembered until the password changes; on POS PCs only for the owner ([0078](docs/decisions/0078-owner-remembered-on-pos-pcs.md)); the owner can end it at any time ([0027](docs/decisions/0027-trust-this-pc-for-the-2-step-code.md), [0077](docs/decisions/0077-two-step-code-once-per-pc.md)). A forgotten password is recovered in the app with the phone code and one recovery code ([0028](docs/decisions/0028-forgot-password-with-phone-and-recovery-code.md)). If the phone or the recovery codes are lost too, an audited emergency password reset works only on the server PC ([0029](docs/decisions/0029-owner-password-reset-on-the-server-pc.md)). |
 | Devices | Only enrolled PCs can reach the server. Enrollment uses a 10-minute one-time code that also proves the server is genuine ([0024](docs/decisions/0024-device-enrollment-proves-the-server.md)). The first owner and first PC are created by commands on the server PC ([0025](docs/decisions/0025-first-owner-and-pc-from-server-commands.md)). Users are deactivated and PCs revoked, always with a reason, never deleted ([0026](docs/decisions/0026-users-and-devices-never-deleted.md)). |
 | Roles & permissions | Granular permissions per action, not just per screen. Default roles: Owner, Accountant, Cashier, Technician, Storekeeper. Custom roles allowed. Company details (printed on every tax invoice) are edited by the owner only ([0030](docs/decisions/0030-company-details-owner-only.md)). |
-| Supervisor approval | Required (supervisor PIN + mandatory reason) for: discounts above the user's limit, refunds and credit notes, price override, selling beyond available stock (oversell), stock adjustments above a threshold, shift-close recount, cash variance above a threshold. **"No Sale" drawer open** requires its own permission plus a reason and is always logged. **Removing items from an unpaid POS cart needs no approval** but is always logged ([0005](docs/decisions/0005-cart-removals-logged-without-approval.md)). |
+| Supervisor approval | Required (the supervisor's one-time 2-step code + mandatory reason, [0074](docs/decisions/0074-approvals-with-the-phone-code.md)) for: discounts above the user's limit, refunds and credit notes, price override, selling beyond available stock (oversell), stock adjustments above a threshold, shift-close recount, cash variance above a threshold. **"No Sale" drawer open** requires its own permission plus a reason and is always logged. **Removing items from an unpaid POS cart needs no approval** but is always logged ([0005](docs/decisions/0005-cart-removals-logged-without-approval.md)). |
 | Audit | Every sensitive action is logged (see rule 7) and viewable by the owner |
 | App integrity | Signed updates (the app refuses unsigned or tampered updates) and no secrets in client code. **No installer code-signing certificate for now**; revisit later ([0007](docs/decisions/0007-no-code-signing-certificate-for-now.md)). |
 | Ransomware resilience | At least one backup copy that is not continuously connected to the network |
+| POS kiosk | POS PCs run the app full screen in kiosk mode: closing refused, restarted by a watchdog; the cashier's Windows account is a standard user that cannot stop the services or read the database or keys; every exit attempt and unlock is audited and alerts the owner; a per-PC "Kiosk lock" switch kept on the server (default on; owner only with 2-step and a reason; off for 15 min / 1 hour / until turned back on, or 15 minutes with the owner's code on the lock screen, and off by itself while the owner is signed in on that PC until sign-out or screen lock ([0091](docs/decisions/0091-kiosk-lock-off-while-the-owner-is-signed-in.md)); a "القفل متوقف / Kiosk lock is off" banner and an alert while off; PIN, shifts and permissions unchanged, [0089](docs/decisions/0089-kiosk-lock-switch-per-pos-device.md)); only the owner unlocks ([0082](docs/decisions/0082-app-mode-by-device-kind-and-pos-kiosk.md), [0083](docs/decisions/0083-exiting-kiosk-mode-owner-only.md), [0085](docs/decisions/0085-server-on-the-pos-pc.md)) |
+| Remote access | None in Phase 1: no VPN, never an internet-facing port, no router port forwarding, no remote-desktop tools; the laptop works on the shop LAN and can be revoked at once. The design stays VPN-agnostic so remote access ([0084](docs/decisions/0084-remote-access-through-private-vpn.md), deferred) can be added later; remote monitoring comes with the Phase 2 mobile dashboard ([0093](docs/decisions/0093-no-remote-access-in-phase-1.md)) |
+| First-run setup | After the server install, a one-time wizard on the server PC: company details, the owner account, phone 2-step, recovery codes (confirmed), enroll this PC as the POS; locked afterwards in the database; console commands are emergency tools ([0092](docs/decisions/0092-first-run-setup-wizard.md)). A second path, **restore from backup** on a new server PC (copy from the PC, a USB drive, or a Google Drive copy downloaded first + the private key, checked before it replaces anything; the master key travels inside the encrypted copies; other PCs enroll again) ([0102](docs/decisions/0102-first-run-new-setup-or-restore.md)). Upgrades and uninstall never touch the data (pre-upgrade backup, all-or-nothing migrations; deleting data needs the owner's password; backups always kept); updates go USB → server → PCs over the LAN, signature-checked ([0103](docs/decisions/0103-upgrades-and-uninstall-never-touch-data.md)). The server keeps its address by a router reservation and is found by its name ([0105](docs/decisions/0105-server-address-and-name.md)) |
+| Cashier and laptop | The owner adds the cashier in Settings → Users (PIN); the PC kind decides the mode, no separate icon; the laptop is enrolled with a code from Settings → Devices and signs in with the same owner account ([0094](docs/decisions/0094-adding-the-cashier-and-the-owner-laptop.md)) |
 | Data export | Exports (CSV/PDF/Excel) are permission-controlled and logged |
 
 ---
@@ -143,11 +150,12 @@ These rules apply to every table and every feature.
 |---|---|
 | 3-2-1 rule | 3 copies, 2 different media, 1 off-site |
 | Local automatic backup | Hourly to a second PC or external drive |
-| Off-site backup | Daily, **encrypted before upload**, to Google Drive or OneDrive when internet is available |
+| Off-site backup | Daily, **encrypted with `age` before upload**, to a **dedicated Google Drive account** (2-step on) when internet is available; the private key stays offline with the owner ([0086](docs/decisions/0086-backups-local-and-google-drive.md)) |
+| External drive | Weekly reminder to plug in the backup drive for a copy that is then unplugged |
 | Point-in-time recovery | WAL archiving, so data can be restored to a specific minute |
 | Restore tool | Built-in restore to a test database, plus a monthly restore-test reminder |
 | Backup health | A dashboard shows the last successful backup. An alert fires if a backup fails or is older than the threshold. |
-| Hardware | UPS on the Main Server (documented requirement) |
+| Hardware | UPS on the Main Server (documented requirement); the health screen reminds the owner until a UPS is confirmed ([0085](docs/decisions/0085-server-on-the-pos-pc.md)) |
 
 ---
 
@@ -209,7 +217,7 @@ Phase tags: **[P1]** to **[P4]** (see section 13).
 - **Out-of-stock at POS:** the sale is allowed with supervisor approval. The system posts an **oversell adjustment** in the same transaction and flags it for the storekeeper to review ([0003](docs/decisions/0003-pos-oversell-with-approval.md)).
 - **Defective stock bucket** for returned broken goods, separate from sellable stock. Defective goods are **held at cost in "Inventory – defective" until written off** ([0015](docs/decisions/0015-defective-returns-held-at-cost.md)).
 - Bundles deduct their components.
-- Barcode label printing: sizes 25×15 to 100×50 mm, A4 label sheets and custom sizes, through the print dialog for now ([0043](docs/decisions/0043-barcode-label-sizes.md)).
+- Barcode label printing for the 2-inch label printer: 50×30 mm by default, also 50×25 and 40×30, custom sizes never wider than the roll; the content stays within the printable width (48 mm). Fixed zones: the Arabic name (2 lines, shrinks, then "…"; English name optional), an EAN-13/EAN-8/UPC-A or Code 128 barcode on whole printer dots, the price ("120.00 درهم" / "AED 120.00") and "incl. VAT". Printed silently at the exact size on each PC's label printer (offset and a test label in Settings → Devices); the print dialog only as a fallback and for A4 label sheets; RAW TSPL next. The owner designs the label in the print designer (what shows, order, size, alignment; sale pack, expiry/batch typed at print time, print date; never below a scannable barcode size; one base design with optional per-size overrides). The barcode's blank quiet zones may use the side margin, 0.5 mm clear of the edge, so 40 × 30 takes 10-character item codes. Labels for many items print in one go (by search or scanner, from a stock increase or the opening stock, or the list of items whose price, "includes VAT" or VAT rate changed since their last label, filterable by category); every label print is recorded with the price printed; default counts are the quantity on hand (unit items) or 1 (kg, m); the total is shown and more than 100 labels are confirmed. Each element in two languages (shop name, sale pack, price, incl. VAT, expiry, batch) has its own language, also per size: Arabic, English or both (the English line under the Arabic one). Each PC prints labels through the Windows driver or directly in TSPL (gap and direction settings; the driver stays the other way) ([0043](docs/decisions/0043-barcode-label-sizes.md), [0096](docs/decisions/0096-barcode-labels-2-inch-printer.md), [0097](docs/decisions/0097-label-designer-and-print-quality.md), [0098](docs/decisions/0098-barcode-quiet-zones-may-use-the-label-margin.md), [0099](docs/decisions/0099-batch-labels-and-price-changed-list.md), [0100](docs/decisions/0100-direct-tspl-label-printing.md), [0101](docs/decisions/0101-label-language-per-element.md)).
 - **Who sees stock cost and value:** owner and accountant only; storekeeper and cashier see quantities ([0040](docs/decisions/0040-stock-cost-visibility.md)). Adjustments above 500.00 AED need a supervisor's approval ([0041](docs/decisions/0041-stock-adjustment-approval-threshold.md)). Opening stock is posted once, by the owner ([0042](docs/decisions/0042-opening-stock-owner-only.md)). Full counts are blind ([0044](docs/decisions/0044-blind-stock-counts.md)).
 - Multi-warehouse ready; transfers between warehouses come in [P3].
 
@@ -219,6 +227,7 @@ Phase tags: **[P1]** to **[P4]** (see section 13).
 - **Invoice format follows the customer's VAT registration** ([0010](docs/decisions/0010-invoice-format-by-vat-registration.md)):
   - customer **not** VAT-registered → **simplified tax invoice**
   - customer VAT-registered → **full tax invoice** showing the customer's TRN
+  - **A4 invoices (INV-)** are full tax invoices for a registered customer or a named customer with an address on file, simplified for the walk-in or a customer without an address; nothing is typed on the invoice ([0071](docs/decisions/0071-a4-invoices-full-and-reprints-current-design.md)). The rule above applies to POS sales, advance invoices and debit notes.
 - **Numbering:** two separate gapless invoice series ([0011](docs/decisions/0011-document-numbering-series.md)):
   - **`POS-`** for POS sales
   - **`INV-`** for A4 invoices, including advance and progress payment tax invoices
@@ -264,6 +273,7 @@ Phase tags: **[P1]** to **[P4]** (see section 13).
 - **X report** (mid-shift, no close).
 - **Z report / shift close** with a **blind count**: the cashier enters the counted cash by denomination (notes 1000–5, coins 1–0.05, plus an "other amount"; exact to the fils, [0056](docs/decisions/0056-blind-count-denominations.md)) without seeing the expected amount; the system then shows over/short.
 - **One recount** is allowed, only with supervisor approval. Both counts are kept and printed on the Z report ([0006](docs/decisions/0006-one-recount-with-supervisor-approval.md)).
+- A shift that can no longer be closed on its own PC (re-enrolled, broken or gone) is **closed from another PC by the owner or the accountant**, with a reason and a count; the drawer moves with a re-enrolled PC, and a PC with an open shift cannot be revoked ([0069](docs/decisions/0069-stuck-shifts.md)).
 - Over/short is **accepted by the owner or the accountant** and posts to Cash over/short. History per cashier, with an alert when a cashier has a difference above AED 20 three times in 30 days (both configurable, [0058](docs/decisions/0058-shift-variance-acceptance.md)).
 - Drawer-left-open alert where the hardware supports status reporting.
 
@@ -271,7 +281,9 @@ Phase tags: **[P1]** to **[P4]** (see section 13).
 - Settings → **Print designer**: the owner customises the layout of printed documents with a live preview ([0020](docs/decisions/0020-print-template-designer.md); design: `design/screens/11-print-designer.html`).
 - Phase 1 templates: A4 tax invoice, quotation, credit note, 80 mm thermal receipt. Z report and barcode labels follow with their milestones.
 - Adjustable: logo (upload, position, size), main colour (A4), print language (Arabic + English / Arabic / English), text size, optional fields on or off, welcome line, terms, footer, A4 margins, thermal width (80 or 58 mm).
-- **Legally required fields are locked** and always printed (title and type, seller name and TRN, number and dates, customer TRN on a full tax invoice, VAT per line and in total).
+- **Legally required fields are locked** and always printed. The list per document type is in [0064](docs/decisions/0064-print-designer-and-locked-fields.md) (pending the accountant's review): among them the seller's name, **address** and TRN on every tax invoice, and the customer's name, **address** and TRN on a full tax invoice. A full tax invoice is refused at issue without the customer's address.
+- Receipts and statements use the A4 invoice design. The thermal receipt's language is chosen here. No QR code until e-invoicing ([0067](docs/decisions/0067-qr-code-deferred.md)).
+- **Bank accounts** (several, UAE IBAN checked) are kept in Company details; the template chooses which one prints ([0065](docs/decisions/0065-company-bank-accounts.md)). An optional **customer PO number** on A4 invoices and quotations prints when filled ([0066](docs/decisions/0066-customer-po-number.md)).
 - Templates are **versioned**; each issued document keeps the version it was issued with, so reprints match the original. Saves are audited. Owner only.
 
 ### 9.7 Purchasing and suppliers [P2]
@@ -377,8 +389,8 @@ Phase tags: **[P1]** to **[P4]** (see section 13).
 
 | Device | Notes |
 |---|---|
-| Main Server PC | Reliable desktop, SSD, ≥16 GB RAM, UPS, BitLocker |
-| Client PCs | Windows 10/11 |
+| Main Server PC | Windows 10 22H2 / 11 64-bit, any edition (Home, Pro, Enterprise; nothing Pro-only, [0106](docs/decisions/0106-every-windows-edition.md)), 4-core CPU, SSD with 60 GB free, ≥16 GB RAM, wired network, router reservation, UPS ([0104](docs/decisions/0104-windows-and-hardware-test-on-a-vm-first.md)); installed only after the clean-VM tests (Home and Pro) pass |
+| Client PCs | Windows 10 22H2 / 11 64-bit, any edition, 8 GB RAM ([0104](docs/decisions/0104-windows-and-hardware-test-on-a-vm-first.md)) |
 | Thermal receipt printer | 80 mm, ESC/POS (Epson TM-T20III / TM-T82 or compatible), with drawer kick port ([0055](docs/decisions/0055-thermal-printer-esc-pos.md)) |
 | Cash drawer | RJ11/RJ12, compatible with the printer |
 | Barcode scanner | USB keyboard-emulation |
@@ -432,6 +444,34 @@ Each phase ends with automated tests passing, a security review, an accountant r
 
 | Version | Date | Change |
 |---|---|---|
+| 1.10 | 2026-10-14 | M4b decisions 0064–0067: print designer with locked tax fields per document type (seller address on every tax invoice, customer address on full tax invoices; a full tax invoice needs the customer's address); company bank accounts with UAE IBAN check; customer PO number on A4 invoices and quotations; no QR code until e-invoicing. |
+| 1.37 | 2026-10-24 | Decision 0102 amended: for a restore, a Google Drive copy is downloaded in the browser first, then chosen like a USB copy (the wizard finds copies on USB drives, Downloads, Desktop and Documents). The restore wizard screens are built. |
+| 1.36 | 2026-10-24 | Decision 0106: every Windows 10/11 edition (Home, Pro, Enterprise); nothing depends on a Pro-only feature; tests on Windows 10 Home and 11 Home before go-live; a Windows 10 warning in the setup screen, never blocking. |
+| 1.35 | 2026-10-20 | M6.2 approved. Decisions 0102–0105: first run "New setup" or "Restore from backup" (master key inside the encrypted copies, PCs enroll again); upgrades and uninstall never touch the data, updates USB → server → LAN; minimum Windows/hardware, Pro vs Home, clean-VM test first, SmartScreen guide; router reservation + server found by name. |
+| 1.34 | 2026-10-20 | Decision 0101: a language for each label element (Arabic / English / both, also per size); "both" puts the English line under the Arabic one (the shop's name no longer cut). |
+| 1.33 | 2026-10-20 | Decision 0100: direct (RAW TSPL) label printing per PC with gap and direction settings; the Windows driver kept as the other way; a failed direct print is never re-sent through the driver by itself. |
+| 1.32 | 2026-10-20 | Decisions 0098–0099: barcode quiet zones may use the label margin (0.5 mm from the edge), so 40 × 30 takes 10-character codes; labels for many items at once and the "price changed, label is old" list (print record, default counts, confirm above 100 labels, category filter). |
+| 1.31 | 2026-10-20 | Decision 0097: label designer (elements, sale pack, expiry/batch at print time, print date; minimum barcode size; base design + per-size override; live preview, test label, reset); crisp 1-bit label printing with darkness/speed and a print quality test; next: batch label printing with a "price changed" list, then RAW TSPL; later in-store EAN-13. |
+| 1.30 | 2026-10-20 | Decision 0096: barcode labels for the 2-inch label printer (sizes, fixed layout in mm, silent printing at exact size, per-PC label printer with offset and test label; RAW TSPL next). |
+| 1.29 | 2026-10-19 | Decision 0095: Google Drive connected by choosing the account; one built-in registration of the app for every installation. Noted: the owner may offer the system to other companies later (a separate decision; scope unchanged). |
+| 1.28 | 2026-10-19 | M6 approved in five parts: backups, installer + first-run setup wizard (0092), adding the cashier (0094), cashier Windows account hardening, owner's laptop on the LAN (0094); remote access dropped for Phase 1 (0093, 0084 deferred). |
+| 1.27 | 2026-10-19 | Decision 0091: the kiosk lock is off while the owner is signed in on the POS PC; the owner code on the lock screen lifts it for 15 minutes. |
+| 1.26 | 2026-10-19 | Decisions 0082–0089 accepted with the owner's answers (no shell replacement; owner code unlock at most 5 minutes; Tailscale with ACLs; dedicated Google account; banner "القفل متوقف"); decision 0090: POS idle behaviour. |
+| 1.25 | 2026-10-18 | Proposed decision 0089: a per-PC "Kiosk lock" switch, owner only, stored on the server. |
+| 1.24 | 2026-10-18 | Proposed decisions 0082–0088: app mode by device kind and POS kiosk mode; owner-only kiosk unlock; remote access through a private VPN only; server on the POS PC; backups to Google Drive encrypted with age; growth to more cashiers and drawers; no cloud database in Phase 1, outbox for a Phase 2 mobile dashboard. |
+| 1.23 | 2026-10-18 | Decision 0081: the owner dashboard (sales, VAT, profit, cash, receivables, stock). |
+| 1.22 | 2026-10-18 | Decision 0080: the owner sees the expected cash on "My shift"; drop alerts clear themselves. |
+| 1.21 | 2026-10-18 | Decision 0079: the idle screen lock can be turned off per kind of PC; off on every PC. |
+| 1.20 | 2026-10-18 | Decision 0078: the owner (only) may be remembered on POS PCs too. |
+| 1.19 | 2026-10-18 | Decision 0077: the 2-step code once per PC; the PC is remembered until the password changes. |
+| 1.18 | 2026-10-18 | Decision 0076: logo in the middle on bilingual A4 documents gives a letterhead (Arabic right, logo centre, English left). |
+| 1.17 | 2026-10-17 | Decision 0075: the thermal receipt can have its own logo, separate from the company logo on A4 documents. |
+| 1.16 | 2026-10-17 | Decision 0074: supervisor approvals with the approver's one-time 2-step code instead of a PIN. |
+| 1.15 | 2026-10-17 | Decision 0071 revised: no name/address fields on A4 invoices; full when the customer is registered or has an address on file, else simplified. |
+| 1.14 | 2026-10-17 | Decision 0072: an issued A4 invoice is cancelled or edited with the owner's approval, through a full credit note (refund at once) and, for edits, a new draft. |
+| 1.13 | 2026-10-17 | Decision 0071: A4 invoices are always full tax invoices (the cash customer's name and address typed); reprints use today's design with unchanged content. |
+| 1.12 | 2026-10-17 | Decision 0070: receipts print on an ESC/POS thermal printer or on any printer through its Windows driver; new receipt look with a separator between items. |
+| 1.11 | 2026-10-17 | Decision 0069: stuck shifts closed from another PC by the owner or the accountant; the drawer moves with a re-enrolled PC; no revoking a PC with an open shift. |
 | 1.9 | 2026-10-13 | Decision 0063: A4 cash taken by a cashier on their open shift goes into the drawer; A4 invoices shown in the shift's sales (POS, A4, total) but never in its expected cash. |
 | 1.0 | 2026-10-06 | Initial approved scope for Phase 1 planning |
 | 1.1 | 2026-10-06 | Applied owner and accountant decisions 0001–0019: confirmed stack; separate repository; POS oversell with approval; one cashier per shift; cart removals logged without approval; one recount with approval; no code-signing for now; POS silent printing and separate A4 section; VAT per line; invoice format by VAT registration; POS-/INV- series; discounts net per line; VAT on advance/progress payments; 4-decimal unit precision and no cash rounding; defective held at cost; monthly lock; quarterly VAT export and annual archive; chart of accounts by line of business (pending review); e-invoicing via accredited provider (go-live pending). Ledger core moved into P1. |

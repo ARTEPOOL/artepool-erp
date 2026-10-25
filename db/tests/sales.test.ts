@@ -53,7 +53,7 @@ const one = async <T extends pg.QueryResultRow>(
 
 async function customer(
   name: string,
-  opts: { trn?: string; creditLimit?: number } = {},
+  opts: { trn?: string; creditLimit?: number; address?: string | null } = {},
 ): Promise<string> {
   phoneNo += 1;
   const credit = opts.creditLimit !== undefined;
@@ -63,8 +63,8 @@ async function customer(
         await one<{ id: string }>(
           c,
           `INSERT INTO md.customers (code, customer_type, name, phone, is_vat_registered, trn, credit_mode,
-                                   credit_limit_fils, payment_terms_days)
-         VALUES ($1, 'company', $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+                                   credit_limit_fils, payment_terms_days, address_line)
+         VALUES ($1, 'company', $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
           [
             `C${phoneNo}`,
             name,
@@ -74,6 +74,8 @@ async function customer(
             credit ? 'credit' : 'cash',
             opts.creditLimit ?? 0,
             credit ? 30 : 0,
+            // An A4 invoice is a full tax invoice and needs the address (0064, 0071).
+            opts.address !== undefined ? opts.address : 'Industrial Area',
           ],
         )
       ).id,
@@ -380,13 +382,71 @@ describe('issue (decisions 0010, 0011)', () => {
         )
       ).t,
     ).toBe('100123456700003');
-    expect((await issueFor(plain)).invoice_format).toBe('simplified');
+    // An A4 invoice is a full tax invoice for every customer, without a TRN when unregistered (0071).
+    const a4 = await issueFor(plain);
+    expect(a4.invoice_format).toBe('full');
     await expect(
       tx((c) => c.query(`UPDATE sales.documents SET notes = 'changed' WHERE id = $1`, [full.doc])),
     ).rejects.toMatchObject({ code: 'AP003' });
     await expect(tx((c) => line(c, full.doc, { item: svc, price: 1 }))).rejects.toMatchObject({
       code: 'AP006',
     });
+  });
+
+  it('a full tax invoice needs the customer’s address, taken from the customer at issue (0064)', async () => {
+    const noAddress = await customer('No address', {
+      trn: '100777888900003',
+      creditLimit: 10_000_000,
+      address: null,
+    });
+    const svc = await item('S-ADDR', 'service', 1_000_000, false);
+    const draftFor = (cust: string) =>
+      tx(async (c) => {
+        const doc = await draft(c, 'invoice', cust);
+        await line(c, doc, { item: svc, price: 1_000_000 });
+        return doc;
+      });
+    const doc = await draftFor(noAddress);
+    await expect(tx((c) => issue(c, doc, noAddress))).rejects.toMatchObject(
+      rule('FULL_INVOICE_ADDRESS'),
+    );
+    // The address added to the customer later is printed on the invoice (the draft had none).
+    await tx(
+      (c) =>
+        c.query(`UPDATE md.customers SET address_line = 'Sanaiya', city = 'Al Ain' WHERE id = $1`, [
+          noAddress,
+        ]),
+      owner,
+      'Address added',
+    );
+    await tx((c) => issue(c, doc, noAddress));
+    expect(
+      (
+        await one<{ a: string }>(
+          api,
+          `SELECT bill_to_address AS a FROM sales.documents WHERE id = $1`,
+          [doc],
+        )
+      ).a,
+    ).toBe('Sanaiya، Al Ain');
+    // An unregistered customer without an address: a simplified invoice, issued (0071).
+    const plain = await customer('Plain, no address', { creditLimit: 10_000_000, address: null });
+    const a4 = await draftFor(plain);
+    expect((await tx((c) => issue(c, a4, plain))).invoice_format).toBe('simplified');
+  });
+
+  it('the walk-in cash customer on an A4 invoice: a simplified invoice, nothing to type (0071)', async () => {
+    const walkIn = await one<{ id: string }>(
+      api,
+      `SELECT id::text FROM md.customers WHERE is_walk_in`,
+    );
+    const svc = await item('S-WALK', 'service', 1_000_000, false);
+    const doc = await tx(async (c) => {
+      const d = await draft(c, 'invoice', walkIn.id);
+      await line(c, d, { item: svc, price: 1_000_000 });
+      return d;
+    });
+    expect((await tx((c) => issue(c, doc, walkIn.id))).invoice_format).toBe('simplified');
   });
 
   it('a POS document needs an open shift of its own cashier; an office one never uses POS-', async () => {

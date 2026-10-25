@@ -35,14 +35,21 @@ export default {
       { message: 'Use start / end, not left / right, so RTL and LTR both work.' },
     ],
     'declaration-property-value-allowed-list': [
-      { 'font-family': ['/^var\\(--font-(family|mono)\\)$/', 'inherit'] },
-      { message: 'Use the font tokens (var(--font-family) or var(--font-mono)).' },
+      { 'font-family': ['/^var\\(--font-(family|mono|heading)\\)$/', 'inherit'] },
+      {
+        message:
+          'Use the font tokens (var(--font-family), var(--font-heading) or var(--font-mono)).',
+      },
     ],
   },
   overrides: [
     {
-      // The token files are where raw values belong.
-      files: ['apps/desktop/src/theme/tokens.css', 'apps/desktop/src/theme/tokens-app.css'],
+      // The token files and the font faces are where raw values belong.
+      files: [
+        'apps/desktop/src/theme/tokens.css',
+        'apps/desktop/src/theme/tokens-app.css',
+        'apps/desktop/src/theme/fonts.css',
+      ],
       rules: {
         'color-no-hex': null,
         'function-disallowed-list': null,

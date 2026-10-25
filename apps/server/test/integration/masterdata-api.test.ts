@@ -13,6 +13,8 @@ import type {
   FilePayload,
   ItemDetail,
   ItemsResponse,
+  LabelSizeItem,
+  LabelSizesResponse,
   PaymentMethodItem,
   SupplierDetail,
   UnitItem,
@@ -228,6 +230,38 @@ describe('items (design 07, decision 0032)', () => {
       })
     ).json<ItemDetail>();
     expect(pumpItem.price).toEqual({ price4dp: '1300000', includesVat: false });
+  });
+
+  it('keep a sale pack for the label; a save that leaves it out keeps it (decision 0097)', async () => {
+    pumpItem = (
+      await owner('PUT', `/api/v1/items/${pumpItem.id}`, {
+        ...pump(),
+        price: pumpItem.price,
+        packAr: 'كرتونة 2 قطعة',
+        packEn: 'Box of 2',
+        rowVersion: pumpItem.rowVersion,
+      })
+    ).json<ItemDetail>();
+    expect(pumpItem).toMatchObject({ packAr: 'كرتونة 2 قطعة', packEn: 'Box of 2' });
+    pumpItem = (
+      await owner('PUT', `/api/v1/items/${pumpItem.id}`, {
+        ...pump(),
+        price: pumpItem.price,
+        rowVersion: pumpItem.rowVersion,
+      })
+    ).json<ItemDetail>();
+    expect(pumpItem).toMatchObject({ packAr: 'كرتونة 2 قطعة', packEn: 'Box of 2' });
+    // Emptied in the item window: cleared.
+    pumpItem = (
+      await owner('PUT', `/api/v1/items/${pumpItem.id}`, {
+        ...pump(),
+        price: pumpItem.price,
+        packAr: '',
+        packEn: '',
+        rowVersion: pumpItem.rowVersion,
+      })
+    ).json<ItemDetail>();
+    expect(pumpItem).toMatchObject({ packAr: null, packEn: null });
   });
 
   it('refuse a save over someone else’s ("changed by someone else")', async () => {
@@ -585,6 +619,29 @@ describe('suppliers and the lists (decision 0034)', () => {
       await owner('POST', '/api/v1/payment-methods', { ...body, glAccountId: account('1230') })
     ).json<PaymentMethodItem>();
     expect(created.code).toBe('TABBY');
+  });
+
+  it('label sizes come with the roll width; a wider size is refused (decision 0096)', async () => {
+    const listed = (await cashier('GET', '/api/v1/label-sizes')).json<LabelSizesResponse>();
+    expect(listed.maxWidthMm).toBe(50);
+    expect(listed.labelSizes.filter((s) => s.isActive)[0]?.code).toBe('50X30');
+    const body = { code: 'TALL', nameAr: 'طويل', nameEn: 'Tall', widthMm: 60, heightMm: 40 };
+    expect(await refusal(owner('POST', '/api/v1/label-sizes', body))).toMatchObject({
+      code: 'RULE_VIOLATION',
+      rule: 'LABEL_TOO_WIDE',
+      field: 'widthMm',
+      maxMm: 50,
+    });
+    const created = (
+      await owner('POST', '/api/v1/label-sizes', { ...body, widthMm: 48 })
+    ).json<LabelSizeItem>();
+    expect(created.widthMm).toBe(48);
+    const wide = listed.labelSizes.find((s) => s.code === '100X50')!;
+    expect(
+      await refusal(
+        owner('POST', `/api/v1/label-sizes/${wide.id}/reactivate`, { rowVersion: wide.rowVersion }),
+      ),
+    ).toMatchObject({ rule: 'LABEL_TOO_WIDE' });
   });
 
   it('one default warehouse, which moves when another is chosen', async () => {

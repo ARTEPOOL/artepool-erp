@@ -9,6 +9,8 @@
   },
   "dependencies": {},
   "devDependencies": {
+    "@artepool/migrate": "workspace:*",
+    "@artepool/node-kit": "workspace:*",
     "@artepool/shared": "workspace:*",
     "@artepool/testing": "workspace:*",
     "pg": "8.23.1",

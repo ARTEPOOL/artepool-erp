@@ -11,6 +11,8 @@ import { sql } from 'kysely';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { computeLine } from '@artepool/shared';
 import type {
+  DashboardResponse,
+  CancelInvoiceResponse,
   CustomerBalance,
   CustomerDetail,
   DocumentDetail,
@@ -51,6 +53,7 @@ let clerk: Actor;
 let clerkId: bigint;
 let clerkPc: TestDevice;
 let accountantId: bigint;
+let ownerId: bigint;
 const ids: Record<string, string> = {};
 let phone = 1_000_000;
 
@@ -97,6 +100,8 @@ async function customer(
       name,
       phone: `050 ${phone}`,
       isVatRegistered: opts.trn !== undefined,
+      // An A4 invoice is a full tax invoice and needs the address (0064, 0071).
+      addressLine: 'Industrial Area 1',
       ...(opts.trn ? { trn: opts.trn } : {}),
     }),
     201,
@@ -159,7 +164,7 @@ async function entryOf(doc: { journalEntryId: string | null }) {
   return out;
 }
 
-async function approval(permission: string) {
+async function approval(permission: string, approver?: bigint) {
   return withBusinessTx(
     server.db,
     { userId: clerkId, deviceId: clerkPc.id, requestId: randomUUID() },
@@ -168,7 +173,7 @@ async function approval(permission: string) {
         await sql<{
           id: string;
         }>`INSERT INTO auth.approvals (permission_code, approved_by, reason_text)
-                                  VALUES (${permission}, ${accountantId}, 'Approved at the counter')
+                                  VALUES (${permission}, ${approver ?? accountantId}, 'Approved at the counter')
                                   RETURNING id::text`.execute(trx)
       ).rows[0]!.id,
   );
@@ -182,7 +187,7 @@ if (process.env.ARTEPOOL_E2E_CHROMIUM)
 beforeAll(async () => {
   server = await startTestServer();
   const office = await addDevice(server, { code: 'OFFICE-01' });
-  const ownerId = await addOwner(server);
+  ownerId = await addOwner(server);
   owner = actor(
     office,
     (await openSession(server, { userId: ownerId, deviceId: office.id, method: 'password_totp' }))
@@ -283,6 +288,18 @@ describe('line arithmetic (decisions 0009, 0012, 0014)', () => {
 });
 
 describe('invoices (decisions 0010, 0011, 0046)', () => {
+  it('the walk-in cash customer on an A4 invoice: a simplified invoice, nothing to type (0071)', async () => {
+    const { rows } = await sql<{ id: string }>`
+      SELECT id::text FROM md.customers WHERE is_walk_in`.execute(server.db);
+    const svc = await item('WALK-SVC', 'service', '1000000');
+    const d = await draft(owner, {
+      customerId: rows[0]!.id,
+      lines: [{ itemId: svc.id, quantityMilli: '1000' }],
+    });
+    const issued = await ok<DocumentDetail>(issue(owner, d, { payments: [cash('10500')] }));
+    expect(issued).toMatchObject({ invoiceFormat: 'simplified', billToTrn: null });
+  });
+
   it('a sale paid at issue: number, stock out at cost, Receivable/Revenue/VAT and Cost of sales/Inventory', async () => {
     const cust = await customer('Walk-in shop');
     const pump = await item('PUMP-01', 'stock', '1000000'); // 100.00 + VAT
@@ -311,7 +328,9 @@ describe('invoices (decisions 0010, 0011, 0046)', () => {
     const issued = await ok<DocumentDetail>(issue(accountant, d, { payments: [cash('21000')] }));
     expect(issued).toMatchObject({
       status: 'issued',
-      invoiceFormat: 'simplified',
+      // A4: a full tax invoice even for an unregistered customer, without a TRN (0071).
+      invoiceFormat: 'full',
+      billToTrn: null,
       settlementStatus: 'settled',
     });
     expect(issued.docNumber).toMatch(/^INV-/);
@@ -394,6 +413,9 @@ describe('invoices (decisions 0010, 0011, 0046)', () => {
 
 describe('the advance and progress payments example (decision 0013)', () => {
   it('quotation 100,000 + VAT → receive 31,500 → 42,000 → final invoice: 31,500 due, VAT 1,500', async () => {
+    const dash = () =>
+      ok<DashboardResponse>(owner('GET', '/api/v1/reports/owner-dashboard?period=today'));
+    const before = await dash();
     const cust = await customer('Villa owner', { credit: '100000000' });
     const pool = await item('POOL-01', 'service', '1000000000'); // 100,000.00 + VAT
     const q = await ok<QuotationDetail>(
@@ -497,6 +519,11 @@ describe('the advance and progress payments example (decision 0013)', () => {
     expect((await documentHtml(server.db, BigInt(final.id))).html).toContain('COPY');
     const balance = await ok<CustomerBalance>(owner('GET', `/api/v1/customers/${cust}/balance`));
     expect(balance).toMatchObject({ balanceFils: '3150000', advancesFils: '0' });
+    // The owner dashboard counts the project once: two advances + the final invoice = 100,000 + VAT.
+    const after = await dash();
+    expect(BigInt(after.current.netFils) - BigInt(before.current.netFils)).toBe(10000000n);
+    expect(BigInt(after.current.vatFils) - BigInt(before.current.vatFils)).toBe(500000n);
+    expect(BigInt(after.current.totalFils) - BigInt(before.current.totalFils)).toBe(10500000n);
   });
 });
 
@@ -921,5 +948,104 @@ describe('fixes from the M4 screens review', () => {
     );
     expect(note).toMatchObject({ netFils: '10000', vatFils: '500', totalFils: '10500' });
     expect(note.lines[0]).toMatchObject({ listPrice4dp: '1000000', priceIncludesVat: false });
+  });
+});
+
+describe('cancelling or editing an issued A4 invoice (decision 0072)', () => {
+  it('the owner cancels a paid invoice: a credit note for all of it, stock back, cash refunded', async () => {
+    const cust = await customer('Cancel me');
+    const pump = await item('CANCEL-PUMP', 'stock', '1000000');
+    await openingStock(pump.id, '5000', '600000');
+    const d = await draft(owner, {
+      customerId: cust,
+      lines: [{ itemId: pump.id, quantityMilli: '2000' }],
+    });
+    const issued = await ok<DocumentDetail>(issue(owner, d, { payments: [cash('21000')] }));
+    // The whole paid amount goes back, no more and no less.
+    expect(
+      await refusal(
+        owner('POST', `/api/v1/sales/documents/${issued.id}/cancel`, {
+          mode: 'cancel',
+          reason: 'Customer changed their mind',
+          refund: [cash('10000')],
+          rowVersion: issued.rowVersion,
+        }),
+      ),
+    ).toMatchObject({ code: 'VALIDATION_FAILED' });
+    const result = await ok<CancelInvoiceResponse>(
+      owner('POST', `/api/v1/sales/documents/${issued.id}/cancel`, {
+        mode: 'cancel',
+        reason: 'Customer changed their mind',
+        refund: [cash('21000')],
+        rowVersion: issued.rowVersion,
+      }),
+    );
+    expect(result.draftId).toBeNull();
+    expect(result.creditNote).toMatchObject({ docType: 'credit_note', totalFils: '21000' });
+    expect(result.creditNote.docNumber).toMatch(/^CN-/);
+    const after = await ok<DocumentDetail>(owner('GET', `/api/v1/sales/documents/${issued.id}`));
+    expect(after.status).toBe('issued'); // never changed, never deleted
+    expect(after.cancelledBy).toMatchObject({
+      docNumber: result.creditNote.docNumber,
+      edited: false,
+    });
+    const stock = await ok<ItemStockResponse>(owner('GET', `/api/v1/items/${pump.id}/stock`));
+    expect(stock.balances[0]).toMatchObject({ quantityMilli: '5000' });
+    const balance = await ok<{ balanceFils: string }>(
+      owner('GET', `/api/v1/customers/${cust}/balance`),
+    );
+    expect(balance.balanceFils).toBe('0');
+    // Only once.
+    expect(
+      await refusal(
+        owner('POST', `/api/v1/sales/documents/${issued.id}/cancel`, {
+          mode: 'cancel',
+          reason: 'Again',
+          rowVersion: after.rowVersion,
+        }),
+      ),
+    ).toMatchObject({ rule: 'INVOICE_HAS_NOTES' });
+  });
+
+  it('someone else needs the owner’s approval; editing opens a new draft copied from it', async () => {
+    const cust = await customer('Edit me', { credit: '10000000' });
+    const svc = await item('EDIT-SVC', 'service', '1000000');
+    const d = await draft(clerk, {
+      customerId: cust,
+      customerPo: 'PO-9',
+      lines: [{ itemId: svc.id, quantityMilli: '3000' }],
+    });
+    const issued = await ok<DocumentDetail>(issue(accountant, d));
+    const body = { mode: 'edit', reason: 'Wrong quantity', rowVersion: issued.rowVersion };
+    expect(
+      await refusal(clerk('POST', `/api/v1/sales/documents/${issued.id}/cancel`, body)),
+    ).toMatchObject({ code: 'PERMISSION_DENIED' });
+    // The accountant cannot approve it: the permission is the owner's.
+    await expect(approval('invoices.cancel')).rejects.toBeTruthy();
+    const approved = await approval('invoices.cancel', ownerId);
+    const result = await ok<CancelInvoiceResponse>(
+      clerk('POST', `/api/v1/sales/documents/${issued.id}/cancel`, {
+        ...body,
+        approvalId: approved,
+      }),
+    );
+    expect(result.creditNote.totalFils).toBe(issued.totalFils);
+    const copy = await ok<DocumentDetail>(
+      owner('GET', `/api/v1/sales/documents/${result.draftId}`),
+    );
+    expect(copy).toMatchObject({
+      status: 'draft',
+      docNumber: null,
+      customerId: cust,
+      customerPo: 'PO-9',
+    });
+    expect(copy.lines.map((l) => l.quantityMilli)).toEqual(['3000']);
+    const original = await ok<DocumentDetail>(owner('GET', `/api/v1/sales/documents/${issued.id}`));
+    expect(original.cancelledBy).toMatchObject({ edited: true });
+    // The unpaid invoice was settled by the credit note: nothing is owed.
+    const balance = await ok<{ balanceFils: string }>(
+      owner('GET', `/api/v1/customers/${cust}/balance`),
+    );
+    expect(balance.balanceFils).toBe('0');
   });
 });

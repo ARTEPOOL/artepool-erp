@@ -131,6 +131,8 @@ const device = (patch: Partial<DeviceListItem>): DeviceListItem => ({
   isCurrent: false,
   defaultWarehouseId: null,
   trustedFor: [],
+  drawer: null,
+  kioskLock: null,
   ...patch,
 });
 
@@ -367,6 +369,100 @@ describe('Settings → Devices', () => {
         ok({ code: 'K7Q-4MX-92P', expiresAt: new Date(Date.now() + 600_000).toISOString() }, 201),
       );
 
+  it('the owner turns the screen lock back on for office PCs (decision 0079)', async () => {
+    const bridge = signedInBridge([...OWNER_PERMISSIONS, 'system.settings.edit'])
+      .on('GET', '/api/v1/devices', ok({ devices: [device({})], openCode: null }))
+      .on('GET', '/api/v1/settings/screen-lock', ok({ officeMinutes: 0, posMinutes: 0 }))
+      .on('PUT', '/api/v1/settings/screen-lock', ok({ officeMinutes: 15, posMinutes: 0 }));
+    await signIn(bridge);
+    await openSettings('الأجهزة والطابعات');
+    const office = await screen.findByRole('switch', { name: 'قفل أجهزة المكتب' });
+    expect((office as HTMLInputElement).checked).toBe(false);
+    fireEvent.click(office);
+    expect(screen.getByLabelText('بعد كم دقيقة بدون استخدام (1–240)')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'حفظ' }));
+    await waitFor(() =>
+      expect(bridge.callsTo('PUT', '/api/v1/settings/screen-lock')[0]?.body).toEqual({
+        officeMinutes: 15,
+        posMinutes: 0,
+      }),
+    );
+  });
+
+  it("the owner turns a POS PC's kiosk lock off for 1 hour with a reason and the code (0089)", async () => {
+    const offUntil = new Date(Date.now() + 3_600_000).toISOString();
+    const bridge = signedInBridge(OWNER_PERMISSIONS)
+      .on(
+        'GET',
+        '/api/v1/devices',
+        ok({
+          devices: [
+            device({
+              kioskLock: { locked: true, switchedOff: false, offUntil: null, ownerSignedIn: false },
+            }),
+          ],
+          openCode: null,
+        }),
+        ok({
+          devices: [
+            device({
+              kioskLock: { locked: false, switchedOff: true, offUntil, ownerSignedIn: false },
+            }),
+          ],
+          openCode: null,
+        }),
+      )
+      .on(
+        'POST',
+        '/api/v1/devices/3/kiosk-lock',
+        ok({ locked: false, switchedOff: true, offUntil, ownerSignedIn: false }),
+      )
+      .on(
+        'GET',
+        '/api/v1/kiosk/alerts',
+        ok({
+          alerts: [
+            {
+              id: '9',
+              alertType: 'kiosk_exit_attempt',
+              createdAt: new Date().toISOString(),
+              deviceId: '3',
+              deviceCode: 'COUNTER-01',
+              deviceName: 'كاشير المعرض',
+              params: { kind: 'close_refused' },
+            },
+          ],
+        }),
+      );
+    await signIn(bridge);
+    await openSettings('الأجهزة والطابعات');
+    const counter = await row('COUNTER-01');
+    expect(within(counter).getByText('قفل الجهاز شغال')).toBeTruthy();
+    expect(await screen.findByText(/حد حاول يقفل برنامج الكاشير/)).toBeTruthy();
+
+    fireEvent.click(within(counter).getByRole('button', { name: 'إيقاف…' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'ساعة' }));
+    fireEvent.change(within(dialog).getByLabelText('السبب'), {
+      target: { value: 'تعريف الطابعة' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'إيقاف…' }));
+    expect(await within(dialog).findByText('اكتب أرقام كود التحقق الستة.')).toBeTruthy();
+    fireEvent.paste(within(dialog).getByLabelText('رقم 1'), {
+      clipboardData: { getData: () => '654321' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'إيقاف…' }));
+    await waitFor(() =>
+      expect(bridge.callsTo('POST', '/api/v1/devices/3/kiosk-lock')[0]?.body).toEqual({
+        on: false,
+        minutes: 60,
+        reason: 'تعريف الطابعة',
+        code: '654321',
+      }),
+    );
+    expect(await within(await row('COUNTER-01')).findByText(/القفل متوقف حتى الساعة/)).toBeTruthy();
+  });
+
   it('revokes another PC with a reason; this PC cannot be revoked from itself', async () => {
     const bridge = devicesBridge();
     await signIn(bridge);
@@ -444,6 +540,119 @@ describe('Settings → Devices', () => {
     expect(bridge.callsTo('POST', '/api/v1/devices/2/end-trust')[0]?.idempotencyKey).toMatch(
       /^[0-9a-f-]{36}$/,
     );
+  });
+});
+
+describe('Settings → System health (decision 0086)', () => {
+  const run = (patch: Record<string, unknown> = {}) => ({
+    id: '1',
+    status: 'success',
+    startedAt: new Date().toISOString(),
+    finishedAt: new Date().toISOString(),
+    fileName: 'artepool-20261019-100000Z.dump',
+    sizeBytes: 1_234_567,
+    errorMessage: null,
+    ...patch,
+  });
+  const health = (patch: Record<string, unknown> = {}) => ({
+    problems: ['offsite_not_set_up', 'offline_due'],
+    local: { last: run(), lastFailure: null, maxAgeMinutes: 90, folder: 'D:\\ARTEPOOL\\backups' },
+    offsite: {
+      last: null,
+      lastFailure: null,
+      maxAgeHours: 30,
+      keySet: false,
+      driveConnected: false,
+      google: { chooseAccount: true, code: true },
+    },
+    offline: { last: null, intervalDays: 7 },
+    restoreTest: { last: null, intervalDays: 30 },
+    integrity: { last: { status: 'ok', finishedAt: new Date().toISOString(), checks: {} } },
+    disk: { freeBytes: 100 * 1024 ** 3, totalBytes: 500 * 1024 ** 3 },
+    requests: [],
+    ...patch,
+  });
+  const identity = `AGE-SECRET-KEY-1${'Q'.repeat(52)}ABCDEF`;
+  const recipient = `age1${'q'.repeat(58)}`;
+
+  it('the owner sees what needs attention, backs up now and creates the backup key', async () => {
+    const bridge = signedInBridge([
+      ...OWNER_PERMISSIONS,
+      'system.health.view',
+      'system.backup.manage',
+      'system.backup.restore_test',
+    ])
+      .on('GET', '/api/v1/health/system', ok(health()))
+      .on('POST', '/api/v1/backup/requests', ok({ id: '5' }, 201))
+      .on('POST', '/api/v1/backup/key', ok({ identity, recipient }))
+      .on('POST', '/api/v1/backup/key/confirm', ok({ ok: true }));
+    await signIn(bridge);
+    await openSettings();
+    fireEvent.click(screen.getByRole('link', { name: 'النسخ الاحتياطي' }));
+    await screen.findByRole('heading', { name: 'صحة النظام والنسخ الاحتياطي', level: 2 });
+    expect(await screen.findByText(/النسخة الخارجية لسه متظبطتش/)).toBeTruthy();
+    expect(screen.getByText(/جه وقت النسخة الأسبوعية/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'نسخة الآن' }));
+    await waitFor(() =>
+      expect(bridge.callsTo('POST', '/api/v1/backup/requests')[0]?.body).toEqual({
+        kind: 'backup_now',
+      }),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'إنشاء مفتاح النسخ' }));
+    let dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'إنشاء مفتاح النسخ' }));
+    expect(await screen.findByText(identity)).toBeTruthy();
+    dialog = screen.getByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText('اكتب آخر 6 حروف في المفتاح'), {
+      target: { value: 'XXXXXX' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'أنا احتفظت بالمفتاح' }));
+    expect(await within(dialog).findByText('دول مش آخر 6 حروف في المفتاح.')).toBeTruthy();
+    expect(bridge.callsTo('POST', '/api/v1/backup/key/confirm')).toHaveLength(0);
+    fireEvent.change(within(dialog).getByLabelText('اكتب آخر 6 حروف في المفتاح'), {
+      target: { value: 'abcdef' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'أنا احتفظت بالمفتاح' }));
+    await waitFor(() =>
+      expect(bridge.callsTo('POST', '/api/v1/backup/key/confirm')[0]?.body).toEqual({ recipient }),
+    );
+  });
+
+  it('connects Google Drive without typing any ID (the code way, in a browser)', async () => {
+    const bridge = signedInBridge([
+      ...OWNER_PERMISSIONS,
+      'system.health.view',
+      'system.backup.manage',
+    ])
+      .on('GET', '/api/v1/health/system', ok(health()))
+      .on(
+        'POST',
+        '/api/v1/backup/drive/connect',
+        ok({
+          userCode: 'ABCD-EFGH',
+          verificationUrl: 'https://www.google.com/device',
+          expiresAt: new Date(Date.now() + 1_800_000).toISOString(),
+          intervalSeconds: 5,
+        }),
+      );
+    await signIn(bridge);
+    await openSettings();
+    fireEvent.click(screen.getByRole('link', { name: 'النسخ الاحتياطي' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'ربط Google Drive' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).queryByLabelText(/Client ID/)).toBeNull();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'اعرض الكود' }));
+    expect(await within(dialog).findByText('ABCD-EFGH')).toBeTruthy();
+    expect(bridge.callsTo('POST', '/api/v1/backup/drive/connect')[0]?.body ?? {}).toEqual({});
+  });
+
+  it('is not offered to anyone else (the server refuses it anyway)', async () => {
+    await signIn(signedInBridge(OWNER_PERMISSIONS));
+    await openSettings();
+    const hub = screen.getByRole('navigation', { name: 'الإعدادات' });
+    expect(within(hub).queryByRole('link', { name: /النسخ الاحتياطي/ })).toBeNull();
   });
 });
 

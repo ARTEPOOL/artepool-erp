@@ -110,6 +110,8 @@ export const SaveQuotationRequest = z.object({
   /** Defaults to the date + sales.quotation_valid_days (15). */
   validUntil: DateText.optional(),
   subject: OptionalText(300),
+  /** The customer's own purchase order number (decision 0066). */
+  customerPo: OptionalText(50),
   termsAr: OptionalText(4000),
   termsEn: OptionalText(4000),
   notes: OptionalText(2000),
@@ -152,6 +154,7 @@ export interface QuotationDetail extends QuotationItem {
   businessLineId: string;
   billToName: string;
   billToTrn: string | null;
+  customerPo: string | null;
   termsAr: string | null;
   termsEn: string | null;
   notes: string | null;
@@ -180,6 +183,14 @@ export const SaveInvoiceRequest = z.object({
   supplyDate: DateText.optional(),
   dueDate: DateText.optional(),
   quotationId: IdText.optional(),
+  /** The customer's own purchase order number (decision 0066). */
+  customerPo: OptionalText(50),
+  /**
+   * Printed on the full tax invoice (decision 0071): the address for any customer (else the one
+   * on file), the name for the walk-in cash customer only.
+   */
+  billToName: OptionalText(200),
+  billToAddress: OptionalText(500),
   notes: OptionalText(2000),
   internalNote: OptionalText(2000),
   docDiscountFils: NonNegativeIntText.optional(),
@@ -245,6 +256,27 @@ export const CreateNoteRequest = z.object({
 });
 export type CreateNoteRequest = z.infer<typeof CreateNoteRequest>;
 
+/**
+ * Cancel an issued A4 invoice, or cancel it to edit it (decision 0072): a credit note for the
+ * whole invoice, the paid money refunded at once, and for "edit" a new draft copied from it.
+ * The owner's permission, or the owner's approval.
+ */
+export const CancelInvoiceRequest = z.object({
+  mode: z.enum(['cancel', 'edit']),
+  reason: Reason,
+  approvalId: IdText.optional(),
+  /** How the paid amount goes back; together exactly what the customer paid. */
+  refund: z.array(PaymentPart).max(10).optional(),
+  rowVersion: RowVersion,
+});
+export type CancelInvoiceRequest = z.infer<typeof CancelInvoiceRequest>;
+
+export interface CancelInvoiceResponse {
+  creditNote: DocumentDetail;
+  /** The new draft to edit ("edit" only). */
+  draftId: string | null;
+}
+
 export const DocumentsQuery = z.object({
   q: z.string().trim().max(100).optional(),
   docType: z.enum(DOC_TYPES).optional(),
@@ -288,6 +320,7 @@ export interface DocumentDetail extends DocumentItem {
   billToTrn: string | null;
   billToAddress: string | null;
   billToPhone: string | null;
+  customerPo: string | null;
   supplyDate: string | null;
   issuedAt: string | null;
   issuedByName: { displayNameAr: string; displayNameEn: string } | null;
@@ -308,6 +341,10 @@ export interface DocumentDetail extends DocumentItem {
   }[];
   /** The payment invoices of the same customer that can still be deducted (draft invoices). */
   deductible?: DocumentItem[];
+  /** Issued invoices: any credit or debit note already issued against it. */
+  hasNotes?: boolean;
+  /** Cancelled (or replaced by an edit) with the owner's approval (decision 0072). */
+  cancelledBy?: { id: string; docNumber: string; edited: boolean } | null;
 }
 
 export interface DocumentsResponse {

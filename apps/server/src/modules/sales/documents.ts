@@ -57,20 +57,40 @@ export async function defaultBranch(db: Db): Promise<bigint> {
   return row.id;
 }
 
-/** The customer's details as printed on the document (the TRN is set by the database at issue). */
-export async function billTo(db: Db, customerId: bigint) {
+/**
+ * The customer's details as printed on the document (the TRN is set by the database at issue).
+ * An address typed on an A4 invoice is printed; for the walk-in cash customer, the typed name too
+ * (decision 0071).
+ */
+export async function billTo(
+  db: Db,
+  customerId: bigint,
+  typed: { billToName?: string | null | undefined; billToAddress?: string | null | undefined } = {},
+) {
   const c = await db
     .selectFrom('md.customers')
-    .select(['id', 'name', 'name_alt', 'phone', 'address_line', 'area', 'city', 'is_active'])
+    .select([
+      'id',
+      'name',
+      'name_alt',
+      'phone',
+      'address_line',
+      'area',
+      'city',
+      'is_active',
+      'is_walk_in',
+    ])
     .where('id', '=', customerId)
     .executeTakeFirst();
   if (!c || !c.is_active) throw fieldError('customerId', 'unknown');
   const address = [c.address_line, c.area, c.city].filter(Boolean).join('، ');
+  const walkIn = c.is_walk_in;
   return {
-    bill_to_name: c.name,
-    bill_to_name_alt: c.name_alt,
+    bill_to_name: (walkIn && typed.billToName) || c.name,
+    bill_to_name_alt: walkIn && typed.billToName ? null : c.name_alt,
     bill_to_phone: c.phone,
-    bill_to_address: address === '' ? null : address,
+    // An address typed on the invoice wins (a customer without one on file, decision 0071).
+    bill_to_address: typed.billToAddress || (address === '' ? null : address),
   };
 }
 
@@ -199,10 +219,11 @@ export async function saveInvoiceDraft(
   const header = {
     customer_id: customerId,
     business_line_id: businessLineId,
-    ...(await billTo(trx, customerId)),
+    ...(await billTo(trx, customerId, body)),
     issue_date: body.issueDate ?? null,
     supply_date: body.supplyDate ?? null,
     due_date: body.dueDate ?? null,
+    customer_po: body.customerPo ?? null,
     notes: body.notes ?? null,
     internal_note: body.internalNote ?? null,
     doc_discount_fils: BigInt(body.docDiscountFils ?? '0'),
@@ -736,6 +757,7 @@ export async function getDocument(db: Db, id: bigint): Promise<DocumentDetail> {
       'd.doc_discount_fils',
       'd.reason_code_id',
       'd.reason_text',
+      'd.customer_po',
       'd.notes',
       'd.internal_note',
       'u.display_name_ar as issued_ar',
@@ -762,8 +784,25 @@ export async function getDocument(db: Db, id: bigint): Promise<DocumentDetail> {
     .where('a.invoice_id', '=', id)
     .orderBy('n.id')
     .execute();
+  const notes = await db
+    .selectFrom('sales.documents as n')
+    .leftJoin('sys.reason_codes as r', 'r.id', 'n.reason_code_id')
+    .select(['n.id', 'n.doc_number', 'r.code'])
+    .where('n.original_document_id', '=', id)
+    .where('n.status', '=', 'issued')
+    .orderBy('n.id')
+    .execute();
+  const cancel = notes.find((n) => n.code === 'INVOICE_CANCELLED' || n.code === 'INVOICE_EDITED');
   const detail: DocumentDetail = {
     ...documentItem(row),
+    hasNotes: notes.length > 0,
+    cancelledBy: cancel
+      ? {
+          id: cancel.id.toString(),
+          docNumber: cancel.doc_number ?? '',
+          edited: cancel.code === 'INVOICE_EDITED',
+        }
+      : null,
     businessLineId: row.business_line_id.toString(),
     billToName: row.bill_to_name,
     billToNameAlt: row.bill_to_name_alt,
@@ -779,6 +818,7 @@ export async function getDocument(db: Db, id: bigint): Promise<DocumentDetail> {
     docDiscountFils: row.doc_discount_fils.toString(),
     reasonCodeId: row.reason_code_id?.toString() ?? null,
     reasonText: row.reason_text,
+    customerPo: row.customer_po,
     notes: row.notes,
     internalNote: row.internal_note,
     journalEntryId: row.journal_id,

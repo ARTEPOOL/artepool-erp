@@ -70,6 +70,7 @@ export async function listUsers(db: Reader, onlyId?: bigint): Promise<UserListIt
       'must_change_password',
       'pin_must_change',
       'pin_blocked_at',
+      'approval_blocked_at',
       'deactivated_at',
       'deactivation_reason',
       sql<number>`greatest(0, ceil(extract(epoch FROM locked_until - now()) / 60))::int`.as(
@@ -90,7 +91,7 @@ export async function listUsers(db: Reader, onlyId?: bigint): Promise<UserListIt
       ? 'inactive'
       : r.locked_minutes > 0
         ? 'locked'
-        : r.pin_blocked_at
+        : r.pin_blocked_at || r.approval_blocked_at
           ? 'pin_blocked'
           : 'active';
     const userRoles = roles.get(r.id) ?? [];
@@ -287,12 +288,19 @@ export async function resetCredentials(
   };
 }
 
-/** Lifts a lockout (wrong passwords) and a PIN block (wrong PINs). */
+/** Lifts a lockout (wrong passwords), a PIN block (wrong PINs) and an approval-code block. */
 export async function unlockUser(trx: Transaction<DB>, id: bigint): Promise<UserListItem> {
   await oneUser(trx, id);
   await trx
     .updateTable('auth.users')
-    .set({ locked_until: null, failed_login_count: 0, pin_blocked_at: null, pin_failed_count: 0 })
+    .set({
+      locked_until: null,
+      failed_login_count: 0,
+      pin_blocked_at: null,
+      pin_failed_count: 0,
+      approval_blocked_at: null,
+      approval_failed_count: 0,
+    })
     .where('id', '=', id)
     .execute();
   await recordEvent(trx, 'auth.user_unlocked', userEntity(id));

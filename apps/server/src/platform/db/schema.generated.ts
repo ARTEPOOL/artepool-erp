@@ -151,6 +151,24 @@ export interface AuthEnrollmentCodes {
   used_device_id: bigint | null;
 }
 
+export interface AuthKioskCodeFailures {
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  device_id: bigint;
+  id: Generated<bigint>;
+}
+
+export interface AuthKioskLockChanges {
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  device_id: bigint;
+  id: Generated<bigint>;
+  lock_on: boolean;
+  off_until: Timestamp | null;
+  reason: string | null;
+  via: string;
+}
+
 export interface AuthPermissions {
   approvable: Generated<boolean>;
   code: string;
@@ -220,6 +238,8 @@ export interface AuthUserRoles {
 }
 
 export interface AuthUsers {
+  approval_blocked_at: Timestamp | null;
+  approval_failed_count: Generated<number>;
   created_at: Generated<Timestamp>;
   created_by: bigint;
   deactivated_at: Timestamp | null;
@@ -345,6 +365,8 @@ export interface CashShifts {
   created_at: Generated<Timestamp>;
   created_by: bigint;
   expected_cash_fils: bigint | null;
+  force_close_reason: string | null;
+  force_closed_by: bigint | null;
   id: Generated<bigint>;
   opened_at: Generated<Timestamp>;
   opened_by: bigint;
@@ -565,6 +587,22 @@ export interface InvCounts {
   warehouse_id: bigint;
 }
 
+export interface InvLabelPrints {
+  copies: number;
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  design_version_id: bigint;
+  device_id: Generated<bigint | null>;
+  gross_fils: bigint | null;
+  id: Generated<bigint>;
+  includes_vat: boolean | null;
+  item_id: bigint;
+  label_size_id: bigint;
+  price_4dp: bigint | null;
+  source: string;
+  vat_rate_bp: number | null;
+}
+
 export interface InvMovements {
   adjustment_line_id: bigint | null;
   approval_id: bigint | null;
@@ -720,6 +758,8 @@ export interface MdItems {
   item_type: string;
   name_ar: string;
   name_en: string;
+  pack_ar: string | null;
+  pack_en: string | null;
   reorder_level: Numeric | null;
   reorder_qty: Numeric | null;
   row_version: Generated<number>;
@@ -870,6 +910,58 @@ export interface MdWarehouses {
   warehouse_type: string;
 }
 
+export interface OpsBackupRequests {
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  error_message: string | null;
+  id: Generated<bigint>;
+  kind: string;
+  row_version: Generated<number>;
+  status: Generated<string>;
+  target: string | null;
+  updated_at: Generated<Timestamp>;
+  updated_by: bigint;
+}
+
+export interface OpsBackupRuns {
+  audit_chain_hash: Buffer | null;
+  audit_chain_seq: bigint | null;
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  details: Json | null;
+  encrypted: Generated<boolean>;
+  error_message: string | null;
+  file_name: string | null;
+  finished_at: Timestamp | null;
+  id: Generated<bigint>;
+  kind: string;
+  request_id: bigint | null;
+  row_version: Generated<number>;
+  sha256: Buffer | null;
+  size_bytes: bigint | null;
+  started_at: Generated<Timestamp>;
+  status: Generated<string>;
+  target: string | null;
+  updated_at: Generated<Timestamp>;
+  updated_by: bigint;
+}
+
+export interface OpsIntegrityRuns {
+  backup_run_id: bigint | null;
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  database_name: string;
+  finished_at: Timestamp | null;
+  id: Generated<bigint>;
+  results: Generated<Json>;
+  row_version: Generated<number>;
+  run_kind: string;
+  started_at: Generated<Timestamp>;
+  status: Generated<string>;
+  updated_at: Generated<Timestamp>;
+  updated_by: bigint;
+}
+
 export interface OpsOutbox {
   attempts: Generated<number>;
   channel: string;
@@ -957,6 +1049,7 @@ export interface SalesDocuments {
   credit_approval_id: bigint | null;
   currency: Generated<string>;
   customer_id: bigint;
+  customer_po: string | null;
   device_id: bigint;
   discount_total_fils: Generated<bigint>;
   doc_discount_fils: Generated<bigint>;
@@ -1112,6 +1205,7 @@ export interface SalesQuotations {
   created_at: Generated<Timestamp>;
   created_by: bigint;
   customer_id: bigint;
+  customer_po: string | null;
   decided_at: Timestamp | null;
   discount_total_fils: Generated<bigint>;
   doc_discount_fils: Generated<bigint>;
@@ -1167,6 +1261,21 @@ export interface SysBranches {
   name_ar: string;
   name_en: string;
   row_version: Generated<number>;
+  updated_at: Generated<Timestamp>;
+  updated_by: bigint;
+}
+
+export interface SysCompanyBankAccounts {
+  account_name: string;
+  bank_name: string;
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  iban: string;
+  id: Generated<bigint>;
+  is_active: Generated<boolean>;
+  row_version: Generated<number>;
+  sort_order: Generated<number>;
+  swift: string | null;
   updated_at: Generated<Timestamp>;
   updated_by: bigint;
 }
@@ -1281,6 +1390,17 @@ export interface SysReasonCodes {
   updated_by: bigint;
 }
 
+export interface SysReceiptLogo {
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  id: Generated<number>;
+  logo: Buffer | null;
+  logo_mime: string | null;
+  row_version: Generated<number>;
+  updated_at: Generated<Timestamp>;
+  updated_by: bigint;
+}
+
 export interface SysSchemaMigrations {
   applied_at: Generated<Timestamp>;
   applied_by: string;
@@ -1301,6 +1421,20 @@ export interface SysSettings {
   value: Json;
 }
 
+export interface SysSetupState {
+  completed_at: Timestamp | null;
+  created_at: Timestamp;
+  created_by: bigint;
+  id: Generated<number>;
+  installation_id: Generated<string>;
+  path: string | null;
+  row_version: number;
+  started_at: Timestamp | null;
+  state: Generated<string>;
+  updated_at: Timestamp;
+  updated_by: bigint;
+}
+
 export interface DB {
   "audit.anchors": AuditAnchors;
   "audit.chain_head": AuditChainHead;
@@ -1311,6 +1445,8 @@ export interface DB {
   "auth.device_trust": AuthDeviceTrust;
   "auth.devices": AuthDevices;
   "auth.enrollment_codes": AuthEnrollmentCodes;
+  "auth.kiosk_code_failures": AuthKioskCodeFailures;
+  "auth.kiosk_lock_changes": AuthKioskLockChanges;
   "auth.permissions": AuthPermissions;
   "auth.recovery_codes": AuthRecoveryCodes;
   "auth.role_permissions": AuthRolePermissions;
@@ -1335,6 +1471,7 @@ export interface DB {
   "inv.balances": InvBalances;
   "inv.count_lines": InvCountLines;
   "inv.counts": InvCounts;
+  "inv.label_prints": InvLabelPrints;
   "inv.movements": InvMovements;
   "md.bundle_components": MdBundleComponents;
   "md.business_lines": MdBusinessLines;
@@ -1352,6 +1489,9 @@ export interface DB {
   "md.units": MdUnits;
   "md.vat_categories": MdVatCategories;
   "md.warehouses": MdWarehouses;
+  "ops.backup_requests": OpsBackupRequests;
+  "ops.backup_runs": OpsBackupRuns;
+  "ops.integrity_runs": OpsIntegrityRuns;
   "ops.outbox": OpsOutbox;
   "sales.credit_allocations": SalesCreditAllocations;
   "sales.document_lines": SalesDocumentLines;
@@ -1364,6 +1504,7 @@ export interface DB {
   "sales.quotations": SalesQuotations;
   "sys.alerts": SysAlerts;
   "sys.branches": SysBranches;
+  "sys.company_bank_accounts": SysCompanyBankAccounts;
   "sys.company_profile": SysCompanyProfile;
   "sys.document_series": SysDocumentSeries;
   "sys.idempotency_keys": SysIdempotencyKeys;
@@ -1371,6 +1512,8 @@ export interface DB {
   "sys.print_template_versions": SysPrintTemplateVersions;
   "sys.print_templates": SysPrintTemplates;
   "sys.reason_codes": SysReasonCodes;
+  "sys.receipt_logo": SysReceiptLogo;
   "sys.schema_migrations": SysSchemaMigrations;
   "sys.settings": SysSettings;
+  "sys.setup_state": SysSetupState;
 }

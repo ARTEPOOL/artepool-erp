@@ -192,6 +192,59 @@ describe('PIN sign-in, only on POS PCs (decision 0021)', () => {
     return bridge;
   };
 
+  it('a locked POS PC offers "Unlock with owner code"; the banner shows once it is off (0083, 0089)', async () => {
+    const offUntil = new Date(Date.now() + 15 * 60_000).toISOString();
+    const bridge = posBridge()
+      .on(
+        'GET',
+        '/api/v1/kiosk/state',
+        ok({ isPos: true, locked: true, switchedOff: false, offUntil: null, ownerSignedIn: false }),
+        ok({ isPos: true, locked: false, switchedOff: true, offUntil, ownerSignedIn: false }),
+      )
+      .on(
+        'POST',
+        '/api/v1/kiosk/unlock-with-code',
+        failure(401, 'INVALID_TWO_STEP_CODE'),
+        ok({ locked: false, switchedOff: true, offUntil, ownerSignedIn: false }),
+      );
+    await startApp(bridge);
+    expect(screen.queryByTestId('kiosk-off')).toBeNull();
+    fireEvent.click(await screen.findByRole('button', { name: 'فتح بكود المالك' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.paste(within(dialog).getByLabelText('رقم 1'), {
+      clipboardData: { getData: () => '111111' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'فتح' }));
+    expect(
+      await within(dialog).findByText(
+        'الرمز غير صحيح أو انتهت صلاحيته. أدخل الرمز الجديد من التطبيق.',
+      ),
+    ).toBeTruthy();
+    fireEvent.paste(within(dialog).getByLabelText('رقم 1'), {
+      clipboardData: { getData: () => '222222' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'فتح' }));
+    const banner = await screen.findByTestId('kiosk-off');
+    expect(banner.textContent).toMatch(/القفل متوقف · حتى الساعة/);
+    expect(bridge.callsTo('POST', '/api/v1/kiosk/unlock-with-code')[1]?.body).toEqual({
+      code: '222222',
+    });
+    // Once the lock is off, the button is gone.
+    expect(screen.queryByRole('button', { name: 'فتح بكود المالك' })).toBeNull();
+  });
+
+  it('while the owner is signed in on the POS PC, the banner says so (0091)', async () => {
+    const bridge = posBridge().on(
+      'GET',
+      '/api/v1/kiosk/state',
+      ok({ isPos: true, locked: false, switchedOff: false, offUntil: null, ownerSignedIn: true }),
+    );
+    await startApp(bridge);
+    const banner = await screen.findByTestId('kiosk-off');
+    expect(banner.textContent).toMatch(/القفل متوقف · طول ما المالك داخل/);
+    expect(screen.queryByRole('button', { name: 'فتح بكود المالك' })).toBeNull();
+  });
+
   it('picks a name and takes the PIN from the keypad; a wrong PIN clears the dots', async () => {
     const bridge = posBridge().on('POST', '/api/v1/auth/pin-sign-in', failure(401, 'INVALID_PIN'));
     await startApp(bridge);
@@ -316,7 +369,35 @@ describe('owner 2-step code (decision 0022)', () => {
 });
 
 describe('"Trust this PC" (decision 0027)', () => {
-  it('is offered when the server offers it, and sent only when ticked', async () => {
+  it('remembers the PC by default until the password changes (decision 0077)', async () => {
+    const bridge = new FakeBridge()
+      .on(
+        'POST',
+        '/api/v1/auth/sign-in',
+        ok({ ...signInAnswer({ stage: 'second_factor' }), trustDays: 3650 }),
+      )
+      .on('POST', '/api/v1/auth/second-factor', ok(signInAnswer({}, {}, 'token-2')))
+      .on('GET', '/api/v1/auth/me', me());
+    await startApp(bridge);
+    type('اسم المستخدم', 'owner');
+    type('كلمة المرور', 'long-owner-password');
+    fireEvent.click(screen.getByRole('button', { name: 'دخول' }));
+    await screen.findByRole('heading', { name: 'تأكيد هوية المالك' });
+    const box = screen.getByRole('checkbox', {
+      name: 'تذكّر هذا الجهاز: بدون رمز الهاتف هنا حتى أغيّر كلمة السر',
+    });
+    expect((box as HTMLInputElement).checked).toBe(true);
+    expect(screen.getByText(/ألغِ التحديد لو الجهاز يستخدمه غيرك/)).toBeTruthy();
+    fireEvent.paste(screen.getByLabelText('رقم 1'), { clipboardData: { getData: () => '123456' } });
+    fireEvent.click(screen.getByRole('button', { name: 'تأكيد' }));
+    await screen.findByRole('heading', { name: 'أهلًا، سارة علي' });
+    expect(bridge.callsTo('POST', '/api/v1/auth/second-factor')[0]?.body).toEqual({
+      code: '123456',
+      trustDevice: true,
+    });
+  });
+
+  it('is not sent when unticked (a shorter setting shows its days)', async () => {
     const bridge = new FakeBridge()
       .on(
         'POST',
@@ -330,16 +411,12 @@ describe('"Trust this PC" (decision 0027)', () => {
     type('كلمة المرور', 'long-owner-password');
     fireEvent.click(screen.getByRole('button', { name: 'دخول' }));
     await screen.findByRole('heading', { name: 'تأكيد هوية المالك' });
-    const box = screen.getByRole('checkbox', { name: 'ثق في هذا الجهاز لمدة 30 يومًا' });
-    expect((box as HTMLInputElement).checked).toBe(false);
-    expect(screen.getByText(/لا تفعّلها على جهاز يستخدمه غيرك/)).toBeTruthy();
-    fireEvent.click(box);
+    fireEvent.click(screen.getByRole('checkbox', { name: 'ثق في هذا الجهاز لمدة 30 يومًا' }));
     fireEvent.paste(screen.getByLabelText('رقم 1'), { clipboardData: { getData: () => '123456' } });
     fireEvent.click(screen.getByRole('button', { name: 'تأكيد' }));
     await screen.findByRole('heading', { name: 'أهلًا، سارة علي' });
     expect(bridge.callsTo('POST', '/api/v1/auth/second-factor')[0]?.body).toEqual({
       code: '123456',
-      trustDevice: true,
     });
   });
 

@@ -70,6 +70,10 @@ export const control = {
   codeFor: async (userId: string) =>
     (await control.call<{ code: string }>('POST', '/code', { userId })).code,
   resetOwnerTwoStep: () => control.call('POST', '/owner/reset-2fa'),
+  /** A fresh server PC just installed: empty database, setup token, "setup" PC not enrolled. */
+  setupServer: () => control.call('POST', '/setup-server'),
+  /** The main server's encrypted off-site copy on the setup PC's USB drive, and the key file. */
+  restoreCopy: () => control.call<{ name: string; keyFile: string }>('POST', '/restore-copy'),
   addDevice: (code: string, name: string) => control.call('POST', '/devices', { code, name }),
   addPosItem: (item: {
     code: string;
@@ -81,6 +85,8 @@ export const control = {
   }) => control.call<{ id: string }>('POST', '/pos-item', item),
   enrollmentCode: async () =>
     (await control.call<{ code: string }>('POST', '/enrollment-code')).code,
+  stuckShift: (shift: { code: string; username: string; displayName: string; floatFils: string }) =>
+    control.call<{ shiftNumber: string }>('POST', '/stuck-shift', shift),
   stopServer: () => control.call('POST', '/server/stop'),
   startServer: () => control.call('POST', '/server/start'),
 };
@@ -135,6 +141,20 @@ export async function typeCode(page: Page, code: string): Promise<void> {
 }
 
 /** A screenshot for the pull request and the owner's review: e2e-screens/<project>/<name>.png */
+/**
+ * A barcode scanner with the cursor anywhere on the screen (not in a field): its keys, stamped
+ * together as a real scan's are, then Enter, sent to whatever has the focus.
+ */
+export async function scanAnywhere(page: Page, code: string): Promise<void> {
+  await page.evaluate((keys) => {
+    const target = document.activeElement ?? document.body;
+    const events = [...keys, 'Enter'].map(
+      (key) => new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }),
+    );
+    for (const event of events) target.dispatchEvent(event);
+  }, code);
+}
+
 export async function snap(page: Page, name: string): Promise<void> {
   const dir = join(import.meta.dirname, '..', 'e2e-screens', base.info().project.name);
   mkdirSync(dir, { recursive: true });
@@ -182,9 +202,21 @@ export async function signInAsOwner(page: Page, t: (key: string) => string): Pro
   const owner = await control.owner();
   await page.getByLabel(t('auth:signIn.username'), { exact: true }).fill(owner.username);
   await page.getByLabel(t('auth:signIn.password'), { exact: true }).fill(owner.password);
-  await page.getByRole('button', { name: t('auth:signIn.submit') }).click();
+  await page.getByRole('button', { name: t('auth:signIn.submit'), exact: true }).click();
   await expect(page.getByRole('heading', { name: t('auth:secondFactor.title') })).toBeVisible();
+  await dontRememberThisPc(page, t);
   await typeCode(page, await control.ownerCode());
   await page.getByRole('button', { name: t('auth:secondFactor.confirm') }).click();
   await expect(page.getByRole('button', { name: t('settings:user.menu') })).toBeVisible();
+}
+
+/**
+ * Unticks "Remember this PC" (ticked by default, decision 0077), so the tests that sign the owner
+ * in keep seeing the phone code on the shared test PCs.
+ */
+export async function dontRememberThisPc(page: Page, t: (key: string) => string): Promise<void> {
+  const box = page.getByRole('checkbox', { name: t('auth:secondFactor.remember') });
+  if ((await box.count()) === 0) return; // not offered here (a POS PC)
+  if (await box.isChecked()) await page.getByText(t('auth:secondFactor.remember')).click();
+  await expect(box).not.toBeChecked();
 }

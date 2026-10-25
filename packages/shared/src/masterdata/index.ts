@@ -66,6 +66,41 @@ export function normalizeTrn(text: string): string | null {
 }
 
 // ---------------------------------------------------------------------------------------------
+// UAE IBAN and SWIFT — decision 0065
+// ---------------------------------------------------------------------------------------------
+
+/** AE, 2 check digits, then 19 digits (3 for the bank, 16 for the account). */
+export const UAE_IBAN_PATTERN = /^AE[0-9]{21}$/;
+/** SWIFT/BIC: 4 letters (bank), 2 letters (country), 2 letters/digits, optional 3 for a branch. */
+export const SWIFT_PATTERN = /^[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?$/;
+
+/** ISO 13616: move the first 4 characters to the end, letters → 10–35; the number mod 97 is 1. */
+function ibanChecksumOk(iban: string): boolean {
+  const rearranged = iban.slice(4) + iban.slice(0, 4);
+  let rest = 0;
+  for (const ch of rearranged) {
+    const value = /[A-Z]/.test(ch) ? String(ch.charCodeAt(0) - 55) : ch;
+    for (const digit of value) rest = (rest * 10 + Number(digit)) % 97;
+  }
+  return rest === 1;
+}
+
+/** An IBAN as typed (spaces, lower case, Arabic digits allowed) → its saved form, or null. */
+export function normalizeUaeIban(text: string): string | null {
+  const iban = asciiDigits(text).replace(/[\s-]/g, '').toUpperCase();
+  return UAE_IBAN_PATTERN.test(iban) && ibanChecksumOk(iban) ? iban : null;
+}
+
+/** "AE07 0331 2345 6789 0123 456": groups of 4, as printed on invoices. */
+export const formatIban = (iban: string): string => iban.replace(/(.{4})(?=.)/g, '$1 ');
+
+/** A SWIFT code as typed → upper case, or null if invalid. */
+export function normalizeSwift(text: string): string | null {
+  const swift = text.replace(/\s/g, '').toUpperCase();
+  return SWIFT_PATTERN.test(swift) ? swift : null;
+}
+
+// ---------------------------------------------------------------------------------------------
 // Phone numbers, stored in the international form (E.164)
 // ---------------------------------------------------------------------------------------------
 

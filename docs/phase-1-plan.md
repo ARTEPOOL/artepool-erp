@@ -453,25 +453,75 @@ A milestone is done only when its tests pass in CI.
 
 **Needs:** the hardware models (printer, drawer, scanner, label printer).
 
-### M6 — Operations
+#### M5c — POS kiosk mode (decisions 0082, 0083, 0087, 0089, 0090)
+
+**Status (2026-10-19):** built — migration 0034, the kiosk API, the Kiosk lock switch and alerts in Settings → Devices (and on the owner dashboard), the banner, "Unlock with owner code", the POS "Lock screen" button, and the Windows window lock (full screen, closing refused, fails closed when the server cannot be reached). Decision 0091 (migration 0035): off while the owner is signed in on that PC; owner code 15 minutes. Moved to M6 with the installer: the watchdog and its `restarted` / `not_running` reports, start at Windows sign-in, and the cashier Windows account hardening (0085).
 
 **Delivers:**
-- Migration 0023.
-- The backup agent: WAL archive, hourly dump, nightly base backup, `age`-encrypted daily off-site upload, external-drive reminders.
-- The restore test into `artepool_restore_test`, the nightly integrity checks and the system-health screen.
-- The server installer (PostgreSQL configuration, roles, CA and certificates, firewall, services) and the client installer (CA trust, offline WebView2).
-- Runbooks.
+- The app reads its PC's kind at start: POS → kiosk mode (full screen, no window controls, closing refused); Office → normal app.
+- Unlock: the Kiosk lock switch (below) from the owner's Office PC, and **Unlock with owner code** on the lock screen (one-time code, 5 tries / 15 minutes, at most 5 minutes off); then kiosk mode returns.
+- The **Kiosk lock** switch per POS PC in Settings → Devices (default on; owner only, 2-step step-up and a reason; off for 15 min / 1 hour / until turned on; automatic return to on). The state lives on the server; the POS app stays locked when it cannot reach it. A "القفل متوقف / Kiosk lock is off" banner ("حتى الساعة … / until …" when timed) on the POS while off.
+- A migration for the kiosk lock state and its history and the new alert types; audit and owner alerts for exit attempts, unlocks and switch changes.
+- Two cashiers on one POS PC: sign out → the other cashier's PIN; the open shift must be closed first (existing rule 0004).
+- A **Lock screen** button on the POS (same cashier resumes with the PIN, shift stays open); no automatic lock on POS by default; the owner's auto-lock setting (0079) stays off (0090).
 
 **Key tests:**
-- In CI: dump → restore → all integrity checks pass.
-- An off-site file decrypts only with the private key.
-- Simulated power loss (process killed mid-sale) → no partial data, and integrity is OK after restart.
-- A server clock that goes backwards → writes are refused.
+- Only the owner can unlock; a supervisor's code or the owner's used code is refused; 5 wrong codes lock the fallback.
+- The unlock ends by itself after its time and is audited from start to end.
+- An exit attempt writes the audit entry and the alert.
+- The switch: refused without the owner's fresh 2-step code or a reason; a timed "off" turns back on by itself; PIN sign-in, shifts and permissions behave the same with the lock off.
+- A second cashier cannot open a shift on a drawer with an open shift.
 
 **Check by hand:**
-- Install on the real server PC and two client PCs.
-- Run "Restore test" from the admin screen → green.
-- Pull the network cable during a backup → an alert appears.
+- On the POS PC press Alt+F4 → nothing closes, and the owner sees an alert.
+- Unlock from the laptop → the POS leaves full screen → after 15 minutes it returns.
+
+### M6 — Operations (approved 2026-10-19, in five parts; each part is planned and approved on its own)
+
+#### M6.1 — Backups (0086)
+
+**Status (2026-10-19):** built — migration 0036, `apps/backup`, the System health screen and alerts, the runbook. WAL archiving, the nightly base backup and running the backup service at Windows start move to M6.2 with the installer.
+
+**Delivers:** hourly local backup; daily off-site upload to a dedicated Google Drive account (2-step on), `age`-encrypted before upload (public key on the server, private key offline with the owner); weekly external-drive reminder; a "Restore test" button that restores into `artepool_restore_test` and runs the integrity checks; the System health screen with alerts when a backup is late or fails. Migration `ops_backup` (0036).
+
+**Key tests:** dump → restore → all integrity checks pass; an off-site file decrypts only with the private key; a late or failed backup raises the alert; only the owner runs the restore test.
+
+**Check by hand:** "Restore test" → green; disconnect the network during the off-site upload → an alert appears; the file in Google Drive cannot be opened without the private key.
+
+#### M6.2 — Installers and the first-run setup wizard (0085, 0092)
+
+**Status (2026-10-20):** task plan **approved** ([`milestones/m6.2-installers-setup.md`](milestones/m6.2-installers-setup.md)); decisions 0102–0105 recorded; built part by part (A–J).
+
+**Delivers:**
+- The **server installer** (for the POS PC, which is also the server): PostgreSQL configuration (localhost only, WAL archiving), roles, CA and certificates, firewall (API port from the LAN only, 0093), the API and backup services under their own accounts, auto-start with Windows, restart on failure; the app starts with Windows and the kiosk watchdog restarts it if closed (0082). No developer tools on any PC.
+- The **Office installer** (the owner's laptop): the app, the ARTÉPOOL CA trust, offline WebView2.
+- The **one-time setup wizard** on the server PC: company details → the owner account → phone 2-step → recovery codes (confirmed) → enroll this PC as the POS. Runs once, only on the server PC, locked afterwards in the database. Console commands stay as emergency tools, with a runbook.
+
+**Key tests:** the wizard refuses every step once complete, and any request not from the server PC; simulated power loss mid-sale → no partial data, integrity OK after restart; a server clock that goes backwards → writes refused.
+
+**Check by hand:** install on the real POS/server PC and run the wizard; restart Windows → the services and the POS app start by themselves; close the app → it comes back.
+
+#### M6.3 — Adding the cashier (0094)
+
+**Delivers:** the owner adds the cashier in Settings → Users (name, Cashier, PIN); the POS PC then opens straight to the PIN screen in kiosk mode (0082, 0083, 0089, 0090, 0091). No separate executable or icon. Verified: two cashiers on one POS PC (own PIN, own shift, the open shift closed first) and a second POS PC with its own drawer (0087).
+
+**Check by hand:** add a cashier → restart the POS PC → the PIN screen appears full screen → sell → "Lock screen" → resume with the PIN.
+
+#### M6.4 — Cashier Windows account hardening (0085)
+
+**Delivers:** a standard (non-admin) Windows account created by the installer, with auto sign-in; Task Manager, Run and the command prompt turned off through the registry (works on Home, no Group Policy: 0106); no access to the database, backups, logs or `.secrets` folders; cannot stop the services; an owner-only administrator account; disk encryption recommended where the edition offers it (0106); the UPS reminder in the health screen. Turning the kiosk lock off (0089) lifts only the app lock; the Windows restrictions stay.
+
+**Key tests:** the cashier account cannot read the database folder or `.secrets`, or stop the services (scripted check on the Windows runner).
+
+#### M6.5 — The owner's laptop (0094)
+
+**Delivers:** Office installer → enrollment code from Settings → Devices on the POS/server PC → typed on the laptop → sign in with the owner account (password + 2-step). Shop LAN only (0093); revoke blocks it at once. Runbooks for installing, enrolling and revoking.
+
+**Check by hand:** enroll the laptop, sign in, revoke it from the POS PC → the laptop is signed out and cannot connect again.
+
+#### Dropped for Phase 1 — remote access (0093)
+
+No VPN (Tailscale or other), no router ports, no remote-desktop tools. The design stays VPN-agnostic so 0084 can be added later; remote monitoring comes with the Phase 2 mobile dashboard.
 
 ### M7 — Acceptance
 

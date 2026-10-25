@@ -16,10 +16,12 @@ const executablePath = process.env.ARTEPOOL_E2E_CHROMIUM;
 const devServer = (pc: keyof typeof E2E.pcs) => ({
   command: `pnpm exec vite --configLoader runner --port ${E2E.pcs[pc].port} --strictPort`,
   url: `http://localhost:${E2E.pcs[pc].port}/`,
-  env: { ...process.env, ARTEPOOL_DEV_DEVICE_FILE: E2E.pcs[pc].deviceFile } as Record<
-    string,
-    string
-  >,
+  env: {
+    ...process.env,
+    ARTEPOOL_DEV_DEVICE_FILE: E2E.pcs[pc].deviceFile,
+    // Only the "setup" PC holds a setup token (written by the harness for each wizard test).
+    ...(pc === 'setup' ? { ARTEPOOL_DEV_SETUP_FILE: E2E.setupFile } : {}),
+  } as Record<string, string>,
   reuseExistingServer: false,
   timeout: 120_000,
 });
@@ -58,5 +60,6 @@ export default defineConfig<{ lang: Lang; theme: Theme }>({
     devServer('office'),
     devServer('pos'),
     devServer('fresh'),
+    devServer('setup'),
   ],
 });

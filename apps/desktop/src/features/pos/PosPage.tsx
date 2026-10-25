@@ -24,6 +24,7 @@ import {
   Undo2,
   UserRound,
   Landmark,
+  Lock,
   Wrench,
   type LucideIcon,
 } from 'lucide-react';
@@ -44,7 +45,7 @@ import {
   Tile,
   type Tone,
 } from '../../ui';
-import { useDisplayName, useErrorText } from '../auth/context';
+import { useAuthController, useDisplayName, useErrorText } from '../auth/context';
 import { money, rate } from '../masterdata/format';
 import { localName, useCategories } from '../masterdata/refs';
 import { CustomerPicker, useWalkInCustomer } from '../sales/CustomerPicker';
@@ -64,6 +65,7 @@ import { HeldCartsDialog } from './HeldCartsDialog';
 import { LineDialog } from './LineDialog';
 import { PaymentDialog } from './PaymentDialog';
 import { ReturnDialog } from './ReturnDialog';
+import { useGlobalScan, useScanInput } from '../items/scan';
 import { OpenShiftCard } from './shift/OpenShiftCard';
 import styles from './pos.module.css';
 
@@ -94,6 +96,7 @@ export function PosPage() {
 
 function Register({ state }: { state: PosState }) {
   const { t, i18n } = useTranslation('pos');
+  const auth = useAuthController();
   const nameOf = useDisplayName();
   const cart = useCart();
   const walkIn = useWalkInCustomer();
@@ -182,6 +185,11 @@ function Register({ state }: { state: PosState }) {
               <Banknote className={iconClass.sm} aria-hidden="true" />
               {t('shift')}
             </Link>
+            {/* Decision 0090: the cashier locks on purpose; the same cashier resumes with the PIN. */}
+            <Button onPress={() => void auth.lock()}>
+              <Lock className={iconClass.sm} aria-hidden="true" />
+              {t('lockScreen')}
+            </Button>
           </div>
         }
       />
@@ -420,23 +428,53 @@ function Catalog(props: {
   const activeCategories = (categories.data ?? []).filter((c) => c.isActive);
   const categoryOf = (id: string) => activeCategories.find((c) => c.id === id);
 
-  const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key !== 'Enter') return;
-    event.preventDefault();
-    // A scanner types the barcode and Enter: the exact match goes straight to the cart.
-    const typed = text.trim();
-    const exact =
-      items.find(
-        (i) => i.primaryBarcode === typed || i.code.toLowerCase() === typed.toLowerCase(),
-      ) ??
-      (q === typed && catalog.data?.exactMatchId
-        ? items.find((i) => i.id === catalog.data?.exactMatchId)
-        : undefined) ??
-      (items.length === 1 ? items[0] : undefined);
+  // A code entered (a scan, or a code and Enter): the exact match goes straight to the cart. When
+  // it is not among the items shown yet, it goes in as soon as the search for it has found it.
+  const pending = useRef<string | null>(null);
+  const exactFor = (typed: string) =>
+    items.find((i) => i.primaryBarcode === typed || i.code.toLowerCase() === typed.toLowerCase()) ??
+    (q === typed && catalog.data?.exactMatchId
+      ? items.find((i) => i.id === catalog.data?.exactMatchId)
+      : undefined);
+  const submit = (typed: string) => {
+    const exact = exactFor(typed) ?? (q === typed && items.length === 1 ? items[0] : undefined);
+    if (exact) {
+      pending.current = null;
+      props.onAdd(exact);
+      setText('');
+      return;
+    }
+    // Searched in every category: a scanned item is found whatever category is chosen.
+    pending.current = typed;
+    setCategory(null);
+    setText(typed);
+    setQ(typed);
+  };
+  useEffect(() => {
+    const typed = pending.current;
+    if (typed === null || q !== typed || catalog.isFetching || !catalog.data) return;
+    pending.current = null;
+    const exact = exactFor(typed);
+    // Not found: the code stays in the search, which says nothing matches.
     if (exact) {
       props.onAdd(exact);
       setText('');
     }
+  });
+
+  // A scan replaces the code scanned before; letters come back in Latin with an Arabic keyboard.
+  const scan = useScanInput(setText);
+  // A scan with the cursor anywhere else on the screen lands here too.
+  useGlobalScan((code) => {
+    props.searchRef.current?.focus();
+    submit(code);
+  });
+  const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    scan.onKeyDown(event);
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    // What is in the field now: a scanner's Enter can come before the screen catches up.
+    submit(scan.read(event.currentTarget.value.trim()));
   };
 
   return (

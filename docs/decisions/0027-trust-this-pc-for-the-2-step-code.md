@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Accepted |
+| **Status** | Accepted; length and default changed by [0077](0077-two-step-code-once-per-pc.md) |
 | **Date** | 2026-10-07 |
 | **Decided by** | Owner |
 

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Accepted (revisit later) |
+| **Status** | Accepted (revisit later); extended by [0103](0103-upgrades-and-uninstall-never-touch-data.md) (updates from the server over the LAN) and [0104](0104-windows-and-hardware-test-on-a-vm-first.md) (SmartScreen steps in the guide) |
 | **Date** | 2026-10-06 |
 | **Decided by** | Owner |
 

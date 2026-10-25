@@ -5,6 +5,7 @@
  * 0055–0062. Amounts travel as whole-number text: fils, 4-decimal prices, quantities in thousandths.
  */
 import { z } from 'zod';
+import type { TemplateSettings } from './printing';
 import { IdText } from './auth';
 import { NonNegativeIntText, OptionalText, Reason } from './common';
 import type { DocumentDetail } from './sales';
@@ -66,6 +67,11 @@ export interface PosState {
   receiptLanguage: 'ar' | 'en' | 'both';
   /** The drawer holds more than the cash-drop alert amount (0057); the amount is never shown. */
   dropDue: boolean;
+  /**
+   * The cash the drawer should hold now, shown on "My shift" to the owner only (decision 0080);
+   * null for everyone else, whose count stays blind (0006).
+   */
+  expectedCashFils: string | null;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -134,6 +140,7 @@ export interface ReceiptData {
     addressEn: string;
     trn: string | null;
     phone: string | null;
+    email: string | null;
   };
   document: DocumentDetail;
   payments: PosPaymentResult[];
@@ -144,6 +151,8 @@ export interface ReceiptData {
   /** Prints so far: 0 = the original; after that every print is a copy (0008). */
   printCount: number;
   markCopies: boolean;
+  /** The receipt template version stored on the document (decisions 0020, 0064). */
+  template: TemplateSettings;
 }
 
 export interface PosSaleResponse {
@@ -272,6 +281,13 @@ export type RecountRequest = z.infer<typeof RecountRequest>;
 export const CloseShiftRequest = z.object({ varianceNote: OptionalText(1000) });
 export type CloseShiftRequest = z.infer<typeof CloseShiftRequest>;
 
+/** A stuck shift closed from another PC (decision 0069): why, and the count of its drawer. */
+export const ForceCloseShiftRequest = CountLines.extend({
+  reason: Reason,
+  varianceNote: OptionalText(1000),
+});
+export type ForceCloseShiftRequest = z.infer<typeof ForceCloseShiftRequest>;
+
 export const AcceptVarianceRequest = z.object({
   note: Reason,
   reasonCodeId: IdText.optional(),
@@ -352,6 +368,12 @@ export interface ShiftListItem extends ShiftSummary {
   countedCashFils: string | null;
   varianceFils: string | null;
   accepted: boolean;
+  /** The PC the drawer is on (null once the drawer has none), and whether it is revoked. */
+  deviceCode: string | null;
+  deviceRevoked: boolean;
+  /** Closed from another PC as a stuck shift (decision 0069): by whom and why. */
+  forceClosedBy: { displayNameAr: string; displayNameEn: string } | null;
+  forceCloseReason: string | null;
 }
 
 export interface ShiftsResponse {

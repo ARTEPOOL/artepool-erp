@@ -38,7 +38,8 @@ type NavItem =
         | '/suppliers'
         | '/accounting'
         | '/pos'
-        | '/shifts';
+        | '/shifts'
+        | '/reports';
       permission: string;
     }
   /** Arrives in a later milestone: shown, greyed, so the layout matches the design. */
@@ -80,7 +81,12 @@ const NAV: NavItem[] = [
     permission: 'suppliers.manage',
   },
   { key: 'shifts', icon: <Wallet aria-hidden="true" />, to: '/shifts', permission: 'shifts.open' },
-  { key: 'reports', icon: <LineChart aria-hidden="true" />, later: true },
+  {
+    key: 'reports',
+    icon: <LineChart aria-hidden="true" />,
+    to: '/reports',
+    permission: 'reports.owner_dashboard',
+  },
   {
     key: 'accounting',
     icon: <BookOpen aria-hidden="true" />,

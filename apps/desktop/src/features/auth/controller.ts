@@ -15,6 +15,9 @@ import type {
   RecoverPasswordResponse,
   SecondFactorRequest,
   SessionView,
+  SetupInfo,
+  SetupRequest,
+  SetupStatusResponse,
   SignInResponse,
   ThisDeviceResponse,
   TwoStepConfirmResponse,
@@ -28,6 +31,13 @@ export type SignInNotice = 'expired' | 'signedOut' | null;
 
 export type Phase =
   | { name: 'starting' }
+  /** The first-run wizard on the server PC (decision 0102). */
+  | {
+      name: 'setup';
+      status: SetupStatusResponse;
+      serverAddress: string;
+      windowsBuild: number | null;
+    }
   | { name: 'enroll'; notice: 'revoked' | 'expired' | null }
   | { name: 'outdated'; minVersion: string }
   | { name: 'signIn'; notice: SignInNotice }
@@ -86,6 +96,8 @@ const AUTH = '/api/v1/auth';
 
 export class AuthController {
   readonly api: ApiClient;
+  /** The first-run wizard's channel: setup steps only, the token added by the native side. */
+  readonly setupApi: ApiClient;
   private state: AuthState = INITIAL;
   private readonly listeners = new Set<() => void>();
   private pendingSecret: { value: string; until: number } | null = null;
@@ -94,6 +106,9 @@ export class AuthController {
 
   constructor(private readonly bridge: Bridge) {
     this.api = new ApiClient(bridge);
+    this.setupApi = new ApiClient({
+      request: (request) => bridge.setupRequest(request as SetupRequest),
+    });
     this.api.onError((error) => this.onApiError(error));
   }
 
@@ -118,13 +133,21 @@ export class AuthController {
   /** Is this PC enrolled, and does the server answer? Decides the first screen. */
   async start(): Promise<void> {
     let local: LocalDevice;
+    let setup: SetupInfo | null;
     try {
-      local = await this.bridge.localDevice();
+      // Asked together, so a normal PC (no setup token) starts as fast as before.
+      [local, setup] = await Promise.all([
+        this.bridge.localDevice(),
+        this.bridge.setupInfo().catch(() => null),
+      ]);
     } catch {
       this.set({ server: 'down', phase: { name: 'signIn', notice: null } });
       return;
     }
     this.set({ device: local.device, suggestedCode: local.suggestedCode });
+    if (setup?.available && setup.serverAddress && (await this.openSetup(setup))) {
+      return;
+    }
     if (!local.enrolled) {
       this.go({ name: 'enroll', notice: null });
       return;
@@ -142,6 +165,45 @@ export class AuthController {
         this.go({ name: 'signIn', notice: null });
       }
     }
+  }
+
+  /**
+   * The server PC right after installation: the setup token is here and setup is not complete →
+   * the wizard. Anywhere else (no token, a normal PC) this changes nothing.
+   */
+  private async openSetup(info: SetupInfo): Promise<boolean> {
+    try {
+      const status = await this.setupApi.get<SetupStatusResponse>('/api/v1/setup/status');
+      if (status.state === 'complete') return false;
+      this.set({ server: 'ok' });
+      this.go({
+        name: 'setup',
+        status,
+        serverAddress: info.serverAddress!,
+        windowsBuild: info.windowsBuild,
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Restore from a backup (decision 0102): the native side finds the copies and runs it. */
+  get restore(): Pick<Bridge, 'restoreCopies' | 'restoreStart' | 'restoreStatus'> {
+    return this.bridge;
+  }
+
+  /** The wizard enrolls this PC as the POS (the normal protocol, decision 0024). */
+  async enrollForSetup(input: Parameters<Bridge['enroll']>[0]) {
+    const outcome = await this.bridge.enroll(input);
+    if (outcome.ok && outcome.device) this.set({ device: outcome.device });
+    return outcome;
+  }
+
+  /** Setup complete: on to the normal sign-in (the token is gone, so no wizard any more). */
+  async setupFinished(): Promise<void> {
+    this.go({ name: 'starting' });
+    await this.start();
   }
 
   /** "Try again" on the server-unreachable message. True when the server answers now. */

@@ -1,4 +1,5 @@
 /** A real API server on a throwaway test database, with logs captured for inspection. */
+import type { BackupPaths } from '@artepool/backup';
 import { randomUUID } from 'node:crypto';
 import type { FastifyInstance, InjectOptions, LightMyRequestResponse } from 'fastify';
 import { sql } from 'kysely';
@@ -41,7 +42,7 @@ export interface TestServer {
 
 export async function startTestServer(
   register?: (app: FastifyInstance) => void,
-  options: { limits?: RateLimits } = {},
+  options: { limits?: RateLimits; backup?: BackupPaths; setupTokenFile?: string } = {},
 ): Promise<TestServer> {
   const testDb = await createTestDatabase();
   const db = createDb(createPool(connectionFor('api', testDb.name), 5));
@@ -52,6 +53,8 @@ export async function startTestServer(
     hasher: new SecretHasher(TEST_ARGON2),
     caCertificatePem: TEST_CA_PEM,
     ...(options.limits ? { limits: options.limits } : {}),
+    ...(options.backup ? { backup: options.backup } : {}),
+    ...(options.setupTokenFile ? { setupTokenFile: options.setupTokenFile } : {}),
   });
   const app = buildApp({ logLevel: 'info', logStream: { write: (line) => logs.push(line) } }, deps);
   register?.(app);
@@ -188,6 +191,8 @@ export interface CallOptions {
   background?: boolean;
   remoteAddress?: string;
   body?: unknown;
+  /** Extra headers (e.g. the setup token). */
+  headers?: Record<string, string>;
 }
 
 /** Sends a request the way the desktop app does: device key, app version, session token. */
@@ -197,7 +202,7 @@ export function call(
   url: string,
   options: CallOptions = {},
 ): Promise<LightMyRequestResponse> {
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = { ...options.headers };
   const device = typeof options.device === 'string' ? options.device : options.device?.key;
   if (device) headers['x-artepool-device'] = device;
   if (options.version !== null) headers['x-artepool-client'] = options.version ?? CLIENT_VERSION;

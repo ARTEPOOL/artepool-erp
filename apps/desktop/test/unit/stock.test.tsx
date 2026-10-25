@@ -4,7 +4,7 @@
  * its movements, the stock adjustment dialog (exact request, supervisor approval, refusals) and
  * the barcode labels dialog.
  */
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type {
   AdjustmentDetail,
@@ -20,6 +20,7 @@ import type {
   StockSummary,
   UnitItem,
 } from '@artepool/shared/contracts';
+import { defaultLabelDesign } from '@artepool/shared/contracts';
 import { App } from '../../src/app/App';
 import {
   FakeBridge,
@@ -94,6 +95,8 @@ const CHLORINE: ItemDetail = {
   isActive: true,
   descriptionAr: null,
   descriptionEn: null,
+  packAr: null,
+  packEn: null,
   defaultBusinessLineId: null,
   reorderLevelMilli: '5000',
   reorderQtyMilli: null,
@@ -295,7 +298,20 @@ function bridgeFor(permissions: string[]) {
     .on('GET', '/api/v1/settings/vat', ok(VAT))
     .on('GET', '/api/v1/business-lines', ok({ businessLines: [] }))
     .on('GET', '/api/v1/reason-codes', ok({ reasonCodes: REASONS }))
-    .on('GET', '/api/v1/label-sizes', ok({ labelSizes: SIZES }))
+    .on('GET', '/api/v1/label-sizes', ok({ labelSizes: SIZES, maxWidthMm: 50 }))
+    .on(
+      'GET',
+      '/api/v1/label-design',
+      ok({
+        versionId: '9',
+        versionNo: 1,
+        savedAt: '2026-10-20T08:00:00.000Z',
+        savedBy: null,
+        design: defaultLabelDesign(),
+        shopName: { ar: 'آرتيبول', en: 'ARTEPOOL' },
+        canEdit: false,
+      }),
+    )
     .on('GET', '/api/v1/stock/summary', ok(summary))
     .on('GET', '/api/v1/items', (request: BridgeRequest) => {
       const toReorder = new URLSearchParams(request.path.split('?')[1]).get('toReorder');
@@ -526,8 +542,8 @@ describe('Items & stock: the stock adjustment dialog', () => {
     const approver = within(approval).getByLabelText('المشرف');
     await within(approver).findByRole('option', { name: 'سالم المشرف' });
     fireEvent.change(approver, { target: { value: '7' } });
-    fireEvent.change(within(approval).getByLabelText('الرمز السري للمشرف'), {
-      target: { value: '4826' },
+    fireEvent.change(within(approval).getByLabelText(/الرمز من تليفون الموافِق/), {
+      target: { value: '482611' },
     });
     fireEvent.change(within(approval).getByLabelText('السبب'), {
       target: { value: 'شحنة وصلت بدون فاتورة' },
@@ -538,7 +554,7 @@ describe('Items & stock: the stock adjustment dialog', () => {
     expect(bridge.callsTo('POST', '/api/v1/approvals')[0]!.body).toMatchObject({
       permission: 'stock.adjust_over_threshold',
       approverId: '7',
-      pin: '4826',
+      code: '482611',
     });
     const [first, second] = bridge.callsTo('POST', '/api/v1/stock/adjustments');
     const sent = {
@@ -587,9 +603,29 @@ describe('Items & stock: the stock adjustment dialog', () => {
 });
 
 describe('Items & stock: barcode labels', () => {
-  it('previews one label at the chosen size and prints the requested number', async () => {
+  /** What the label layout put on the preview (decision 0096). */
+  const layoutOf = (preview: HTMLElement) => {
+    const data = JSON.parse(preview.getAttribute('data-layout')!) as {
+      texts: { part: string; text: string }[];
+      prices: { text: string; x: number; dir: string }[][];
+      moduleDots: number;
+    };
+    const textsOf = (part: string) => data.texts.filter((l) => l.part === part).map((l) => l.text);
+    return {
+      name: textsOf('nameAr'),
+      english: textsOf('nameEn')[0] ?? null,
+      price: data.prices[0] ?? null,
+      vat: textsOf('vatNote')[0] ?? null,
+      moduleDots: data.moduleDots,
+    };
+  };
+
+  it('lays out one label at the chosen size and prints the requested number', async () => {
     const print = vi.spyOn(window, 'print').mockImplementation(() => undefined);
-    await openItems(bridgeFor(STOREKEEPER));
+    const bridge = bridgeFor(STOREKEEPER).on('POST', '/api/v1/label-prints', (request) =>
+      ok({ recorded: ['10'], priceChanged: [], echo: request.body }, 201),
+    );
+    await openItems(bridge);
     const card = await stockCard();
     fireEvent.click(within(card).getByRole('button', { name: 'ملصقات باركود' }));
     const dialog = await screen.findByRole('dialog', { name: 'ملصقات باركود' });
@@ -602,21 +638,33 @@ describe('Items & stock: barcode labels', () => {
       ]),
     );
     const preview = within(dialog).getByTestId('label-preview');
-    const label = preview.firstElementChild as HTMLElement;
+    const label = within(preview).getByRole('img', { name: 'باركود 6291100000012' });
     expect(label.style.getPropertyValue('--label-w')).toBe('38mm');
     expect(label.style.getPropertyValue('--label-h')).toBe('25mm');
-    expect(within(preview).getByText('كلور حبيبات 10 كجم')).toBeTruthy();
-    expect(within(preview).getByText('6291100000012')).toBeTruthy();
-    // 12.50 excluding VAT → 13.13 with 5% VAT.
-    expect(within(preview).getByText('13.13 درهم')).toBeTruthy();
-    const bars = within(preview).getByRole('img', { name: 'باركود 6291100000012' });
-    expect(bars.getAttribute('data-modules')).toBe(String(11 * 15 + 13));
+    let layout = layoutOf(preview);
+    expect(layout.name).toEqual(['كلور حبيبات 10 كجم']);
+    expect(layout.english).toBeNull();
+    // 12.50 excluding VAT → 13.13 with 5% VAT: "13.13 درهم", the number to the right of "درهم".
+    expect(layout.price?.map((run) => run.text)).toEqual(['درهم', '13.13']);
+    expect(layout.price![1]!.x).toBeGreaterThan(layout.price![0]!.x);
+    // The price excludes VAT on the item: no "شامل الضريبة" line.
+    expect(layout.vat).toBeNull();
+    expect(layout.moduleDots).toBeGreaterThanOrEqual(2);
 
     fireEvent.change(sizeSelect, { target: { value: '2' } });
     expect(label.style.getPropertyValue('--label-w')).toBe('50mm');
     expect(label.style.getPropertyValue('--label-h')).toBe('30mm');
+    fireEvent.click(
+      within(dialog).getByRole('switch', { name: 'أضف الاسم الإنجليزي لو فيه مكان' }),
+    );
+    expect(layoutOf(within(dialog).getByTestId('label-preview')).english).toBe(
+      'Granular chlorine 10 kg',
+    );
     fireEvent.click(within(dialog).getByRole('switch', { name: 'طباعة السعر شامل الضريبة' }));
-    expect(within(preview).queryByText('13.13 درهم')).toBeNull();
+    layout = layoutOf(within(dialog).getByTestId('label-preview'));
+    expect(layout.price).toBeNull();
+    // No label printer on this PC (a browser): the print dialog is the way.
+    expect(within(dialog).getByText(/مفيش طابعة ملصقات مضبوطة/)).toBeTruthy();
 
     fireEvent.change(within(dialog).getByLabelText('عدد الملصقات'), { target: { value: '0' } });
     fireEvent.click(within(dialog).getByRole('button', { name: 'طباعة' }));
@@ -632,7 +680,23 @@ describe('Items & stock: barcode labels', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'طباعة' }));
     await waitFor(() => expect(print).toHaveBeenCalledTimes(1));
     expect(printed).toBe(3);
+    // A print dialog that does not hold the screen: the labels stay until printing is over.
+    expect(screen.getByTestId('label-print').children).toHaveLength(3);
+    expect(document.head.textContent).toContain('@page');
+    act(() => {
+      window.dispatchEvent(new Event('afterprint'));
+    });
     await waitFor(() => expect(screen.queryByTestId('label-print')).toBeNull());
     expect(document.head.textContent).not.toContain('@page');
+    // Recorded only once the person says the labels printed (decision 0099): no price on them.
+    expect(bridge.callsTo('POST', '/api/v1/label-prints')).toHaveLength(0);
+    fireEvent.click(await within(dialog).findByRole('button', { name: 'أيوه، اتطبعت' }));
+    await waitFor(() => expect(bridge.callsTo('POST', '/api/v1/label-prints')).toHaveLength(1));
+    expect(bridge.callsTo('POST', '/api/v1/label-prints')[0]!.body).toEqual({
+      sizeId: '2',
+      designVersionId: '9',
+      source: 'item',
+      lines: [{ itemId: '10', copies: 3, price: null }],
+    });
   });
 });

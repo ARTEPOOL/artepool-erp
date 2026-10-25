@@ -208,6 +208,7 @@ const detail = (patch: Partial<DocumentDetail>): DocumentDetail => ({
   businessLineId: '1',
   billToName: 'Blue Lagoon Villas',
   billToNameAlt: null,
+  customerPo: null,
   billToTrn: '100123456700003',
   billToAddress: 'Al Jimi, Al Ain',
   billToPhone: '+971501234567',
@@ -355,8 +356,8 @@ async function approve(reason: string) {
   const dialog = await screen.findByRole('dialog', { name: /approval/i });
   await within(dialog).findByRole('option', { name: 'Khalid Salem' });
   fireEvent.change(within(dialog).getByLabelText('Supervisor'), { target: { value: '8' } });
-  fireEvent.change(within(dialog).getByLabelText(/Supervisor's PIN/), {
-    target: { value: '4826' },
+  fireEvent.change(within(dialog).getByLabelText(/Code from the approver/), {
+    target: { value: '482611' },
   });
   fireEvent.change(within(dialog).getByLabelText(/^Reason/), { target: { value: reason } });
   fireEvent.click(within(dialog).getByRole('button', { name: 'Approve' }));
@@ -534,12 +535,13 @@ describe('Invoices (A4): a new invoice', () => {
       ok({ customers: [WALK_IN, CUSTOMER], total: 2, counts: { active: 2, vatRegistered: 1 } }),
     );
     await signIn(bridge, 'New tax invoice');
-    // The cash customer is chosen by default (simplified invoice).
+    // The cash customer is chosen by default: a simplified invoice, nothing to type (0071).
     const chosen = await screen.findByRole('group', { name: 'Customer' });
     expect(await within(chosen).findByText('Cash customer')).toBeTruthy();
     expect(
       screen.getByText('The customer is not VAT-registered: a simplified tax invoice.'),
     ).toBeTruthy();
+    expect(screen.queryByLabelText('Customer name on the invoice')).toBeNull();
 
     // The items list opens on focus, before anything is typed.
     fireEvent.focus(screen.getByRole('searchbox', { name: /Search items/ }));
@@ -602,6 +604,35 @@ describe('Invoices (A4): a new invoice', () => {
       deductions: [{ advanceDocumentId: '201' }],
       rowVersion: 3,
     });
+  });
+
+  it('a saved draft for the cash customer can be issued; nothing to type (0071)', async () => {
+    const WALK_IN: CustomerListItem = {
+      ...CUSTOMER,
+      id: '1',
+      code: 'C-0001',
+      customerType: 'individual',
+      name: 'عميل نقدي',
+      phone: null,
+      isVatRegistered: false,
+      trn: null,
+      isWalkIn: true,
+    };
+    const saved = { ...DRAFT, customerId: '1', billToName: 'عميل نقدي', billToAddress: null };
+    const bridge = bridgeFor(OFFICE, '/invoices/300')
+      .on('GET', '/api/v1/sales/documents/300', ok(saved))
+      .on(
+        'GET',
+        '/api/v1/customers',
+        ok({ customers: [WALK_IN], total: 1, counts: { active: 1, vatRegistered: 0 } }),
+      );
+    await signIn(bridge, 'Invoice draft');
+    // Saved as it is: not "changed", so it can be issued straight away.
+    const issueButton = await screen.findByRole('button', { name: 'Issue invoice' });
+    await waitFor(() => expect(issueButton.hasAttribute('data-disabled')).toBe(false));
+    expect(screen.queryByText('Save the draft before issuing it.')).toBeNull();
+    fireEvent.click(issueButton);
+    expect(await screen.findByRole('dialog')).toBeTruthy();
   });
 
   it('discarding a draft asks first, then sends its row version', async () => {
@@ -683,7 +714,7 @@ describe('Invoices (A4): issuing', () => {
     expect(bridge.callsTo('POST', '/api/v1/approvals')[0]!.body).toMatchObject({
       permission: 'sales.discount_over_limit',
       approverId: '8',
-      pin: '4826',
+      code: '482611',
       reason: 'Long-standing customer',
     });
     const issues = bridge.callsTo('POST', '/api/v1/sales/documents/300/issue');

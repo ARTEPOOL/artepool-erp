@@ -3,6 +3,7 @@
  * chart of accounts with its event links and lines of business (0018, 0035), and periods (0016).
  */
 import { randomUUID } from 'node:crypto';
+import { idleSecondsFor } from '../../src/modules/auth/sessions';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type {
   AccountItem,
@@ -228,6 +229,44 @@ describe('numbering series (decision 0011)', () => {
       })
     ).json<SeriesItem>();
     expect(changed).toMatchObject({ prefix: 'QUO-', nextFormatted: 'QUO-00001' });
+  });
+});
+
+describe('the screen lock (decision 0079)', () => {
+  it('is off by default, owner only, and minutes per kind of PC turn it back on', async () => {
+    expect((await accountant('GET', '/api/v1/settings/screen-lock')).statusCode).toBe(403);
+    expect(
+      (await accountant('PUT', '/api/v1/settings/screen-lock', { officeMinutes: 5, posMinutes: 5 }))
+        .statusCode,
+    ).toBe(403);
+    expect((await owner('GET', '/api/v1/settings/screen-lock')).json()).toEqual({
+      officeMinutes: 0,
+      posMinutes: 0,
+    });
+    const officePc = { id: 1n, code: 'X', kind: 'office' } as never;
+    const posPc = { id: 2n, code: 'Y', kind: 'pos' } as never;
+    // Off: the idle limit is the whole session (12 hours by default).
+    expect(await idleSecondsFor(server.deps, officePc)).toBe(12 * 3600);
+
+    const saved = await owner('PUT', '/api/v1/settings/screen-lock', {
+      officeMinutes: 20,
+      posMinutes: 0,
+    });
+    expect(saved.json()).toEqual({ officeMinutes: 20, posMinutes: 0 });
+    expect(await idleSecondsFor(server.deps, officePc)).toBe(20 * 60);
+    expect(await idleSecondsFor(server.deps, posPc)).toBe(12 * 3600);
+    expect(
+      (await owner('PUT', '/api/v1/settings/screen-lock', { officeMinutes: 241, posMinutes: 0 }))
+        .statusCode,
+    ).toBe(422);
+    const audited = await server.db
+      .selectFrom('audit.log')
+      .select('entity_id')
+      .where('entity_type', '=', 'sys.settings')
+      .where('entity_id', '=', 'security.idle_lock_minutes.office')
+      .execute();
+    expect(audited.length).toBeGreaterThan(0);
+    await owner('PUT', '/api/v1/settings/screen-lock', { officeMinutes: 0, posMinutes: 0 });
   });
 });
 
