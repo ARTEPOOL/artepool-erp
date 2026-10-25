@@ -9,7 +9,7 @@
 //! Its answer is one JSON line on standard output. It may hold a temporary password, so it goes
 //! to the window only: it is never logged or written anywhere.
 
-use std::io::{Read, Write};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
@@ -155,15 +155,14 @@ pub fn run_action(launcher: &Path, action: &str, input: &Value) -> Value {
         let _ = stdin.write_all(input.to_string().as_bytes());
         // Dropped here: end of input.
     }
-    let mut out = String::new();
-    let mut errors = String::new();
-    if let Some(mut stdout) = child.stdout.take() {
-        let _ = stdout.read_to_string(&mut out);
-    }
-    if let Some(mut stderr) = child.stderr.take() {
-        let _ = stderr.read_to_string(&mut errors);
-    }
-    let _ = child.wait();
+    // Both outputs are read together, so a program that writes much to one never waits on us.
+    let (out, errors) = match child.wait_with_output() {
+        Ok(output) => (
+            String::from_utf8_lossy(&output.stdout).into_owned(),
+            String::from_utf8_lossy(&output.stderr).into_owned(),
+        ),
+        Err(error) => (String::new(), error.to_string()),
+    };
     match last_json_line(&out) {
         Some(answer) if answer.get("ok").and_then(Value::as_bool).is_some() => answer,
         _ => failure(
