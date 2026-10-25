@@ -1,7 +1,8 @@
 /**
  * `artepool-svc run updater` — the server PC's updater (decision 0108, M6.2 part G5), run every
  * few minutes as SYSTEM by the scheduled task "ARTEPOOL Updater"; the steps are in
- * updater/steps.ts. Its lines go to `logs\install\updater.log` (no secret is ever written).
+ * updater/steps.ts. Its lines go to `logs\install\updater.log`, only when the outcome changes
+ * (no secret is ever written).
  */
 import { spawn } from 'node:child_process';
 import { createWriteStream, mkdirSync, readFileSync } from 'node:fs';
@@ -12,7 +13,7 @@ import pg from 'pg';
 import { LATEST_URL } from '@artepool/release';
 import { connectionFor, loadEnv, resourcePath } from '@artepool/node-kit';
 import { InstallLog } from './install/log';
-import { runUpdater } from './updater/steps';
+import { outcomeChanged, runUpdater } from './updater/steps';
 
 function required(name: string): string {
   const value = process.env[name];
@@ -61,9 +62,12 @@ try {
     now: () => new Date(),
     log: (line) => log.line(line),
   });
-  if (outcome !== 'up_to_date' && outcome !== 'installing') log.line(`Updater: ${outcome}.`);
+  if (await outcomeChanged(updatesDir, outcome)) log.line(`Updater: ${outcome}.`);
 } catch (error) {
-  log.line(`Updater FAILED: ${error instanceof Error ? error.message : String(error)}`);
+  const reason = error instanceof Error ? error.message : String(error);
+  if (await outcomeChanged(updatesDir, `failed: ${reason}`).catch(() => true)) {
+    log.line(`Updater FAILED: ${reason}`);
+  }
   process.exitCode = 1;
 } finally {
   await client.end().catch(() => undefined);
