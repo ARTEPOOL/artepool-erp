@@ -1,0 +1,74 @@
+name: Release
+
+# Decision 0108: a version tag (v1.2.3) on main builds the setups, signs them with the update key
+# and publishes ONLY the allowed release files to the public repository
+# adretaae-ctrl/artepool-releases. The job waits in the protected "release" environment until the
+# owner approves it (one click); the signing key and the publishing token are secrets of that
+# environment only. The source code never leaves this private repository.
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build, sign and publish (after the owner's approval)
+    runs-on: windows-latest
+    environment: release
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Only a tag on main, matching the app's version
+        shell: pwsh
+        run: |
+          git fetch origin main
+          git merge-base --is-ancestor $env:GITHUB_SHA origin/main
+          if ($LASTEXITCODE -ne 0) { throw "The tag $env:GITHUB_REF_NAME is not on main: nothing is released." }
+          $version = (Get-Content apps/desktop/package.json -Raw | ConvertFrom-Json).version
+          if ("v$version" -ne $env:GITHUB_REF_NAME) { throw "The tag $env:GITHUB_REF_NAME does not match the app's version $version." }
+          "VERSION=$version" >> $env:GITHUB_ENV
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: The update key's public half and the release notes are there
+        run: |
+          pnpm release tauri-config apps/desktop/src-tauri/release.conf.json
+          pnpm release check
+      - name: Unit tests
+        run: pnpm test:unit
+      - name: Build the packaged server
+        run: pnpm build:server --windows
+      - name: Build the service launcher and the emergency tool
+        run: cargo build --release -p artepool-svc -p artepool-emergency --manifest-path apps/desktop/src-tauri/Cargo.toml
+      - name: Build the desktop app, signed with the update key
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: pnpm --filter @artepool/desktop exec tauri build --config src-tauri/release.conf.json
+      - name: Build the server setup
+        run: pnpm build:installer
+      - name: Sign the server setup with the update key
+        shell: pwsh
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: pnpm --filter @artepool/desktop exec tauri signer sign "$env:GITHUB_WORKSPACE\dist\installer\ARTEPOOL-Server-Setup-$env:VERSION.exe"
+      - name: Prepare the release files (only the allowed ones; anything else stops here)
+        run: pnpm release prepare
+      - name: Publish to adretaae-ctrl/artepool-releases
+        env:
+          RELEASES_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+        run: pnpm release publish

@@ -403,6 +403,12 @@ importers:
         specifier: 8.23.1
         version: 8.23.1
 
+  tools/release:
+    dependencies:
+      '@artepool/node-kit':
+        specifier: workspace:*
+        version: link:../../packages/node-kit
+
   tools/tls:
     dependencies:
       '@artepool/node-kit':
