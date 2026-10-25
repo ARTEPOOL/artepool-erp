@@ -21,5 +21,11 @@
   "device": {
     "label": "{name} · {code}",
     "notEnrolled": "This PC is not enrolled yet"
+  },
+  "appUpdate": {
+    "ready": "ARTEPOOL {version} is ready",
+    "install": "Install and restart",
+    "installing": "Installing…",
+    "failed": "The update could not be installed now; it is tried again later."
   }
 }

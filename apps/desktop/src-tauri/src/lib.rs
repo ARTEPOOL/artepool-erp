@@ -235,6 +235,51 @@ fn installation() -> artepool_bridge::emergency::Installation {
     }
 }
 
+/// The server PC's app is updated by the server setup (with the server, at a safe time), never
+/// by itself; every other PC updates itself from the public update list.
+fn updates_itself() -> bool {
+    !installation().launcher().is_file()
+}
+
+async fn pending_update(
+    app: &tauri::AppHandle,
+) -> Result<Option<tauri_plugin_updater::Update>, String> {
+    use tauri_plugin_updater::UpdaterExt;
+    if !updates_itself() {
+        return Ok(None);
+    }
+    // No update key or list in this build (development, CI): nothing to check.
+    let updater = app.updater().map_err(|e| e.to_string())?;
+    updater.check().await.map_err(|e| e.to_string())
+}
+
+/// A newer version of this app for this PC (decision 0108), with its release notes, or null.
+#[tauri::command]
+async fn app_update_check(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
+    Ok(match pending_update(&app).await? {
+        Some(update) => serde_json::json!({
+            "version": update.version,
+            "notesAr": update.raw_json.get("notesAr"),
+            "notesEn": update.raw_json.get("notesEn").cloned().or_else(|| update.body.clone().map(serde_json::Value::from)),
+        }),
+        None => serde_json::Value::Null,
+    })
+}
+
+/// Downloads the signed setup (the updater checks its signature with the update key), runs it
+/// and starts the new version.
+#[tauri::command]
+async fn app_update_install(app: tauri::AppHandle) -> Result<(), String> {
+    let Some(update) = pending_update(&app).await? else {
+        return Ok(());
+    };
+    update
+        .download_and_install(|_, _| {}, || {})
+        .await
+        .map_err(|e| e.to_string())?;
+    app.restart();
+}
+
 #[tauri::command]
 fn emergency_info() -> serde_json::Value {
     let emergency = emergency_mode();
@@ -635,6 +680,8 @@ pub fn run() {
             restore_copies,
             restore_start,
             restore_status,
+            app_update_check,
+            app_update_install,
             emergency_info,
             emergency_check,
             emergency_run,

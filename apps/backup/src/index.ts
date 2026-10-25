@@ -11,3 +11,4 @@ export * from './bundle';
 export * from './offline';
 export * from './service';
 export * from './full-restore';
+export { connectionArgs, pgTool, run as runPgTool, sha256File } from './tools';

@@ -75,7 +75,7 @@ In **PowerShell**:
 cd $HOME
 mkdir Projects
 cd Projects
-git clone https://github.com/adretaae-ctrl/artepool-erp.git
+git clone https://github.com/ARTEPOOL/artepool-erp.git
 cd artepool-erp
 ```
 

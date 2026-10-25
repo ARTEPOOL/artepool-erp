@@ -208,6 +208,7 @@ describe('the owner is protected (decisions 0025, 0026)', () => {
       'system.integrity.run',
       'system.series.manage',
       'system.settings.edit',
+      'system.update.manage',
       'users.manage',
       'users.reset_credentials',
     ]);

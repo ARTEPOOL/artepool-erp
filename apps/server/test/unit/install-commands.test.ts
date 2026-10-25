@@ -10,6 +10,7 @@ import { hbaConf, initdbArgs, postgresqlSettings } from '../../src/cli/install/p
 import { pcNames, windowsBuildOf } from '../../src/cli/install/steps';
 import {
   firewallRule,
+  updaterTask,
   icaclsGrant,
   icaclsReset,
   icaclsRestrict,
@@ -100,6 +101,25 @@ describe('services', () => {
       ]),
     );
     expect(add!.join(' ')).not.toContain('5432');
+  });
+
+  it("the updater: every 5 minutes as SYSTEM, the launcher's own updater program", () => {
+    expect(updaterTask('C:\\Program Files\\ARTEPOOL\\artepool-svc.exe')).toEqual([
+      '/Create',
+      '/TN',
+      'ARTEPOOL Updater',
+      '/RU',
+      'SYSTEM',
+      '/SC',
+      'MINUTE',
+      '/MO',
+      '5',
+      '/RL',
+      'HIGHEST',
+      '/F',
+      '/TR',
+      '"C:\\Program Files\\ARTEPOOL\\artepool-svc.exe" run updater',
+    ]);
   });
 });
 
@@ -220,5 +240,54 @@ describe('the Windows steps, in order', () => {
       'sc.exe query ArtepoolDatabase',
       'sc.exe query ArtepoolDatabase',
     ]);
+  });
+});
+
+describe('stopping and starting for an upgrade', () => {
+  it('a service already stopped or missing, or already running, is fine', async () => {
+    const { windowsPlatform } = await import('../../src/cli/install/windows');
+    const calls: string[] = [];
+    const platform = windowsPlatform({
+      exec: (file, args) => {
+        calls.push(`${file} ${args.join(' ')}`);
+        if (args[0] === 'stop') {
+          return Promise.reject(new Error('sc.exe stop: [SC] ControlService FAILED 1062'));
+        }
+        if (args[0] === 'start') {
+          return Promise.reject(new Error('sc.exe start: [SC] StartService FAILED 1056'));
+        }
+        return Promise.resolve(
+          calls.filter((c) => c.includes('stop')).length >
+            calls.filter((c) => c.includes('start')).length
+            ? 'STATE : 1  STOPPED'
+            : 'STATE : 4  RUNNING',
+        );
+      },
+      programDir: 'C:\\PF\\ARTEPOOL',
+      pgBin: 'C:\\PF\\ARTEPOOL\\pgsql\\bin',
+      logDir: 'C:\\PD\\logs',
+      pollMs: 1,
+    });
+    await platform.stopService('server');
+    await platform.startService('server');
+    expect(calls).toEqual([
+      'sc.exe stop ArtepoolServer',
+      'sc.exe query ArtepoolServer',
+      'sc.exe start ArtepoolServer',
+      'sc.exe query ArtepoolServer',
+    ]);
+  });
+
+  it('another failure to stop is not hidden', async () => {
+    const { windowsPlatform } = await import('../../src/cli/install/windows');
+    const platform = windowsPlatform({
+      exec: () =>
+        Promise.reject(new Error('sc.exe stop: [SC] OpenService FAILED 5: Access is denied.')),
+      programDir: 'C:\\PF\\ARTEPOOL',
+      pgBin: 'C:\\PF\\ARTEPOOL\\pgsql\\bin',
+      logDir: 'C:\\PD\\logs',
+      pollMs: 1,
+    });
+    await expect(platform.stopService('server')).rejects.toThrow(/Access is denied/);
   });
 });

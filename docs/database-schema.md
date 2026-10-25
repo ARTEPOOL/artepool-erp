@@ -48,7 +48,7 @@ Phase 1 has **68 tables in 9 schemas**, plus reporting views and the functions a
 | `artepool_owner` | no | Owns every object | — |
 | `artepool_migrator` | yes (server only) | Migration runner | Member of `artepool_owner` |
 | `artepool_api` | yes (server only) | API service | See below |
-| `artepool_backup` | yes (server only) | Backup service | `pg_read_all_data`, `REPLICATION`, `CREATEDB` (only for the throwaway restore-test database); write `ops.backup_runs`, `ops.integrity_runs`, move `ops.backup_requests` forward; `audit.add_anchor()`, `audit.verify_chain()`; never changes business data |
+| `artepool_backup` | yes (server only) | Backup service | `pg_read_all_data`, `REPLICATION`, `CREATEDB` (only for the throwaway restore-test database); write `ops.backup_runs`, `ops.integrity_runs`, move `ops.backup_requests` forward; the server PC's updater keeps `ops.update_state` and moves `ops.update_requests` forward (0108); `audit.add_anchor()`, `audit.verify_chain()`; never changes business data |
 | `artepool_maint` | yes (server only) | Nightly maintenance | `DELETE` only on `sys.idempotency_keys` older than 30 days (a trigger enforces both the role and the age). Sessions are never deleted ([0026](decisions/0026-users-and-devices-never-deleted.md)). |
 
 **`artepool_api` privileges:**
@@ -110,7 +110,7 @@ Phase 1 has **68 tables in 9 schemas**, plus reporting views and the functions a
         │                               cash.drawer_events                                  (incl. oversell, pending review)
         └── every financial event ─► gl.journal_entries ─► gl.journal_lines ─► gl.accounts      gl.periods (monthly)
 
- audit.log (hash-chained) ◄─ every table + explicit events         ops.outbox · ops.backup_runs · ops.integrity_runs · ops.backup_requests
+ audit.log (hash-chained) ◄─ every table + explicit events         ops.outbox · ops.backup_runs · ops.integrity_runs · ops.backup_requests · ops.update_state · ops.update_requests
 ```
 
 ---
@@ -1598,6 +1598,24 @@ The owner asks the backup service for something now. Inserted by the API (owner 
 | [upd] | | |
 
 ---
+
+### 12.5 `ops.update_state` (migration 0044, decision 0108)
+
+One row (`id = 1`) kept by the server PC's updater (as `artepool_backup`, SYSTEM context) and shown in System health.
+
+| Column | Type | Notes |
+|---|---|---|
+| current_version | text? | The version running (x.y.z) |
+| checked_at / check_error | timestamptz? / text? | Last read of the public update list; why it failed (no internet is normal) |
+| available_version, notes_ar, notes_en, published_at | text? … | The newest published version and its release notes (null when up to date) |
+| download_status | text | `none`, `downloading`, `ready` (SHA-256 and signature checked), `failed` |
+| waiting_reason | text? | `open_shift`, `outside_window`, `failed_before` (rolled back once; waits for "Install now"), `installing` |
+| last_result | jsonb? | The setup's `updates\last-result.json`: ok, from, to, at, failed step |
+| window_start_hour / window_end_hour | smallint | Night window in Asia/Dubai hours (default 2–5); owner editable |
+
+### 12.6 `ops.update_requests` (migration 0044, decision 0108)
+
+The owner's "Install now" (`system.update.manage`, owner only): `version`, `status` (`pending` → `running` → `done`/`failed`, forward only; one open at a time), `error_message`. Audited, never deleted.
 
 ## 13. Views
 

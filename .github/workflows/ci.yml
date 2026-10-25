@@ -245,9 +245,9 @@ jobs:
           name: artepool-erp-windows
           path: apps/desktop/src-tauri/target/release/bundle/nsis/*.exe
           retention-days: 14
-      - name: Server installer (pinned PostgreSQL, Node and WinSW, each checked by SHA-256)
-        run: pnpm build:installer
-      - name: Install, restore and uninstall the server as on a clean PC
+      - name: Server installer (pinned PostgreSQL, Node and WinSW, each checked by SHA-256), and two test upgrades
+        run: pnpm build:installer --test-upgrade
+      - name: Install, upgrade, restore and uninstall the server as on a clean PC
         shell: pwsh
         run: ./tools/installer/windows/test-install.ps1 -Installer (Get-ChildItem dist/installer/ARTEPOOL-Server-Setup-*.exe).FullName
       - name: Server installer
@@ -258,6 +258,14 @@ jobs:
             dist/installer/ARTEPOOL-Server-Setup-*.exe
             dist/installer/ARTEPOOL-Office-Setup-*.exe
             dist/installer/SHA256SUMS.txt
+          retention-days: 14
+      # For trying an upgrade by hand on a test PC or VM (never the shop PC): the next version
+      # (works) and the one after (its migration fails, so the previous version comes back).
+      - name: Test upgrades (for a test PC only, never published)
+        uses: actions/upload-artifact@v4
+        with:
+          name: artepool-test-upgrades
+          path: dist/installer/test/ARTEPOOL-Server-Setup-*.exe
           retention-days: 14
       - name: Installation logs (for review; they hold no secret)
         if: always()

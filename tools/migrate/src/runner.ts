@@ -18,6 +18,12 @@ export interface MigrateOptions {
   ownerRole?: string;
   /** Run every pending migration, then roll everything back. */
   dryRun?: boolean;
+  /**
+   * Upgrades (decision 0103): every pending migration in one transaction, committed only if all
+   * succeed. The applied ones are checked first; on any failure nothing at all changes.
+   * Development keeps one transaction per file.
+   */
+  allOrNothing?: boolean;
   log?: (message: string) => void;
 }
 
@@ -118,26 +124,35 @@ async function withLock<T>(client: Client, work: () => Promise<T>): Promise<T> {
   }
 }
 
-/** Applies every pending migration, each in its own transaction, as the owner role. */
+/**
+ * Applies every pending migration as the owner role: each in its own transaction, or all in one
+ * (`allOrNothing`, upgrades), or all in one that is then rolled back (`dryRun`).
+ */
 export async function migrate(options: MigrateOptions): Promise<MigrationFile[]> {
-  const { client, dir, dryRun = false, log = () => undefined } = options;
+  const { client, dir, dryRun = false, allOrNothing = false, log = () => undefined } = options;
   const ownerRole = client.escapeIdentifier(options.ownerRole ?? 'artepool_owner');
   const files = loadMigrationFiles(dir);
 
   return withLock(client, async () => {
-    if (dryRun) {
+    if (dryRun || allOrNothing) {
       await client.query('BEGIN');
+      let committed = false;
       try {
         await client.query(`SET LOCAL ROLE ${ownerRole}`);
+        await client.query(`SET LOCAL lock_timeout = '10s'`);
         await client.query(BOOTSTRAP);
         const pending = verifyApplied(await readApplied(client), files);
         for (const file of pending) {
           const ms = await applyFile(client, file);
-          log(`Checked ${file.fileName} (${ms} ms)`);
+          log(`${dryRun ? 'Checked' : 'Applied'} ${file.fileName} (${ms} ms)`);
+        }
+        if (!dryRun) {
+          await client.query('COMMIT');
+          committed = true;
         }
         return pending;
       } finally {
-        await client.query('ROLLBACK');
+        if (!committed) await client.query('ROLLBACK');
       }
     }
 

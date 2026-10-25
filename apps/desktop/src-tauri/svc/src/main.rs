@@ -4,7 +4,8 @@
 //!   artepool-svc secrets init            new secrets (installation)
 //!   artepool-svc secrets set <name>      replace one secret, value read from the standard input
 //!   artepool-svc secrets check           every secret present, opening, well protected
-//!   artepool-svc config init [--port N] [--database-port N]   the settings file (installation)
+//!   artepool-svc config init [--port N] [--database-port N|auto]   the settings file (installation;
+//!                                        auto: 5432, or the next free port up to 5442)
 //!
 //! `--data <folder>` (before the command) replaces `C:\ProgramData\ARTEPOOL`.
 
@@ -15,7 +16,7 @@ const USAGE: &str = "Usage:
   artepool-svc [--data <folder>] secrets init
   artepool-svc [--data <folder>] secrets set <name>   (the value is read from the standard input)
   artepool-svc [--data <folder>] secrets check
-  artepool-svc [--data <folder>] config init [--port <n>] [--database-port <n>]";
+  artepool-svc [--data <folder>] config init [--port <n>] [--database-port <n>|auto]";
 
 #[cfg(windows)]
 fn main() -> ExitCode {
@@ -131,13 +132,24 @@ fn main() -> ExitCode {
     }
 }
 
-/// `--port <n>` and `--database-port <n>`, in any order; anything else is refused.
+/// `--port <n>` and `--database-port <n>|auto`, in any order; anything else is refused.
 #[cfg(windows)]
 fn config_choice(options: &[&str]) -> Option<artepool_svc::config::ConfigChoice> {
+    use artepool_svc::config::{free_database_port, port_free};
     let mut choice = artepool_svc::config::ConfigChoice::default();
     let mut rest = options.iter();
     while let Some(option) = rest.next() {
-        let value: u16 = rest.next()?.parse().ok().filter(|p| *p > 0)?;
+        let text = *rest.next()?;
+        let value: u16 = if *option == "--database-port" && text == "auto" {
+            // Another PostgreSQL (or any program) on 5432: the next free port.
+            let Some(port) = free_database_port(port_free) else {
+                eprintln!("Ports 5432 to 5442 are all in use by other programs.");
+                return None;
+            };
+            port
+        } else {
+            text.parse().ok().filter(|p| *p > 0)?
+        };
         match *option {
             "--port" => choice.server_port = value,
             "--database-port" => choice.database_port = value,

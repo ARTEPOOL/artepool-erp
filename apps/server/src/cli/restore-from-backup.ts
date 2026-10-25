@@ -63,7 +63,12 @@ export const exec: Exec = (file, args, input) =>
       { env: childEnv({}), windowsHide: true },
       (error, stdout, stderr) =>
         error
-          ? reject(new Error(`${file} ${args.join(' ')}: ${stderr || error.message}`))
+          ? // sc.exe writes its errors (1056, 1060, 1062…) to the standard output.
+            reject(
+              new Error(
+                `${file} ${args.join(' ')}: ${stderr.trim() || stdout.trim() || error.message}`,
+              ),
+            )
           : resolve(stdout),
     );
     if (input !== undefined) child.stdin?.end(input);

@@ -39,7 +39,7 @@
 | Thermal receipts | Rendered in the app → bitmap → **ESC/POS raster**, sent RAW | Arabic prints correctly on any ESC/POS printer; silent printing. |
 | Windows service | **WinSW** around a bundled `node.exe` + esbuild bundle | Auto-start, auto-restart, log rotation. |
 | Logging | **pino** with redaction | Secrets can never reach the logs. |
-| Desktop shell | **Tauri 2** (Rust) | Small, harder to tamper with; signed auto-updates from the LAN server. |
+| Desktop shell | **Tauri 2** (Rust) | Small, harder to tamper with; signed automatic updates ([0108](decisions/0108-automatic-online-updates.md)). |
 | UI | **React 19** + TS + **Vite**; TanStack Query/Router; Zustand (POS cart only) | |
 | UI primitives | **React Aria Components** (headless) | Best RTL, keyboard and accessibility support; the custom design is applied later. |
 | Styling | **CSS Modules** + **design tokens** (CSS variables), logical properties only | Stylelint blocks raw colors and sizes (golden rule 12). |
@@ -77,7 +77,7 @@
 - **Clients hold no business data.** A client stores only its device secret (in Windows Credential Manager) and UI preferences.
 - **Server unreachable:** the app shows a clear "Server unreachable" screen. A POS cart in progress stays in memory so it can be completed when the server is back, but nothing is ever saved halfway.
 - **Idempotency keys:** every save request carries one. A retry after a network drop returns the original result and never creates a second sale.
-- **Version lock-step:** the server states the minimum client version. Clients update themselves from the server over the LAN, and the update signature is verified ([0007](decisions/0007-no-code-signing-certificate-for-now.md)).
+- **Version lock-step:** the server states the minimum client version. Clients update themselves from the public update list (`ARTEPOOL/artepool-releases`), and the update signature is verified ([0007](decisions/0007-no-code-signing-certificate-for-now.md), [0108](decisions/0108-automatic-online-updates.md)).
 
 ---
 
@@ -93,7 +93,7 @@
 - **Settings and secrets on the installed server:** `config\server.json` (strict: an unknown key, such as a password, is refused) is turned into the same settings the programs read in development. The launcher `artepool-svc.exe` (Rust) keeps six secrets (master key, four role passwords, and PostgreSQL's superuser password, which only the restore program receives) as DPAPI machine blobs bound to their names, refuses to start when one is missing or does not open, or when the folder or a file can be opened by anyone but SYSTEM, Administrators and `NT SERVICE\…` accounts, and gives them to Node in its environment. The server takes the master key out of its environment once read, and pg_dump and the PDF browser never inherit a secret. `artepool-svc run <tool>` is also how an administrator runs the console tools there. The restore from a backup (`run restore`, started by the setup wizard) restores into a separate database, runs every integrity check, and swaps it in only if all pass, keeping the empty database aside.
 - **First-run wizard (0102):** the installer leaves `setup\token` (32 random bytes) and `setup\ca.crt` in ProgramData, readable by administrators only. The app opens the wizard by itself when it can read them and setup is not complete; its Rust side sends only `/api/v1/setup/*` with the token (`x-artepool-setup`) to `127.0.0.1` over TLS 1.3 pinned to that CA; the token never reaches the screens. The server answers only from the socket's own loopback address, compares the token in constant time, refuses everything once `sys.setup_state` is complete, and deletes the token at the end. Steps run as SYSTEM with reason "setup wizard"; this PC is enrolled as the POS through the normal protocol (0024).
 - **Network:** PostgreSQL on localhost only; one firewall rule for the API port from the local subnet (private profile). The PCs reach the server **by its name**; the server PC keeps its address by a router reservation; the app never changes network settings.
-- **Upgrades** back up first and migrate all-or-nothing; **uninstall** keeps `ProgramData`. Updates for the other PCs are served by the server PC on the LAN and checked against the update signature.
+- **Upgrades** back up first and migrate all-or-nothing, and put the previous version back on failure; **uninstall** keeps `ProgramData`. **Updates are automatic and online** (0108): signed in GitHub's protected `release` environment after the owner's approval; the server PC's updater (a SYSTEM scheduled task) downloads, checks the SHA-256 and signature, and installs only with no open shift, in the night window or on "Install now"; the office PCs' app updates itself; without internet everything keeps working.
 
 ## 3. How the integrity rules are enforced
 
@@ -383,4 +383,4 @@ App (POS section)                     API                                       
 
 Built in M6.1 (decision [0086](decisions/0086-backups-local-and-google-drive.md)): the hourly logical backup, the daily age-encrypted Google Drive copy (`drive.file` only, refresh token sealed in `.secrets`), the external-drive copy, the restore test and the nightly checks, run by `apps/backup`; WAL archiving and the nightly base backup come with the installer (M6.2). Runbook: [backup-and-restore.md](runbooks/backup-and-restore.md).
 
-**Upgrades:** backup → rehearse the migrations on a restored copy → stop the API → migrate → start → clients update themselves.
+**Upgrades:** no open shift → checked pre-upgrade backup → stop the services → swap the program folder (previous kept) → migrate all or nothing → start and check `/health` → on any failure the previous version and database come back → clients update themselves (0103, 0108).

@@ -648,6 +648,88 @@ describe('Settings → System health (decision 0086)', () => {
     expect(bridge.callsTo('POST', '/api/v1/backup/drive/connect')[0]?.body ?? {}).toEqual({});
   });
 
+  const update = (patch: Record<string, unknown> = {}) => ({
+    currentVersion: '1.0.0',
+    checkedAt: new Date().toISOString(),
+    checkError: null,
+    available: {
+      version: '1.1.0',
+      notesAr: 'الكاشير بقى أسرع.',
+      notesEn: 'The POS is faster.',
+      publishedAt: new Date().toISOString(),
+    },
+    downloadStatus: 'ready',
+    waitingReason: 'outside_window',
+    lastResult: {
+      ok: false,
+      from: '0.9.0',
+      to: '1.0.0',
+      at: new Date().toISOString(),
+      step: 'migrate',
+    },
+    window: { startHour: 2, endHour: 5 },
+    request: null,
+    ...patch,
+  });
+
+  it('shows the update with its notes, the last result, and "Install now" after confirming (0108)', async () => {
+    const bridge = signedInBridge([
+      ...OWNER_PERMISSIONS,
+      'system.health.view',
+      'system.update.manage',
+    ])
+      .on('GET', '/api/v1/health/system', ok(health()))
+      .on('GET', '/api/v1/system/update', ok(update()))
+      .on('POST', '/api/v1/system/update/install-now', ok({ version: '1.1.0' }, 201))
+      .on('PUT', '/api/v1/system/update/window', ok({ ok: true }));
+    await signIn(bridge);
+    await openSettings();
+    fireEvent.click(screen.getByRole('link', { name: 'النسخ الاحتياطي' }));
+    const card = await screen.findByTestId('updates-card');
+    expect(await within(card).findByText('الكاشير بقى أسرع.')).toBeTruthy();
+    expect(within(card).getByText(/هتتسطّب لوحدها في وقت التحديث بالليل/)).toBeTruthy();
+    expect(within(card).getByText(/تغييرات قاعدة البيانات/)).toBeTruthy();
+    expect(within(card).getByText('رجعنا للنسخة القديمة')).toBeTruthy();
+
+    fireEvent.click(within(card).getByRole('button', { name: 'ثبّت دلوقتي' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/عمره ما بيبدأ وفيه وردية مفتوحة/)).toBeTruthy();
+    expect(bridge.callsTo('POST', '/api/v1/system/update/install-now')).toHaveLength(0);
+    fireEvent.click(within(dialog).getByRole('button', { name: 'ثبّت دلوقتي' }));
+    await waitFor(() =>
+      expect(bridge.callsTo('POST', '/api/v1/system/update/install-now')).toHaveLength(1),
+    );
+
+    fireEvent.click(within(card).getByRole('button', { name: 'غيّر' }));
+    const windowDialog = await screen.findByRole('dialog');
+    fireEvent.change(within(windowDialog).getByLabelText('من'), { target: { value: '23' } });
+    fireEvent.change(within(windowDialog).getByLabelText('لحد'), { target: { value: '4' } });
+    fireEvent.click(within(windowDialog).getByRole('button', { name: 'حفظ' }));
+    await waitFor(() =>
+      expect(bridge.callsTo('PUT', '/api/v1/system/update/window')[0]?.body).toEqual({
+        startHour: 23,
+        endHour: 4,
+      }),
+    );
+  });
+
+  it('without internet says updates wait; without the permission there is no "Install now"', async () => {
+    const bridge = signedInBridge([...OWNER_PERMISSIONS, 'system.health.view'])
+      .on('GET', '/api/v1/health/system', ok(health()))
+      .on(
+        'GET',
+        '/api/v1/system/update',
+        ok(update({ checkError: 'getaddrinfo ENOTFOUND', available: null, lastResult: null })),
+      );
+    await signIn(bridge);
+    await openSettings();
+    fireEvent.click(screen.getByRole('link', { name: 'النسخ الاحتياطي' }));
+    const card = await screen.findByTestId('updates-card');
+    expect(within(card).getByText(/مفيش إنترنت دلوقتي/)).toBeTruthy();
+    expect(within(card).queryByRole('button', { name: 'ثبّت دلوقتي' })).toBeNull();
+    expect(within(card).queryByRole('button', { name: 'غيّر' })).toBeNull();
+  });
+
   it('is not offered to anyone else (the server refuses it anyway)', async () => {
     await signIn(signedInBridge(OWNER_PERMISSIONS));
     await openSettings();

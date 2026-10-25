@@ -3,11 +3,10 @@
  * the server setup as administrator; the steps are in install/steps.ts. Progress lines go to the
  * standard output (the setup shows them) and to the install log in `logs\install`.
  */
-import { get } from 'node:https';
 import { join } from 'node:path';
-import type { TLSSocket } from 'node:tls';
 import { loadEnv } from '@artepool/node-kit';
 import { exec } from './restore-from-backup';
+import { waitHealthy } from './install/health';
 import { InstallLog, logFileName } from './install/log';
 import { InstallError, runInstall, windowsBuildOf, type InstallPaths } from './install/steps';
 import { windowsPlatform } from './install/windows';
@@ -17,29 +16,6 @@ function required(name: string): string {
   if (!value)
     throw new InstallError(`${name} is not set: the installation is started by artepool-svc.`);
   return value;
-}
-
-/** /health over TLS 1.3, trusting only the new ARTEPOOL CA; up to two minutes. */
-function waitHealthy(port: number) {
-  return async (ca: string): Promise<void> => {
-    for (let attempt = 0; attempt < 60; attempt++) {
-      const ok = await new Promise<boolean>((resolve) => {
-        const request = get(
-          { host: '127.0.0.1', port, path: '/health', ca, servername: 'localhost', timeout: 3000 },
-          (response) => {
-            const tls13 = (response.socket as TLSSocket).getProtocol() === 'TLSv1.3';
-            response.resume();
-            resolve(tls13 && response.statusCode === 200);
-          },
-        );
-        request.on('timeout', () => request.destroy());
-        request.on('error', () => resolve(false));
-      });
-      if (ok) return;
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-    }
-    throw new InstallError('The server did not answer within two minutes; see logs\\server.');
-  };
 }
 
 loadEnv();
@@ -77,7 +53,12 @@ try {
     exec,
     log,
     windowsBuild: windowsBuildOf(),
-    waitHealthy: waitHealthy(serverPort),
+    // The setup passes --reattach over the data an uninstall kept (decision 0103, part G3).
+    reattach: process.argv.includes('--reattach'),
+    waitHealthy: waitHealthy(
+      serverPort,
+      () => new InstallError('The server did not answer within two minutes; see logs\\server.'),
+    ),
   });
 } catch (error) {
   const reason = error instanceof Error ? error.message : String(error);

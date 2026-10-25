@@ -2,6 +2,7 @@
  * Database upgrade tool.
  *   pnpm db:migrate            apply pending migrations
  *   pnpm db:migrate --dry-run  check pending migrations, then undo everything
+ *   pnpm db:migrate --all-or-nothing  all pending migrations in one transaction (upgrades, 0103)
  *   pnpm db:status             show applied / pending migrations and verify checksums
  *   pnpm db:new <name>         create the next migration file
  */
@@ -37,6 +38,7 @@ async function main(): Promise<void> {
         client,
         dir: migrationsDir,
         dryRun,
+        allOrNothing: rest.includes('--all-or-nothing'),
         log: (m) => console.log(m),
       });
       if (dryRun) {

@@ -41,6 +41,7 @@
     "build:desktop": "pnpm --filter @artepool/desktop build:app",
     "build:server": "tsx tools/build-server/src/cli.ts",
     "build:installer": "tsx tools/installer/src/cli.ts",
+    "release": "tsx tools/release/src/cli.ts",
     "test:rust": "cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --workspace",
     "owner:create": "tsx apps/server/src/cli/owner-create.ts",
     "device:code": "tsx apps/server/src/cli/device-code.ts",

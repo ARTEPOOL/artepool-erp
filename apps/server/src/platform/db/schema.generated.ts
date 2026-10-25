@@ -984,6 +984,39 @@ export interface OpsOutbox {
   uuid: Generated<string>;
 }
 
+export interface OpsUpdateRequests {
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  error_message: string | null;
+  id: Generated<bigint>;
+  row_version: Generated<number>;
+  status: Generated<string>;
+  updated_at: Generated<Timestamp>;
+  updated_by: bigint;
+  version: string;
+}
+
+export interface OpsUpdateState {
+  available_version: string | null;
+  check_error: string | null;
+  checked_at: Timestamp | null;
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  current_version: string | null;
+  download_status: Generated<string>;
+  id: Generated<number>;
+  last_result: Json | null;
+  notes_ar: string | null;
+  notes_en: string | null;
+  published_at: Timestamp | null;
+  row_version: Generated<number>;
+  updated_at: Generated<Timestamp>;
+  updated_by: bigint;
+  waiting_reason: string | null;
+  window_end_hour: Generated<number>;
+  window_start_hour: Generated<number>;
+}
+
 export interface SalesCreditAllocations {
   amount_fils: bigint;
   created_at: Generated<Timestamp>;
@@ -1493,6 +1526,8 @@ export interface DB {
   "ops.backup_runs": OpsBackupRuns;
   "ops.integrity_runs": OpsIntegrityRuns;
   "ops.outbox": OpsOutbox;
+  "ops.update_requests": OpsUpdateRequests;
+  "ops.update_state": OpsUpdateState;
   "sales.credit_allocations": SalesCreditAllocations;
   "sales.document_lines": SalesDocumentLines;
   "sales.documents": SalesDocuments;

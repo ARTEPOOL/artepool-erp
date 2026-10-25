@@ -10,6 +10,13 @@
 # The desktop app's start at sign-in (a scheduled task for every person, least privilege) and its
 # watchdog (it starts the app again only when it stopped while the kiosk lock was on), then the
 # desktop app's own uninstaller removes the task.
+# Upgrades (decision 0103, M6.2 part G2), with the two test setups `pnpm build:installer
+# --test-upgrade` makes: one that works (data kept, its migration applied, a checked pre-upgrade
+# copy, the previous programs kept), an older setup refused, and one whose migration fails (the
+# database unchanged, the previous version back and answering).
+# Reinstall over the kept data (part G3): an older setup refused, the same version's setup uses
+# the database and the CA as they were, no wizard. Deleting the data (part G4): refused without
+# the owner's password; with it the database, secrets and settings go and the backups stay.
 # The install logs are searched for every secret (and the emergency temporary password): none
 # may appear.
 param([Parameter(Mandatory = $true)][string]$Installer)
@@ -46,7 +53,7 @@ function Install-Server([string]$label) {
   Ok ($p.ExitCode -eq 0) "$label silent install (exit $($p.ExitCode))"
 }
 
-function Uninstall-Server([string]$label) {
+function Uninstall-Server([string]$label, [bool]$dataKept = $true) {
   $p = Start-Process -FilePath "$pf\uninstall.exe" -ArgumentList '/S', "_?=$pf" -Wait -PassThru
   Ok ($p.ExitCode -eq 0) "$label uninstall (exit $($p.ExitCode))"
   Remove-Item -Recurse -Force $pf -ErrorAction SilentlyContinue
@@ -54,9 +61,16 @@ function Uninstall-Server([string]$label) {
     Ok ($null -eq (Get-Service -Name $name -ErrorAction SilentlyContinue)) "$label service $name removed"
   }
   Ok ($null -eq (Get-NetFirewallRule -DisplayName 'ARTEPOOL Server' -ErrorAction SilentlyContinue)) "$label firewall rule removed"
-  Ok (Test-Path "$data\pgdata\PG_VERSION") "$label the data is kept in ProgramData"
+  Ok ($null -eq (Get-ScheduledTask -TaskName 'ARTEPOOL Updater' -ErrorAction SilentlyContinue)) "$label updater task removed"
+  if ($dataKept) { Ok (Test-Path "$data\pgdata\PG_VERSION") "$label the data is kept in ProgramData" }
   Ok (@(Emergency-Shortcuts).Count -eq 0) "$label the emergency tool's shortcut is removed"
+  Ok (-not (Test-Path "$pf.previous") -and -not (Test-Path "$pf.failed")) "$label the folders upgrades leave are removed"
 }
+
+$uninstallKey = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\ARTEPOOL-Server'
+function Installed-Version { (Get-ItemProperty $uninstallKey).DisplayVersion }
+function Run-Setup([string]$file) { (Start-Process -FilePath $file -ArgumentList '/S' -Wait -PassThru).ExitCode }
+function Version-Of([IO.FileInfo]$setup) { $setup.BaseName -replace '^ARTEPOOL-Server-Setup-', '' }
 
 function Secret([string]$name) {
   $entropy = [Text.Encoding]::UTF8.GetBytes("ARTEPOOL secrets v1/$name")
@@ -68,7 +82,8 @@ function Secret([string]$name) {
 function Psql([string]$sql) {
   $env:PGPASSWORD = Secret 'pg-superuser-password'
   try {
-    $out = & "$pf\pgsql\bin\psql.exe" -h localhost -U postgres -d artepool -At -v ON_ERROR_STOP=1 -c $sql
+    $port = (Get-Content "$data\config\server.json" -Raw | ConvertFrom-Json).database.port
+    $out = & "$pf\pgsql\bin\psql.exe" -h localhost -p $port -U postgres -d artepool -At -v ON_ERROR_STOP=1 -c $sql
     if ($LASTEXITCODE -ne 0) { throw "psql failed: $sql" }
     return $out
   } finally {
@@ -84,8 +99,11 @@ function Check-Health([string]$label) {
 $script:alsoSecret = @()
 
 function Check-Logs-Hold-No-Secret([string]$label) {
-  $secrets = @('master-key', 'migrator-password', 'api-password', 'backup-password', 'maint-password', 'pg-superuser-password') |
-    ForEach-Object { Secret $_ }
+  $secrets = @()
+  if (Test-Path "$data\secrets") {
+    $secrets += @('master-key', 'migrator-password', 'api-password', 'backup-password', 'maint-password', 'pg-superuser-password') |
+      ForEach-Object { Secret $_ }
+  }
   $secrets += $script:alsoSecret
   if (Test-Path "$data\setup\token") { $secrets += (Get-Content "$data\setup\token" -Raw).Trim() }
   $files = Get-ChildItem "$data\logs" -Recurse -File
@@ -113,8 +131,21 @@ function Emergency([string]$action, [string]$json) {
   return ($lines | Where-Object { $_ -like '{*' } | Select-Object -Last 1 | ConvertFrom-Json)
 }
 
-# ---- 1. A clean PC: install ----
+# ---- 1. A PC where another program already uses PostgreSQL's port 5432 ----
+# A first attempt with every database port taken stops (and leaves its secrets); with only 5432
+# taken, the setup runs again over what it left and gives the database the next free port.
+$listeners = @(5432..5442 | ForEach-Object {
+  $listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Any, $_)
+  $listener.Start()
+  $listener
+})
+$exit = Run-Setup $Installer
+Ok ($exit -ne 0) "the setup stops when every database port is taken (exit $exit)"
+Ok (Test-Path "$data\secrets\master-key.dpapi") 'the stopped attempt left its secrets'
+$listeners | Select-Object -Skip 1 | ForEach-Object { $_.Stop() }
 Install-Server 'first'
+$listeners[0].Stop()
+Ok ((Get-Content "$data\config\server.json" -Raw | ConvertFrom-Json).database.port -eq 5433) 'another program on 5432: the database takes 5433'
 foreach ($name in 'ArtepoolDatabase', 'ArtepoolServer', 'ArtepoolBackup') {
   $service = Get-CimInstance Win32_Service -Filter "Name='$name'"
   Ok ($service.State -eq 'Running') "$name is running"
@@ -130,7 +161,8 @@ $lan = Get-NetIPAddress -AddressFamily IPv4 |
   Select-Object -First 1 -ExpandProperty IPAddress
 $probe = New-Object Net.Sockets.TcpClient
 $reached = $false
-try { $probe.Connect($lan, 5432); $reached = $true } catch { } finally { $probe.Close() }
+$databasePort = (Get-Content "$data\config\server.json" -Raw | ConvertFrom-Json).database.port
+try { $probe.Connect($lan, $databasePort); $reached = $true } catch { } finally { $probe.Close() }
 Ok (-not $reached) "the database is not reachable on the LAN address $lan"
 
 $allowed = @('S-1-5-18', 'S-1-5-32-544')
@@ -148,6 +180,18 @@ Ok ($rule.Direction -eq 'Inbound' -and $rule.Action -eq 'Allow') 'one inbound fi
 Ok ([string]$rule.Profile -eq 'Private') "the firewall rule is for private networks ($($rule.Profile))"
 Ok ((($rule | Get-NetFirewallAddressFilter).RemoteAddress) -contains 'LocalSubnet') 'the firewall rule is for the local subnet only'
 Ok ((($rule | Get-NetFirewallPortFilter).LocalPort) -eq '3100') 'the firewall rule opens the API port only'
+
+# ---- The server PC's updater (decision 0108) ----
+$updater = Get-ScheduledTask -TaskName 'ARTEPOOL Updater'
+Ok ($updater.Principal.UserId -in @('SYSTEM', 'NT AUTHORITY\SYSTEM', 'S-1-5-18')) "the updater runs as SYSTEM ($($updater.Principal.UserId))"
+# Task Scheduler keeps the quotes schtasks needs around a path with spaces (and may keep the
+# arguments with the program): compare the whole command line without them.
+$updaterCommand = "$($updater.Actions[0].Execute) $($updater.Actions[0].Arguments)".Replace('"', '').Trim()
+Ok ($updaterCommand -eq "$svc run updater") "the updater runs the launcher ($updaterCommand)"
+& $svc run updater
+Ok ($LASTEXITCODE -eq 0) 'the updater runs'
+Ok ((Psql 'SELECT current_version IS NOT NULL FROM ops.update_state') -eq 't') 'the updater records the version running'
+Ok ((Psql 'SELECT check_error FROM ops.update_state') -like '*update key is not set*') 'without the update key no update is accepted'
 
 # ---- The desktop app: start at sign-in and the watchdog (decisions 0082, 0083) ----
 $appDir = Join-Path $env:ProgramFiles 'ARTEPOOL ERP'
@@ -213,6 +257,7 @@ Ok ($refused.ok -eq $false -and $refused.reason -eq 'reason_required') 'emergenc
 $reset = Emergency 'reset-password' '{"reason":"CI emergency test","phoneLost":false}'
 Ok ($reset.ok -eq $true -and $reset.result.temporaryPassword.Length -ge 10) 'emergency: a temporary password for the owner'
 $script:alsoSecret += $reset.result.temporaryPassword
+$ownerPassword = $reset.result.temporaryPassword
 Ok ((Psql "SELECT count(*) FROM audit.log WHERE action = 'event:auth.owner_password_reset' AND reason LIKE 'emergency tool % CI emergency test'") -eq '1') 'emergency: the reset is in the audit log with its reason'
 $code = Emergency 'device-code' '{}'
 Ok ($code.ok -eq $true -and $code.result.code.Length -ge 6) 'emergency: an enrollment code'
@@ -224,8 +269,87 @@ Copy-Item $copy.FullName "$work\local.dump"
 & pnpm exec tsx "$repo\tools\installer\windows\make-bundle.ts" "$work\local.dump" $oldKey $work
 Ok ($LASTEXITCODE -eq 0) 'the encrypted off-site copy is made'
 
-# ---- 4. Uninstall keeps the data; then a new PC ----
+# ---- Upgrades (decision 0103): one that works, an older setup, one whose migration fails ----
+$tests = @(Get-ChildItem (Join-Path (Split-Path $Installer) 'test') -Filter 'ARTEPOOL-Server-Setup-*.exe' |
+  Sort-Object { [version](Version-Of $_) })
+Ok ($tests.Count -eq 2) 'the two test upgrades were built'
+$firstVersion = Installed-Version
+$users = Psql 'SELECT count(*) FROM auth.users'
+$exit = Run-Setup $tests[0].FullName
+if ($exit -ne 0) { Show-Logs }
+Ok ($exit -eq 0) "upgrade $firstVersion -> $(Version-Of $tests[0]) (exit $exit)"
+Ok ((Installed-Version) -eq (Version-Of $tests[0])) 'the new version is installed'
+Check-Health 'after the upgrade'
+Ok ((Psql 'SELECT count(*) FROM auth.users') -eq $users) 'the data is kept'
+Ok ((Psql "SELECT to_regclass('sys.ci_upgrade_check') IS NOT NULL") -eq 't') "the new version's migration is applied"
+Ok ((Psql "SELECT count(*) FROM audit.log WHERE action = 'event:system.upgraded'") -eq '1') 'the upgrade is in the audit log'
+$pre = @(Get-ChildItem "$data\backups\pre-upgrade" -Filter '*.dump')
+Ok ($pre.Count -eq 1) "a pre-upgrade copy was made ($($pre[0].Name))"
+$sum = (Get-Content "$($pre[0].FullName).sha256" -Raw).Split(' ')[0]
+Ok ($sum -eq (Get-FileHash $pre[0].FullName -Algorithm SHA256).Hash.ToLower()) 'its SHA-256 is beside it'
+Ok (Test-Path "$pf.previous\artepool-svc.exe") 'the previous programs are kept beside'
+foreach ($name in 'ArtepoolDatabase', 'ArtepoolServer', 'ArtepoolBackup') {
+  Ok ((Get-Service $name).Status -eq 'Running') "$name runs after the upgrade"
+}
+$result = Get-Content "$data\updates\last-result.json" -Raw | ConvertFrom-Json
+Ok ($result.ok -eq $true) 'the result is saved for System health'
+
+$exit = Run-Setup $Installer
+Ok ($exit -eq 4) "an older setup over a newer installation changes nothing (exit $exit)"
+Ok ((Installed-Version) -eq (Version-Of $tests[0])) 'the newer version stays'
+
+$migrations = Psql 'SELECT count(*) FROM sys.schema_migrations'
+$exit = Run-Setup $tests[1].FullName
+Ok ($exit -eq 6) "a failing upgrade puts the previous version back (exit $exit)"
+Ok ((Installed-Version) -eq (Version-Of $tests[0])) 'the previous version is installed again'
+Check-Health 'after the failed upgrade'
+foreach ($name in 'ArtepoolDatabase', 'ArtepoolServer', 'ArtepoolBackup') {
+  Ok ((Get-Service $name).Status -eq 'Running') "$name runs again after the failed upgrade"
+}
+Ok ((Psql 'SELECT count(*) FROM sys.schema_migrations') -eq $migrations) 'the database is unchanged'
+Ok ((Psql "SELECT to_regclass('sys.ci_upgrade_broken') IS NULL") -eq 't') 'nothing of the failing migration is left'
+$result = Get-Content "$data\updates\last-result.json" -Raw | ConvertFrom-Json
+Ok ($result.ok -eq $false -and $result.step -eq 'migrate') "the failure is saved for System health ($($result.step))"
+Ok (Test-Path "$pf.failed\artepool-svc.exe") 'the failed programs are kept aside for support'
+Check-Logs-Hold-No-Secret 'after the upgrades:'
+
+# ---- 4. Uninstall keeps the data; reinstall uses it; then deleting the data ----
 Uninstall-Server 'first'
+$caHash = (Get-FileHash "$data\secrets\tls\ca.crt").Hash
+$exit = Run-Setup $Installer
+Ok ($exit -eq 4) "an older setup does not reinstall over data of a newer version (exit $exit)"
+Ok ($null -eq (Get-Service -Name 'ArtepoolDatabase' -ErrorAction SilentlyContinue)) 'and changes nothing'
+$exit = Run-Setup $tests[0].FullName
+if ($exit -ne 0) { Show-Logs }
+Ok ($exit -eq 0) "reinstall over the kept data (exit $exit)"
+Check-Health 'after the reinstall'
+Ok ((Psql "SELECT count(*) FROM auth.users WHERE username = 'ciowner'") -eq '1') 'the owner is still there'
+Ok ((Psql 'SELECT state FROM sys.setup_state') -eq 'complete') 'the first-run setup stays closed'
+Ok (-not (Test-Path "$data\setup\token")) 'no setup token'
+Ok ((Get-FileHash "$data\secrets\tls\ca.crt").Hash -eq $caHash) 'the PCs keep trusting the same CA'
+Ok (@(Get-ChildItem "$data\backups\pre-upgrade" -Filter '*-before-reinstall.dump').Count -eq 1) 'a checked copy was made before the reinstall'
+foreach ($name in 'ArtepoolDatabase', 'ArtepoolServer', 'ArtepoolBackup') {
+  Ok ((Get-Service $name).Status -eq 'Running') "$name runs after the reinstall"
+}
+Check-Logs-Hold-No-Secret 'after the reinstall:'
+
+$script:alsoSecret += @('master-key', 'migrator-password', 'api-password', 'backup-password', 'maint-password', 'pg-superuser-password') |
+  ForEach-Object { Secret $_ }
+"DELETE`nnot-the-owner-password`n" | & $svc run delete-data | Out-Null
+Ok ($LASTEXITCODE -eq 1) "delete data with a wrong owner's password is refused (exit $LASTEXITCODE)"
+Ok (Test-Path "$data\pgdata\PG_VERSION") 'nothing was deleted'
+Ok ((Psql "SELECT count(*) FROM audit.log WHERE action = 'event:system.data_delete_refused'") -eq '1') 'the refusal is in the audit log'
+"delete`n$ownerPassword`n" | & $svc run delete-data | Out-Null
+Ok ($LASTEXITCODE -eq 1 -and (Test-Path "$data\pgdata\PG_VERSION")) 'without the word DELETE nothing is deleted'
+"DELETE`n$ownerPassword`n" | & $svc run delete-data | Out-Null
+Ok ($LASTEXITCODE -eq 0) "delete data with DELETE and the owner's password (exit $LASTEXITCODE)"
+foreach ($folder in 'pgdata', 'wal', 'secrets', 'config', 'setup') {
+  Ok (-not (Test-Path "$data\$folder")) "$folder is deleted"
+}
+Ok (@(Get-ChildItem "$data\backups" -Recurse -Filter '*.dump').Count -ge 2) 'the backups folder stays'
+Ok (Test-Path "$data\logs\install") 'the logs stay'
+Check-Logs-Hold-No-Secret 'after deleting the data:'
+Uninstall-Server 'after deleting the data:' $false
 Remove-Item -Recurse -Force $data
 Ok (-not (Test-Path $data)) 'the data is wiped, as on a new PC'
 

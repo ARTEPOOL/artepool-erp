@@ -138,6 +138,31 @@ export function firewallRule(port: number): string[][] {
   ];
 }
 
+export const UPDATER_TASK = 'ARTEPOOL Updater';
+
+/**
+ * The server PC's updater (decision 0108): every 5 minutes as SYSTEM, one at a time. It reads the
+ * update list only every few hours; the short interval is for the owner's "Install now".
+ */
+export function updaterTask(launcher: string): string[] {
+  return [
+    '/Create',
+    '/TN',
+    UPDATER_TASK,
+    '/RU',
+    'SYSTEM',
+    '/SC',
+    'MINUTE',
+    '/MO',
+    '5',
+    '/RL',
+    'HIGHEST',
+    '/F',
+    '/TR',
+    `"${launcher}" run updater`,
+  ];
+}
+
 /** The Windows things the installation does; a fake one in the tests. */
 export interface Platform {
   restrictFolder(folder: string, grants?: Grant[]): Promise<void>;
@@ -148,6 +173,15 @@ export interface Platform {
   registerAppService(service: 'server' | 'backup'): Promise<void>;
   startService(service: ServiceKey): Promise<void>;
   addFirewallRule(port: number): Promise<void>;
+  /** The scheduled task of the server PC's updater (decision 0108); replaced if it exists. */
+  registerUpdaterTask(): Promise<void>;
+}
+
+/** What an upgrade adds (M6.2 part G2). */
+export interface UpgradeWindows {
+  stopService(service: ServiceKey): Promise<void>;
+  /** The new version's WinSW files for a service already registered. */
+  refreshAppService(service: 'server' | 'backup'): Promise<void>;
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -158,7 +192,7 @@ export function windowsPlatform(options: {
   pgBin: string;
   logDir: string;
   pollMs?: number;
-}): Platform {
+}): Platform & UpgradeWindows {
   const { exec } = options;
   const pollMs = options.pollMs ?? 1000;
   const waitRunning = async (service: ServiceKey) => {
@@ -173,8 +207,37 @@ export function windowsPlatform(options: {
     }
     throw new Error(`The service ${name} did not start within two minutes.`);
   };
+  const waitStopped = async (service: ServiceKey) => {
+    const { name } = SERVICES[service];
+    for (let i = 0; i < 120; i++) {
+      const out = await exec('sc.exe', ['query', name]).catch((error: unknown) => String(error));
+      if (/STATE\s*:\s*\d+\s+STOPPED/.test(out) || out.includes('1060')) return;
+      await sleep(pollMs);
+    }
+    throw new Error(`The service ${name} did not stop within two minutes.`);
+  };
   const configure = async (service: ServiceKey, description: string) => {
     for (const args of scConfigure(service, description)) await exec('sc.exe', args);
+  };
+  const description = (service: 'server' | 'backup') =>
+    service === 'server'
+      ? 'ARTEPOOL ERP server: the API the PCs of the shop connect to.'
+      : 'ARTEPOOL ERP backups: hourly copies, Google Drive, checks.';
+  /** WinSW's copy named after the service, and its settings beside it. */
+  const writeWinsw = async (service: 'server' | 'backup') => {
+    const { name } = SERVICES[service];
+    const dir = join(options.programDir, 'winsw');
+    await copyFile(join(dir, 'winsw.exe'), join(dir, `${name}.exe`));
+    await writeFile(
+      join(dir, `${name}.xml`),
+      winswXml({
+        service,
+        launcher: join(options.programDir, 'artepool-svc.exe'),
+        logDir: join(options.logDir, service),
+        description: description(service),
+      }),
+    );
+    return join(dir, `${name}.exe`);
   };
   return {
     async restrictFolder(folder, grants = []) {
@@ -193,28 +256,28 @@ export function windowsPlatform(options: {
       await waitRunning('database');
     },
     async registerAppService(service) {
-      const { name } = SERVICES[service];
-      const dir = join(options.programDir, 'winsw');
-      const description =
-        service === 'server'
-          ? 'ARTEPOOL ERP server: the API the PCs of the shop connect to.'
-          : 'ARTEPOOL ERP backups: hourly copies, Google Drive, checks.';
-      await copyFile(join(dir, 'winsw.exe'), join(dir, `${name}.exe`));
-      await writeFile(
-        join(dir, `${name}.xml`),
-        winswXml({
-          service,
-          launcher: join(options.programDir, 'artepool-svc.exe'),
-          logDir: join(options.logDir, service),
-          description,
-        }),
-      );
-      await exec(join(dir, `${name}.exe`), ['install']);
-      await configure(service, description);
+      await exec(await writeWinsw(service), ['install']);
+      await configure(service, description(service));
+    },
+    async refreshAppService(service) {
+      await writeWinsw(service);
     },
     async startService(service) {
-      await exec('sc.exe', ['start', SERVICES[service].name]);
+      // Already running (error 1056) is fine.
+      await exec('sc.exe', ['start', SERVICES[service].name]).catch((error: unknown) => {
+        if (!String(error).includes('1056')) throw error;
+      });
       await waitRunning(service);
+    },
+    async stopService(service) {
+      // Not running (1062) or not there (1060) is fine.
+      await exec('sc.exe', ['stop', SERVICES[service].name]).catch((error: unknown) => {
+        if (!/1062|1060/.test(String(error))) throw error;
+      });
+      await waitStopped(service);
+    },
+    async registerUpdaterTask() {
+      await exec('schtasks.exe', updaterTask(join(options.programDir, 'artepool-svc.exe')));
     },
     async addFirewallRule(port) {
       const [remove, add] = firewallRule(port);
