@@ -11,6 +11,7 @@ import { pcNames, windowsBuildOf } from '../../src/cli/install/steps';
 import {
   firewallRule,
   icaclsGrant,
+  icaclsReset,
   icaclsRestrict,
   pgCtlRegister,
   scConfigure,
@@ -30,13 +31,17 @@ describe('folder access rules', () => {
       '*S-1-5-18:(OI)(CI)F',
       '*S-1-5-32-544:(OI)(CI)F',
       'NT SERVICE\\ArtepoolBackup:(OI)(CI)M',
-      '/T',
       '/C',
       '/Q',
     ]);
     expect(icaclsGrant('D:\\x', { service: 'server', access: 'read' })).toContain(
       'NT SERVICE\\ArtepoolServer:(OI)(CI)RX',
     );
+    // The inheritance flags go on the folder alone; files get its rules passed down, after a reset
+    // that drops any explicit rule (an inheritance flag on a file would leave it unreadable).
+    expect(icaclsRestrict('D:\\x')).not.toContain('/T');
+    expect(icaclsGrant('D:\\x', { service: 'server', access: 'read' })).not.toContain('/T');
+    expect(icaclsReset('D:\\x')).toEqual(['D:\\x', '/reset', '/T', '/C', '/Q']);
     // Never "Users" or "Everyone".
     expect(icaclsRestrict('D:\\x').join(' ')).not.toMatch(/Users|Everyone|S-1-1-0|S-1-5-32-545/);
   });
@@ -210,7 +215,7 @@ describe('the Windows steps, in order', () => {
       'sc.exe config ArtepoolDatabase obj= NT SERVICE\\ArtepoolDatabase DisplayName= ARTEPOOL Database start= auto',
       'sc.exe description ArtepoolDatabase ARTEPOOL ERP database (PostgreSQL 18, this PC only).',
       'sc.exe failure ArtepoolDatabase reset= 86400 actions= restart/5000/restart/10000/restart/30000',
-      'icacls.exe C:\\PD\\pgdata /grant NT SERVICE\\ArtepoolDatabase:(OI)(CI)F /T /C /Q',
+      'icacls.exe C:\\PD\\pgdata /grant NT SERVICE\\ArtepoolDatabase:(OI)(CI)F /C /Q',
       'sc.exe start ArtepoolDatabase',
       'sc.exe query ArtepoolDatabase',
       'sc.exe query ArtepoolDatabase',

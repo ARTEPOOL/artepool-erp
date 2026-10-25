@@ -33,8 +33,17 @@ const RIGHTS: Record<Access, string> = { read: 'RX', modify: 'M', full: 'F' };
 export const serviceAccount = (service: ServiceKey) => `NT SERVICE\\${SERVICES[service].name}`;
 
 /**
- * Only SYSTEM, Administrators and the given services may open `folder` (and everything in it):
- * inherited rules are removed, existing files included.
+ * First step of closing a folder: everything in it (and the folder) back to plain inherited
+ * rules, dropping any explicit ones (initdb leaves its own on the data folder). Valid on files,
+ * unlike the inheritance flags of the next step.
+ */
+export function icaclsReset(folder: string): string[] {
+  return [folder, '/reset', '/T', '/C', '/Q'];
+}
+
+/**
+ * Second step: only SYSTEM, Administrators and the given services may open `folder`. Set on the
+ * folder alone; Windows passes these inheritable rules down to everything in it.
  */
 export function icaclsRestrict(folder: string, grants: Grant[] = []): string[] {
   return [
@@ -44,19 +53,17 @@ export function icaclsRestrict(folder: string, grants: Grant[] = []): string[] {
     `${SYSTEM}:(OI)(CI)F`,
     `${ADMINISTRATORS}:(OI)(CI)F`,
     ...grants.map((g) => `${serviceAccount(g.service)}:(OI)(CI)${RIGHTS[g.access]}`),
-    '/T',
     '/C',
     '/Q',
   ];
 }
 
-/** Adds one service's rights to a folder already restricted. */
+/** Adds one service's rights to a folder already restricted (passed down to its contents). */
 export function icaclsGrant(folder: string, grant: Grant): string[] {
   return [
     folder,
     '/grant',
     `${serviceAccount(grant.service)}:(OI)(CI)${RIGHTS[grant.access]}`,
-    '/T',
     '/C',
     '/Q',
   ];
@@ -171,6 +178,7 @@ export function windowsPlatform(options: {
   };
   return {
     async restrictFolder(folder, grants = []) {
+      await exec('icacls.exe', icaclsReset(folder));
       await exec('icacls.exe', icaclsRestrict(folder, grants));
     },
     async grantFolder(folder, grant) {

@@ -32,8 +32,10 @@ function Ok([bool]$condition, [string]$what) {
 function Show-Logs {
   if (Test-Path "$data\logs") {
     Get-ChildItem "$data\logs" -Recurse -File | ForEach-Object {
-      Write-Host "----- $($_.FullName)"
-      Get-Content $_.FullName -Tail 80
+      $file = $_.FullName
+      Write-Host "----- $file"
+      try { Get-Content $file -Tail 80 -ErrorAction Stop }
+      catch { Write-Host "(cannot be read: $($_.Exception.Message))"; & icacls.exe $file 2>&1 | Write-Host }
     }
   }
 }
