@@ -4,6 +4,7 @@
  * folder) stops the release. Release notes in Arabic and English are required. The update list
  * holds what the desktop app's updater and the server PC's updater read.
  */
+import { readFileSync } from 'node:fs';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -26,13 +27,17 @@ async function folder(files: Record<string, string>): Promise<string> {
   return dir;
 }
 
+/** A real signature from Tauri's signer (the test key of the server's signature tests). */
+const tauriSignature = readFileSync(
+  join(import.meta.dirname, '../../../../apps/server/test/fixtures/update-signature/data.bin.sig'),
+  'utf8',
+).trim();
+
 const good = {
   'ARTEPOOL-Server-Setup-1.2.3.exe': 'MZ',
-  'ARTEPOOL-Server-Setup-1.2.3.exe.sig': Buffer.from('untrusted comment: signature').toString(
-    'base64',
-  ),
+  'ARTEPOOL-Server-Setup-1.2.3.exe.sig': tauriSignature,
   'ARTEPOOL-Office-Setup-1.2.3.exe': 'MZ',
-  'ARTEPOOL-Office-Setup-1.2.3.exe.sig': 'c2ln',
+  'ARTEPOOL-Office-Setup-1.2.3.exe.sig': tauriSignature,
   'latest.json': '{"version":"1.2.3"}',
   'SHA256SUMS.txt': 'abc  ARTEPOOL-Server-Setup-1.2.3.exe\n',
 };
@@ -44,7 +49,18 @@ afterAll(() => rm(root, { recursive: true, force: true }));
 
 describe('what may be published', () => {
   it('allows the setups, their signatures, latest.json and SHA256SUMS.txt', async () => {
+    // Tauri's signatures say "signature from tauri secret key": that is not a secret.
+    expect(Buffer.from(tauriSignature, 'base64').toString('utf8')).toContain('secret key');
     expect(await checkPublishable(await folder(good))).toEqual([]);
+  });
+
+  it('refuses a .sig that is not a signature', async () => {
+    const refused = await checkPublishable(
+      await folder({ ...good, 'ARTEPOOL-Office-Setup-1.2.3.exe.sig': 'c2ln' }),
+    );
+    expect(refused).toEqual([
+      { file: 'ARTEPOOL-Office-Setup-1.2.3.exe.sig', reason: 'not a signature' },
+    ]);
   });
 
   it('refuses any other file, a folder, or nothing at all', async () => {
@@ -82,10 +98,7 @@ describe('what may be published', () => {
     ];
     for (const [name, content] of cases) {
       const refused = await checkPublishable(await folder({ ...good, [name]: content }));
-      expect(
-        refused.map((r) => r.file),
-        content,
-      ).toEqual([name]);
+      expect([...new Set(refused.map((r) => r.file))], content).toEqual([name]);
     }
   });
 });
