@@ -48,7 +48,7 @@ Phase 1 has **68 tables in 9 schemas**, plus reporting views and the functions a
 | `artepool_owner` | no | Owns every object | — |
 | `artepool_migrator` | yes (server only) | Migration runner | Member of `artepool_owner` |
 | `artepool_api` | yes (server only) | API service | See below |
-| `artepool_backup` | yes (server only) | Backup service | `pg_read_all_data`, `REPLICATION`, `CREATEDB` (only for the throwaway restore-test database); write `ops.backup_runs`, `ops.integrity_runs`, move `ops.backup_requests` forward; the server PC's updater keeps `ops.update_state` and moves `ops.update_requests` forward (0108); `audit.add_anchor()`, `audit.verify_chain()`; never changes business data |
+| `artepool_backup` | yes (server only) | Backup service | `pg_read_all_data`, `REPLICATION`, `CREATEDB` (only for the throwaway restore-test database); write `ops.backup_runs`, `ops.integrity_runs`, move `ops.backup_requests` forward; the server PC's updater keeps `ops.update_state` and moves `ops.update_requests` forward (0108) and records the server certificate in `ops.server_health` (M6.2 H); `audit.add_anchor()`, `audit.verify_chain()`; never changes business data |
 | `artepool_maint` | yes (server only) | Nightly maintenance | `DELETE` only on `sys.idempotency_keys` older than 30 days (a trigger enforces both the role and the age). Sessions are never deleted ([0026](decisions/0026-users-and-devices-never-deleted.md)). |
 
 **`artepool_api` privileges:**
@@ -110,7 +110,7 @@ Phase 1 has **68 tables in 9 schemas**, plus reporting views and the functions a
         │                               cash.drawer_events                                  (incl. oversell, pending review)
         └── every financial event ─► gl.journal_entries ─► gl.journal_lines ─► gl.accounts      gl.periods (monthly)
 
- audit.log (hash-chained) ◄─ every table + explicit events         ops.outbox · ops.backup_runs · ops.integrity_runs · ops.backup_requests · ops.update_state · ops.update_requests
+ audit.log (hash-chained) ◄─ every table + explicit events         ops.outbox · ops.backup_runs · ops.integrity_runs · ops.backup_requests · ops.update_state · ops.update_requests · ops.server_health
 ```
 
 ---
@@ -1616,6 +1616,19 @@ One row (`id = 1`) kept by the server PC's updater (as `artepool_backup`, SYSTEM
 ### 12.6 `ops.update_requests` (migration 0044, decision 0108)
 
 The owner's "Install now" (`system.update.manage`, owner only): `version`, `status` (`pending` → `running` → `done`/`failed`, forward only; one open at a time), `error_message`. Audited, never deleted.
+
+### 12.7 `ops.server_health` (migration 0045, M6.2 part H)
+
+One row (`id = 1`), audited, never deleted; shown on System health → "Server PC" (owner only).
+
+| Column | Type | Notes |
+|---|---|---|
+| ups_confirmed_at | timestamptz? | The owner confirmed a UPS is connected (`system.health.manage`; a trigger lets only the owner change it). Asked again after 182 days |
+| cert_expires_at | timestamptz? | The server certificate in use, as the updater last saw it |
+| cert_renewed_at | timestamptz? | The last automatic renewal that was checked and switched to (60 days before the end; the audit log keeps the old and new expiry of each) |
+| cert_renew_attempted_at / cert_renew_error | timestamptz? / text? | The last try and why it failed (tried again the next night) |
+
+The API may update only `ups_confirmed_at`; the updater (`artepool_backup`) only the certificate columns. Disks, the backup service heartbeat (`backups\.heartbeat`, a file), WAL archiving (`pg_stat_archiver`) and the certificates' dates are read live, not stored.
 
 ## 13. Views
 
