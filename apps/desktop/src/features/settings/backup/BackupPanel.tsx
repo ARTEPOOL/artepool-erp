@@ -39,6 +39,7 @@ import { CardHead, NoAccess, PanelHeader, settingsClasses } from '../parts';
 import styles from './backup.module.css';
 import { DriveDialog } from './DriveDialog';
 import { KeyDialog } from './KeyDialog';
+import { ServerHealthCard } from './ServerHealthCard';
 import { UpdatesCard } from './UpdatesCard';
 
 export const HEALTH_KEY = ['settings', 'health'] as const;
@@ -161,6 +162,7 @@ export function BackupPanel() {
 
       {h && (
         <>
+          <ServerHealthCard backup={h} onCreateKey={() => setKeying(true)} />
           <div className={styles.kpis}>
             <Kpi
               icon={<Database aria-hidden="true" />}

@@ -984,5 +984,75 @@
     "from": "From",
     "to": "To",
     "automatic": "The server PC checks for updates by itself, downloads them in the background and installs them at a safe time. The office PCs update after the server."
+  },
+  "serverHealth": {
+    "title": "Server PC",
+    "lastBackup": "Last backup",
+    "noBackupYet": "No backup yet",
+    "backupKey": "Backup key",
+    "createKey": "Create it now",
+    "age": {
+      "minutes_one": "{count} minute ago",
+      "minutes_other": "{count} minutes ago",
+      "hours_one": "{count} hour ago",
+      "hours_other": "{count} hours ago",
+      "days_one": "{count} day ago",
+      "days_other": "{count} days ago"
+    },
+    "level": {
+      "ok": "OK",
+      "warning": "Soon",
+      "urgent": "Now"
+    },
+    "disk": {
+      "data": "Database disk",
+      "backups": "Backups disk",
+      "system": "Windows disk"
+    },
+    "services": {
+      "title": "Services",
+      "databaseServer": "Database and server running",
+      "backupRunning": "backup service running",
+      "backupStopped": "backup service not running"
+    },
+    "wal": {
+      "ok": "continuous copy working",
+      "failing": "continuous copy failing",
+      "off": "continuous copy not set up on this PC"
+    },
+    "cert": {
+      "server": "Server certificate",
+      "rootCa": "Root certificate (ARTÉPOOL CA)",
+      "until_one": "Valid until {date} ({count} day left)",
+      "until_other": "Valid until {date} ({count} days left)",
+      "expired": "Ended on {date}",
+      "renewsItself": "renews itself 60 days before it ends",
+      "renewedOn": "renewed by itself on {date}",
+      "renewalFailed": "the last automatic renewal failed; it is tried again tonight",
+      "rootCaManual": "renewed by hand, with the owner's approval"
+    },
+    "clock": {
+      "title": "Server clock",
+      "ok": "Correct: {time}",
+      "behind": "The clock went back: correct the date and time in Windows on the server PC"
+    },
+    "ups": {
+      "title": "UPS (battery backup)",
+      "question": "Is a UPS connected to the server PC?",
+      "confirmed": "Confirmed on {date}; asked again after six months",
+      "confirm": "Yes, a UPS is connected",
+      "thanks": "Thank you: the UPS is confirmed"
+    },
+    "problem": {
+      "disk_low": "A disk on the server PC is getting full.",
+      "disk_urgent": "A disk on the server PC is almost full: free some space now.",
+      "backup_service_down": "The backup service is not running on the server PC.",
+      "wal_archive_failed": "The database's continuous copy is failing.",
+      "certificate_expiring": "The server certificate ends soon and has not renewed itself yet.",
+      "certificate_renewal_failed": "The automatic renewal of the server certificate failed; it is tried again tonight.",
+      "root_ca_expiring": "The root certificate (ARTÉPOOL CA) ends in less than two years: plan its renewal with support.",
+      "clock_behind": "The server PC's clock went back: nothing can be saved until it is corrected.",
+      "ups_unconfirmed": "Confirm that a UPS is connected to the server PC."
+    }
   }
 }

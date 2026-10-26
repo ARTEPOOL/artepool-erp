@@ -110,3 +110,8 @@
     border: 0;
   }
 }
+
+/* The server PC card sits above the backup figures (M6.2 part H). */
+.serverCard {
+  margin-block-end: var(--space-4);
+}
