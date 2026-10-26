@@ -204,6 +204,7 @@ describe('the owner is protected (decisions 0025, 0026)', () => {
       'system.backup.restore_test', // the health screen and its tools are the owner's (M6.1)
       'system.company.edit', // company details are printed on tax invoices (decision 0030)
       'system.devices.manage',
+      'system.health.manage', // confirming the UPS on System health (M6.2 part H)
       'system.health.view',
       'system.integrity.run',
       'system.series.manage',

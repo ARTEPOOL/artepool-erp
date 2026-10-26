@@ -984,6 +984,20 @@ export interface OpsOutbox {
   uuid: Generated<string>;
 }
 
+export interface OpsServerHealth {
+  cert_expires_at: Timestamp | null;
+  cert_renew_attempted_at: Timestamp | null;
+  cert_renew_error: string | null;
+  cert_renewed_at: Timestamp | null;
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  id: Generated<number>;
+  row_version: Generated<number>;
+  updated_at: Generated<Timestamp>;
+  updated_by: bigint;
+  ups_confirmed_at: Timestamp | null;
+}
+
 export interface OpsUpdateRequests {
   created_at: Generated<Timestamp>;
   created_by: bigint;
@@ -1526,6 +1540,7 @@ export interface DB {
   "ops.backup_runs": OpsBackupRuns;
   "ops.integrity_runs": OpsIntegrityRuns;
   "ops.outbox": OpsOutbox;
+  "ops.server_health": OpsServerHealth;
   "ops.update_requests": OpsUpdateRequests;
   "ops.update_state": OpsUpdateState;
   "sales.credit_allocations": SalesCreditAllocations;
