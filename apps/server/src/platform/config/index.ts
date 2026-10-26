@@ -26,6 +26,8 @@ export interface ServerConfig {
   masterKey: MasterKeySource;
   /** Folder with the CA certificate and the server certificate and key (`pnpm tls:init`). */
   tlsDir: string;
+  /** The data folder (`ProgramData\ARTEPOOL` installed): System health reads its disk space. */
+  dataDir: string;
 }
 
 /**
@@ -42,5 +44,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     database: connectionFor('api'),
     masterKey: masterKeySource(env),
     tlsDir: settings.ARTEPOOL_TLS_DIR ?? join(repoRoot, '.secrets', 'tls'),
+    dataDir: env.ARTEPOOL_DATA_DIR || repoRoot,
   };
 }
