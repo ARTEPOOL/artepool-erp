@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { loadConfig } from '../../src/platform/config';
 import { clockSkewSeconds, dubaiDate } from '../../src/platform/time';
 
@@ -17,6 +17,12 @@ describe('Dubai business date', () => {
 
 describe('server settings', () => {
   const env = { ARTEPOOL_API_PASSWORD: 'x', ARTEPOOL_DB: 'artepool_dev' };
+  // The database connection is read from the process settings: set them here, so the test does
+  // not depend on the shell it runs in (the release build has none of them).
+  beforeEach(() => {
+    for (const [name, value] of Object.entries(env)) vi.stubEnv(name, value);
+  });
+  afterEach(() => vi.unstubAllEnvs());
 
   it('uses safe defaults: localhost only', () => {
     const config = loadConfig({ ...env });

@@ -18,8 +18,11 @@ describe('device file', () => {
     const dir = await mkdtemp(join(tmpdir(), 'artepool-device-'));
     const file = join(dir, 'nested', 'device.json');
     await writeDevice(file, sample);
-    expect((await stat(file)).mode & 0o777).toBe(0o600);
-    expect((await stat(join(dir, 'nested'))).mode & 0o777).toBe(0o700);
+    // Windows has no owner/group/other modes (the folder's own access rules apply there).
+    if (process.platform !== 'win32') {
+      expect((await stat(file)).mode & 0o777).toBe(0o600);
+      expect((await stat(join(dir, 'nested'))).mode & 0o777).toBe(0o700);
+    }
     expect(await readDevice(file)).toEqual(sample);
   });
 

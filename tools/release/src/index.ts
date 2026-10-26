@@ -34,7 +34,9 @@ export const MAX_FILE_BYTES = 1024 ** 3;
 const FORBIDDEN_TEXT: [RegExp, string][] = [
   [/AGE-SECRET-KEY-1/, 'a backup private key'],
   [/-----BEGIN [A-Z ]*PRIVATE KEY-----/, 'a private key'],
-  [/secret key/i, 'a signing secret key'],
+  // Tauri's secret key file says "rsign encrypted secret key"; its signatures say "signature
+  // from tauri secret key", which is fine.
+  [/encrypted secret key/i, 'a signing secret key'],
   [/github_pat_|ghp_[A-Za-z0-9]{20}/, 'a GitHub token'],
   [/ARTEPOOL_[A-Z_]*(PASSWORD|MASTER_KEY)/, 'a setting with a secret'],
 ];
@@ -65,6 +67,9 @@ export async function checkPublishable(dir: string): Promise<Refusal[]> {
       const text = await readFile(join(dir, file), 'utf8');
       // A .sig is base64 of minisign text: check what it says, too.
       const decoded = file.endsWith('.sig') ? Buffer.from(text, 'base64').toString('utf8') : '';
+      if (file.endsWith('.sig') && !decoded.startsWith('untrusted comment: signature from ')) {
+        refused.push({ file, reason: 'not a signature' });
+      }
       for (const [pattern, what] of FORBIDDEN_TEXT) {
         if (pattern.test(text) || pattern.test(decoded)) refused.push({ file, reason: what });
       }
