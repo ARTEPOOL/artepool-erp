@@ -191,7 +191,11 @@ Ok ($updaterCommand -eq "$svc run updater") "the updater runs the launcher ($upd
 & $svc run updater
 Ok ($LASTEXITCODE -eq 0) 'the updater runs'
 Ok ((Psql 'SELECT current_version IS NOT NULL FROM ops.update_state') -eq 't') 'the updater records the version running'
-Ok ((Psql 'SELECT check_error FROM ops.update_state') -like '*update key is not set*') 'without the update key no update is accepted'
+# The owner's update key is built in (release/update-public-key.txt): the updater reads the
+# update list (reachable or not, nothing newer is installed during this test).
+Ok ((Psql 'SELECT checked_at IS NOT NULL FROM ops.update_state') -eq 't') 'the updater checked the update list'
+Ok ((Psql "SELECT coalesce(check_error, '') NOT LIKE '%update key is not set%' FROM ops.update_state") -eq 't') 'the update key is built in'
+Ok ((Psql "SELECT coalesce(waiting_reason, '') <> 'installing' FROM ops.update_state") -eq 't') 'the updater started no setup'
 
 # ---- The desktop app: start at sign-in and the watchdog (decisions 0082, 0083) ----
 $appDir = Join-Path $env:ProgramFiles 'ARTEPOOL ERP'
