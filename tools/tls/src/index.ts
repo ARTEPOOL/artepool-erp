@@ -10,7 +10,12 @@
 import 'reflect-metadata';
 import { randomBytes, webcrypto } from 'node:crypto';
 import { chmod, mkdir, readFile, writeFile } from 'node:fs/promises';
-import { isIPv4, isIPv6 } from 'node:net';
+import { isIPv4, isIPv6, type AddressInfo } from 'node:net';
+import {
+  checkServerIdentity,
+  connect as tlsConnect,
+  createServer as createTlsServer,
+} from 'node:tls';
 import { join } from 'node:path';
 import { AsnConvert } from '@peculiar/asn1-schema';
 import {
@@ -228,4 +233,68 @@ export async function fingerprint(certPem: string): Promise<string> {
   const der = new x509.X509Certificate(certPem).rawData;
   const hash = Buffer.from(await webcrypto.subtle.digest('SHA-256', der));
   return [...hash].map((b) => b.toString(16).padStart(2, '0').toUpperCase()).join(':');
+}
+
+/** The names (host names and IP addresses) a server certificate is for, read from it. */
+export function serverCertNames(certPem: string): TlsNames {
+  const cert = new x509.X509Certificate(certPem);
+  const san = cert.getExtension(x509.SubjectAlternativeNameExtension);
+  const out: TlsNames = { dns: [], ips: [] };
+  for (const name of san?.names.items ?? []) {
+    if (name.type === 'dns') out.dns.push(name.value);
+    if (name.type === 'ip') out.ips.push(name.value);
+  }
+  return out;
+}
+
+/** When a certificate stops being valid. */
+export function certificateExpiry(certPem: string): Date {
+  return new x509.X509Certificate(certPem).notAfter;
+}
+
+/**
+ * Proves a server certificate and key work before they are used (M6.2 part H3): a throwaway
+ * TLS 1.3 server on 127.0.0.1 with them, and a client that trusts only the CA and checks every
+ * name the certificate is for. Throws when anything does not hold.
+ */
+export async function checkServerPair(pair: PemPair, caCertPem: string): Promise<void> {
+  const names = serverCertNames(pair.certPem);
+  const hosts = [...names.dns, ...names.ips];
+  if (hosts.length === 0) throw new TlsError('The certificate is for no name at all.');
+  const server = createTlsServer(
+    { cert: pair.certPem, key: pair.keyPem, minVersion: 'TLSv1.3', maxVersion: 'TLSv1.3' },
+    (socket) => socket.end('ok'),
+  );
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', resolve);
+  });
+  const { port } = server.address() as AddressInfo;
+  try {
+    for (const host of hosts) {
+      await new Promise<void>((resolve, reject) => {
+        const socket = tlsConnect(
+          {
+            host: '127.0.0.1',
+            port,
+            ca: caCertPem,
+            minVersion: 'TLSv1.3',
+            ...(isIPv4(host) || isIPv6(host) ? {} : { servername: host }),
+            checkServerIdentity: (_hostname, cert) => checkServerIdentity(host, cert),
+          },
+          () => {
+            const ok = socket.authorized && socket.getProtocol() === 'TLSv1.3';
+            socket.destroy();
+            if (ok) resolve();
+            else reject(new TlsError(`The certificate was not accepted for ${host}.`));
+          },
+        );
+        socket.once('error', (error: Error) =>
+          reject(new TlsError(`The certificate was not accepted for ${host}: ${error.message}`)),
+        );
+      });
+    }
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
 }
