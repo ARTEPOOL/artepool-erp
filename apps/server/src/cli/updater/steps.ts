@@ -283,3 +283,16 @@ export async function runUpdater(deps: UpdaterDeps): Promise<UpdaterOutcome> {
   deps.runSetup(file);
   return 'started';
 }
+
+/**
+ * The scheduled task runs every few minutes: its log gets a line only when what it has to say
+ * changes (the same "no key", "offline" or "waiting" every five minutes says nothing new). The
+ * last one is kept in updates\last-outcome.txt.
+ */
+export async function outcomeChanged(updatesDir: string, outcome: string): Promise<boolean> {
+  const file = join(updatesDir, 'last-outcome.txt');
+  const previous = existsSync(file) ? (await readFile(file, 'utf8')).trim() : null;
+  if (previous === outcome) return false;
+  await writeFile(file, `${outcome}\n`);
+  return true;
+}
