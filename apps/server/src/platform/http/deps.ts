@@ -26,6 +26,11 @@ export interface AppDeps {
    * the installed server, readable by administrators only and deleted when setup completes.
    */
   readonly setupTokenFile: string;
+  /**
+   * Where System health looks on the server PC (M6.2 part H): the data folder (its disk holds the
+   * database) and the TLS folder (the server certificate and the root CA).
+   */
+  readonly health: { dataDir: string; tlsDir: string };
 }
 
 export function createDeps(input: {
@@ -36,6 +41,7 @@ export function createDeps(input: {
   caCertificatePem?: string | null;
   backup?: BackupPaths;
   setupTokenFile?: string;
+  health?: { dataDir: string; tlsDir: string };
 }): AppDeps {
   return {
     db: input.db,
@@ -48,6 +54,10 @@ export function createDeps(input: {
     setupTokenFile:
       input.setupTokenFile ??
       (process.env.ARTEPOOL_SETUP_TOKEN_FILE || join(repoRoot, '.secrets', 'setup', 'token')),
+    health: input.health ?? {
+      dataDir: process.env.ARTEPOOL_DATA_DIR || repoRoot,
+      tlsDir: process.env.ARTEPOOL_TLS_DIR || join(repoRoot, '.secrets', 'tls'),
+    },
   };
 }
 

@@ -103,7 +103,7 @@ describe('roles and permissions', () => {
     const { rows } = await api.query<{ code: string; approvable: boolean }>(
       'SELECT code, approvable FROM auth.permissions ORDER BY code',
     );
-    expect(rows).toHaveLength(75); // 64 + system.backup.manage (0086) + customers.credit (0036) + items.cost (0038) + stock.opening (0042) + customers.opening (0051) + print_templates.manage (0020) + stock.new_item_quantity (0053) + shifts.force_close (0069) + invoices.cancel (0072) + reports.owner_dashboard (0081) + system.update.manage (0108)
+    expect(rows).toHaveLength(76); // 64 + system.backup.manage (0086) + customers.credit (0036) + items.cost (0038) + stock.opening (0042) + customers.opening (0051) + print_templates.manage (0020) + stock.new_item_quantity (0053) + shifts.force_close (0069) + invoices.cancel (0072) + reports.owner_dashboard (0081) + system.update.manage (0108) + system.health.manage (M6.2 H)
     expect(rows.filter((r) => r.approvable).map((r) => r.code)).toEqual([
       'cash.paid_out',
       'cash.variance_accept',
@@ -132,7 +132,7 @@ describe('roles and permissions', () => {
          FROM auth.roles r JOIN auth.role_permissions rp ON rp.role_id = r.id GROUP BY r.code`,
     );
     const perms = Object.fromEntries(rows.map((r) => [r.role, r.perms]));
-    expect(perms.owner).toHaveLength(75);
+    expect(perms.owner).toHaveLength(76);
     expect(perms.accountant).toContain('shifts.force_close'); // decision 0069
     expect(perms.cashier).toEqual([
       'cash.drop',

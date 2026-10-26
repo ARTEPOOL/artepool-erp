@@ -1,8 +1,9 @@
 /**
  * `artepool-svc run updater` — the server PC's updater (decision 0108, M6.2 part G5), run every
  * few minutes as SYSTEM by the scheduled task "ARTEPOOL Updater"; the steps are in
- * updater/steps.ts. Its lines go to `logs\install\updater.log`, only when the outcome changes
- * (no secret is ever written).
+ * updater/steps.ts. It also renews the server certificate 60 days before it ends
+ * (updater/certificate.ts, M6.2 part H3). Its lines go to `logs\install\updater.log`, only when
+ * the outcome changes (no secret is ever written).
  */
 import { spawn } from 'node:child_process';
 import { createWriteStream, mkdirSync, readFileSync } from 'node:fs';
@@ -12,7 +13,11 @@ import { pipeline } from 'node:stream/promises';
 import pg from 'pg';
 import { LATEST_URL } from '@artepool/release';
 import { connectionFor, loadEnv, resourcePath } from '@artepool/node-kit';
+import { waitHealthy } from './install/health';
 import { InstallLog } from './install/log';
+import { windowsPlatform } from './install/windows';
+import { exec } from './restore-from-backup';
+import { renewServerCertificate } from './updater/certificate';
 import { outcomeChanged, runUpdater } from './updater/steps';
 
 function required(name: string): string {
@@ -63,6 +68,32 @@ try {
     log: (line) => log.line(line),
   });
   if (await outcomeChanged(updatesDir, outcome)) log.line(`Updater: ${outcome}.`);
+
+  // The server certificate renews itself 60 days before it ends (M6.2 part H3); never while an
+  // update is starting or running (both restart the server).
+  if (outcome !== 'started' && outcome !== 'installing') {
+    const platform = windowsPlatform({
+      exec,
+      programDir,
+      pgBin: required('ARTEPOOL_PG_BIN'),
+      logDir: required('ARTEPOOL_LOG_DIR'),
+    });
+    const renewal = await renewServerCertificate({
+      db: client,
+      tlsDir: required('ARTEPOOL_TLS_DIR'),
+      now: () => new Date(),
+      restartServer: async () => {
+        await platform.stopService('server');
+        await platform.startService('server');
+      },
+      waitHealthy: waitHealthy(
+        Number(required('SERVER_PORT')),
+        () => new Error('The server did not answer within two minutes; see logs\\server.'),
+      ),
+      log: (line) => log.line(line),
+    });
+    if (renewal === 'renewed' || renewal === 'failed') log.line(`Certificate: ${renewal}.`);
+  }
 } catch (error) {
   const reason = error instanceof Error ? error.message : String(error);
   if (await outcomeChanged(updatesDir, `failed: ${reason}`).catch(() => true)) {

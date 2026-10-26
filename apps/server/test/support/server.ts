@@ -42,7 +42,12 @@ export interface TestServer {
 
 export async function startTestServer(
   register?: (app: FastifyInstance) => void,
-  options: { limits?: RateLimits; backup?: BackupPaths; setupTokenFile?: string } = {},
+  options: {
+    limits?: RateLimits;
+    backup?: BackupPaths;
+    setupTokenFile?: string;
+    health?: { dataDir: string; tlsDir: string };
+  } = {},
 ): Promise<TestServer> {
   const testDb = await createTestDatabase();
   const db = createDb(createPool(connectionFor('api', testDb.name), 5));
@@ -55,6 +60,7 @@ export async function startTestServer(
     ...(options.limits ? { limits: options.limits } : {}),
     ...(options.backup ? { backup: options.backup } : {}),
     ...(options.setupTokenFile ? { setupTokenFile: options.setupTokenFile } : {}),
+    ...(options.health ? { health: options.health } : {}),
   });
   const app = buildApp({ logLevel: 'info', logStream: { write: (line) => logs.push(line) } }, deps);
   register?.(app);

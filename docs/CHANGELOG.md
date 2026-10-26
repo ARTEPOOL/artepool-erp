@@ -1,5 +1,31 @@
 # Changelog
 
+## Installation, part H: the server PC's health, and a certificate that renews itself (2026-10-26)
+
+**In plain words:** Settings → System health now starts with a **"Server PC"** card. It shows, in green, orange or red:
+
+- the last backup (and how long ago it was);
+- the backup key;
+- free space on the database, backups and Windows disks;
+- whether the backup service and the database's continuous copy are working;
+- the server certificate and the root certificate, with their end dates;
+- the server clock;
+- whether a UPS is connected. You confirm it once with a button, and it asks again after six months.
+
+Anything that needs attention also appears on the owner dashboard and as an owner alert, once a day.
+
+**The server certificate now renews itself** 60 days before it ends:
+- It happens at night and never while a shift is open.
+- The new certificate is checked before it is used.
+- The old one is kept and put back if anything fails, and it tries again the next night.
+- Every renewal is written in the audit log with the old and new end dates (no keys).
+- The other PCs need nothing, because they trust the same root certificate.
+
+The root certificate is renewed by hand with your approval; the screen warns two years ahead.
+
+- Migration 0045 (`ops.server_health`, `system.health.manage`, new alert types).
+- Tests: unit, integration (API, renewal, database rules), desktop and screen tests in both languages.
+
 ## Installation, part F: the installers, the emergency tool, start at sign-in and the watchdog (2026-10-25)
 
 **In plain words:** ARTÉPOOL now installs like any Windows program.

@@ -16,6 +16,7 @@ import { nightlyIntegrity } from './integrity';
 import { localBackup } from './local';
 import { offlineCopy } from './offline';
 import { restoreTest } from './restore';
+import { startHeartbeat } from './heartbeat';
 import { tick } from './service';
 
 loadEnv();
@@ -65,6 +66,12 @@ try {
     console.log(`Copied to the drive: ${copy.path}`);
   } else if (command === 'run') {
     console.log(`Backup service started; copies in ${config.backupDir}`);
+    // System health reads this sign of life (M6.2 part H).
+    startHeartbeat(config.backupDir, (error) =>
+      console.error(
+        `Could not write the heartbeat: ${error instanceof Error ? error.message : String(error)}`,
+      ),
+    );
     for (;;) {
       const done = await tick(client, config);
       if (done.length > 0) console.log(`${new Date().toISOString()} ${done.join(', ')}`);

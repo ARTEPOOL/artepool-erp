@@ -6,6 +6,7 @@ import { SecretBox } from './platform/crypto/secret-box';
 import { createDb, createPool } from './platform/db/pool';
 import { createDeps } from './platform/http/deps';
 import { raiseBackupAlerts } from './modules/backup/service';
+import { raiseServerHealthAlerts } from './modules/health/service';
 import { ensurePeriods } from './modules/ledger/periods';
 import { raiseClockAlert } from './platform/time/clock-guard';
 
@@ -16,7 +17,12 @@ const [secretBox, tls] = await Promise.all([
 ]);
 const pool = createPool(config.database);
 const db = createDb(pool);
-const deps = createDeps({ db, secretBox, caCertificatePem: tls.caCertPem });
+const deps = createDeps({
+  db,
+  secretBox,
+  caCertificatePem: tls.caCertPem,
+  health: { dataDir: config.dataDir, tlsDir: config.tlsDir },
+});
 const app = buildApp({ ...config, https: { cert: tls.certPem, key: tls.keyPem } }, deps);
 
 /** Accounting months always exist 3 months ahead (decision 0016): at start-up and every 6 hours. */
@@ -31,12 +37,21 @@ async function keepPeriodsAhead(): Promise<void> {
 const periodsTimer = setInterval(() => void keepPeriodsAhead(), 6 * 60 * 60 * 1000);
 periodsTimer.unref();
 
-/** A late or failed backup alerts the owner (decision 0086): checked every 5 minutes. */
+/**
+ * A late or failed backup (decision 0086) and a problem with the server PC (M6.2 part H: disks,
+ * the backup service, WAL archiving, certificates, the UPS) alert the owner: checked every 5
+ * minutes.
+ */
 async function checkBackups(): Promise<void> {
   try {
     await raiseBackupAlerts(deps);
   } catch (error) {
     app.log.error({ err: error }, 'could not check the backups');
+  }
+  try {
+    await raiseServerHealthAlerts(deps);
+  } catch (error) {
+    app.log.error({ err: error }, 'could not check the server PC health');
   }
 }
 const backupTimer = setInterval(() => void checkBackups(), 5 * 60 * 1000);

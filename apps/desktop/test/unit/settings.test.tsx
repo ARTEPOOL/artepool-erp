@@ -730,6 +730,62 @@ describe('Settings → System health (decision 0086)', () => {
     expect(within(card).queryByRole('button', { name: 'غيّر' })).toBeNull();
   });
 
+  it('shows the server PC: disks, services, certificates, clock and the UPS (M6.2 part H)', async () => {
+    const GB = 1024 ** 3;
+    const serverHealth = {
+      problems: ['disk_low', 'backup_service_down', 'certificate_expiring', 'ups_unconfirmed'],
+      disks: [
+        { disk: 'data', path: 'C:\\', freeBytes: 8 * GB, totalBytes: 100 * GB, level: 'warning' },
+        { disk: 'backups', path: 'D:\\', freeBytes: 300 * GB, totalBytes: 500 * GB, level: 'ok' },
+      ],
+      services: { backupHeartbeatAt: null, backupRunning: false },
+      wal: { enabled: true, lastArchivedAt: null, lastFailedAt: null, failing: false },
+      certificate: {
+        server: { expiresAt: '2026-12-01T00:00:00.000Z', daysLeft: 30, level: 'warning' },
+        rootCa: { expiresAt: '2046-10-25T00:00:00.000Z', daysLeft: 7300, level: 'ok' },
+        lastRenewedAt: null,
+        lastAttemptAt: null,
+        renewalError: null,
+      },
+      clock: { serverTime: new Date().toISOString(), latestRecordAt: null, isBehind: false },
+      ups: { confirmedAt: null, due: true, reminderDays: 182 },
+    };
+    const bridge = signedInBridge([
+      ...OWNER_PERMISSIONS,
+      'system.health.view',
+      'system.health.manage',
+      'system.backup.manage',
+    ])
+      .on('GET', '/api/v1/health/system', ok(health()))
+      .on('GET', '/api/v1/system/server-health', ok(serverHealth))
+      .on(
+        'POST',
+        '/api/v1/system/server-health/ups',
+        ok({ confirmedAt: new Date().toISOString() }),
+      );
+    await signIn(bridge);
+    await openSettings();
+    fireEvent.click(screen.getByRole('link', { name: 'النسخ الاحتياطي' }));
+    const card = await screen.findByTestId('server-health');
+    const disk = await within(card).findByTestId('health-disk-data');
+    expect(within(disk).getByText('هارد قاعدة البيانات')).toBeTruthy();
+    expect(within(disk).getByText('قريب')).toBeTruthy();
+    expect(within(card).getByTestId('health-services').textContent).toContain(
+      'خدمة النسخ الاحتياطي واقفة',
+    );
+    expect(within(card).getByTestId('health-certificate').textContent).toContain('فاضل 30 يوم');
+    expect(within(card).getByTestId('health-root-ca').textContent).toContain(
+      'بتتجدد بإيد الدعم الفني',
+    );
+    expect(within(card).getByTestId('health-key').textContent).toContain('لسه ماتعملش');
+    const ups = within(card).getByTestId('health-ups');
+    expect(ups.textContent).toContain('جهاز السيرفر متوصل بـ UPS؟');
+    fireEvent.click(within(ups).getByRole('button', { name: 'أيوه، متوصل بـ UPS' }));
+    await waitFor(() =>
+      expect(bridge.callsTo('POST', '/api/v1/system/server-health/ups')).toHaveLength(1),
+    );
+  });
+
   it('is not offered to anyone else (the server refuses it anyway)', async () => {
     await signIn(signedInBridge(OWNER_PERMISSIONS));
     await openSettings();

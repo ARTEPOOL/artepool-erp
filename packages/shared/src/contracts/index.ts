@@ -19,4 +19,5 @@ export * from './printing';
 export * from './reports';
 export * from './backup';
 export * from './updates';
+export * from './health';
 export * from './setup';
