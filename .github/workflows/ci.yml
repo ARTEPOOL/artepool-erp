@@ -129,6 +129,14 @@ jobs:
           echo "ARTEPOOL_PG_BIN=/usr/lib/postgresql/18/bin" >> "$GITHUB_ENV"
       - name: Screen flows against the real API (throwaway database)
         run: pnpm test:e2e
+      # The page as it was when a test failed (Playwright's accessibility snapshot of the screen,
+      # test data only), so the cause can be read here without downloading the artifact.
+      - name: The screen at each failure
+        if: failure()
+        working-directory: apps/desktop
+        run: |
+          find test-results -name error-context.md -print0 2>/dev/null |
+            while IFS= read -r -d '' file; do echo "::group::$file"; cat "$file"; echo "::endgroup::"; done
       - name: Screenshots and report
         if: always()
         uses: actions/upload-artifact@v4
