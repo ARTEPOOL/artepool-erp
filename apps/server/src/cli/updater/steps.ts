@@ -4,8 +4,9 @@
  *
  *   1. records the result of the last update (the setup writes updates\last-result.json) and
  *      finishes the owner's "Install now" request it belonged to;
- *   2. every few hours, or at once for an "Install now", reads the public update list. No
- *      internet is normal: everything keeps working and the update waits;
+ *   2. every few hours, at once after an update, and at once for the owner's "Check now" (0110)
+ *      or "Install now", reads the public update list. No internet is normal: everything keeps
+ *      working and the update waits;
  *   3. downloads a newer server setup in the background into updates\, and keeps it only if its
  *      SHA-256 and its signature (the update key) are right;
  *   4. installs it only at a safe time: never while a shift is open; inside the night window, or
@@ -66,6 +67,7 @@ export interface UpdaterDeps {
 
 interface State {
   checked_at: Date | null;
+  check_requested_at: Date | null;
   available_version: string | null;
   download_status: string;
   waiting_reason: string | null;
@@ -160,10 +162,34 @@ export async function runUpdater(deps: UpdaterDeps): Promise<UpdaterOutcome> {
     }
   }
   await save({ current_version: deps.currentVersion }, 'the version running');
+  // The version just installed is no longer "new": what was kept for it goes, and the update
+  // list is read again at once (it says "up to date" or names a newer version).
+  state = await readState();
+  const installed = state.available_version;
+  if (installed && compareVersions(installed, deps.currentVersion) <= 0) {
+    await save(
+      {
+        available_version: null,
+        notes_ar: null,
+        notes_en: null,
+        published_at: null,
+        download_status: 'none',
+        waiting_reason: null,
+        checked_at: null,
+      },
+      `${installed} is installed`,
+    );
+    await rm(join(deps.updatesDir, setupFileName(installed)), { force: true });
+    await rm(join(deps.updatesDir, `${setupFileName(installed)}.sig`), { force: true });
+  }
   if (existsSync(marker)) {
     const started = JSON.parse(await readFile(marker, 'utf8')) as { at: string };
     if (now.getTime() - Date.parse(started.at) < INSTALL_TIMEOUT_MS) return 'installing';
     await rm(marker, { force: true });
+  }
+  state = await readState();
+  if (state.waiting_reason === 'installing') {
+    await save({ waiting_reason: null }, 'the setup has finished');
   }
   for (const request of await openRequests()) {
     if (request.status === 'running') {
@@ -179,12 +205,17 @@ export async function runUpdater(deps: UpdaterDeps): Promise<UpdaterOutcome> {
     return 'no_key';
   }
 
-  // 2. The update list: every few hours, or at once for an "Install now".
+  // 2. The update list: every few hours, or at once after an update, for the owner's "Check now"
+  //    or an "Install now".
   let requests = await openRequests();
   state = await readState();
   let latest: Latest | null = null;
+  const checkAsked =
+    state.check_requested_at !== null &&
+    (!state.checked_at || state.check_requested_at.getTime() > state.checked_at.getTime());
   const due =
     requests.length > 0 ||
+    checkAsked ||
     !state.checked_at ||
     now.getTime() - state.checked_at.getTime() >= CHECK_EVERY_MS ||
     state.download_status === 'failed';

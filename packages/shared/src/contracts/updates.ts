@@ -9,6 +9,17 @@ export const UPDATE_WAITING_REASONS = [
 ] as const;
 export type UpdateWaitingReason = (typeof UPDATE_WAITING_REASONS)[number];
 
+/** x.y.z versions: true when `a` is newer than `b` (anything that is not x.y.z is never newer). */
+export function isNewerVersion(a: string, b: string | null): boolean {
+  const parse = (v: string) => /^(\d+)\.(\d+)\.(\d+)$/.exec(v)?.slice(1).map(Number);
+  const x = parse(a);
+  if (!x) return false;
+  const y = b ? parse(b) : undefined;
+  if (!y) return true;
+  for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return x[i]! > y[i]!;
+  return false;
+}
+
 export interface UpdateResult {
   ok: boolean;
   from: string | null;
@@ -25,6 +36,9 @@ export interface UpdateStatus {
   checkedAt: string | null;
   /** Why the update list could not be read (no internet is normal; updates wait). */
   checkError: string | null;
+  /** The owner pressed "Check now" (0110) and the server PC has not read the list since. */
+  checking: boolean;
+  /** Only a version newer than the one running (the one just installed is never "new"). */
   available: {
     version: string;
     notesAr: string | null;

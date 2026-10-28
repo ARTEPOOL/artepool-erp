@@ -3,7 +3,9 @@
  * list and the download faked and a file signed by Tauri's signer (test key) as the "setup":
  * no key or no internet changes nothing; a newer version is downloaded and kept only when its
  * SHA-256 and signature are right; it starts only at a safe time (no open shift; the night window
- * or the owner's "Install now"); the result is recorded and a failed version waits for the owner.
+ * or the owner's "Install now"); the result is recorded and a failed version waits for the owner;
+ * the version just installed is forgotten at once; the owner's "Check now" (0110) reads the list
+ * on the next run.
  */
 import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
@@ -81,6 +83,11 @@ async function reset() {
     await su.query(`UPDATE ops.update_requests SET status = 'failed' WHERE status = 'pending'`);
     await su.query(`UPDATE ops.update_requests SET status = 'failed' WHERE status = 'running'`);
   });
+  await inContext(
+    su,
+    () => su.query('UPDATE ops.update_state SET check_requested_at = NULL WHERE id = 1'),
+    owner,
+  );
   await rm(dir, { recursive: true, force: true });
   await mkdir(dir, { recursive: true });
 }
@@ -178,6 +185,77 @@ describe('the server PC updater', () => {
     expect(await runUpdater(after)).toBe('up_to_date');
     expect((await state()).last_result).toMatchObject({ ok: true, to: '1.1.0' });
     expect(existsSync(join(dir, 'installing.json'))).toBe(false);
+  });
+
+  it('forgets the version just installed at once, even minutes after the last check', async () => {
+    const before = new Date(NIGHT.getTime() - 6 * 60_000);
+    await installNow('1.1.0');
+    expect(await runUpdater(deps({ now: () => before }))).toBe('started');
+    await writeFile(
+      join(dir, 'last-result.json'),
+      JSON.stringify({ ok: true, from: '1.0.0', to: '1.1.0', at: before.toISOString() }),
+    );
+    let reads = 0;
+    const after = deps({
+      currentVersion: '1.1.0',
+      now: () => NIGHT,
+      fetchLatest: () => {
+        reads++;
+        return Promise.resolve(latest('1.1.0'));
+      },
+    });
+    expect(await runUpdater(after)).toBe('up_to_date');
+    const s = await state();
+    expect(s).toMatchObject({
+      current_version: '1.1.0',
+      available_version: null,
+      notes_ar: null,
+      download_status: 'none',
+      waiting_reason: null,
+    });
+    // Read again at once after the update, not hours later.
+    expect(reads).toBe(1);
+    expect(s.checked_at).toEqual(NIGHT);
+    expect(existsSync(join(dir, setupFileName('1.1.0')))).toBe(false);
+    expect(existsSync(join(dir, `${setupFileName('1.1.0')}.sig`))).toBe(false);
+  });
+
+  it('reads the list on the next run after the owner\'s "Check now", and only then', async () => {
+    let reads = 0;
+    const at = (minutes: number) => () => new Date(NOON.getTime() + minutes * 60_000);
+    const counting = (minutes: number) =>
+      deps({
+        now: at(minutes),
+        fetchLatest: () => {
+          reads++;
+          return Promise.resolve(latest('1.0.0'));
+        },
+      });
+    expect(await runUpdater(counting(0))).toBe('up_to_date');
+    expect(await runUpdater(counting(5))).toBe('up_to_date');
+    expect(reads).toBe(1);
+
+    await inContext(
+      su,
+      () => su.query('UPDATE ops.update_state SET check_requested_at = $1 WHERE id = 1', [at(7)()]),
+      owner,
+    );
+    expect(await runUpdater(counting(10))).toBe('up_to_date');
+    expect(reads).toBe(2);
+    expect((await state()).checked_at).toEqual(at(10)());
+    expect(await runUpdater(counting(15))).toBe('up_to_date');
+    expect(reads).toBe(2);
+  });
+
+  it('lets only the owner ask to check now', async () => {
+    const cashier = await createUser(su, { username: 'cashier-check', roles: ['cashier'] });
+    await expect(
+      inContext(
+        su,
+        () => su.query('UPDATE ops.update_state SET check_requested_at = now() WHERE id = 1'),
+        cashier,
+      ),
+    ).rejects.toMatchObject({ code: 'AP010' });
   });
 
   it('refuses a download with a wrong SHA-256 or a wrong signature', async () => {

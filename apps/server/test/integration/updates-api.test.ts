@@ -1,7 +1,8 @@
 /**
  * System health → updates (decision 0108) through the API: owner only; the state the server PC's
  * updater keeps (version, release notes in Arabic and English, waiting reason, last result);
- * "Install now" only for a downloaded, checked version, one at a time, audited; the night window.
+ * "Install now" only for a downloaded, checked version, one at a time, audited; the night window;
+ * the version running is never shown as new; "Check now" (0110), owner only, audited.
  */
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -54,6 +55,9 @@ describe('updates in System health', () => {
     expect(
       errorCode(await write('POST', '/api/v1/system/update/install-now', {}, accountantToken)),
     ).toBe('PERMISSION_DENIED');
+    expect(errorCode(await write('POST', '/api/v1/system/update/check', {}, accountantToken))).toBe(
+      'PERMISSION_DENIED',
+    );
     expect(
       errorCode(
         await write(
@@ -108,6 +112,38 @@ describe('updates in System health', () => {
       `SELECT reason FROM audit.log WHERE entity_type = 'ops.update_requests'`,
     );
     expect(audit.rows.map((r) => r.reason)).toEqual(['install the downloaded update now']);
+  });
+
+  it('never show the version running as new, and refuse "Install now" for it', async () => {
+    await updaterState(`current_version = '1.1.0', available_version = '1.1.0',
+      download_status = 'ready', waiting_reason = 'installing'`);
+    await server.admin.query('BEGIN');
+    await server.admin.query("SELECT sys.set_context(1, p_reason => 'test: updater')");
+    await server.admin.query(
+      `UPDATE ops.update_requests SET status = 'failed' WHERE status IN ('pending', 'running')`,
+    );
+    await server.admin.query('COMMIT');
+    const status = (await get()).json<UpdateStatus>();
+    expect(status).toMatchObject({ currentVersion: '1.1.0', available: null });
+    expect(errorCode(await write('POST', '/api/v1/system/update/install-now'))).toBe(
+      'UPDATE_NOT_AVAILABLE',
+    );
+  });
+
+  it('"Check now" asks the server PC to read the list; checking until it has, audited', async () => {
+    await updaterState(`checked_at = now() - interval '1 hour'`);
+    expect((await get()).json<UpdateStatus>().checking).toBe(false);
+    const asked = await write('POST', '/api/v1/system/update/check');
+    expect(asked.statusCode).toBe(201);
+    expect((await get()).json<UpdateStatus>().checking).toBe(true);
+    // The updater read the list after the request.
+    await updaterState(`checked_at = now() + interval '1 second'`);
+    expect((await get()).json<UpdateStatus>().checking).toBe(false);
+    const audit = await server.admin.query<{ reason: string }>(
+      `SELECT reason FROM audit.log WHERE entity_type = 'ops.update_state'
+        AND reason = 'check for updates now'`,
+    );
+    expect(audit.rowCount).toBe(1);
   });
 
   it('change the night window, never to an empty one', async () => {
