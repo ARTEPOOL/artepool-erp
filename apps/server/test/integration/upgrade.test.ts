@@ -18,6 +18,7 @@ import type { ServiceKey } from '../../src/cli/install/windows';
 import {
   applyUpgrade,
   compareVersions,
+  failureText,
   KEEP_PRE_UPGRADE,
   postgresMajor,
   preUpgradeFileName,
@@ -32,6 +33,8 @@ let db: TestDatabase;
 let connections: UpgradeConnections;
 let pgBin: string;
 let last: number;
+/** The migrations the database has now (the repository's, then each applied test version's). */
+let currentDir: string;
 
 function fakePlatform() {
   const calls: string[] = [];
@@ -81,6 +84,7 @@ async function prepare(platform: UpgradePlatform, from: string, to: string, now:
     dataPgMajor: 18,
     bundledPgMajor: 18,
     databaseName: db.name,
+    migrationsDir: currentDir,
     backupsDir: join(root, 'backups'),
     pgBin,
     connections,
@@ -100,6 +104,7 @@ beforeAll(async () => {
   };
   pgBin = configFromEnv(db.name).pgBin;
   last = (await readdir(migrationsDir)).filter((f) => f.endsWith('.sql')).length;
+  currentDir = migrationsDir;
 }, 120_000);
 
 afterAll(async () => {
@@ -129,6 +134,13 @@ describe('versions', () => {
       'artepool-20261025-093000Z-1.4.0-to-1.5.0.dump',
     );
   });
+
+  it('writes the reason for the setup as two short ASCII lines', () => {
+    expect(failureText('migrate', 'Upgrade 1.0.0 → 1.1.0:\nبوظ')).toBe(
+      'migrate\r\nUpgrade 1.0.0 -> 1.1.0: ???\r\n',
+    );
+    expect(failureText('checks', 'x'.repeat(2000)).length).toBeLessThan(720);
+  });
 });
 
 describe('the server upgrade', () => {
@@ -147,6 +159,7 @@ describe('the server upgrade', () => {
         dataPgMajor: 18,
         bundledPgMajor: 19,
         databaseName: db.name,
+        migrationsDir,
         backupsDir: join(root, 'backups'),
         pgBin,
         connections,
@@ -208,6 +221,7 @@ describe('the server upgrade', () => {
     });
 
     expect(result).toMatchObject({ ok: true, from: '1.0.0', to: '1.1.0', migrations: 1 });
+    currentDir = dir;
     expect(healthCa).toBe('the CA');
     expect(calls).toEqual([
       'refresh server',
@@ -307,6 +321,44 @@ describe('the server upgrade', () => {
     expect(kept[0]!.t).not.toBeNull();
     expect(calls.slice(-3)).toEqual(['stop backup', 'stop server', 'stop database']);
   }, 120_000);
+
+  it('refuses a version that lacks a migration the database has, before stopping anything', async () => {
+    const { platform, calls } = fakePlatform();
+    const refused = prepareUpgrade({
+      from: '1.1.0',
+      to: '1.3.0',
+      dataPgMajor: 18,
+      bundledPgMajor: 18,
+      databaseName: db.name,
+      migrationsDir, // the repository's: without the test version's migration applied above
+      backupsDir: join(root, 'backups'),
+      pgBin,
+      connections,
+      platform,
+      log: quietLog(),
+    });
+    await expect(refused).rejects.toMatchObject({ step: 'checks' });
+    await expect(refused).rejects.toThrow(/file is missing\. Nothing was changed\./);
+    expect(calls).toEqual([]);
+  });
+
+  it('says in plain words that a CI test version changed the database', async () => {
+    const { platform, calls } = fakePlatform();
+    const su = await db.connect('superuser');
+    try {
+      await su.query(
+        `INSERT INTO sys.schema_migrations (version, name, checksum_sha256, applied_by, execution_ms)
+         VALUES (9000, 'ci_upgrade_check', 'x', 'ci', 0)`,
+      );
+      const refused = prepare(platform, '1.1.0', '1.3.0', new Date());
+      await expect(refused).rejects.toMatchObject({ step: 'test_version' });
+      await expect(refused).rejects.toThrow(/test version from the CI tests.*Nothing was changed/);
+      expect(calls).toEqual([]);
+    } finally {
+      await su.query('DELETE FROM sys.schema_migrations WHERE version = 9000');
+      await su.end();
+    }
+  });
 
   it('refuses while a shift is open, and starts the services again', async () => {
     const { platform, calls } = fakePlatform();

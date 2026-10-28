@@ -26,7 +26,7 @@ import { mkdir, readdir, readFile, rename, stat, unlink, writeFile } from 'node:
 import { basename, join } from 'node:path';
 import pg from 'pg';
 import { createAppDatabase } from '@artepool/dev-db';
-import { migrate } from '@artepool/migrate';
+import { migrate, migrationStatus } from '@artepool/migrate';
 import { connectionArgs, pgTool, runPgTool as run, sha256File } from '@artepool/backup';
 import type { PgConnection } from '@artepool/node-kit';
 import type { InstallLog } from '../install/log';
@@ -36,7 +36,31 @@ import type { ServiceKey } from '../install/windows';
 export const KEEP_PRE_UPGRADE = 10;
 
 export type UpgradeStep =
-  'checks' | 'open_shift' | 'backup' | 'services' | 'migrate' | 'health' | 'put_back';
+  | 'checks'
+  | 'test_version'
+  | 'open_shift'
+  | 'backup'
+  | 'services'
+  | 'migrate'
+  | 'health'
+  | 'put_back';
+
+/**
+ * `updates\last-failure.txt` for the setup (NSIS reads it byte by byte): the step, then why, one
+ * line each, plain ASCII (anything else becomes "?"), short enough for one message box.
+ */
+export function failureText(step: string, detail: string): string {
+  const line = (text: string) =>
+    text
+      .replace(/→/g, '->')
+      .replace(/[\r\n]+/g, ' ')
+      .replace(/[^\x20-\x7e]/g, '?')
+      .slice(0, 700);
+  return `${line(step)}\r\n${line(detail)}\r\n`;
+}
+
+/** The migrations only the CI test upgrades carry (tools/installer `--test-upgrade`). */
+export const TEST_MIGRATION = /^ci_upgrade_/;
 
 export class UpgradeError extends Error {
   override readonly name = 'UpgradeError';
@@ -114,6 +138,40 @@ async function openShifts(migrator: PgConnection, database: string): Promise<num
   }
 }
 
+/**
+ * The database's applied migrations must be the first files of the new version, unchanged:
+ * checked before anything is stopped, so a database the new version cannot take is refused with
+ * nothing changed. When a CI test upgrade's migration is what the new version does not have, it
+ * says so in plain words (the CI's own test upgrades carry theirs, so they pass).
+ */
+async function checkAppliedMigrations(
+  migrator: PgConnection,
+  database: string,
+  dir: string,
+): Promise<void> {
+  const client = new pg.Client({ ...migrator, database, application_name: 'artepool-upgrade' });
+  await client.connect();
+  try {
+    try {
+      await migrationStatus(client, dir);
+    } catch (error) {
+      const { rows } = await client.query<{ name: string }>(
+        'SELECT name FROM sys.schema_migrations ORDER BY version',
+      );
+      const test = rows.find((r) => TEST_MIGRATION.test(r.name));
+      if (test) {
+        throw new UpgradeError(
+          'test_version',
+          `This database was used by a test version from the CI tests (its change "${test.name}" is in no real version), so no real version can take it. Delete the data and install again. Nothing was changed.`,
+        );
+      }
+      throw new UpgradeError('checks', `${message(error)} Nothing was changed.`);
+    }
+  } finally {
+    await client.end();
+  }
+}
+
 /** The oldest copies beyond KEEP_PRE_UPGRADE; never the one just made (even if the clock went back). */
 async function removeOldPreUpgradeCopies(dir: string, current: string): Promise<void> {
   const copies = (await readdir(dir))
@@ -134,6 +192,8 @@ export interface PrepareInput {
   /** The PostgreSQL major version the new programs bring. */
   bundledPgMajor: number | null;
   databaseName: string;
+  /** The new version's migrations: the applied ones must be its first files. */
+  migrationsDir: string;
   backupsDir: string;
   pgBin: string;
   connections: UpgradeConnections;
@@ -227,6 +287,7 @@ export async function prepareUpgrade(input: PrepareInput): Promise<PreparedUpgra
       `The database is PostgreSQL ${input.dataPgMajor} and this version brings PostgreSQL ${input.bundledPgMajor}; this upgrade needs support. Nothing was changed.`,
     );
   }
+  await checkAppliedMigrations(connections.migrator, input.databaseName, input.migrationsDir);
 
   log.line('Stopping the server and backup services');
   await platform.stopService('backup');

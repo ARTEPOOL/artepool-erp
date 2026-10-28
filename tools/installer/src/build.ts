@@ -89,7 +89,7 @@ function googleJson(): string | null {
   return `${JSON.stringify(value, null, 2)}\n`;
 }
 
-function runMakensis(version: string, outFile: string): void {
+function runMakensis(version: string, outFile: string, testBuild = false): void {
   execFileSync(
     makensis(),
     [
@@ -99,10 +99,16 @@ function runMakensis(version: string, outFile: string): void {
       `/DVERSION=${version}`,
       `/DSTAGE=${stage}`,
       `/DOUTFILE=${outFile}`,
+      ...(testBuild ? ['/DTEST_BUILD'] : []),
       join(repoRoot, 'tools', 'installer', 'windows', 'server.nsi'),
     ],
     { stdio: 'inherit' },
   );
+}
+
+/** `ARTEPOOL-Server-Setup-1.4.3-TEST.exe`: a CI test upgrade, never for the shop. */
+export function testSetupFileName(version: string): string {
+  return `ARTEPOOL-Server-Setup-${version}-TEST.exe`;
 }
 
 /** 1.4.2 + 1 → 1.4.3. */
@@ -113,7 +119,9 @@ export function nextPatch(version: string, by: number): string {
 
 /**
  * `--test-upgrade` (the Windows CI test of upgrades, M6.2 part G2): from the same staged files,
- * two more server setups in `dist/installer/test` — never published:
+ * two more server setups in `dist/installer/test` — never published, named `…-TEST.exe` and
+ * saying on every page that they are not for the shop (a PC that ran one cannot take a real
+ * version: its test migration is in none):
  *   <version+1>  one more, harmless migration (an upgrade that works);
  *   <version+2>  then a migration that fails (the database must stay unchanged and the previous
  *                version come back).
@@ -130,12 +138,12 @@ export async function buildTestUpgradeInstallers(version: string): Promise<strin
   try {
     await writeFile(good, 'CREATE TABLE sys.ci_upgrade_check (id integer);\n');
     const next = nextPatch(version, 1);
-    files.push(join(dir, `ARTEPOOL-Server-Setup-${next}.exe`));
-    runMakensis(next, files[0]!);
+    files.push(join(dir, testSetupFileName(next)));
+    runMakensis(next, files[0]!, true);
     await writeFile(broken, 'CREATE TABLE sys.ci_upgrade_broken (id integer);\nSELECT 1 / 0;\n');
     const failing = nextPatch(version, 2);
-    files.push(join(dir, `ARTEPOOL-Server-Setup-${failing}.exe`));
-    runMakensis(failing, files[1]!);
+    files.push(join(dir, testSetupFileName(failing)));
+    runMakensis(failing, files[1]!, true);
   } finally {
     await rm(good, { force: true });
     await rm(broken, { force: true });
