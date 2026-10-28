@@ -1,5 +1,20 @@
 # Changelog
 
+## Updates: "Check now", and clearer messages when an update fails (2026-10-28)
+
+**In plain words:**
+
+- Settings → Backups → Updates has a **"Check now"** button (owner only). The server PC checks for a new version within 5 minutes, and the card says "Checking for updates…" until it has. It still checks by itself every few hours and installs at night, as before.
+- After an update, the card no longer shows the version you are already running as a "new version" with "installing now…" and an "Install now" button. It checks again at once and says "Up to date".
+- Release notes show one point per line.
+- If an update fails, the setup's message and its log now say **why**, not only "exit code 1".
+- A PC that once had a **test version** from the GitHub tests says so in plain words: delete the data and install again. Test versions are now named `…-TEST.exe` and warn first that they are never for the shop.
+- The "Kiosk lock is off" bar sits above the page instead of covering a card.
+- The external drive folder shows "Example: E:\" so it does not look already filled in.
+
+- Migration 0046 (`ops.update_state.check_requested_at`, owner only, audited). Decision 0110.
+- Tests: integration (updater, API, upgrade check), unit (version compare, installer names), desktop and screen tests in both languages; the Windows CI checks the reason in the setup's log.
+
 ## Installation, part H: the server PC's health, and a certificate that renews itself (2026-10-26)
 
 **In plain words:** Settings → System health now starts with a **"Server PC"** card. It shows, in green, orange or red:

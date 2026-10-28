@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Accepted (2026-10-25) |
+| **Status** | Accepted (2026-10-25); extended by [0110](0110-check-for-updates-now.md) ("Check now") |
 | **Date** | 2026-10-25 |
 | **Decided by** | Owner |
 | **Related** | Replaces the "updates without internet" part of [0103](0103-upgrades-and-uninstall-never-touch-data.md) (its upgrade, uninstall and delete-data rules stay); extends [0007](0007-no-code-signing-certificate-for-now.md); [0086](0086-backups-local-and-google-drive.md) backups; [0093](0093-no-remote-access-in-phase-1.md) unchanged (updates are outgoing only, nothing reaches into the shop) |

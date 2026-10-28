@@ -1607,7 +1607,8 @@ One row (`id = 1`) kept by the server PC's updater (as `artepool_backup`, SYSTEM
 |---|---|---|
 | current_version | text? | The version running (x.y.z) |
 | checked_at / check_error | timestamptz? / text? | Last read of the public update list; why it failed (no internet is normal) |
-| available_version, notes_ar, notes_en, published_at | text? … | The newest published version and its release notes (null when up to date) |
+| check_requested_at | timestamptz? | The owner's last "Check now" (migration 0046, decision 0110; owner-only guard, the API may set only this and the window): the updater reads the list on its next run when this is newer than `checked_at` |
+| available_version, notes_ar, notes_en, published_at | text? … | The newest published version and its release notes (null when up to date; cleared as soon as that version is running) |
 | download_status | text | `none`, `downloading`, `ready` (SHA-256 and signature checked), `failed` |
 | waiting_reason | text? | `open_shift`, `outside_window`, `failed_before` (rolled back once; waits for "Install now"), `installing` |
 | last_result | jsonb? | The setup's `updates\last-result.json`: ok, from, to, at, failed step |
