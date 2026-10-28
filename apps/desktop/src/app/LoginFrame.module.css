@@ -1,6 +1,6 @@
 /* From design/screens/01-login.html: .login, .login-top, .login-mid, .login-foot */
 .login {
-  min-block-size: 100dvh;
+  min-block-size: calc(100dvh - var(--kiosk-bar-height));
   display: grid;
   grid-template-rows: auto 1fr auto;
   padding: var(--space-4) var(--space-6);

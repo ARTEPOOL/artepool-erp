@@ -70,7 +70,7 @@ function Uninstall-Server([string]$label, [bool]$dataKept = $true) {
 $uninstallKey = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\ARTEPOOL-Server'
 function Installed-Version { (Get-ItemProperty $uninstallKey).DisplayVersion }
 function Run-Setup([string]$file) { (Start-Process -FilePath $file -ArgumentList '/S' -Wait -PassThru).ExitCode }
-function Version-Of([IO.FileInfo]$setup) { $setup.BaseName -replace '^ARTEPOOL-Server-Setup-', '' }
+function Version-Of([IO.FileInfo]$setup) { $setup.BaseName -replace '^ARTEPOOL-Server-Setup-', '' -replace '-TEST$', '' }
 
 function Secret([string]$name) {
   $entropy = [Text.Encoding]::UTF8.GetBytes("ARTEPOOL secrets v1/$name")
@@ -277,6 +277,7 @@ Ok ($LASTEXITCODE -eq 0) 'the encrypted off-site copy is made'
 $tests = @(Get-ChildItem (Join-Path (Split-Path $Installer) 'test') -Filter 'ARTEPOOL-Server-Setup-*.exe' |
   Sort-Object { [version](Version-Of $_) })
 Ok ($tests.Count -eq 2) 'the two test upgrades were built'
+Ok (@($tests | Where-Object { $_.BaseName -notlike '*-TEST' }).Count -eq 0) 'the test upgrades are named -TEST'
 $firstVersion = Installed-Version
 $users = Psql 'SELECT count(*) FROM auth.users'
 $exit = Run-Setup $tests[0].FullName
@@ -315,6 +316,8 @@ Ok ((Psql "SELECT to_regclass('sys.ci_upgrade_broken') IS NULL") -eq 't') 'nothi
 $result = Get-Content "$data\updates\last-result.json" -Raw | ConvertFrom-Json
 Ok ($result.ok -eq $false -and $result.step -eq 'migrate') "the failure is saved for System health ($($result.step))"
 Ok (Test-Path "$pf.failed\artepool-svc.exe") 'the failed programs are kept aside for support'
+$reason = Select-String -Path "$data\logs\install\upgrade-*.log" -Pattern '^Reason \(migrate\): ' -List
+Ok ($null -ne $reason) 'the setup log names the reason of the failed upgrade'
 Check-Logs-Hold-No-Secret 'after the upgrades:'
 
 # ---- 4. Uninstall keeps the data; reinstall uses it; then deleting the data ----

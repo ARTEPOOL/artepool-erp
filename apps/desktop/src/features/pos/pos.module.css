@@ -7,7 +7,7 @@
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   gap: var(--space-4);
-  block-size: calc(100dvh - var(--topbar-height) - 2 * var(--space-8));
+  block-size: calc(100dvh - var(--kiosk-bar-height) - var(--topbar-height) - 2 * var(--space-8));
   min-block-size: 32rem;
 }
 

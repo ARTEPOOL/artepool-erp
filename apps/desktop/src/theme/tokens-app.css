@@ -13,3 +13,13 @@
   --color-qr-dark: #000000;
   --color-qr-light: #ffffff;
 }
+
+/* The "Kiosk lock is off" bar (0089) takes its own room at the top of the window, so it never
+   covers a card; full-height layouts take its height off. */
+:root {
+  --kiosk-bar-height: 0px;
+}
+
+:root[data-kiosk-off] {
+  --kiosk-bar-height: 2.25rem;
+}

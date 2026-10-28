@@ -1,10 +1,11 @@
 /**
- * System health → updates (decision 0108). Owner only: the version running, a newer version with
- * its release notes (in the screen's language), why it is waiting, the last update's result,
- * "Install now" and the night window. Updates come by themselves; without internet they wait.
+ * System health → updates (decision 0108). Owner only: the version running with "Check now"
+ * (0110), a newer version with its release notes (in the screen's language, one point per line),
+ * why it is waiting, the last update's result, "Install now" and the night window. Updates come
+ * by themselves; without internet they wait.
  */
 import { useState } from 'react';
-import { Download } from 'lucide-react';
+import { Download, RefreshCw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import type { UpdateStatus, UpdateWindowBody } from '@artepool/shared/contracts';
@@ -30,6 +31,36 @@ export const UPDATE_KEY = ['settings', 'update'] as const;
 
 const hour = (h: number) => `${String(h).padStart(2, '0')}:00`;
 
+/** Release notes as written: "- " lines become points, other lines paragraphs. */
+export function ReleaseNotes({ text }: { text: string }) {
+  const blocks: { points?: string[]; text?: string }[] = [];
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line) continue;
+    const point = /^[-•*]\s+(.*)$/.exec(line);
+    const last = blocks.at(-1);
+    if (point) {
+      if (last?.points) last.points.push(point[1]!);
+      else blocks.push({ points: [point[1]!] });
+    } else blocks.push({ text: line });
+  }
+  return (
+    <div className={styles.notes} data-testid="release-notes">
+      {blocks.map((b, i) =>
+        b.points ? (
+          <ul key={i}>
+            {b.points.map((p, j) => (
+              <li key={j}>{p}</li>
+            ))}
+          </ul>
+        ) : (
+          <p key={i}>{b.text}</p>
+        ),
+      )}
+    </div>
+  );
+}
+
 export function UpdatesCard() {
   const { t, i18n } = useTranslation('settings');
   const api = useApi();
@@ -42,12 +73,18 @@ export function UpdatesCard() {
   const status = useQuery({
     queryKey: UPDATE_KEY,
     queryFn: () => api.get<UpdateStatus>('/api/v1/system/update'),
-    // While an "Install now" waits or runs, follow it.
-    refetchInterval: (query) =>
-      query.state.data?.request && ['pending', 'running'].includes(query.state.data.request.status)
-        ? 10_000
-        : 60_000,
+    // While a "Check now" or an "Install now" waits or runs, follow it.
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      const following =
+        data?.checking || (data?.request && ['pending', 'running'].includes(data.request.status));
+      return following ? 10_000 : 60_000;
+    },
   });
+  const checkNow = useSave(
+    (a, _: null, key) => a.post('/api/v1/system/update/check', {}, { idempotencyKey: key }),
+    { invalidate: [[...UPDATE_KEY]], onSuccess: () => toast(t('updates.checkAsked')) },
+  );
   const installNow = useSave(
     (a, _: null, key) => a.post('/api/v1/system/update/install-now', {}, { idempotencyKey: key }),
     { invalidate: [[...UPDATE_KEY]], onSuccess: () => toast(t('updates.asked')) },
@@ -81,15 +118,34 @@ export function UpdatesCard() {
               <b>
                 {t('updates.current')}: <bdi>{u.currentVersion ?? '—'}</bdi>
               </b>
-              <div className={styles.muted}>
-                {u.checkError
-                  ? t('updates.offline')
-                  : u.checkedAt
-                    ? t('updates.checked', { date: formatDateTime(u.checkedAt) })
-                    : t('updates.notChecked')}
+              <div className={styles.muted} data-testid="update-checked">
+                {u.checking
+                  ? t('updates.checking')
+                  : u.checkError
+                    ? t('updates.offline')
+                    : u.checkedAt
+                      ? t('updates.checked', { date: formatDateTime(u.checkedAt) })
+                      : t('updates.notChecked')}
               </div>
             </div>
-            {!u.available && !u.checkError && <Chip tone="ok">{t('updates.upToDate')}</Chip>}
+            <div className={styles.placeActions}>
+              {!u.available && !u.checkError && !u.checking && u.checkedAt && (
+                <Chip tone="ok">{t('updates.upToDate')}</Chip>
+              )}
+              {manage && (
+                <Button
+                  busy={checkNow.isPending}
+                  isDisabled={u.checking}
+                  onPress={() => {
+                    setProblem(null);
+                    checkNow.mutate(null, { onError: (e) => setProblem(errorText(e)) });
+                  }}
+                >
+                  <RefreshCw className={iconClass.sm} aria-hidden="true" />
+                  {t('updates.checkNow')}
+                </Button>
+              )}
+            </div>
           </div>
 
           {u.available && (
@@ -99,7 +155,7 @@ export function UpdatesCard() {
                 <b>
                   {t('updates.available')}: <bdi>{u.available.version}</bdi>
                 </b>
-                {notes && <p className={settingsClasses.helpText}>{notes}</p>}
+                {notes && <ReleaseNotes text={notes} />}
                 <div className={styles.muted}>
                   {t(`updates.download.${u.downloadStatus}`)}
                   {u.waitingReason && <> · {t(`updates.waiting.${u.waitingReason}`)}</>}

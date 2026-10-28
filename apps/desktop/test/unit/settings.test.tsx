@@ -652,6 +652,7 @@ describe('Settings → System health (decision 0086)', () => {
     currentVersion: '1.0.0',
     checkedAt: new Date().toISOString(),
     checkError: null,
+    checking: false,
     available: {
       version: '1.1.0',
       notesAr: 'الكاشير بقى أسرع.',
@@ -728,6 +729,58 @@ describe('Settings → System health (decision 0086)', () => {
     expect(within(card).getByText(/مفيش إنترنت دلوقتي/)).toBeTruthy();
     expect(within(card).queryByRole('button', { name: 'ثبّت دلوقتي' })).toBeNull();
     expect(within(card).queryByRole('button', { name: 'غيّر' })).toBeNull();
+  });
+
+  it('release notes show one point per line (0110)', async () => {
+    const notesAr =
+      'صحة جهاز السيرفر في مكان واحد.\n\n- كارت جديد «جهاز السيرفر».\n- أكّد مرة إن فيه UPS.';
+    const bridge = signedInBridge([...OWNER_PERMISSIONS, 'system.health.view'])
+      .on('GET', '/api/v1/health/system', ok(health()))
+      .on(
+        'GET',
+        '/api/v1/system/update',
+        ok(update({ available: { ...update().available, notesAr } })),
+      );
+    await signIn(bridge);
+    await openSettings();
+    fireEvent.click(screen.getByRole('link', { name: 'النسخ الاحتياطي' }));
+    const notes = await screen.findByTestId('release-notes');
+    expect(within(notes).getByText('صحة جهاز السيرفر في مكان واحد.').tagName).toBe('P');
+    expect(
+      within(notes)
+        .getAllByRole('listitem')
+        .map((li) => li.textContent),
+    ).toEqual(['كارت جديد «جهاز السيرفر».', 'أكّد مرة إن فيه UPS.']);
+  });
+
+  it('"Check now" asks the server PC and says it is checking; up to date without a new version (0110)', async () => {
+    const bridge = signedInBridge([
+      ...OWNER_PERMISSIONS,
+      'system.health.view',
+      'system.update.manage',
+    ])
+      .on('GET', '/api/v1/health/system', ok(health()))
+      .on(
+        'GET',
+        '/api/v1/system/update',
+        ok(update({ available: null, lastResult: null })),
+        ok(update({ available: null, lastResult: null, checking: true })),
+      )
+      .on('POST', '/api/v1/system/update/check', ok({ ok: true }, 201));
+    await signIn(bridge);
+    await openSettings();
+    fireEvent.click(screen.getByRole('link', { name: 'النسخ الاحتياطي' }));
+    const card = await screen.findByTestId('updates-card');
+    expect(await within(card).findByText('على آخر نسخة')).toBeTruthy();
+    expect(within(card).queryByTestId('update-available')).toBeNull();
+    fireEvent.click(within(card).getByRole('button', { name: 'افحص دلوقتي' }));
+    await waitFor(() =>
+      expect(bridge.callsTo('POST', '/api/v1/system/update/check')).toHaveLength(1),
+    );
+    expect(await within(card).findByText(/بندوّر على تحديثات/)).toBeTruthy();
+    expect(within(card).getByRole('button', { name: 'افحص دلوقتي' }).hasAttribute('disabled')).toBe(
+      true,
+    );
   });
 
   it('shows the server PC: disks, services, certificates, clock and the UPS (M6.2 part H)', async () => {

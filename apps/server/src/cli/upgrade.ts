@@ -6,11 +6,13 @@
  * `prepare` writes `updates\pending-upgrade.json` (versions and the pre-upgrade copy) for `apply`;
  * `apply` writes `updates\last-result.json`, which System health shows. Progress lines go to the
  * standard output and to `logs\install\upgrade-<time>.log`; the last line is the JSON result.
+ * A failure also leaves `updates\last-failure.txt` (the step, then why, one line each), which the
+ * setup copies into its own log and shows in its message.
  * Exit code 0: done; 1: failed (after `prepare`, nothing changed and the services run again; after
  * `apply`, every service is stopped so the setup can put the previous programs back).
  */
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { connectionFor, loadEnv, migrationsDir } from '@artepool/node-kit';
@@ -21,6 +23,7 @@ import { InstallLog, logFileName } from './install/log';
 import { windowsPlatform } from './install/windows';
 import {
   applyUpgrade,
+  failureText,
   postgresMajor,
   prepareUpgrade,
   UpgradeError,
@@ -53,10 +56,20 @@ const dataDir = process.env.ARTEPOOL_DATA_DIR ?? '';
 const updatesDir = join(dataDir, 'updates');
 const pendingFile = join(updatesDir, 'pending-upgrade.json');
 const resultFile = join(updatesDir, 'last-result.json');
+const failureFile = join(updatesDir, 'last-failure.txt');
 const saveResult = (result: UpgradeResult) => {
   mkdirSync(updatesDir, { recursive: true });
   writeFileSync(resultFile, `${JSON.stringify(result, null, 2)}\n`);
 };
+const saveFailure = (step: string, detail: string) => {
+  try {
+    mkdirSync(updatesDir, { recursive: true });
+    writeFileSync(failureFile, failureText(step, detail));
+  } catch {
+    // The reason stays in this program's own log.
+  }
+};
+if (dataDir) rmSync(failureFile, { force: true });
 
 try {
   required('ARTEPOOL_DATA_DIR');
@@ -97,6 +110,7 @@ try {
         dataPgMajor,
         bundledPgMajor: bundled,
         databaseName,
+        migrationsDir,
         backupsDir: required('ARTEPOOL_BACKUP_DIR'),
         pgBin,
         connections,
@@ -111,6 +125,7 @@ try {
       const step = error instanceof UpgradeError ? error.step : 'checks';
       const detail = error instanceof Error ? error.message : String(error);
       log.line(`FAILED (${step}): ${detail}`);
+      saveFailure(step, detail);
       const result: UpgradeResult = {
         ok: false,
         from,
@@ -145,6 +160,7 @@ try {
       ),
     });
     saveResult(result);
+    if (!result.ok) saveFailure(result.step, result.detail);
     print({ result });
     process.exitCode = result.ok ? 0 : 1;
   } else {
@@ -154,6 +170,7 @@ try {
   const reason = error instanceof Error ? error.message : String(error);
   if (log) log.line(`FAILED: ${reason}`);
   else console.error(`FAILED: ${reason}`);
+  saveFailure('checks', reason);
   print({ result: { ok: false, step: 'checks', detail: reason } });
   process.exitCode = 1;
 }

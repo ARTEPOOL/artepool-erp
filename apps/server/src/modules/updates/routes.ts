@@ -17,6 +17,13 @@ export function registerUpdateRoutes(app: FastifyInstance): void {
   });
   defineWrite(app, {
     method: 'POST',
+    url: '/api/v1/system/update/check',
+    access: manage,
+    reason: () => 'check for updates now',
+    handler: async ({ trx }) => ({ status: 201, body: await updates.checkNow(trx) }),
+  });
+  defineWrite(app, {
+    method: 'POST',
     url: '/api/v1/system/update/install-now',
     access: manage,
     reason: () => 'install the downloaded update now',

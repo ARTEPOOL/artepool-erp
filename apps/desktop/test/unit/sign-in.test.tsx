@@ -242,6 +242,8 @@ describe('PIN sign-in, only on POS PCs (decision 0021)', () => {
     await startApp(bridge);
     const banner = await screen.findByTestId('kiosk-off');
     expect(banner.textContent).toMatch(/القفل متوقف · طول ما المالك داخل/);
+    // The bar takes its own room at the top (0110): the page starts below it.
+    expect(document.documentElement.hasAttribute('data-kiosk-off')).toBe(true);
     expect(screen.queryByRole('button', { name: 'فتح بكود المالك' })).toBeNull();
   });
 

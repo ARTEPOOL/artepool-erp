@@ -32,6 +32,7 @@ SetCompressor /SOLID lzma
 !include "WinVer.nsh"
 !include "FileFunc.nsh"
 !include "WordFunc.nsh"
+!include "TextFunc.nsh"
 !include "nsDialogs.nsh"
 
 !ifndef VERSION
@@ -50,10 +51,16 @@ SetCompressor /SOLID lzma
 !define SERVER_PORT 3100
 !define APP_EXE "$PROGRAMFILES64\ARTEPOOL ERP\artepool-erp.exe"
 
-Name "${PRODUCT}"
 OutFile "${OUTFILE}"
 InstallDir "$PROGRAMFILES64\ARTEPOOL"
-BrandingText "ARTEPOOL ERP ${VERSION}"
+; The CI test upgrades (/DTEST_BUILD) say on every page that they are not for the shop.
+!ifdef TEST_BUILD
+  Name "${PRODUCT} - TEST"
+  BrandingText "ARTEPOOL ERP ${VERSION} - TEST / اختبار"
+!else
+  Name "${PRODUCT}"
+  BrandingText "ARTEPOOL ERP ${VERSION}"
+!endif
 VIProductVersion "${VERSION}.0"
 VIAddVersionKey /LANG=1033 "ProductName" "${PRODUCT}"
 VIAddVersionKey /LANG=1033 "FileVersion" "${VERSION}"
@@ -86,10 +93,16 @@ LangString StepFailed ${LANG_ARABIC} "التسطيب ما كملش. السبب �
 LangString StepFailed ${LANG_ENGLISH} "The installation did not finish. The reason is in the install log in C:\ProgramData\ARTEPOOL\logs\install. Send it to support."
 LangString NotNewer ${LANG_ARABIC} "النسخة دي مش أحدث من المتسطّبة. مفيش حاجة اتغيرت."
 LangString NotNewer ${LANG_ENGLISH} "This version is not newer than the installed one. Nothing was changed."
-LangString UpgradeNotDone ${LANG_ARABIC} "التحديث ما اتعملش، ومفيش حاجة اتغيرت. السبب مكتوب في سجل التحديث في C:\ProgramData\ARTEPOOL\logs\install."
-LangString UpgradeNotDone ${LANG_ENGLISH} "The update was not done and nothing was changed. The reason is in the update log in C:\ProgramData\ARTEPOOL\logs\install."
-LangString UpgradeRolledBack ${LANG_ARABIC} "التحديث ما نجحش، فرجّعنا النسخة القديمة وهي شغالة دلوقتي. بياناتك زي ما هي. السبب في سجل التحديث في C:\ProgramData\ARTEPOOL\logs\install، والنسخة الاحتياطية في backups\pre-upgrade."
-LangString UpgradeRolledBack ${LANG_ENGLISH} "The update did not succeed, so the previous version was put back and is running. Your data is as it was. The reason is in the update log in C:\ProgramData\ARTEPOOL\logs\install; the backup is in backups\pre-upgrade."
+LangString UpgradeNotDone ${LANG_ARABIC} "التحديث ما اتعملش، ومفيش حاجة اتغيرت. السبب مكتوب تحت وفي سجل التحديث (upgrade-...) في C:\ProgramData\ARTEPOOL\logs\install."
+LangString UpgradeNotDone ${LANG_ENGLISH} "The update was not done and nothing was changed. The reason is below and in the update log (upgrade-...) in C:\ProgramData\ARTEPOOL\logs\install."
+LangString UpgradeRolledBack ${LANG_ARABIC} "التحديث ما نجحش، فرجّعنا النسخة القديمة وهي شغالة دلوقتي. بياناتك زي ما هي. السبب مكتوب تحت وفي سجل التحديث (upgrade-...) في C:\ProgramData\ARTEPOOL\logs\install، والنسخة الاحتياطية في backups\pre-upgrade."
+LangString UpgradeRolledBack ${LANG_ENGLISH} "The update did not succeed, so the previous version was put back and is running. Your data is as it was. The reason is below and in the update log (upgrade-...) in C:\ProgramData\ARTEPOOL\logs\install; the backup is in backups\pre-upgrade."
+LangString UpgradeTestVersion ${LANG_ARABIC} "التحديث ما اتعملش، ومفيش حاجة اتغيرت.$\r$\n$\r$\nالجهاز ده اتسطّب عليه قبل كده نسخة تجريبية من اختبارات GitHub، ومينفعش يتحدّث لأي نسخة حقيقية. امسح البيانات (إلغاء التسطيب ← مسح البيانات) وسطّب من جديد."
+LangString UpgradeTestVersion ${LANG_ENGLISH} "The update was not done and nothing was changed.$\r$\n$\r$\nThis PC once had a test version from the GitHub tests, so no real version can update it. Delete the data (uninstall → delete the data) and install again."
+LangString ReasonLabel ${LANG_ARABIC} "السبب:"
+LangString ReasonLabel ${LANG_ENGLISH} "Reason:"
+LangString TestBuild ${LANG_ARABIC} "دي نسخة اختبار من اختبارات GitHub، مش للمحل. متسطّبهاش على جهاز فيه بيانات حقيقية: الجهاز بعدها مش هيتحدّث لأي نسخة حقيقية.$\r$\n$\r$\nتكمّل؟"
+LangString TestBuild ${LANG_ENGLISH} "This is a test version from the GitHub tests, not for the shop. Never install it on a PC with real data: that PC could then not be updated to any real version.$\r$\n$\r$\nContinue?"
 LangString DeleteDataTitle ${LANG_ARABIC} "البيانات"
 LangString DeleteDataTitle ${LANG_ENGLISH} "The data"
 LangString DeleteDataSub ${LANG_ARABIC} "البيانات بتفضل على الجهاز إلا لو اخترت تمسحها."
@@ -107,6 +120,8 @@ Var Mode
 Var OldVersion
 Var DeleteData
 Var DeleteBox
+Var FailStep
+Var FailDetail
 
 ; One line in the setup's own log (the install program keeps a fuller one beside it).
 !macro Log text
@@ -143,6 +158,12 @@ Function .onInit
   ${IfNot} ${Silent}
     !insertmacro MUI_LANGDLL_DISPLAY
   ${EndIf}
+  !ifdef TEST_BUILD
+    ; A test version is never for the shop: one more chance to stop (silent CI runs go on).
+    MessageBox MB_ICONEXCLAMATION|MB_OKCANCEL "$(TestBuild)" /SD IDOK IDOK +3
+    SetErrorLevel 1
+    Abort
+  !endif
   ${IfNot} ${RunningX64}
     MessageBox MB_ICONSTOP|MB_OK "$(Not64)" /SD IDOK
     SetErrorLevel 3
@@ -207,12 +228,37 @@ FunctionEnd
   Pop $1
 !macroend
 
+; The reason the upgrade program left in updates\last-failure.txt (line 1: the step, line 2: why),
+; copied into this log so the reason is where people look first.
+Function ReadFailure
+  StrCpy $FailStep ""
+  StrCpy $FailDetail ""
+  ClearErrors
+  FileOpen $9 "$DataDir\updates\last-failure.txt" r
+  ${IfNot} ${Errors}
+    FileRead $9 $FailStep
+    FileRead $9 $FailDetail
+    FileClose $9
+    ${TrimNewLines} "$FailStep" $FailStep
+    ${TrimNewLines} "$FailDetail" $FailDetail
+  ${EndIf}
+  ${If} $FailDetail != ""
+    !insertmacro Log "Reason ($FailStep): $FailDetail"
+  ${EndIf}
+FunctionEnd
+
 ; Stops with "nothing was changed" (exit code 5): the installed version keeps running.
 !macro UpgradeNotDone why
   !insertmacro Log "NOT DONE (${why}); nothing was changed."
   RMDir /r "$INSTDIR.new"
   FileClose $LogFile
-  MessageBox MB_ICONSTOP|MB_OK "$(UpgradeNotDone)" /SD IDOK
+  ${If} $FailStep == "test_version"
+    MessageBox MB_ICONSTOP|MB_OK "$(UpgradeTestVersion)" /SD IDOK
+  ${ElseIf} $FailDetail != ""
+    MessageBox MB_ICONSTOP|MB_OK "$(UpgradeNotDone)$\r$\n$\r$\n$(ReasonLabel) $FailDetail" /SD IDOK
+  ${Else}
+    MessageBox MB_ICONSTOP|MB_OK "$(UpgradeNotDone)" /SD IDOK
+  ${EndIf}
   SetErrorLevel 5
   Abort
 !macroend
@@ -234,6 +280,7 @@ Function Upgrade
   nsExec::ExecToLog '"$INSTDIR.new\artepool-svc.exe" --data "$DataDir" run upgrade prepare --from $OldVersion --to ${VERSION}'
   Pop $0
   ${If} $0 != 0
+    Call ReadFailure
     !insertmacro UpgradeNotDone "prepare: exit code $0"
   ${EndIf}
 
@@ -258,13 +305,18 @@ Function Upgrade
   Pop $0
   ${If} $0 != 0
     !insertmacro Log "FAILED (apply: exit code $0): putting the previous version back"
+    Call ReadFailure
     RMDir /r "$INSTDIR.failed"
     Rename "$INSTDIR" "$INSTDIR.failed"
     Rename "$INSTDIR.previous" "$INSTDIR"
     !insertmacro StartServices
     !insertmacro Log "The previous version $OldVersion is back; the failed one is in $INSTDIR.failed."
     FileClose $LogFile
-    MessageBox MB_ICONSTOP|MB_OK "$(UpgradeRolledBack)" /SD IDOK
+    ${If} $FailDetail != ""
+      MessageBox MB_ICONSTOP|MB_OK "$(UpgradeRolledBack)$\r$\n$\r$\n$(ReasonLabel) $FailDetail" /SD IDOK
+    ${Else}
+      MessageBox MB_ICONSTOP|MB_OK "$(UpgradeRolledBack)" /SD IDOK
+    ${EndIf}
     SetErrorLevel 6
     Abort
   ${EndIf}

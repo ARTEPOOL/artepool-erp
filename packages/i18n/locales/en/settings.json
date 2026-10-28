@@ -828,7 +828,7 @@
     "driveStep": "Open {url} on your phone or a PC, sign in with the backup account, and type this code:",
     "driveWaiting": "Waiting for your approval (until {time})…",
     "open": "Open",
-    "driveExample": "E:\\",
+    "driveExample": "Example: E:\\",
     "keySheetTitle": "ARTEPOOL ERP — مفتاح النسخ الاحتياطي / backup key",
     "chooseExplain": "The browser opens Google's page: choose the shop's Google account (the one for backups) and press Allow. Then come back here.",
     "chooseAccount": "Choose account",
@@ -942,6 +942,9 @@
     "notChecked": "Not checked yet",
     "offline": "The internet could not be reached. Everything keeps working; updates wait.",
     "upToDate": "Up to date",
+    "checkNow": "Check now",
+    "checking": "Checking for updates… the result shows here within 5 minutes.",
+    "checkAsked": "The server PC checks for updates within 5 minutes.",
     "available": "New version",
     "download": {
       "none": "Not downloaded yet",
@@ -976,14 +979,15 @@
       "services": "starting the services",
       "migrate": "the database changes",
       "health": "the new version did not answer",
-      "put_back": "putting the database back — call support"
+      "put_back": "putting the database back — call support",
+      "test_version": "this PC once had a test version"
     },
     "window": "Night window",
     "windowText": "Updates install by themselves between {start} and {end} (shop time), never during a shift.",
     "changeWindow": "Change",
     "from": "From",
     "to": "To",
-    "automatic": "The server PC checks for updates by itself, downloads them in the background and installs them at a safe time. The office PCs update after the server."
+    "automatic": "The server PC checks for updates by itself every few hours; to check at once, press \"Check now\". It downloads them in the background and installs them at a safe time. The office PCs update after the server."
   },
   "serverHealth": {
     "title": "Server PC",

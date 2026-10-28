@@ -3,7 +3,8 @@
  * owner sees what needs attention, asks for a backup now (it waits for the backup service), and
  * creates the backup key: the private key is shown once and must be confirmed by its last 6
  * characters; then only the public key is kept. The server PC card (M6.2 part H) shows the
- * disks, services, certificates, clock and the UPS, and the owner confirms the UPS.
+ * disks, services, certificates, clock and the UPS, and the owner confirms the UPS. "Check now"
+ * (0110) asks the server PC to read the update list and says it is checking.
  */
 import { expect, signInAsOwner, snap, test } from './fixtures';
 
@@ -35,6 +36,15 @@ test('the owner opens System health, asks for a backup and creates the backup ke
   if (await confirm.isVisible()) await confirm.click();
   await expect(ups.getByRole('button')).toHaveCount(0);
   await snap(page, '93-server-health');
+
+  // Updates (0110): "Check now" asks the server PC; the card says it is checking, and the button
+  // waits until the server PC has read the list (a run in the other language may have asked).
+  const updates = page.getByTestId('updates-card');
+  const checkNow = updates.getByRole('button', { name: t('settings:updates.checkNow') });
+  if (await checkNow.isEnabled()) await checkNow.click();
+  await expect(updates.getByTestId('update-checked')).toContainText(t('settings:updates.checking'));
+  await expect(checkNow).toBeDisabled();
+  await snap(page, '96-update-check-now');
 
   await page.getByRole('button', { name: t('settings:backup.backupNow') }).click();
   await expect(page.getByTestId('backup-requests')).toContainText(

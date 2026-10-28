@@ -38,7 +38,16 @@ export function KioskWatcher() {
     return () => void stop.then((unlisten) => unlisten());
   }, [api]);
 
-  if (!kiosk?.isPos || kiosk.locked) return null;
+  // The bar's room at the top of the window (tokens-app.css: --kiosk-bar-height).
+  const off = !!kiosk?.isPos && !kiosk.locked;
+  useEffect(() => {
+    const root = document.documentElement;
+    if (off) root.dataset.kioskOff = '';
+    else delete root.dataset.kioskOff;
+    return () => void delete root.dataset.kioskOff;
+  }, [off]);
+
+  if (!off || !kiosk) return null;
   return (
     <div className={styles.banner} role="status" data-testid="kiosk-off">
       <LockOpen className={iconClass.sm} aria-hidden="true" />

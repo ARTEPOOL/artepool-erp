@@ -1013,6 +1013,10 @@ export interface OpsUpdateRequests {
 export interface OpsUpdateState {
   available_version: string | null;
   check_error: string | null;
+  /**
+   * The owner's last "Check now" (decision 0110): the updater reads the update list at once when this is newer than checked_at.
+   */
+  check_requested_at: Timestamp | null;
   checked_at: Timestamp | null;
   created_at: Generated<Timestamp>;
   created_by: bigint;
