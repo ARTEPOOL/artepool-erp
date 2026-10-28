@@ -31,6 +31,12 @@ export const UPDATE_KEY = ['settings', 'update'] as const;
 
 const hour = (h: number) => `${String(h).padStart(2, '0')}:00`;
 
+/** "**word**" is shown bold; nothing else in the notes is markup (plain text, never HTML). */
+function Inline({ text }: { text: string }) {
+  const parts = text.split(/\*\*(.+?)\*\*/g);
+  return <>{parts.map((part, i) => (i % 2 === 1 ? <b key={i}>{part}</b> : part))}</>;
+}
+
 /** Release notes as written: "- " lines become points, other lines paragraphs. */
 export function ReleaseNotes({ text }: { text: string }) {
   const blocks: { points?: string[]; text?: string }[] = [];
@@ -50,11 +56,15 @@ export function ReleaseNotes({ text }: { text: string }) {
         b.points ? (
           <ul key={i}>
             {b.points.map((p, j) => (
-              <li key={j}>{p}</li>
+              <li key={j}>
+                <Inline text={p} />
+              </li>
             ))}
           </ul>
         ) : (
-          <p key={i}>{b.text}</p>
+          <p key={i}>
+            <Inline text={b.text!} />
+          </p>
         ),
       )}
     </div>
