@@ -733,7 +733,7 @@ describe('Settings → System health (decision 0086)', () => {
 
   it('release notes show one point per line (0110)', async () => {
     const notesAr =
-      'صحة جهاز السيرفر في مكان واحد.\n\n- كارت جديد «جهاز السيرفر».\n- أكّد مرة إن فيه UPS.';
+      'صحة جهاز السيرفر في مكان واحد.\n\n- كارت جديد «جهاز السيرفر».\n- دوس **افحص دلوقتي** لما تحب.';
     const bridge = signedInBridge([...OWNER_PERMISSIONS, 'system.health.view'])
       .on('GET', '/api/v1/health/system', ok(health()))
       .on(
@@ -750,7 +750,10 @@ describe('Settings → System health (decision 0086)', () => {
       within(notes)
         .getAllByRole('listitem')
         .map((li) => li.textContent),
-    ).toEqual(['كارت جديد «جهاز السيرفر».', 'أكّد مرة إن فيه UPS.']);
+    ).toEqual(['كارت جديد «جهاز السيرفر».', 'دوس افحص دلوقتي لما تحب.']);
+    // "**…**" is shown bold, never as asterisks.
+    expect(within(notes).getByText('افحص دلوقتي').tagName).toBe('B');
+    expect(notes.textContent).not.toContain('*');
   });
 
   it('"Check now" asks the server PC and says it is checking; up to date without a new version (0110)', async () => {
