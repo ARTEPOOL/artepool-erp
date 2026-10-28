@@ -2,7 +2,7 @@
 .shell {
   display: grid;
   grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
-  min-block-size: 100dvh;
+  min-block-size: calc(100dvh - var(--kiosk-bar-height));
 }
 
 .side {
