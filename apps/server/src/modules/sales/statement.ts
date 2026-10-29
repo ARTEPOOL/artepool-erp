@@ -4,7 +4,6 @@
  */
 import { sql, type Kysely, type Transaction } from 'kysely';
 import type {
-  CustomerBalance,
   OpeningBalanceItem,
   OpeningBalanceRequest,
   StatementLine,
@@ -16,6 +15,7 @@ import { filledByDatabase } from '../../platform/db/stamped';
 import { today } from '../inventory/service';
 import { postEntry } from '../ledger/posting';
 import { openingBalancePosting } from '../ledger/sales-posting';
+import { advancesOf, outstandingOf } from './balance';
 
 type Db = Kysely<DB> | Transaction<DB>;
 
@@ -148,6 +148,14 @@ export async function statement(
       balanceFils: balance.toString(),
     });
   }
+  // Decision 0114: today's net position (advance payments apart, never netted in the lines).
+  const id = sql<bigint>`${customerId}::bigint`;
+  const now = (
+    await sql<{ outstanding: string; advances: string }>`
+      SELECT ${outstandingOf(id)} AS outstanding, ${advancesOf(id)} AS advances`.execute(db)
+  ).rows[0]!;
+  const outstanding = BigInt(now.outstanding);
+  const advances = BigInt(now.advances);
   return {
     customerId: customerId.toString(),
     from: query.from,
@@ -155,28 +163,10 @@ export async function statement(
     openingFils: opening.toString(),
     lines,
     closingFils: balance.toString(),
-  };
-}
-
-export async function customerBalance(db: Db, customerId: bigint): Promise<CustomerBalance> {
-  const c = await db
-    .selectFrom('md.customers')
-    .select([
-      'credit_mode',
-      'credit_limit_fils',
-      sql<string>`sales.customer_balance(id)::text`.as('balance'),
-      sql<string>`(SELECT coalesce(sum(d.net_fils - d.advance_used_net_fils + d.vat_fils - d.advance_used_vat_fils), 0)::text
-                     FROM sales.documents d
-                    WHERE d.customer_id = md.customers.id AND d.doc_type = 'advance_invoice' AND d.status = 'issued')`.as(
-        'advances',
-      ),
-    ])
-    .where('id', '=', customerId)
-    .executeTakeFirstOrThrow();
-  return {
-    balanceFils: c.balance,
-    creditMode: c.credit_mode as CustomerBalance['creditMode'],
-    creditLimitFils: c.credit_limit_fils.toString(),
-    advancesFils: c.advances,
+    today: {
+      outstandingFils: outstanding.toString(),
+      advancesFils: advances.toString(),
+      netPositionFils: (outstanding - advances).toString(),
+    },
   };
 }

@@ -5,6 +5,7 @@
  * out every line; amounts a screen shows before saving are previews from the same shared helper.
  */
 import { z } from 'zod';
+import type { BalanceStatus } from '../balance/index';
 import { IdText } from './auth';
 import { NonNegativeIntText, OptionalText, Reason, RowVersion } from './common';
 import { DateText, STOCK_STATUSES, type StockStatus } from './inventory';
@@ -530,13 +531,57 @@ export interface StatementResponse {
   openingFils: string;
   lines: StatementLine[];
   closingFils: string;
+  /**
+   * Decision 0114, as of today: what is outstanding, the advance payments not yet deducted, and the
+   * net position (outstanding − advance payments).
+   */
+  today: { outstandingFils: string; advancesFils: string; netPositionFils: string };
 }
 
-/** The customer's position right now: what they owe (positive) or are owed (negative). */
-export interface CustomerBalance {
-  balanceFils: string;
-  creditMode: 'cash' | 'credit';
+/** The amounts behind the balance (decision 0114); only with customers.balance.view. */
+export interface CustomerBalanceAmounts {
+  /** What the customer owes (negative: they are owed), from posted documents only. */
+  outstandingFils: string;
+  /** The part of it past its due date. */
+  overdueFils: string;
+  /** 0 for a cash customer. */
   creditLimitFils: string;
-  /** Unused advances (payment invoices not yet deducted), with VAT. */
+  /** Credit limit − outstanding (advance payments never add to it). */
+  availableFils: string;
+  /** Payment tax invoices not yet deducted, with VAT; never subtracted from outstanding. */
   advancesFils: string;
+  /** Outstanding − advance payments. */
+  netPositionFils: string;
 }
+
+/** One thing still owed, with its age (decision 0114: the customer page). */
+export interface OpenDebtLine {
+  kind: 'invoice' | 'debit_note' | 'opening_balance';
+  documentId: string | null;
+  docNumber: string | null;
+  date: string;
+  dueDate: string | null;
+  totalFils: string;
+  dueFils: string;
+  /** Days since its date. */
+  ageDays: number;
+  /** Days past its due date (0 when not overdue). */
+  daysOverdue: number;
+}
+
+/**
+ * The customer's balance right now (decision 0114). The status (colour and words) for anyone who
+ * may see customers; the amounts and the open debts only with customers.balance.view.
+ */
+export interface CustomerBalance {
+  status: BalanceStatus;
+  creditMode: 'cash' | 'credit';
+  isWalkIn: boolean;
+  amounts: CustomerBalanceAmounts | null;
+  /** With `?detail=yes` and the permission: what is owed, oldest first, and its oldest date. */
+  openDebts?: OpenDebtLine[];
+  oldestUnpaidDate?: string | null;
+}
+
+export const CustomerBalanceQuery = z.object({ detail: z.enum(['yes']).optional() });
+export type CustomerBalanceQuery = z.infer<typeof CustomerBalanceQuery>;

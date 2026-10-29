@@ -11,6 +11,7 @@ import { sql } from 'kysely';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { computeLine } from '@artepool/shared';
 import type {
+  CustomersResponse as CustomerList,
   DashboardResponse,
   CancelInvoiceResponse,
   CustomerBalance,
@@ -519,7 +520,7 @@ describe('the advance and progress payments example (decision 0013)', () => {
     await ok(accountant('POST', `/api/v1/sales/documents/${final.id}/printed`, {}));
     expect((await documentHtml(server.db, BigInt(final.id))).html).toContain('COPY');
     const balance = await ok<CustomerBalance>(owner('GET', `/api/v1/customers/${cust}/balance`));
-    expect(balance).toMatchObject({ balanceFils: '3150000', advancesFils: '0' });
+    expect(balance.amounts).toMatchObject({ outstandingFils: '3150000', advancesFils: '0' });
     // The owner dashboard counts the project once: two advances + the final invoice = 100,000 + VAT.
     const after = await dash();
     expect(BigInt(after.current.netFils) - BigInt(before.current.netFils)).toBe(10000000n);
@@ -1015,10 +1016,8 @@ describe('cancelling or editing an issued A4 invoice (decision 0072)', () => {
     );
     const stock = await ok<ItemStockResponse>(owner('GET', `/api/v1/items/${pump.id}/stock`));
     expect(stock.balances[0]).toMatchObject({ quantityMilli: '5000' });
-    const balance = await ok<{ balanceFils: string }>(
-      owner('GET', `/api/v1/customers/${cust}/balance`),
-    );
-    expect(balance.balanceFils).toBe('0');
+    const balance = await ok<CustomerBalance>(owner('GET', `/api/v1/customers/${cust}/balance`));
+    expect(balance.amounts?.outstandingFils).toBe('0');
     // Only once.
     expect(
       await refusal(
@@ -1067,10 +1066,8 @@ describe('cancelling or editing an issued A4 invoice (decision 0072)', () => {
     const original = await ok<DocumentDetail>(owner('GET', `/api/v1/sales/documents/${issued.id}`));
     expect(original.cancelledBy).toMatchObject({ edited: true });
     // The unpaid invoice was settled by the credit note: nothing is owed.
-    const balance = await ok<{ balanceFils: string }>(
-      owner('GET', `/api/v1/customers/${cust}/balance`),
-    );
-    expect(balance.balanceFils).toBe('0');
+    const balance = await ok<CustomerBalance>(owner('GET', `/api/v1/customers/${cust}/balance`));
+    expect(balance.amounts?.outstandingFils).toBe('0');
   });
 });
 
@@ -1295,5 +1292,194 @@ describe('receipts settle open invoices first; one worked-out status (decision 0
     } finally {
       await client.end();
     }
+  });
+});
+
+describe("the customer's balance (decision 0114)", () => {
+  const balance = (who: Actor, id: string, detail = false) =>
+    ok<CustomerBalance>(
+      who('GET', `/api/v1/customers/${id}/balance${detail ? '?detail=yes' : ''}`),
+    );
+  const yesterday = async () =>
+    (await sql<{ d: string }>`SELECT (sys.business_date(now()) - 1)::text AS d`.execute(server.db))
+      .rows[0]!.d;
+  /** An invoice for `quantity` services at 100.00 + VAT, issued unpaid (the clerk; approval if over). */
+  async function invoiceOf(
+    cust: string,
+    quantityMilli: string,
+    extra: Record<string, unknown> = {},
+  ) {
+    phone += 1;
+    const svc = await item(`B114-${phone}`, 'service', '1000000');
+    const d = await draft(clerk, {
+      customerId: cust,
+      lines: [{ itemId: svc.id, quantityMilli }],
+    });
+    return ok<DocumentDetail>(issue(clerk, d, extra));
+  }
+
+  it('from posted documents only: an invoice, a partial payment, a credit note, an opening balance', async () => {
+    const cust = await customer('Balance contractor', { credit: '100000' }); // limit 1,000.00
+    expect(await balance(accountant, cust)).toMatchObject({
+      status: 'nothing_due',
+      creditMode: 'credit',
+      amounts: { outstandingFils: '0', overdueFils: '0', availableFils: '100000' },
+    });
+    const inv = await invoiceOf(cust, '2000'); // 210.00
+    expect((await balance(accountant, cust)).amounts).toMatchObject({
+      outstandingFils: '21000',
+      availableFils: '79000',
+    });
+    await ok(
+      accountant('POST', '/api/v1/sales/payments', { customerId: cust, part: cash('4000') }),
+      201,
+    );
+    expect((await balance(accountant, cust)).amounts!.outstandingFils).toBe('17000');
+    await ok(
+      accountant('POST', '/api/v1/sales/notes', {
+        kind: 'credit_note',
+        originalDocumentId: inv.id,
+        reasonCodeId: ids.cnReturn,
+        reasonText: 'One not done',
+        lines: [{ originalLineId: inv.lines[0]!.id, quantityMilli: '1000' }],
+      }),
+      201,
+    );
+    expect((await balance(accountant, cust)).amounts!.outstandingFils).toBe('6500');
+    // An opening balance past its due date: outstanding and overdue (orange).
+    const due = await yesterday();
+    await ok(
+      owner('POST', '/api/v1/customers/opening-balances', {
+        customerId: cust,
+        direction: 'receivable',
+        amountFils: '30000',
+        dueDate: due,
+      }),
+      201,
+    );
+    const after = await balance(accountant, cust, true);
+    expect(after).toMatchObject({
+      status: 'overdue',
+      amounts: { outstandingFils: '36500', overdueFils: '30000', availableFils: '63500' },
+    });
+    // The customer page: oldest first, with ages and days overdue.
+    expect(after.openDebts!.map((d) => [d.kind, d.dueFils, d.daysOverdue])).toEqual([
+      ['opening_balance', '30000', 1],
+      ['invoice', '6500', 0],
+    ]);
+    expect(after.oldestUnpaidDate).toBe(after.openDebts![0]!.date);
+  });
+
+  it('near the limit at 80%, over the limit above it; the same rule as the credit approval (0046)', async () => {
+    const cust = await customer('Near the limit', { credit: '25000' }); // 250.00
+    await invoiceOf(cust, '2000'); // 210.00 = 84%
+    expect((await balance(accountant, cust)).status).toBe('near_limit');
+    // Above the limit the issue needs a supervisor's approval, and the status is red.
+    await invoiceOf(cust, '1000', { creditApprovalId: await approval('sales.credit_over_limit') });
+    expect(await balance(accountant, cust)).toMatchObject({
+      status: 'over_limit',
+      amounts: { outstandingFils: '31500', availableFils: '-6500' },
+    });
+  });
+
+  it('advance payments apart: never subtracted from outstanding, never added to the credit', async () => {
+    const cust = await customer('Deposit payer', { credit: '100000' });
+    await ok(
+      accountant('POST', '/api/v1/sales/payments', {
+        customerId: cust,
+        part: cash('20000'),
+        asAdvance: true,
+      }),
+      201,
+    );
+    await invoiceOf(cust, '1000'); // 105.00, not deducting the advance
+    expect((await balance(accountant, cust)).amounts).toMatchObject({
+      outstandingFils: '10500',
+      advancesFils: '20000',
+      netPositionFils: '-9500',
+      availableFils: '89500',
+    });
+    const st = await ok<StatementResponse>(
+      accountant('GET', `/api/v1/customers/${cust}/statement?from=2026-01-01&to=2099-12-31`),
+    );
+    expect(st.today).toEqual({
+      outstandingFils: '10500',
+      advancesFils: '20000',
+      netPositionFils: '-9500',
+    });
+  });
+
+  it('without customers.balance.view: the status only, never the amounts', async () => {
+    const cust = await customer('Hidden amounts', { credit: '100000' });
+    await invoiceOf(cust, '1000');
+    expect(await balance(cashier, cust, true)).toEqual({
+      status: 'within_limit',
+      creditMode: 'credit',
+      isWalkIn: false,
+      amounts: null,
+    });
+  });
+
+  it('a cash customer who owes is over the limit; the walk-in is marked', async () => {
+    const cust = await customer('Cash owes');
+    await invoiceOf(cust, '1000', { creditApprovalId: await approval('sales.credit_over_limit') });
+    expect((await balance(cashier, cust)).status).toBe('over_limit');
+    const walkIn = (
+      await sql<{ id: string }>`SELECT id::text FROM md.customers WHERE is_walk_in`.execute(
+        server.db,
+      )
+    ).rows[0]!.id;
+    expect((await balance(cashier, walkIn)).isWalkIn).toBe(true);
+  });
+
+  it('the customers list: the column, the overdue filter, and sorting by amount with the permission', async () => {
+    const late = await customer('Zz late payer', { credit: '100000' });
+    await invoiceOf(late, '1000', { issueDate: await yesterday() }); // 30 days: not overdue yet
+    const due = await yesterday();
+    await ok(
+      owner('POST', '/api/v1/customers/opening-balances', {
+        customerId: late,
+        direction: 'receivable',
+        amountFils: '99000',
+        dueDate: due,
+      }),
+      201,
+    );
+    const mine = (list: CustomerList) => list.customers.find((c) => c.id === late)!;
+    const seen = await ok<CustomerList>(
+      accountant('GET', '/api/v1/customers?balance=yes&q=late%20payer'),
+    );
+    expect(mine(seen).balance).toEqual({
+      status: 'over_limit',
+      outstandingFils: '109500',
+      overdueFils: '99000',
+    });
+    const blind = await ok<CustomerList>(
+      cashier('GET', '/api/v1/customers?balance=yes&q=late%20payer'),
+    );
+    expect(mine(blind).balance).toEqual({
+      status: 'over_limit',
+      outstandingFils: null,
+      overdueFils: null,
+    });
+    // Without asking, no balance is worked out (the pickers stay fast).
+    const plain = await ok<CustomerList>(accountant('GET', '/api/v1/customers?q=late%20payer'));
+    expect(mine(plain).balance).toBeUndefined();
+    const overdue = await ok<CustomerList>(
+      accountant('GET', '/api/v1/customers?overdue=yes&pageSize=200'),
+    );
+    expect(overdue.customers.map((c) => c.id)).toContain(late);
+    expect(overdue.customers.every((c) => !c.isWalkIn)).toBe(true);
+    // Biggest first (other tests in this file leave customers owing more than this one).
+    const sorted = await ok<CustomerList>(
+      accountant('GET', '/api/v1/customers?sort=outstanding&pageSize=200'),
+    );
+    const amounts = sorted.customers.map((c) => BigInt(c.balance!.outstandingFils!));
+    expect([...amounts].sort((a, b) => (a < b ? 1 : a > b ? -1 : 0))).toEqual(amounts);
+    expect(amounts[0]).toBeGreaterThanOrEqual(109500n);
+    expect(sorted.customers.map((c) => c.id)).toContain(late);
+    expect(await refusal(cashier('GET', '/api/v1/customers?sort=outstanding'))).toMatchObject({
+      status: 403,
+    });
   });
 });

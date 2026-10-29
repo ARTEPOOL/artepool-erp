@@ -20,14 +20,14 @@ export function CustomerAccount({ customer }: { customer: CustomerDetail }) {
   const can = useCan();
   const [dialog, setDialog] = useState<'statement' | 'opening' | null>(null);
   const balance = useCustomerBalance(customer.id);
-  const b = balance.data;
+  const b = balance.data?.amounts ? { ...balance.data, amounts: balance.data.amounts } : null;
   const statements = can('statements.view');
   const opening = can('customers.opening');
   const receive = can('payments.receive') && customer.isActive;
   const navigate = useNavigate();
 
   if (!b && !statements && !opening && !receive) return null;
-  const owed = b ? BigInt(b.balanceFils) : 0n;
+  const owed = b ? BigInt(b.amounts.outstandingFils) : 0n;
   return (
     <Card rise index={3}>
       <CardHeader title={t('account.title')} />
@@ -47,12 +47,14 @@ export function CustomerAccount({ customer }: { customer: CustomerDetail }) {
                 label: t('account.credit'),
                 value:
                   b.creditMode === 'credit'
-                    ? t('sales:customerPicker.credit', { limit: money(BigInt(b.creditLimitFils)) })
+                    ? t('sales:customerPicker.credit', {
+                        limit: money(BigInt(b.amounts.creditLimitFils)),
+                      })
                     : t('sales:customerPicker.cash'),
               },
               {
                 label: t('account.advances'),
-                value: <bdi>{money(BigInt(b.advancesFils))}</bdi>,
+                value: <bdi>{money(BigInt(b.amounts.advancesFils))}</bdi>,
               },
             ]}
           />

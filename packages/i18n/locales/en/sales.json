@@ -108,6 +108,7 @@
     "change": "Change customer",
     "cash": "Cash (no credit)",
     "credit": "Credit up to {limit}",
+    "creditOnly": "Credit customer",
     "balance": "Current balance: {amount}",
     "trn": "TRN: {trn}",
     "add": "Add a new customer",

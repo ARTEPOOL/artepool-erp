@@ -599,7 +599,7 @@ const CANCELLING_NOTE = sql`
  * Decision 0113: issued, not cancelled, not fully settled, and past the due date set at issue from
  * the customer's payment terms (an "on receipt" cash invoice is overdue from the next day).
  */
-const OVERDUE = sql`(d.status = 'issued' AND d.doc_type IN ('invoice', 'debit_note')
+export const OVERDUE = sql`(d.status = 'issued' AND d.doc_type IN ('invoice', 'debit_note')
   AND d.due_date IS NOT NULL AND d.due_date < sys.business_date(now())
   AND d.settled_fils < d.total_fils AND NOT EXISTS (SELECT 1 ${CANCELLING_NOTE}))`;
 

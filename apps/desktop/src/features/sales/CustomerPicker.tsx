@@ -78,10 +78,20 @@ export function CustomerPicker(props: {
               <>
                 <span>
                   {b.creditMode === 'credit'
-                    ? t('customerPicker.credit', { limit: money(BigInt(b.creditLimitFils)) })
+                    ? b.amounts
+                      ? t('customerPicker.credit', {
+                          limit: money(BigInt(b.amounts.creditLimitFils)),
+                        })
+                      : t('customerPicker.creditOnly')
                     : t('customerPicker.cash')}
                 </span>
-                <span>{t('customerPicker.balance', { amount: money(BigInt(b.balanceFils)) })}</span>
+                {b.amounts && (
+                  <span>
+                    {t('customerPicker.balance', {
+                      amount: money(BigInt(b.amounts.outstandingFils)),
+                    })}
+                  </span>
+                )}
               </>
             )}
           </div>

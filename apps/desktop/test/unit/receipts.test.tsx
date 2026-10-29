@@ -148,10 +148,17 @@ const HOTEL_ITEM: CustomerListItem = {
 };
 
 const BALANCE: CustomerBalance = {
-  balanceFils: '360000',
+  status: 'within_limit',
   creditMode: 'credit',
-  creditLimitFils: '1000000',
-  advancesFils: '31500',
+  isWalkIn: false,
+  amounts: {
+    outstandingFils: '360000',
+    overdueFils: '0',
+    creditLimitFils: '1000000',
+    availableFils: '640000',
+    advancesFils: '31500',
+    netPositionFils: '328500',
+  },
 };
 
 const OPENING: OpeningBalanceItem = {
@@ -860,6 +867,7 @@ describe('Customer account', () => {
       },
     ],
     closingFils: '150000',
+    today: { outstandingFils: '150000', advancesFils: '0', netPositionFils: '150000' },
   };
 
   it('shows the balance and the statement of account, and prints it with the dates', async () => {

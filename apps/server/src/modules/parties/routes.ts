@@ -32,7 +32,12 @@ export function registerPartyRoutes(app: FastifyInstance): void {
     url: '/api/v1/customers',
     access: viewCustomers,
     query: CustomersQuery,
-    handler: ({ query }) => customers.listCustomers(db, query),
+    handler: ({ request, query }) =>
+      customers.listCustomers(
+        db,
+        query,
+        request.auth?.permissions.has('customers.balance.view') ?? false,
+      ),
   });
   defineRoute(app, {
     method: 'GET',
