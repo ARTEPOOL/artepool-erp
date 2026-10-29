@@ -290,6 +290,7 @@ describe('the POS PC and its shift (decisions 0004, 0021)', () => {
     ).toMatchObject({ code: 'PERMISSION_DENIED', rule: 'SHIFT_NOT_OWNER' });
     const mine = await ok<PosState>(a('GET', '/api/v1/pos/state'));
     expect(mine.shift?.id).toBe(shift.id);
+    expect(mine.lastSale).toBeNull(); // no invoice in the new shift yet (0111)
     expect(mine.paymentMethods.map((m) => m.code)).toEqual(['CASH', 'CARD']);
     expect(mine.denominations.map((d) => d.valueFils)).toContain('5');
     // The float came from the safe (row 18).
@@ -353,6 +354,14 @@ describe('POS sales', () => {
       server.db,
     );
     expect(rows[0]).toEqual({ n: '1', events: '1' });
+    // The POS shows the shift's last invoice, so it can be checked and printed again (0111).
+    const state = await ok<PosState>(cashier('GET', '/api/v1/pos/state'));
+    expect(state.lastSale).toMatchObject({
+      id: first.document.id,
+      docNumber: first.document.docNumber,
+      totalFils: '2310',
+    });
+    expect(Date.parse(state.lastSale!.issuedAt)).toBeLessThanOrEqual(Date.now());
   });
 
   it('split cash + card: the card part carries the slip’s approval code only', async () => {

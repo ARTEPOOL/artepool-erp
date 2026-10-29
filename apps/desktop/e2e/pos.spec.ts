@@ -92,9 +92,16 @@ test('sell, oversell with approval, close the shift with a recount', async ({
   await snap(page, '52-pos-payment');
   await pay.getByRole('button', { name: new RegExp(t('pos:payment.confirm')) }).click();
   await expect(page.getByTestId('pos-receipt-number')).toHaveText(/^POS-/);
+  const saleNumber = (await page.getByTestId('pos-receipt-number').textContent())!;
   await expect(page.getByRole('img', { name: t('pos:done.preview') })).toBeVisible();
   await snap(page, '53-pos-done');
   await page.getByRole('button', { name: new RegExp(t('pos:done.newSale')) }).click();
+  // The last invoice stays in view with a reprint button (0111).
+  await expect(page.getByTestId('last-sale')).toContainText(saleNumber);
+  await expect(
+    page.getByTestId('last-sale').getByRole('button', { name: t('pos:lastSale.reprint') }),
+  ).toBeVisible();
+  await snap(page, '58-pos-last-sale');
 
   // One piece is left: selling two needs the supervisor (decision 0003).
   await search.fill(barcode);
