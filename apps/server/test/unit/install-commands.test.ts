@@ -143,6 +143,14 @@ describe('PostgreSQL', () => {
       `archive_command = 'copy "%p" "C:\\\\ProgramData\\\\ARTEPOOL\\\\wal\\\\%f"'`,
     );
     expect(conf).toContain('archive_timeout = 300');
+    // A confirmed sale survives a power cut (M6.2 part I).
+    for (const line of [
+      'fsync = on',
+      'synchronous_commit = on',
+      'full_page_writes = on',
+      'wal_sync_method = fsync_writethrough',
+    ])
+      expect(conf).toContain(line);
     expect(() => postgresqlSettings({ port: 1, walDir: "C:\\it's" })).toThrow();
     const hba = hbaConf()
       .split('\n')

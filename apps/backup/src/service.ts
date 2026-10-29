@@ -3,14 +3,15 @@
  * - a local copy when the last good one is an hour old;
  * - the off-site copy once a day, when the key and Google Drive are set up (retried hourly
  *   after a failure);
- * - the integrity checks of the live database every night after 02:00 (Dubai);
+ * - the integrity checks of the live database once after every start of the database (after a
+ *   power cut too, M6.2 part I), and every night after 02:00 (Dubai);
  * - the owner's requests (back up now, upload now, restore test, drive copy), oldest first.
  */
 import { stat } from 'node:fs/promises';
 import type pg from 'pg';
 import type { BackupConfig } from './config';
 import { inSystemTx } from './db';
-import { nightlyIntegrity } from './integrity';
+import { liveIntegrity, nightlyIntegrity, startCheckDue } from './integrity';
 import { localBackup } from './local';
 import { offlineCopy } from './offline';
 import { ageRecipient, offsiteUpload } from './offsite';
@@ -106,6 +107,9 @@ export async function tick(
     }
   };
   await processRequests(client, config);
+  if (await startCheckDue(client)) {
+    await attempt('start-check', () => liveIntegrity(client, 'after_start'));
+  }
   if (olderThan(await lastRunAt(client, 'logical_dump', 'success'), HOUR, now)) {
     await attempt('local', () => localBackup(client, config, { now }));
   }

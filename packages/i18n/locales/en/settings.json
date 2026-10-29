@@ -1047,6 +1047,19 @@
       "confirm": "Yes, a UPS is connected",
       "thanks": "Thank you: the UPS is confirmed"
     },
+    "database": {
+      "title": "Protection from power cuts",
+      "on": "On: every confirmed operation is on the disk before the program says \"done\"",
+      "off": "Off ({list}): call support",
+      "started": "The database last started {time}",
+      "check": {
+        "ok": "the integrity check after it is clean",
+        "issues": "the integrity check after it found problems",
+        "error": "the integrity check after it did not finish",
+        "running": "the integrity check after it is running",
+        "pending": "the integrity check after it starts within a minute"
+      }
+    },
     "problem": {
       "disk_low": "A disk on the server PC is getting full.",
       "disk_urgent": "A disk on the server PC is almost full: free some space now.",
@@ -1056,7 +1069,9 @@
       "certificate_renewal_failed": "The automatic renewal of the server certificate failed; it is tried again tonight.",
       "root_ca_expiring": "The root certificate (ARTÉPOOL CA) ends in less than two years: plan its renewal with support.",
       "clock_behind": "The server PC's clock went back: nothing can be saved until it is corrected.",
-      "ups_unconfirmed": "Confirm that a UPS is connected to the server PC."
+      "ups_unconfirmed": "Confirm that a UPS is connected to the server PC.",
+      "durability_off": "A setting that protects the data from power cuts is off on the server PC: call support.",
+      "start_check_failed": "The integrity check after the database last started found problems: open System health."
     }
   }
 }

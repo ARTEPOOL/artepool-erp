@@ -1,8 +1,9 @@
 /**
  * System health → the server PC (M6.2 part H) through the API, on a real PostgreSQL: owner only;
  * the backup service shows as running only with a fresh heartbeat; the server certificate and the
- * root CA with their levels; WAL archiving; the clock; the owner's UPS confirmation (audited); and
- * the owner alerts, raised once per problem per day.
+ * root CA with their levels; WAL archiving; the clock; the owner's UPS confirmation (audited); the
+ * database's power-cut settings and the check after its start (part I); and the owner alerts,
+ * raised once per problem per day.
  */
 import { randomUUID } from 'node:crypto';
 import { mkdir, mkdtemp, rm } from 'node:fs/promises';
@@ -95,6 +96,34 @@ describe('the server PC in System health', () => {
     expect(h.clock.isBehind).toBe(false);
     // The test database has no WAL archiving (the installed server PC has).
     expect(h.wal).toMatchObject({ enabled: false, failing: false });
+  });
+
+  it('shows the database start, its power-cut settings and the check after the start (part I)', async () => {
+    let h = await health();
+    expect(Date.parse(h.database.startedAt)).toBeLessThan(Date.now());
+    // The test database runs with them all on (wal_sync_method is checked on Windows only).
+    expect(h.database.durability).toEqual({ ok: true, off: [] });
+    expect(h.database.startCheck).toBeNull();
+    expect(h.problems).not.toContain('durability_off');
+
+    const run = async (status: 'ok' | 'issues') => {
+      await server.admin.query('BEGIN');
+      await server.admin.query("SELECT sys.set_context(1, p_reason => 'test: backup service')");
+      await server.admin.query(
+        `INSERT INTO ops.integrity_runs (run_kind, database_name, finished_at, status)
+         VALUES ('after_start', current_database(), now(), $1)`,
+        [status],
+      );
+      await server.admin.query('COMMIT');
+    };
+    await run('issues');
+    h = await health();
+    expect(h.database.startCheck).toMatchObject({ status: 'issues' });
+    expect(h.problems).toContain('start_check_failed');
+    await run('ok');
+    h = await health();
+    expect(h.database.startCheck).toMatchObject({ status: 'ok' });
+    expect(h.problems).not.toContain('start_check_failed');
   });
 
   it('shows the backup service as running only with a fresh heartbeat', async () => {

@@ -39,6 +39,12 @@ export function postgresqlSettings(options: { port: number; walDir: string }): s
     "listen_addresses = 'localhost'",
     `port = ${options.port}`,
     "password_encryption = 'scram-sha-256'",
+    // A confirmed sale is on the disk before "committed", through a power cut (M6.2 part I):
+    // flushed through the disk's own write cache on Windows.
+    'fsync = on',
+    'synchronous_commit = on',
+    'full_page_writes = on',
+    'wal_sync_method = fsync_writethrough',
     'wal_level = replica',
     'archive_mode = on',
     `archive_command = 'copy "%p" "${wal}\\\\%f"'`,
