@@ -16,6 +16,7 @@ import type {
   CustomerBalance,
   CustomerDetail,
   DocumentDetail,
+  DocumentsResponse,
   ItemDetail,
   ItemStockResponse,
   JournalEntryDetail,
@@ -989,6 +990,29 @@ describe('cancelling or editing an issued A4 invoice (decision 0072)', () => {
       docNumber: result.creditNote.docNumber,
       edited: false,
     });
+    // The list says so too, and its status filter finds it under "cancelled", not "active".
+    const listed = async (status: string) =>
+      (
+        await ok<DocumentsResponse>(
+          owner('GET', `/api/v1/sales/documents?customerId=${cust}&status=${status}`),
+        )
+      ).documents.map((x) => x.docNumber);
+    const all = await ok<DocumentsResponse>(
+      owner('GET', `/api/v1/sales/documents?customerId=${cust}`),
+    );
+    expect(all.documents.find((x) => x.id === issued.id)?.cancelledBy).toMatchObject({
+      docNumber: result.creditNote.docNumber,
+      edited: false,
+    });
+    expect(all.documents.find((x) => x.id === result.creditNote.id)).toMatchObject({
+      cancelledBy: null,
+      originalDocumentNumber: issued.docNumber,
+    });
+    expect(await listed('cancelled')).toEqual([issued.docNumber]);
+    expect(await listed('active')).toEqual([result.creditNote.docNumber]);
+    expect(await listed('issued')).toEqual(
+      expect.arrayContaining([issued.docNumber, result.creditNote.docNumber]),
+    );
     const stock = await ok<ItemStockResponse>(owner('GET', `/api/v1/items/${pump.id}/stock`));
     expect(stock.balances[0]).toMatchObject({ quantityMilli: '5000' });
     const balance = await ok<{ balanceFils: string }>(

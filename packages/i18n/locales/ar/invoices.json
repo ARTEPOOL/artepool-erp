@@ -6,13 +6,20 @@
     "search": "الرقم أو العميل",
     "type": "النوع",
     "allTypes": "كل الأنواع",
-    "allStatuses": "الكل (دون الملغاة)",
+    "allStatuses": "الكل (دون المسودات الملغاة)",
+    "statuses": {
+      "draft": "مسودة",
+      "active": "صادرة",
+      "cancelled": "ملغاة (بإشعار دائن)",
+      "discarded": "مسودة ملغاة"
+    },
     "settlement": "الدفع",
     "allSettlements": "الكل",
     "notFullyPaid": "غير مدفوعة بالكامل",
     "label": "الفواتير والإشعارات",
     "paidDue": "المدفوع / المستحق",
     "draftNumber": "مسودة (بلا رقم بعد)",
+    "forDocument": "عن {number}",
     "due": "المستحق {amount}",
     "empty": "لا توجد مستندات تطابق هذه التصفية."
   },

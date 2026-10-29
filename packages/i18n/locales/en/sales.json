@@ -17,7 +17,7 @@
   "statuses": {
     "draft": "Draft",
     "issued": "Issued",
-    "discarded": "Discarded"
+    "discarded": "Discarded draft"
   },
   "settlement": {
     "open": "Unpaid",

@@ -6,13 +6,20 @@
     "search": "Number or customer",
     "type": "Type",
     "allTypes": "All types",
-    "allStatuses": "All (without discarded)",
+    "allStatuses": "All (without discarded drafts)",
+    "statuses": {
+      "draft": "Draft",
+      "active": "Issued",
+      "cancelled": "Cancelled (by a credit note)",
+      "discarded": "Discarded draft"
+    },
     "settlement": "Payment",
     "allSettlements": "All",
     "notFullyPaid": "Not fully paid",
     "label": "Invoices and notes",
     "paidDue": "Paid / due",
     "draftNumber": "Draft (no number yet)",
+    "forDocument": "for {number}",
     "due": "Due {amount}",
     "empty": "No documents match these filters."
   },

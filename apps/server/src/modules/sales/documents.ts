@@ -588,6 +588,13 @@ export async function issueInvoice(
 // Reading
 // ---------------------------------------------------------------------------------------------
 
+/** An issued credit note for all of the invoice, made by "Cancel" or "Edit" (decision 0072). */
+const CANCELLING_NOTE = sql`
+  FROM sales.documents n
+  JOIN sys.reason_codes r ON r.id = n.reason_code_id
+ WHERE n.original_document_id = d.id AND n.status = 'issued'
+   AND r.code IN ('INVOICE_CANCELLED', 'INVOICE_EDITED')`;
+
 function documentBase(db: Db) {
   return db
     .selectFrom('sales.documents as d')
@@ -617,6 +624,10 @@ function documentBase(db: Db) {
       'd.quotation_id',
       'd.print_count',
       'd.row_version',
+      sql<{ id: string; number: string | null; edited: boolean } | null>`(
+        SELECT jsonb_build_object('id', n.id::text, 'number', n.doc_number,
+                                  'edited', r.code = 'INVOICE_EDITED')
+        ${CANCELLING_NOTE} ORDER BY n.id LIMIT 1)`.as('cancelled_by'),
     ]);
 }
 
@@ -651,13 +662,27 @@ function documentItem(r: DocumentRow): DocumentItem {
     quotationId: r.quotation_id?.toString() ?? null,
     printCount: r.print_count,
     rowVersion: r.row_version,
+    cancelledBy: r.cancelled_by
+      ? {
+          id: r.cancelled_by.id,
+          docNumber: r.cancelled_by.number ?? '',
+          edited: r.cancelled_by.edited,
+        }
+      : null,
   };
 }
 
 export async function listDocuments(db: Db, query: DocumentsQuery): Promise<DocumentsResponse> {
   let q = documentBase(db);
   if (query.docType) q = q.where('d.doc_type', '=', query.docType);
-  if (query.status) q = q.where('d.status', '=', query.status);
+  if (query.status === 'active' || query.status === 'cancelled') {
+    q = q.where('d.status', '=', 'issued');
+    q = q.where(
+      query.status === 'cancelled'
+        ? sql<boolean>`EXISTS (SELECT 1 ${CANCELLING_NOTE})`
+        : sql<boolean>`NOT EXISTS (SELECT 1 ${CANCELLING_NOTE})`,
+    );
+  } else if (query.status) q = q.where('d.status', '=', query.status);
   else q = q.where('d.status', '<>', 'discarded');
   if (query.settlement === 'unpaid') q = q.where('d.settlement_status', '<>', 'settled');
   else if (query.settlement) q = q.where('d.settlement_status', '=', query.settlement);
@@ -792,17 +817,9 @@ export async function getDocument(db: Db, id: bigint): Promise<DocumentDetail> {
     .where('n.status', '=', 'issued')
     .orderBy('n.id')
     .execute();
-  const cancel = notes.find((n) => n.code === 'INVOICE_CANCELLED' || n.code === 'INVOICE_EDITED');
   const detail: DocumentDetail = {
     ...documentItem(row),
     hasNotes: notes.length > 0,
-    cancelledBy: cancel
-      ? {
-          id: cancel.id.toString(),
-          docNumber: cancel.doc_number ?? '',
-          edited: cancel.code === 'INVOICE_EDITED',
-        }
-      : null,
     businessLineId: row.business_line_id.toString(),
     billToName: row.bill_to_name,
     billToNameAlt: row.bill_to_name_alt,
