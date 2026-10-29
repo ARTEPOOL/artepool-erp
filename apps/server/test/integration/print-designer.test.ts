@@ -256,6 +256,47 @@ describe('the print designer (decisions 0020, 0064)', () => {
     expect(html).not.toContain('only'); // amount in words
   });
 
+  it('the account summary (decision 0114): credit customers by default, every named customer, or off', async () => {
+    const current = await template('tax_invoice_a4');
+    expect(current.settings.balanceBlock).toBe('credit_customers');
+    const preview = async (balanceBlock: TemplateSettings['balanceBlock'], language = 'en') =>
+      (
+        await ok<PreviewTemplateResponse>(
+          owner('POST', '/api/v1/print-templates/tax_invoice_a4/preview', {
+            settings: { ...current.settings, balanceBlock, language },
+          }),
+        )
+      ).html!;
+    // The sample customer is on credit: owed 1,250.00, this invoice 3,097.50, 1,000.00 paid now.
+    const on = await preview('credit_customers');
+    for (const text of [
+      'Account summary',
+      'Previous balance',
+      '1,250.00 AED',
+      'This invoice',
+      'Paid now',
+      '-1,000.00 AED',
+      'Total due',
+      '3,347.50 AED',
+    ]) {
+      expect(on).toContain(text);
+    }
+    expect(await preview('named_customers')).toContain('Account summary');
+    expect(await preview('off')).not.toContain('Account summary');
+    const ar = await preview('credit_customers', 'ar');
+    expect(ar).toContain('ملخص الحساب');
+    expect(ar).toContain('الرصيد السابق');
+    expect(ar).toContain('إجمالي الرصيد المستحق');
+    // The quotation never has one.
+    const quotation = await template('quotation_a4');
+    const q = await ok<PreviewTemplateResponse>(
+      owner('POST', '/api/v1/print-templates/quotation_a4/preview', {
+        settings: { ...quotation.settings, balanceBlock: 'named_customers' },
+      }),
+    );
+    expect(q.html).not.toContain('Account summary');
+  });
+
   it('logo in the middle, both languages: Arabic details on the right, English on the left', async () => {
     const current = await template('tax_invoice_a4');
     const { html } = await ok<PreviewTemplateResponse>(

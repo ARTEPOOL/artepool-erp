@@ -229,6 +229,13 @@ function sampleDocument(kind: DesignedKind, logo: string | null): PrintDocument 
     wordsFils: '309750',
     notes: 'التسليم خلال أسبوع · Delivery within a week',
     logoDataUri: logo,
+    // Decision 0114: a credit customer who owed 1,250.00 and paid 1,000.00 at issue.
+    account: {
+      previousFils: '125000',
+      thisInvoiceFils: '309750',
+      paidNowFils: '100000',
+      credit: true,
+    },
   };
   if (kind === 'quotation_a4') {
     return {

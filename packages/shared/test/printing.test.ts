@@ -57,4 +57,21 @@ describe('print templates (decision 0064)', () => {
     expect(LOCKED_BY_KIND.credit_note_a4).toContain('reason');
     expect(LOCKED_BY_KIND.tax_invoice_a4).toContain('customerFull');
   });
+
+  it('the account summary (decision 0114): on for credit customers unless the owner chose', () => {
+    expect(defaultTemplateSettings('tax_invoice_a4').balanceBlock).toBe('credit_customers');
+    // A version saved before 0114 has no choice: the default applies, nothing else is lost.
+    const old = readTemplateSettings('tax_invoice_a4', { language: 'en', color: '#123456' });
+    expect(old).toMatchObject({
+      language: 'en',
+      color: '#123456',
+      balanceBlock: 'credit_customers',
+    });
+    expect(
+      readTemplateSettings('tax_invoice_a4', { language: 'ar', balanceBlock: 'sometimes' }),
+    ).toMatchObject({ language: 'ar', balanceBlock: 'credit_customers' });
+    expect(readTemplateSettings('tax_invoice_a4', { balanceBlock: 'off' }).balanceBlock).toBe(
+      'off',
+    );
+  });
 });

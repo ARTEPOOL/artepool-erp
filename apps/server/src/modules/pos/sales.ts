@@ -343,6 +343,7 @@ export async function sell(
     ...(body.approvalId ? { approvalId: body.approvalId } : {}),
     ...(body.priceApprovalId ? { priceApprovalId: body.priceApprovalId } : {}),
     ...(body.creditApprovalId ? { creditApprovalId: body.creditApprovalId } : {}),
+    paidNowFils: body.payments.reduce((s, p) => s + BigInt(p.amountFils), 0n),
   });
 
   const issued = await trx

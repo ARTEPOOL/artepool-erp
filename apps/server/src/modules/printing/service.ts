@@ -118,6 +118,9 @@ export async function documentHtml(
     .leftJoin('auth.users as s', 's.id', 'd.salesperson_id')
     .select([
       'd.seller_snapshot',
+      'd.balance_before_fils',
+      'd.paid_at_issue_fils',
+      'd.credit_customer',
       'o.issue_date as original_date',
       's.display_name_ar',
       's.display_name_en',
@@ -215,6 +218,16 @@ export async function documentHtml(
     wordsFils: d.totalFils,
     notes: d.notes,
     logoDataUri: logo,
+    // Decision 0114: as stored at issue, so every reprint shows the same numbers.
+    account:
+      d.docType === 'invoice' && d.status === 'issued' && extra.balance_before_fils !== null
+        ? {
+            previousFils: extra.balance_before_fils.toString(),
+            thisInvoiceFils: d.totalFils,
+            paidNowFils: (extra.paid_at_issue_fils ?? 0n).toString(),
+            credit: extra.credit_customer === true,
+          }
+        : null,
   };
   return { html: await render(db, doc, seller, kind, settings), number: d.docNumber };
 }

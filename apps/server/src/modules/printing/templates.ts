@@ -6,7 +6,8 @@
  * the title, the seller's name, address and TRN, the customer's name, address and TRN on a full
  * tax invoice, the number and dates, per line the description, quantity, unit price, discount
  * (when any), taxable amount, VAT rate, VAT and total, the totals, earlier payments deducted, and
- * on a credit note the original invoice and the reason.
+ * on a credit note the original invoice and the reason. An invoice can add the customer's account
+ * summary as frozen at issue (decision 0114).
  */
 import { readFileSync } from 'node:fs';
 import { resourcePath } from '@artepool/node-kit';
@@ -86,6 +87,16 @@ export interface PrintDocument {
   table?: { head: [string, string][]; rows: string[][] } | null;
   notes?: string | null;
   logoDataUri?: string | null;
+  /**
+   * Decision 0114: an invoice's account summary, frozen at issue (a named customer only): the
+   * balance before it, this invoice, what was paid at issue, and whether they were on credit then.
+   */
+  account?: {
+    previousFils: string;
+    thisInvoiceFils: string;
+    paidNowFils: string;
+    credit: boolean;
+  } | null;
 }
 
 export interface RenderOptions {
@@ -303,6 +314,31 @@ export function renderHtml(doc: PrintDocument, seller: Seller, options: RenderOp
     )
     .join('');
 
+  // Decision 0114: on for credit customers by default, every named customer, or off.
+  const account =
+    kind === 'tax_invoice_a4' &&
+    doc.kind === 'invoice' &&
+    doc.account &&
+    (settings.balanceBlock === 'named_customers' ||
+      (settings.balanceBlock === 'credit_customers' && doc.account.credit))
+      ? doc.account
+      : null;
+  const accountRow = (label: [string, string], fils: bigint, strong = false) =>
+    `<div class="row ${strong ? 'strong' : ''}"><span>${t(label)}</span><span class="ltr">${money(fils)} AED</span></div>`;
+  const accountBox = account
+    ? `<div class="account"><h3>${heading(['ملخص الحساب', 'Account summary'])}</h3>
+      ${accountRow(['الرصيد السابق', 'Previous balance'], BigInt(account.previousFils))}
+      ${accountRow(['هذه الفاتورة', 'This invoice'], BigInt(account.thisInvoiceFils))}
+      ${BigInt(account.paidNowFils) > 0n ? accountRow(['المدفوع الآن', 'Paid now'], -BigInt(account.paidNowFils)) : ''}
+      ${accountRow(
+        ['إجمالي الرصيد المستحق', 'Total due'],
+        BigInt(account.previousFils) +
+          BigInt(account.thisInvoiceFils) -
+          BigInt(account.paidNowFils),
+        true,
+      )}</div>`
+    : '';
+
   const bank = on('bankDetails') ? options.bankAccount : null;
   const words =
     on('amountInWords') && doc.wordsFils != null && BigInt(doc.wordsFils) >= 0n
@@ -360,6 +396,10 @@ tr.deduction td { color: #333; font-style: italic; }
 .totals { margin-inline-start: auto; inline-size: 75mm; }
 .totals .row { padding: 1mm 0; border-block-end: 0.5pt solid #ddd; }
 .totals .strong { font-weight: 700; font-size: 1.15em; border-block-end: 1.5pt solid var(--main); color: #111; }
+.account { border: 0.8pt solid #999; border-radius: 2mm; padding: 2mm 3mm; max-inline-size: 85mm; }
+.account h3 { font-size: 1em; margin: 0 0 1mm; color: #111; }
+.account .row { padding: 0.6mm 0; }
+.account .strong { font-weight: 700; border-block-start: 1pt solid var(--main); margin-block-start: 0.5mm; }
 .words, .bank, .notes { margin-block-start: 3mm; }
 .notes h3, .bank h3 { font-size: 1em; margin: 0 0 1mm; color: #111; }
 .notes p, .bank p { margin: 0.5mm 0; }
@@ -429,6 +469,7 @@ ${
 }
 <section class="after">
   <div class="side">
+    ${accountBox}
     ${words ? `<div class="words">${words}</div>` : ''}
     ${
       bank

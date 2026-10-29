@@ -1432,6 +1432,82 @@ describe("the customer's balance (decision 0114)", () => {
     expect((await balance(cashier, walkIn)).isWalkIn).toBe(true);
   });
 
+  it('the printed account summary: stored at issue, a reprint shows the same numbers', async () => {
+    const cust = await customer('Printed balance', { credit: '100000' });
+    await invoiceOf(cust, '1000'); // 105.00 owed before
+    // 210.00, 50.00 of it paid at issue.
+    phone += 1;
+    const svc = await item(`B114-${phone}`, 'service', '1000000');
+    const d = await draft(clerk, {
+      customerId: cust,
+      lines: [{ itemId: svc.id, quantityMilli: '2000' }],
+    });
+    const inv = await ok<DocumentDetail>(issue(accountant, d, { payments: [cash('5000')] }));
+    const stored = (
+      await sql<{ before: string; paid: string; credit: boolean }>`
+        SELECT balance_before_fils::text AS before, paid_at_issue_fils::text AS paid,
+               credit_customer AS credit
+          FROM sales.documents WHERE id = ${BigInt(inv.id)}`.execute(server.db)
+    ).rows[0]!;
+    expect(stored).toEqual({ before: '10500', paid: '5000', credit: true });
+    const block = async (id: string) =>
+      /<div class="account">[\s\S]*?<\/div><\/div>/.exec(
+        (await documentHtml(server.db, BigInt(id))).html,
+      )?.[0] ?? null;
+    const first = await block(inv.id);
+    expect(first).toContain('Previous balance');
+    expect(first).toContain('105.00 AED');
+    expect(first).toContain('210.00 AED');
+    expect(first).toContain('-50.00 AED'); // paid now
+    expect(first).toContain('265.00 AED'); // total due = 105 + 210 − 50
+    // Later payments change the balance, never what the invoice printed.
+    await ok(
+      accountant('POST', '/api/v1/sales/payments', { customerId: cust, part: cash('20000') }),
+      201,
+    );
+    expect(await block(inv.id)).toBe(first);
+    // The draft itself prints no summary (nothing is frozen until issue).
+    const later = await draft(clerk, {
+      customerId: cust,
+      lines: [{ itemId: svc.id, quantityMilli: '1000' }],
+    });
+    expect(await block(later.id)).toBeNull();
+  });
+
+  it('the summary is for credit customers by default; the walk-in never has one', async () => {
+    const cust = await customer('Cash printed');
+    phone += 1;
+    const svc = await item(`B114-${phone}`, 'service', '1000000');
+    const d = await draft(clerk, {
+      customerId: cust,
+      lines: [{ itemId: svc.id, quantityMilli: '1000' }],
+    });
+    const inv = await ok<DocumentDetail>(issue(accountant, d, { payments: [cash('10500')] }));
+    const html = (await documentHtml(server.db, BigInt(inv.id))).html;
+    expect(html).not.toContain('Account summary');
+    const walkIn = (
+      await sql<{ id: string }>`SELECT id::text FROM md.customers WHERE is_walk_in`.execute(
+        server.db,
+      )
+    ).rows[0]!.id;
+    const w = await draft(clerk, {
+      customerId: walkIn,
+      lines: [{ itemId: svc.id, quantityMilli: '1000' }],
+    });
+    const sold = await ok<DocumentDetail>(issue(accountant, w, { payments: [cash('10500')] }));
+    const rows = (
+      await sql<{ id: string; before: string | null; credit: boolean | null }>`
+        SELECT id::text, balance_before_fils::text AS before, credit_customer AS credit
+          FROM sales.documents WHERE id IN (${BigInt(inv.id)}, ${BigInt(sold.id)}) ORDER BY id`.execute(
+        server.db,
+      )
+    ).rows;
+    expect(rows).toEqual([
+      { id: inv.id, before: '0', credit: false },
+      { id: sold.id, before: null, credit: null },
+    ]);
+  });
+
   it('the customers list: the column, the overdue filter, and sorting by amount with the permission', async () => {
     const late = await customer('Zz late payer', { credit: '100000' });
     await invoiceOf(late, '1000', { issueDate: await yesterday() }); // 30 days: not overdue yet
