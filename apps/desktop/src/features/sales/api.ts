@@ -152,11 +152,15 @@ export function useSalesPaymentMethods() {
   });
 }
 
-export function useCustomerBalance(customerId: string | null) {
+/** Decision 0114: the status for everyone; with `detail`, the open invoices (amounts permission). */
+export function useCustomerBalance(customerId: string | null, opts: { detail?: boolean } = {}) {
   const api = useApi();
   return useQuery({
-    queryKey: SALES_KEYS.balance(customerId ?? ''),
-    queryFn: () => api.get<CustomerBalance>(SALES_PATHS.customerBalance(customerId ?? '')),
+    queryKey: [...SALES_KEYS.balance(customerId ?? ''), opts.detail ? 'detail' : 'summary'],
+    queryFn: () =>
+      api.get<CustomerBalance>(
+        `${SALES_PATHS.customerBalance(customerId ?? '')}${opts.detail ? '?detail=yes' : ''}`,
+      ),
     enabled: customerId !== null,
   });
 }

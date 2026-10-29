@@ -319,7 +319,7 @@ function bridgeFor(permissions: string[], path: string) {
     .on(
       'GET',
       '/api/v1/customers/20/balance',
-      ok({ balanceFils: '0', creditMode: 'cash', creditLimitFils: '0', advancesFils: '0' }),
+      ok({ status: 'nothing_due', creditMode: 'cash', isWalkIn: false, amounts: null }),
     )
     .on(
       'GET',

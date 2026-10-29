@@ -29,7 +29,7 @@ import type {
   TrialBalanceResponse,
 } from '@artepool/shared/contracts';
 import { withBusinessTx } from '../../src/platform/db/tx';
-import { documentHtml } from '../../src/modules/printing/service';
+import { documentHtml, statementHtml } from '../../src/modules/printing/service';
 import { writeFileSync } from 'node:fs';
 import {
   addDevice,
@@ -1407,6 +1407,12 @@ describe("the customer's balance (decision 0114)", () => {
       advancesFils: '20000',
       netPositionFils: '-9500',
     });
+    // The printed statement shows the same three lines.
+    const printed = await statementHtml(server.db, BigInt(cust), '2026-01-01', '2099-12-31');
+    for (const text of ['Outstanding today', '105.00 AED', 'Advance payments', '200.00 AED']) {
+      expect(printed).toContain(text);
+    }
+    expect(printed).toMatch(/Net position[\s\S]*?-95\.00 AED/);
   });
 
   it('without customers.balance.view: the status only, never the amounts', async () => {

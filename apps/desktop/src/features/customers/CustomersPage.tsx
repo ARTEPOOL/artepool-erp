@@ -1,5 +1,14 @@
 import { useEffect, useMemo, useState, type KeyboardEvent } from 'react';
-import { BadgeCheck, Ban, Download, Plus, Store, Upload, Users } from 'lucide-react';
+import {
+  ArrowDownWideNarrow,
+  BadgeCheck,
+  Ban,
+  Download,
+  Plus,
+  Store,
+  Upload,
+  Users,
+} from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import type { CustomerDetail, FilePayload } from '@artepool/shared/contracts';
@@ -29,14 +38,23 @@ import { downloadFile } from '../masterdata/files';
 import { ImportDialog } from '../masterdata/ImportDialog';
 import { MD_KEYS } from '../masterdata/refs';
 import { CustomerAccount } from '../receipts/CustomerAccount';
-import { CUSTOMER_FILTERS, useCustomer, useCustomerList, type CustomerFilter } from './api';
+import { BalanceCell } from '../sales/CustomerBalanceBanner';
+import {
+  CUSTOMER_FILTERS,
+  useCustomer,
+  useCustomerList,
+  type CustomerFilter,
+  type CustomerSort,
+} from './api';
 import { CreditChip, CustomerCard } from './CustomerCard';
 import { CUSTOMER_TYPE_ICONS, CustomerDialog } from './CustomerDialog';
 import { partiesClasses as styles, Phone, useDebounced, VatChip } from './parts';
 
 /**
  * Design 14: Customers. Since M4 the detail also shows the account (balance, statement of
- * account, opening balance; features/receipts). Overdue and aging come later.
+ * account, opening balance; features/receipts). Decision 0114: the Outstanding column (its colour
+ * for everyone, the amount and sorting by it with customers.balance.view), the "Has overdue
+ * invoices" filter, and on the detail the open invoices with their age.
  */
 export function CustomersPage() {
   const { t } = useTranslation(['parties', 'masterdata']);
@@ -47,12 +65,14 @@ export function CustomersPage() {
   const [search, setSearch] = useState('');
   const q = useDebounced(search);
   const [filter, setFilter] = useState<CustomerFilter>('active');
+  const amounts = can('customers.balance.view');
+  const [sort, setSort] = useState<CustomerSort>('name');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dialog, setDialog] = useState<'new' | 'import' | null>(null);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<unknown>(null);
 
-  const list = useCustomerList(q, filter);
+  const list = useCustomerList(q, filter, amounts ? sort : 'name');
   const customers = useMemo(
     () => list.data?.pages.flatMap((page) => page.customers) ?? [],
     [list.data],
@@ -61,7 +81,7 @@ export function CustomersPage() {
   const detail = useCustomer(selectedId);
 
   // A new search or filter starts again from its first customer.
-  useEffect(() => setSelectedId(null), [q, filter]);
+  useEffect(() => setSelectedId(null), [q, filter, sort]);
   useEffect(() => {
     if (selectedId === null && customers.length > 0 && !list.isPlaceholderData) {
       setSelectedId((customers.find((c) => !c.isWalkIn) ?? customers[0])!.id);
@@ -145,6 +165,22 @@ export function CustomersPage() {
               <th>{t('parties:customers.cols.type')}</th>
               <th>{t('parties:customers.cols.vat')}</th>
               <th>{t('parties:customers.cols.payment')}</th>
+              <th aria-sort={amounts && sort === 'outstanding' ? 'descending' : undefined}>
+                {amounts ? (
+                  <button
+                    type="button"
+                    className={styles.sortButton}
+                    aria-pressed={sort === 'outstanding'}
+                    onClick={() => setSort(sort === 'outstanding' ? 'name' : 'outstanding')}
+                    title={t('parties:customers.sortByOutstanding')}
+                  >
+                    {t('parties:customers.cols.outstanding')}
+                    <ArrowDownWideNarrow className={iconClass.sm} aria-hidden="true" />
+                  </button>
+                ) : (
+                  t('parties:customers.cols.outstanding')
+                )}
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -190,11 +226,16 @@ export function CustomersPage() {
                     <Chip icon={<Ban aria-hidden="true" />}>{t('masterdata:status.inactive')}</Chip>
                   )}
                 </td>
+                <td className={tbl.num}>
+                  {c.balance && !c.isWalkIn && (
+                    <BalanceCell balance={c.balance} creditMode={c.creditMode} />
+                  )}
+                </td>
               </tr>
             ))}
             {list.isLoading && (
               <tr className={tbl.empty}>
-                <td colSpan={4}>{t('parties:loading')}</td>
+                <td colSpan={5}>{t('parties:loading')}</td>
               </tr>
             )}
           </tbody>

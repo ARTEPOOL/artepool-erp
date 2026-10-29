@@ -109,10 +109,25 @@
     "cash": "كاش (بدون ائتمان)",
     "credit": "ائتمان حتى {limit}",
     "creditOnly": "عميل آجل",
-    "balance": "الرصيد الحالي: {amount}",
     "trn": "الرقم الضريبي: {trn}",
     "add": "إضافة عميل جديد",
     "walkIn": "عميل نقدي"
+  },
+  "balance": {
+    "label": "رصيد العميل",
+    "status": {
+      "nothing_due": "لا يوجد مستحق",
+      "within_limit": "ضمن الحد",
+      "near_limit": "قريب من حد الائتمان",
+      "overdue": "عليه فواتير متأخرة",
+      "over_limit": "تجاوز الحد — يحتاج موافقة",
+      "cash_owes": "عميل نقدي عليه مبلغ — يحتاج موافقة"
+    },
+    "outstanding": "المستحق: {amount} درهم",
+    "overdue": "المتأخر: {amount} درهم",
+    "limit": "حد الائتمان: {amount} درهم",
+    "available": "المتاح: {amount} درهم",
+    "advances": "دفعات مقدمة: {amount} درهم"
   },
   "print": {
     "print": "طباعة",

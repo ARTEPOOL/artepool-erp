@@ -379,6 +379,13 @@ export async function statementHtml(
     totals: [
       { label: ['الرصيد الافتتاحي', 'Opening balance'], fils: st.openingFils },
       { label: ['الرصيد الختامي', 'Closing balance'], fils: st.closingFils, strong: true },
+      // Decision 0114: as of today, advance payments apart and the net position.
+      { label: ['المستحق حتى اليوم', 'Outstanding today'], fils: st.today.outstandingFils },
+      { label: ['دفعات مقدمة', 'Advance payments'], fils: st.today.advancesFils },
+      {
+        label: ['صافي المركز (المستحق − الدفعات المقدمة)', 'Net position (outstanding − advances)'],
+        fils: st.today.netPositionFils,
+      },
     ],
     logoDataUri: logo,
   };

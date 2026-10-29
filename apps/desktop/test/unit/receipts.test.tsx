@@ -479,7 +479,15 @@ describe('Receive payment', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Receive payment' }));
     await screen.findByRole('heading', { name: 'Receive payment', level: 1 });
     await chooseHotel();
-    expect(await screen.findByText('Current balance: 3,600.00')).toBeTruthy();
+    // Decision 0114: the balance banner under the customer, yellow (within the limit), amounts
+    // for the accountant, advance payments on their own line.
+    const banner = await screen.findByRole('status', { name: 'Customer balance' });
+    expect(banner.dataset.status).toBe('within_limit');
+    expect(within(banner).getByText('Within limit')).toBeTruthy();
+    expect(within(banner).getByText('Outstanding: AED 3,600.00')).toBeTruthy();
+    expect(within(banner).getByText('Credit limit: AED 10,000.00')).toBeTruthy();
+    expect(within(banner).getByText('Available: AED 6,400.00')).toBeTruthy();
+    expect(within(banner).getByText('Advance payments: AED 315.00')).toBeTruthy();
 
     const table = await debtsTable();
     await within(table).findByText('INV-000012');

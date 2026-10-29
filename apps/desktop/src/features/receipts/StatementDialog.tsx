@@ -140,6 +140,21 @@ export function StatementDialog(props: {
           </div>
         )}
         {s && s.lines.length === 0 && <EmptyState>{t('statement.empty')}</EmptyState>}
+        {s && (
+          // Decision 0114: as of today, advance payments apart and the net position.
+          <p className={styles.todayLine} aria-label={t('statement.today')}>
+            <b>{t('statement.today')}</b>
+            <span>
+              {t('statement.outstanding')}: <bdi>{money(BigInt(s.today.outstandingFils))}</bdi>
+            </span>
+            <span>
+              {t('account.advances')}: <bdi>{money(BigInt(s.today.advancesFils))}</bdi>
+            </span>
+            <span>
+              {t('account.netPosition')}: <bdi>{money(BigInt(s.today.netPositionFils))}</bdi>
+            </span>
+          </p>
+        )}
         {statement.isLoading && datesOk && <EmptyState>{t('sales:loading')}</EmptyState>}
         <p className={styles.muted}>{t('statement.sign')}</p>
         {printError !== null && <Alert>{errorText(printError)}</Alert>}

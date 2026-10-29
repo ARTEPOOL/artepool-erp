@@ -23,6 +23,9 @@
   --color-success-soft: #ECFDF3;
   --color-warning: #854D0E;
   --color-warning-soft: #FFF7DB;
+  /* Orange, between warning (yellow) and danger (red): the customer's balance banner (0114). */
+  --color-caution: #B54708;
+  --color-caution-soft: #FFEAD5;
   --color-danger: #B42318;
   --color-danger-soft: #FEF3F2;
   --color-info: #175CD3;
@@ -69,6 +72,7 @@
   --color-border: #2A4851; --color-control-border: #3D5F69; --color-text: #E6F0F2; --color-text-secondary: #9DB4BB;
   --color-focus: #6FD3DF; --color-disabled-bg: #1E3840; --color-disabled-text: #7F979E;
   --color-success: #6FD39A; --color-success-soft: #133426; --color-warning: #E8B65C; --color-warning-soft: #3A2E14;
+  --color-caution: #F5A15B; --color-caution-soft: #3D2414;
   --color-danger: #F2877D; --color-danger-soft: #3D1C1A; --color-info: #8DB4F5; --color-info-soft: #1A2A44;
   --color-financial: #2E9E5B; --color-financial-hover: #34B066; --color-on-financial: #FFFFFF;
   --status-credit: #B9A2F0; --status-credit-bg: #2A2244; --color-overlay: rgb(5 12 15 / 60%); --color-shadow: rgb(0 0 0 / 30%);
@@ -80,6 +84,7 @@
   --color-border: #2A4851; --color-control-border: #3D5F69; --color-text: #E6F0F2; --color-text-secondary: #9DB4BB;
   --color-focus: #6FD3DF; --color-disabled-bg: #1E3840; --color-disabled-text: #7F979E;
   --color-success: #6FD39A; --color-success-soft: #133426; --color-warning: #E8B65C; --color-warning-soft: #3A2E14;
+  --color-caution: #F5A15B; --color-caution-soft: #3D2414;
   --color-danger: #F2877D; --color-danger-soft: #3D1C1A; --color-info: #8DB4F5; --color-info-soft: #1A2A44;
   --color-financial: #2E9E5B; --color-financial-hover: #34B066; --color-on-financial: #FFFFFF;
   --status-credit: #B9A2F0; --status-credit-bg: #2A2244; --color-overlay: rgb(5 12 15 / 60%); --color-shadow: rgb(0 0 0 / 30%);

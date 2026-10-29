@@ -169,3 +169,22 @@
   display: grid;
   gap: var(--space-3);
 }
+
+/* The customer's open invoices (decision 0114). */
+.caption {
+  caption-side: top;
+  padding-block-end: var(--space-2);
+  font-weight: 600;
+  text-align: start;
+}
+
+.netHint {
+  display: block;
+}
+
+.todayLine {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  margin: 0;
+}

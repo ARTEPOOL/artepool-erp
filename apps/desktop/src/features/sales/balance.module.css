@@ -1,0 +1,76 @@
+/* The customer's balance banner (decision 0114): green, yellow, orange, red. */
+.banner {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  flex-basis: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid currentcolor;
+  border-radius: var(--radius-md);
+  font-size: var(--text-caption);
+}
+
+.banner svg {
+  flex-shrink: 0;
+  margin-block-start: 2px;
+}
+
+.body {
+  display: grid;
+  gap: var(--space-1);
+  min-inline-size: 0;
+}
+
+.body b {
+  font-size: var(--text-body);
+}
+
+.figures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  color: var(--color-text);
+}
+
+.compact {
+  margin-inline: var(--space-4);
+  margin-block-end: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+}
+
+.compact .body b {
+  font-size: var(--text-caption);
+}
+
+.green {
+  color: var(--color-success);
+  background: var(--color-success-soft);
+}
+
+.yellow {
+  color: var(--color-warning);
+  background: var(--color-warning-soft);
+}
+
+.orange {
+  color: var(--color-caution);
+  background: var(--color-caution-soft);
+}
+
+.red {
+  color: var(--color-danger);
+  background: var(--color-danger-soft);
+}
+
+.cell {
+  display: inline-block;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.none {
+  color: var(--color-text-secondary);
+}
