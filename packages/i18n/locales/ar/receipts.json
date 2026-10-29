@@ -166,11 +166,8 @@
     "openingBalance": "رصيد افتتاحي",
     "cols": {
       "document": "المستند",
-      "date": "التاريخ",
       "due": "تاريخ الاستحقاق",
-      "amount": "المتبقي",
-      "age": "العمر",
-      "late": "متأخر"
+      "amount": "المتبقي"
     },
     "days_zero": "{count} يوم",
     "days_one": "يوم واحد",
@@ -178,6 +175,12 @@
     "days_few": "{count} أيام",
     "days_many": "{count} يومًا",
     "days_other": "{count} يوم",
+    "overdueBy_zero": "متأخر {count} يوم",
+    "overdueBy_one": "متأخر يومًا واحدًا",
+    "overdueBy_two": "متأخر يومين",
+    "overdueBy_few": "متأخر {count} أيام",
+    "overdueBy_many": "متأخر {count} يومًا",
+    "overdueBy_other": "متأخر {count} يوم",
     "unavailable": "تعذر تحميل الرصيد."
   }
 }

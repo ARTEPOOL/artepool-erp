@@ -188,3 +188,12 @@
   gap: var(--space-1) var(--space-4);
   margin: 0;
 }
+
+/* The account card never grows wider than the detail panel. */
+.account {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.openDebts {
+  overflow-x: auto;
+}

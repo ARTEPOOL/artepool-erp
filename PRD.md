@@ -245,7 +245,13 @@ Phase tags: **[P1]** to **[P4]** (see section 13).
   - A total discount is spread across the lines before VAT.
   - Every invoice line shows the original price, the discount amount and the net amount. The discount is stored per line, so reports show total discounts given.
   - Revenue is posted **net of discount**. There is no separate "sales discounts" account.
-- Customer **statement of account** for any date range (PDF/print).
+- Customer **statement of account** for any date range (PDF/print), with today's outstanding, advance payments and net position.
+- **The customer's balance wherever a customer is chosen ([0114](docs/decisions/0114-customer-balance-everywhere.md)):**
+  - A banner under the customer on the A4 invoice, the receipt and the POS (a named customer): green nothing due, yellow within the limit, orange overdue or 80% of the limit or more, red over the limit (an unpaid sale then needs approval, 0046). A cash customer shows only when they owe; the walk-in never.
+  - Outstanding, overdue, credit limit and available are computed from posted documents only. Advance payments have their own line; they are not subtracted and do not add to the credit.
+  - Amounts only with `customers.balance.view` (owner and accountant); everyone else sees the colour and the words.
+  - Customers list: an Outstanding column (sorted by amount with the permission) and the filter "Has overdue invoices". Customer page: open invoices with their age and days overdue, the oldest unpaid date, the net position (outstanding − advance payments).
+  - A4 invoices can print an **account summary** (previous balance / this invoice / paid now / total due), frozen at issue so a reprint shows the same numbers; on for credit customers by default (Print designer), never for the walk-in.
 - **Sections ([0045](docs/decisions/0045-sales-sections-in-the-side-menu.md)):** Invoices (A4), Quotations and Receipts each have their own entry in the side menu.
 - **Invoices (A4) section:** create, print (with print dialog) and reprint A4 documents. **Any POS sale can be reprinted in A4 format**: same document, same number, counted and logged as a reprint ([0008](docs/decisions/0008-printing-pos-silent-a4-section.md)).
 - Send PDF by WhatsApp/email when online [P4].
@@ -449,6 +455,7 @@ Each phase ends with automated tests passing, a security review, an accountant r
 | 1.40 | 2026-10-28 | Decision 0110: "Check now" for updates in System health (the server PC still checks by itself); the version just installed is never shown as new; a failed upgrade names its reason in the setup; CI test upgrades marked TEST. |
 | 1.41 | 2026-10-29 | Decision 0111: a confirmed sale survives a power cut (durability settings pinned by the setup, shown in System health, alert when off); integrity check after every database start; the POS always shows the shift's last invoice with Reprint. |
 | 1.42 | 2026-10-29 | Decision 0112: a new version is released by merging the pull request that raises the app's version, with the owner's one approval; no git commands. |
+| 1.44 | 2026-10-29 | Decision 0114: the customer's balance wherever a customer is chosen (banner by colour, amounts by permission), customers list column and overdue filter, customer page with open invoices and net position, the A4 invoice's account summary frozen at issue. |
 | 1.43 | 2026-10-29 | Decision 0113: receipts settle open invoices first (an advance only for the excess, or with its own permission and a reason); receiving from an invoice opens on it with a preview; one worked-out invoice status with overdue; Invoices tabs and a history on the invoice page. |
 | 1.38 | 2026-10-25 | Decision 0107: the "ARTÉPOOL – Emergency tool" window replaces typing console commands at the shop. Part F plan detailed; LAN updates moved to Part G; the cashier's Windows account listed for its own part. |
 | 1.37 | 2026-10-24 | Decision 0102 amended: for a restore, a Google Drive copy is downloaded in the browser first, then chosen like a USB copy (the wizard finds copies on USB drives, Downloads, Desktop and Documents). The restore wizard screens are built. |

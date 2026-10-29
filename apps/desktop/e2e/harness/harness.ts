@@ -227,6 +227,13 @@ const routes: Record<string, (input: Record<string, unknown>) => Promise<unknown
       owner.id,
       input as unknown as Parameters<typeof support.addPosItem>[2],
     ),
+  /** A credit customer, optionally with an overdue opening balance (decision 0114). */
+  'POST /credit-customer': async (input) =>
+    support.addCreditCustomer(
+      server,
+      owner.id,
+      input as unknown as Parameters<typeof support.addCreditCustomer>[2],
+    ),
   /** Enrolls one more PC through the real protocol (for tests that revoke a PC). */
   'POST /devices': async (input) => {
     const deviceCode = typeof input.code === 'string' ? input.code : 'EXTRA-PC';

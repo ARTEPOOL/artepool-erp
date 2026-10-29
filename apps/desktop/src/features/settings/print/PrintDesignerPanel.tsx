@@ -348,7 +348,8 @@ function Designer({
             </>
           )}
           {kind === 'tax_invoice_a4' && (
-            <>
+            <div className={styles.choice}>
+              <span aria-hidden="true">{t('print.balanceBlock')}</span>
               <Segmented
                 label={t('print.balanceBlock')}
                 value={settings.balanceBlock}
@@ -359,7 +360,7 @@ function Designer({
                 }))}
               />
               <Note>{t('print.balanceBlockHint')}</Note>
-            </>
+            </div>
           )}
         </Card>
 

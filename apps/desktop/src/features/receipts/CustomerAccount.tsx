@@ -42,7 +42,7 @@ export function CustomerAccount({ customer }: { customer: CustomerDetail }) {
   return (
     <Card rise index={3}>
       <CardHeader title={t('account.title')} />
-      <div className={styles.form}>
+      <div className={cx(styles.form, styles.account)}>
         {b && <BalanceBanner balance={b} />}
         {b?.amounts && <Amounts balance={b} amounts={b.amounts} />}
         {b?.openDebts && <OpenDebts balance={b} />}
@@ -139,62 +139,67 @@ function Amounts(props: {
   );
 }
 
-/** What is still owed, oldest first: number, date, due date, amount due, age, days overdue. */
+/** What is still owed, oldest first: the document with its date and age, its due date with the
+ * days overdue, and what is still due. Three columns, so it fits the detail panel. */
 function OpenDebts({ balance }: { balance: CustomerBalance }) {
   const { t } = useTranslation('receipts');
   const debts = balance.openDebts ?? [];
   if (debts.length === 0) return <p className={styles.muted}>{t('account.noOpen')}</p>;
   return (
-    <table className={tbl.table} aria-label={t('account.openTitle')}>
-      <caption className={styles.caption}>{t('account.openTitle')}</caption>
-      <thead>
-        <tr>
-          <th>{t('account.cols.document')}</th>
-          <th>{t('account.cols.date')}</th>
-          <th>{t('account.cols.due')}</th>
-          <th className={tbl.num}>{t('account.cols.amount')}</th>
-          <th className={tbl.num}>{t('account.cols.age')}</th>
-          <th className={tbl.num}>{t('account.cols.late')}</th>
-        </tr>
-      </thead>
-      <tbody>
-        {debts.map((d) => (
-          <tr key={`${d.kind}-${d.documentId ?? d.date}`}>
-            <td>
-              {d.documentId ? (
-                <Link
-                  to="/invoices/$documentId"
-                  params={{ documentId: d.documentId }}
-                  className={styles.link}
-                >
-                  <bdi>{d.docNumber}</bdi>
-                </Link>
-              ) : (
-                <span>
-                  {t('account.openingBalance')}
-                  {d.docNumber && (
-                    <>
-                      {' · '}
-                      <bdi>{d.docNumber}</bdi>
-                    </>
-                  )}
-                </span>
-              )}
-            </td>
-            <td>
-              <bdi>{formatDate(d.date)}</bdi>
-            </td>
-            <td>{d.dueDate ? <bdi>{formatDate(d.dueDate)}</bdi> : '—'}</td>
-            <td className={tbl.num}>
-              <bdi>{money(BigInt(d.dueFils))}</bdi>
-            </td>
-            <td className={tbl.num}>{t('account.days', { count: d.ageDays })}</td>
-            <td className={cx(tbl.num, d.daysOverdue > 0 && styles.owes)}>
-              {d.daysOverdue > 0 ? t('account.days', { count: d.daysOverdue }) : '—'}
-            </td>
+    <div className={styles.openDebts}>
+      <table className={tbl.table} aria-label={t('account.openTitle')}>
+        <caption className={styles.caption}>{t('account.openTitle')}</caption>
+        <thead>
+          <tr>
+            <th>{t('account.cols.document')}</th>
+            <th>{t('account.cols.due')}</th>
+            <th className={tbl.num}>{t('account.cols.amount')}</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {debts.map((d) => (
+            <tr key={`${d.kind}-${d.documentId ?? d.date}`}>
+              <td>
+                {d.documentId ? (
+                  <Link
+                    to="/invoices/$documentId"
+                    params={{ documentId: d.documentId }}
+                    className={styles.link}
+                  >
+                    <bdi>{d.docNumber}</bdi>
+                  </Link>
+                ) : (
+                  <span>
+                    {t('account.openingBalance')}
+                    {d.docNumber && (
+                      <>
+                        {' · '}
+                        <bdi>{d.docNumber}</bdi>
+                      </>
+                    )}
+                  </span>
+                )}
+                <span className={tbl.sub}>
+                  <bdi>{formatDate(d.date)}</bdi>
+                  {' · '}
+                  {t('account.days', { count: d.ageDays })}
+                </span>
+              </td>
+              <td>
+                {d.dueDate ? <bdi>{formatDate(d.dueDate)}</bdi> : '—'}
+                {d.daysOverdue > 0 && (
+                  <span className={cx(tbl.sub, styles.owes)}>
+                    {t('account.overdueBy', { count: d.daysOverdue })}
+                  </span>
+                )}
+              </td>
+              <td className={tbl.num}>
+                <bdi>{money(BigInt(d.dueFils))}</bdi>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }

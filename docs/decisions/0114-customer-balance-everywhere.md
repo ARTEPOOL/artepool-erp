@@ -34,3 +34,10 @@
 ## Why
 
 The person at the counter or in the office must see, before selling on credit, whether the customer is within the limit or late, without opening another screen. Amounts stay with the people allowed to see them.
+
+## How it is built
+
+- **Server:** `GET /customers/:id/balance` sends the status, the credit mode and the walk-in flag to everyone who can see customers, and the amounts only with `customers.balance.view`; `?detail=yes` adds the open invoices with their age and days overdue and the oldest unpaid date. The customers list takes `balance=yes`, `overdue=yes` and `sort=outstanding` (the sort is refused without the permission). The colour rule is one shared function (`balanceStatus`), used by the server, the screens and the tests.
+- **Printed block:** migration 0049 adds `balance_before_fils`, `paid_at_issue_fils` and `credit_customer` to `sales.documents`, set in the update that issues an invoice (A4 or POS) and frozen afterwards by the database guard. Drafts and invoices issued before version 0.7.0 print no block. Arabic labels: الرصيد السابق / هذه الفاتورة / المدفوع الآن / إجمالي الرصيد المستحق.
+- **Statement:** the screen and the PDF also show today's outstanding, advance payments and net position.
+- **Colours:** green, yellow and red use the existing success, warning and danger tokens; orange is a new token `--color-caution` (light and dark), added to the approved token file `design/artepool-tokens.css`.

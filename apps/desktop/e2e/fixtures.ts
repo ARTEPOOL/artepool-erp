@@ -83,6 +83,12 @@ export const control = {
     price4dp: string;
     quantityMilli: string;
   }) => control.call<{ id: string }>('POST', '/pos-item', item),
+  addCreditCustomer: (customer: {
+    name: string;
+    phone: string;
+    creditLimitFils: string;
+    overdueFils?: string;
+  }) => control.call<{ id: string }>('POST', '/credit-customer', customer),
   enrollmentCode: async () =>
     (await control.call<{ code: string }>('POST', '/enrollment-code')).code,
   stuckShift: (shift: { code: string; username: string; displayName: string; floatFils: string }) =>

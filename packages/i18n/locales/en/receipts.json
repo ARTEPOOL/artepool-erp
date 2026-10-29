@@ -166,14 +166,13 @@
     "openingBalance": "Opening balance",
     "cols": {
       "document": "Document",
-      "date": "Date",
       "due": "Due date",
-      "amount": "Still due",
-      "age": "Age",
-      "late": "Overdue"
+      "amount": "Still due"
     },
     "days_one": "{count} day",
     "days_other": "{count} days",
+    "overdueBy_one": "{count} day overdue",
+    "overdueBy_other": "{count} days overdue",
     "unavailable": "The balance could not be loaded."
   }
 }
