@@ -1,14 +1,21 @@
 name: Release
 
-# Decision 0108: a version tag (v1.2.3) on main builds the setups, signs them with the update key
-# and publishes ONLY the allowed release files to the public repository
-# ARTEPOOL/artepool-releases. The job waits in the protected "release" environment until the
-# owner approves it (one click); the signing key and the publishing token are secrets of that
-# environment only. The source code never leaves this private repository.
+# Decision 0108: a new version on main builds the setups, signs them with the update key and
+# publishes ONLY the allowed release files to the public repository ARTEPOOL/artepool-releases.
+# The job waits in the protected "release" environment until the owner approves it (one click);
+# the signing key and the publishing token are secrets of that environment only. The source code
+# never leaves this private repository.
+#
+# Decision 0112: merging a pull request that raises the app's version (apps/desktop/package.json)
+# is enough; nobody types git commands. A merge that keeps the version, or a version already
+# published in ARTEPOOL/artepool-releases, releases nothing. After the release, the version tag
+# (v1.2.3) is added here for the history.
 
 on:
   push:
-    tags: ['v*.*.*']
+    branches: [main]
+  # Again by hand (Actions -> Release -> Run workflow), e.g. after a refused approval.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -18,24 +25,54 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  decide:
+    name: A new version to release?
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      release: ${{ steps.version.outputs.release }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: The app's version, and whether it is already published
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "Only main is released ($GITHUB_REF is not)." >> "$GITHUB_STEP_SUMMARY"
+            echo "release=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          version=$(node -p "require('./apps/desktop/package.json').version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          # The releases repository is public: this job's own read-only token is enough (and keeps
+          # GitHub's limit for anonymous requests out of the way).
+          status=$(curl -s -o /dev/null -w '%{http_code}' -H "authorization: Bearer $GH_TOKEN" \
+            "https://api.github.com/repos/ARTEPOOL/artepool-releases/releases/tags/v$version")
+          case "$status" in
+            200) echo "Version $version is already published: nothing to release." >> "$GITHUB_STEP_SUMMARY"
+                 echo "release=false" >> "$GITHUB_OUTPUT" ;;
+            404) echo "Version $version is new: it waits for the owner's approval." >> "$GITHUB_STEP_SUMMARY"
+                 echo "release=true" >> "$GITHUB_OUTPUT" ;;
+            *)   echo "GitHub answered $status for the releases repository; try again later." >&2; exit 1 ;;
+          esac
+
   release:
     name: Build, sign and publish (after the owner's approval)
+    needs: decide
+    if: needs.decide.outputs.release == 'true'
     runs-on: windows-latest
     environment: release
     timeout-minutes: 90
+    permissions:
+      # Only for the version tag at the end.
+      contents: write
+    env:
+      VERSION: ${{ needs.decide.outputs.version }}
     steps:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
-      - name: Only a tag on main, matching the app's version
-        shell: pwsh
-        run: |
-          git fetch origin main
-          git merge-base --is-ancestor $env:GITHUB_SHA origin/main
-          if ($LASTEXITCODE -ne 0) { throw "The tag $env:GITHUB_REF_NAME is not on main: nothing is released." }
-          $version = (Get-Content apps/desktop/package.json -Raw | ConvertFrom-Json).version
-          if ("v$version" -ne $env:GITHUB_REF_NAME) { throw "The tag $env:GITHUB_REF_NAME does not match the app's version $version." }
-          "VERSION=$version" >> $env:GITHUB_ENV
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v5
         with:
@@ -72,3 +109,9 @@ jobs:
         env:
           RELEASES_TOKEN: ${{ secrets.RELEASES_TOKEN }}
         run: pnpm release publish
+      - name: The version tag, for the history
+        shell: pwsh
+        run: |
+          if (git ls-remote --tags origin "refs/tags/v$env:VERSION") { "The tag v$env:VERSION is already there."; exit 0 }
+          git tag "v$env:VERSION" $env:GITHUB_SHA
+          git push origin "v$env:VERSION"

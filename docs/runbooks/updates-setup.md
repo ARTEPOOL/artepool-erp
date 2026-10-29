@@ -56,7 +56,7 @@
 
 1. افتح المستودع الخاص `ARTEPOOL/artepool-erp` ← **Settings** ← **Environments** ← **New environment** ← الاسم: `release` ← **Configure environment**.
 2. علّم **Required reviewers** واكتب اسم حسابك. (سيب **Prevent self-review** من غير علامة، علشان انت اللي بتوافق.)
-3. **Deployment branches and tags** ← **Selected branches and tags** ← **Add deployment branch or tag rule** ← اختار **Tag** واكتب `v*`.
+3. **Deployment branches and tags** ← **Selected branches and tags** ← **Add deployment branch or tag rule** ← اختار **Branch** واكتب `main` ← **Add rule**. (القرار [0112](../decisions/0112-release-on-merge.md): النسخة بتتنشر من `main` لما تدمج.)
 4. تحت **Environment secrets** ← **Add environment secret**، 3 مرات:
 
    | الاسم (Name) | القيمة (Value) |
@@ -69,11 +69,15 @@
 
 ## كل تحديث بعد كده: ضغطة واحدة
 
-1. أنا بجهّز النسخة الجديدة وملاحظاتها بالعربي والإنجليزي، وبعد الدمج بعمل لها رقم (مثلًا `v0.2.0`).
-2. هيجيلك إيميل من GitHub: **Review pending deployments**.
+1. أنا بجهّز النسخة الجديدة وملاحظاتها بالعربي والإنجليزي في PR فيه رقم النسخة الجديد.
+2. انت بتدوس **Merge** للـ PR. **مفيش أوامر git.** هيجيلك إيميل من GitHub: **Review pending deployments**. (لو الـ PR مفيهوش رقم نسخة جديد، مفيش حاجة بتتنشر.)
 3. افتحه ← **Review deployments** ← علّم على **release** ← **Approve and deploy**.
 4. GitHub بيبني وبيوقّع وبينشر. جهاز السيرفر هيلاقي التحديث لوحده خلال كام ساعة، ويسطّبه بالليل.
 5. لو مش عايز تستنى: من **الإعدادات ← النسخ الاحتياطي ← التحديثات** دوس **افحص دلوقتي**، وخلال 5 دقايق هيظهر "نسخة جديدة" ومعاها ملاحظاتها. بعد ما تتحمّل، دوس **ثبّت دلوقتي** (اقفل الوردية الأول). القرار: [0110](../decisions/0110-check-for-updates-now.md).
+
+## لو رفضت الموافقة بالغلط، أو النشر ما نجحش
+
+افتح المستودع ← **Actions** ← **Release** ← **Run workflow** ← سيب `main` ← **Run workflow**. هيطلب موافقتك تاني. النسخة اللي اتنشرت قبل كده عمرها ما بتتنشر مرتين.
 
 ## لو التحديث ما نجحش
 
