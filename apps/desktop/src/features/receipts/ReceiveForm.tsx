@@ -1,9 +1,12 @@
 /**
- * Receiving a payment from a customer (decisions 0013, 0047, 0048, 0052). The amount settles the
- * oldest open debts first, or the amounts chosen; the rest is an advance, and the server issues
- * its payment tax invoice (INV-) in the same transaction. The preview here uses exact integers.
+ * Receiving a payment from a customer (decisions 0013, 0047, 0048, 0052, 0113). The amount settles
+ * the amounts chosen first, then the oldest open debts; only the excess is an advance, and the
+ * server issues its payment tax invoice (INV-) in the same transaction. Opened from an invoice,
+ * the form is set on that invoice with what is still due. Before saving it says what will happen,
+ * and an advance payment invoice is confirmed first. Keeping money as an advance while invoices
+ * are open needs its own permission and a reason. The preview here uses exact integers.
  */
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { ArrowLeft, HandCoins } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
@@ -14,6 +17,7 @@ import type {
   SalesPaymentMethod,
 } from '@artepool/shared/contracts';
 import { useSave } from '../../api/hooks';
+import { formatFils } from '@artepool/shared';
 import { dubaiDay, formatDate } from '../../lib/format';
 import {
   Alert,
@@ -21,6 +25,8 @@ import {
   Card,
   CardHeader,
   cx,
+  Dialog,
+  DialogFooter,
   EmptyState,
   iconClass,
   InfoBar,
@@ -68,6 +74,8 @@ interface Problems {
   chequeBank?: 'required';
   over?: true;
   shares?: true;
+  nothingChosen?: true;
+  advanceReason?: 'required';
 }
 
 /** The standard VAT rate (SR, 5%) the server uses for an advance unless told otherwise. */
@@ -75,8 +83,11 @@ const DEFAULT_RATE_BP = 500;
 
 export function ReceiveForm({
   initialCustomer = null,
+  initialDocumentId = null,
 }: {
   initialCustomer?: ChosenCustomer | null;
+  /** Opened from an invoice (decision 0113): set on it, with what is still due. */
+  initialDocumentId?: string | null;
 }) {
   const { t, i18n } = useTranslation('receipts');
   const name = localName(i18n.language);
@@ -100,7 +111,10 @@ export function ReceiveForm({
   const [mode, setMode] = useState<Mode>('auto');
   const [typed, setTyped] = useState<Record<string, string>>({});
   const [quotationId, setQuotationId] = useState('');
+  const [advanceReason, setAdvanceReason] = useState('');
   const [tried, setTried] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [preset, setPreset] = useState(initialDocumentId === null);
 
   const open = useOpenDebts(customer?.id ?? null);
   const canQuotations = can('quotations.manage') && customer !== null;
@@ -116,6 +130,19 @@ export function ReceiveForm({
   const read = readFils(amount);
   const amountFils = read.ok ? read.value : 0n;
   const debts = open.debts;
+  // Opened from an invoice: that invoice, with what is still due, once the debts are known.
+  useEffect(() => {
+    if (preset || open.isLoading) return;
+    const debt = debts.find((d) => d.documentId === initialDocumentId);
+    if (debt) {
+      setMode('manual');
+      setTyped({ [debt.key]: formatFils(debt.dueFils) });
+      setAmount(formatFils(debt.dueFils));
+    }
+    setPreset(true);
+  }, [preset, open.isLoading, debts, initialDocumentId]);
+  const mayAdvanceWithOpen = can('sales.advance_with_open_invoices');
+  const advanceWithOpen = mode === 'advance' && debts.length > 0;
   const manual = manualSpread(amountFils, debts, typed);
   const spread: Spread =
     mode === 'advance'
@@ -134,6 +161,8 @@ export function ReceiveForm({
   if (isCheque && !chequeBank.trim()) problems.chequeBank = 'required';
   if (mode === 'manual' && manual.over) problems.over = true;
   if (mode === 'manual' && Object.keys(manual.problems).length > 0) problems.shares = true;
+  if (mode === 'manual' && manual.nothingChosen) problems.nothingChosen = true;
+  if (advanceWithOpen && advanceReason.trim().length < 3) problems.advanceReason = 'required';
   const shown = <K extends keyof Problems>(key: K): Problems[K] =>
     tried ? problems[key] : undefined;
 
@@ -157,11 +186,8 @@ export function ReceiveForm({
     },
   );
 
-  const submit = (event: FormEvent) => {
-    event.preventDefault();
-    setTried(true);
-    receive.reset();
-    if (Object.keys(problems).length > 0 || !customer || !method || !read.ok) return;
+  const send = () => {
+    if (!customer || !method || !read.ok) return;
     const part: ReceivePaymentRequest['part'] = {
       paymentMethodId: method.id,
       amountFils: read.value.toString(),
@@ -169,20 +195,32 @@ export function ReceiveForm({
       ...(isCheque ? { chequeDate, chequeBank: chequeBank.trim() } : {}),
     };
     const body: ReceivePaymentRequest = { customerId: customer.id, paymentDate: date, part };
-    if (mode === 'manual' && spread.shares.length > 0) {
-      body.allocations = spread.shares.map((s) => ({
+    // Only what was typed: the server settles the rest oldest first, as the preview shows.
+    if (mode === 'manual' && manual.typed.length > 0) {
+      body.allocations = manual.typed.map((s) => ({
         ...(s.debt.documentId
           ? { documentId: s.debt.documentId }
           : { openingBalanceId: s.debt.openingBalanceId! }),
         amountFils: s.amountFils.toString(),
       }));
     }
-    // Manual with nothing chosen settles nothing: without allocations the server would spread it.
-    if (mode === 'advance' || (mode === 'manual' && spread.shares.length === 0))
-      body.asAdvance = true;
+    if (mode === 'advance') body.asAdvance = true;
+    if (advanceWithOpen) body.advanceReason = advanceReason.trim();
     if (quotationId && spread.advanceFils > 0n) body.quotationId = quotationId;
     if (notes.trim()) body.notes = notes.trim();
     receive.mutate(body);
+  };
+
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    setTried(true);
+    receive.reset();
+    if (Object.keys(problems).length > 0 || !customer || !method || !read.ok) return;
+    // Not before the open debts are known: the preview would wrongly show an advance.
+    if (open.isLoading) return;
+    // An advance payment invoice is a tax document: never by surprise (decision 0113).
+    if (spread.advanceFils > 0n) setConfirming(true);
+    else send();
   };
 
   const amountText = (problem: AmountProblem | undefined) =>
@@ -315,7 +353,10 @@ export function ReceiveForm({
               options={[
                 { value: 'auto', label: t('receive.modes.auto') },
                 { value: 'manual', label: t('receive.modes.manual') },
-                { value: 'advance', label: t('receive.modes.advance') },
+                // While invoices are open, only with its own permission (decision 0113).
+                ...(debts.length === 0 || mayAdvanceWithOpen || mode === 'advance'
+                  ? [{ value: 'advance' as const, label: t('receive.modes.advance') }]
+                  : []),
               ]}
             />
           </CardHeader>
@@ -323,6 +364,31 @@ export function ReceiveForm({
             <p className={styles.muted}>{t(`receive.modeHint.${mode}`)}</p>
             {customer === null ? (
               <EmptyState>{t('receive.chooseCustomer')}</EmptyState>
+            ) : advanceWithOpen ? (
+              <div className={styles.openWarning} data-testid="receive-open-warning">
+                <Alert>
+                  {t('receive.openWarning')}{' '}
+                  {debts.map((d, i) => (
+                    <span key={d.key}>
+                      {i > 0 && '، '}
+                      <bdi>{d.docNumber ?? kindText(d.docType)}</bdi> (<bdi>{money(d.dueFils)}</bdi>
+                      )
+                    </span>
+                  ))}
+                </Alert>
+                {mayAdvanceWithOpen ? (
+                  <TextField
+                    label={t('receive.advanceReason')}
+                    value={advanceReason}
+                    onChange={setAdvanceReason}
+                    maxLength={500}
+                    isRequired
+                    error={shown('advanceReason') ? t('problems.advanceReason') : undefined}
+                  />
+                ) : (
+                  <Alert>{t('receive.advanceNotAllowed')}</Alert>
+                )}
+              </div>
             ) : mode !== 'advance' ? (
               <>
                 <div className={styles.tableWrap}>
@@ -450,12 +516,41 @@ export function ReceiveForm({
                 </div>
               )}
             </dl>
+            {amountFils > 0n && (
+              <div className={styles.effects} data-testid="receive-effects">
+                <b>{t('receive.effects.title')}</b>
+                <ul>
+                  {spread.shares.map((s) => (
+                    <li key={s.debt.key}>
+                      {t('receive.effects.settles', {
+                        number: s.debt.docNumber ?? kindText(s.debt.docType),
+                        amount: money(s.amountFils),
+                      })}
+                    </li>
+                  ))}
+                  {spread.advanceFils > 0n && (
+                    <li className={styles.effectAdvance}>
+                      {t('receive.effects.advance', {
+                        amount: money(spread.advanceFils),
+                        vat: money(advanceVat(spread.advanceFils, rateBp)),
+                      })}
+                    </li>
+                  )}
+                </ul>
+              </div>
+            )}
             {spread.advanceFils > 0n && <InfoBar>{t('receive.advanceExplain')}</InfoBar>}
             {shown('over') && <Alert>{t('problems.over')}</Alert>}
             {shown('shares') && <Alert>{t('problems.shares')}</Alert>}
+            {shown('nothingChosen') && <Alert>{t('problems.nothingChosen')}</Alert>}
             {receive.error !== null && <Alert>{errorText(receive.error)}</Alert>}
             <div className={salesStyles.actions}>
-              <Button type="submit" variant="fin" size="lg" busy={receive.isPending}>
+              <Button
+                type="submit"
+                variant="fin"
+                size="lg"
+                busy={receive.isPending || open.isLoading}
+              >
                 <HandCoins className={iconClass.sm} aria-hidden="true" />
                 {t('receive.submit', { amount: money(amountFils) })}
               </Button>
@@ -463,6 +558,31 @@ export function ReceiveForm({
           </div>
         </Card>
       </form>
+      <Dialog
+        isOpen={confirming}
+        onClose={() => setConfirming(false)}
+        title={t('receive.confirm.title')}
+      >
+        <p data-testid="receive-confirm">
+          {t('receive.confirm.body', {
+            amount: money(spread.advanceFils),
+            vat: money(advanceVat(spread.advanceFils, rateBp)),
+          })}
+        </p>
+        <DialogFooter>
+          <Button onPress={() => setConfirming(false)}>{t('receive.confirm.back')}</Button>
+          <Button
+            variant="fin"
+            busy={receive.isPending}
+            onPress={() => {
+              setConfirming(false);
+              send();
+            }}
+          >
+            {t('receive.confirm.yes')}
+          </Button>
+        </DialogFooter>
+      </Dialog>
     </div>
   );
 }

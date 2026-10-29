@@ -120,16 +120,33 @@ export function autoSpread(amountFils: bigint, debts: OpenDebt[]): Spread {
 
 export type ShareProblem = 'invalid' | 'more_than_due';
 
+/** One share per debt (a debt chosen by hand may also get some of what is left). */
+function merged(shares: Share[]): Share[] {
+  const byKey = new Map<string, Share>();
+  for (const s of shares) {
+    const seen = byKey.get(s.debt.key);
+    byKey.set(s.debt.key, seen ? { debt: s.debt, amountFils: seen.amountFils + s.amountFils } : s);
+  }
+  return [...byKey.values()];
+}
+
 /**
- * Manual: the amounts typed per debt. Each is at most what is due; together they are at most the
- * payment (`over` otherwise); the rest is an advance.
+ * Manual (decision 0113, as the server does it): the amounts typed per debt first, each at most
+ * what is due and together at most the payment (`over` otherwise); what is left still settles the
+ * other open debts, oldest first; only the excess is an advance. `typed` are the shares to send.
  */
 export function manualSpread(
   amountFils: bigint,
   debts: OpenDebt[],
   typed: Readonly<Record<string, string>>,
-): { spread: Spread; problems: Record<string, ShareProblem>; over: boolean } {
-  const shares: Share[] = [];
+): {
+  spread: Spread;
+  typed: Share[];
+  problems: Record<string, ShareProblem>;
+  over: boolean;
+  nothingChosen: boolean;
+} {
+  const chosen: Share[] = [];
   const problems: Record<string, ShareProblem> = {};
   let settled = 0n;
   for (const debt of debts) {
@@ -144,14 +161,39 @@ export function manualSpread(
       problems[debt.key] = 'more_than_due';
       continue;
     }
-    shares.push({ debt, amountFils: read.value });
+    chosen.push({ debt, amountFils: read.value });
     settled += read.value;
   }
   const over = settled > amountFils;
+  if (over) {
+    return {
+      spread: { shares: chosen, settledFils: settled, advanceFils: 0n },
+      typed: chosen,
+      problems,
+      over,
+      nothingChosen: false,
+    };
+  }
+  const rest = debts
+    .map((debt) => {
+      const taken = chosen.find((c) => c.debt.key === debt.key)?.amountFils ?? 0n;
+      return { ...debt, dueFils: debt.dueFils - taken };
+    })
+    .filter((debt) => debt.dueFils > 0n);
+  const more = autoSpread(amountFils - settled, rest);
+  const shares = merged([
+    ...chosen,
+    ...more.shares.map((s) => ({
+      debt: debts.find((d) => d.key === s.debt.key)!,
+      amountFils: s.amountFils,
+    })),
+  ]);
   return {
-    spread: { shares, settledFils: settled, advanceFils: over ? 0n : amountFils - settled },
+    spread: { shares, settledFils: settled + more.settledFils, advanceFils: more.advanceFils },
+    typed: chosen,
     problems,
     over,
+    nothingChosen: chosen.length === 0 && Object.keys(problems).length === 0,
   };
 }
 

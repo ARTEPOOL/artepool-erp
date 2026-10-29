@@ -112,6 +112,8 @@ function ReceiptView({ payment: p }: { payment: PaymentDetail }) {
       ? [{ label: t('detail.receivedBy'), value: nameOf(p.receivedByName) }]
       : []),
     ...(p.notes ? [{ label: t('sales:fields.notes'), value: p.notes }] : []),
+    // Decision 0113: why it was kept as an advance while invoices were open.
+    ...(p.advanceReason ? [{ label: t('detail.advanceReason'), value: p.advanceReason }] : []),
   ];
 
   return (
@@ -259,7 +261,7 @@ export function ReceiptPage() {
 /** A new receipt, with the customer already chosen when the link names one. */
 function NewReceipt() {
   const { t } = useTranslation('receipts');
-  const { customerId } = useSearch({ from: '/receipts/$paymentId' });
+  const { customerId, documentId } = useSearch({ from: '/receipts/$paymentId' });
   const customer = useCustomer(customerId ?? null);
   if (customerId && customer.isPending) {
     return (
@@ -272,6 +274,7 @@ function NewReceipt() {
   return (
     <ReceiveForm
       initialCustomer={customer.data && customer.data.isActive ? chosenFrom(customer.data) : null}
+      initialDocumentId={documentId ?? null}
     />
   );
 }

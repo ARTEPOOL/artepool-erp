@@ -396,7 +396,7 @@ export function DocumentView({ doc }: { doc: DocumentDetail }) {
                   void navigate({
                     to: '/receipts/$paymentId',
                     params: { paymentId: 'new' },
-                    search: { customerId: doc.customerId },
+                    search: { customerId: doc.customerId, documentId: doc.id },
                   })
                 }
               >
