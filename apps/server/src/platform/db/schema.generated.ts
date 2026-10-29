@@ -1085,6 +1085,7 @@ export interface SalesDocuments {
   advance_used_net_fils: Generated<bigint>;
   advance_used_vat_fils: Generated<bigint>;
   approval_id: bigint | null;
+  balance_before_fils: bigint | null;
   bill_to_address: string | null;
   bill_to_name: string;
   bill_to_name_alt: string | null;
@@ -1098,6 +1099,7 @@ export interface SalesDocuments {
   created_at: Generated<Timestamp>;
   created_by: bigint;
   credit_approval_id: bigint | null;
+  credit_customer: boolean | null;
   currency: Generated<string>;
   customer_id: bigint;
   customer_po: string | null;
@@ -1116,6 +1118,7 @@ export interface SalesDocuments {
   net_fils: Generated<bigint>;
   notes: string | null;
   original_document_id: bigint | null;
+  paid_at_issue_fils: bigint | null;
   pos_cart_id: string | null;
   price_level_id: bigint | null;
   print_count: Generated<number>;
