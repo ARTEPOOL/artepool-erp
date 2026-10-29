@@ -200,6 +200,7 @@ const item = (patch: Partial<DocumentItem>): DocumentItem => ({
   quotationId: null,
   printCount: 0,
   rowVersion: 2,
+  cancelledBy: null,
   ...patch,
 });
 
@@ -418,7 +419,7 @@ describe('Invoices (A4): the list', () => {
     expect(screen.getByRole('button', { name: 'New invoice' })).toBeTruthy();
 
     fireEvent.change(screen.getByLabelText('Type'), { target: { value: 'credit_note' } });
-    fireEvent.change(screen.getByLabelText('Status'), { target: { value: 'issued' } });
+    fireEvent.change(screen.getByLabelText('Status'), { target: { value: 'active' } });
     fireEvent.change(screen.getByLabelText('Payment'), { target: { value: 'partial' } });
     fireEvent.change(screen.getByRole('searchbox', { name: 'Number or customer' }), {
       target: { value: 'Lagoon' },
@@ -429,13 +430,58 @@ describe('Invoices (A4): the list', () => {
         pageSize: '100',
         q: 'Lagoon',
         docType: 'credit_note',
-        status: 'issued',
+        status: 'active',
         settlement: 'partial',
       });
     });
 
     fireEvent.click(within(table).getByText('INV-000101'));
     await screen.findByRole('heading', { name: 'INV-000101', level: 1 });
+  });
+
+  it('a cancelled invoice says so in the list, and "Cancelled" is a filter of its own (0072)', async () => {
+    const LIST = [
+      item({
+        id: '104',
+        docType: 'credit_note',
+        docNumber: 'CN-000001',
+        settlementStatus: 'settled',
+        originalDocumentId: '101',
+        originalDocumentNumber: 'INV-000101',
+      }),
+      item({
+        settlementStatus: 'settled',
+        cancelledBy: { id: '104', docNumber: 'CN-000001', edited: false },
+      }),
+    ];
+    const bridge = bridgeFor(OFFICE, '/invoices').on(
+      'GET',
+      '/api/v1/sales/documents',
+      ok({ documents: LIST, total: 2 }),
+    );
+    await signIn(bridge, 'A4 invoices');
+    const table = await screen.findByRole('table', { name: 'Invoices and notes' });
+    const invoice = (await within(table).findByText('INV-000101')).closest('tr')!;
+    expect(within(invoice).getByText('Cancelled · CN-000001')).toBeTruthy();
+    expect(within(invoice).queryByText('Issued')).toBeNull();
+    expect(within(invoice).queryByText('Paid')).toBeNull();
+    const note = within(table).getByText('CN-000001').closest('tr')!;
+    expect(within(note).getByText(/for INV-000101/)).toBeTruthy();
+
+    const status = screen.getByLabelText('Status');
+    expect([...status.querySelectorAll('option')].map((o) => o.textContent)).toEqual([
+      'All (without discarded drafts)',
+      'Draft',
+      'Issued',
+      'Cancelled (by a credit note)',
+      'Discarded draft',
+    ]);
+    fireEvent.change(status, { target: { value: 'cancelled' } });
+    await waitFor(() =>
+      expect(queryOf(bridge.callsTo('GET', '/api/v1/sales/documents').at(-1)!).get('status')).toBe(
+        'cancelled',
+      ),
+    );
   });
 
   it('shows the empty state when nothing matches', async () => {

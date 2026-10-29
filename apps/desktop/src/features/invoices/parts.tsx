@@ -54,6 +54,16 @@ export function StatusChip({ status }: { status: DocStatus }) {
   );
 }
 
+/** An issued invoice that a credit note for all of it cancelled or replaced (decision 0072). */
+export function CancelledChip({ by }: { by: { docNumber: string; edited: boolean } }) {
+  const { t } = useTranslation('invoices');
+  return (
+    <Chip tone="danger" icon={<Ban aria-hidden="true" />}>
+      {t(by.edited ? 'cancel.replacedBy' : 'cancel.cancelledBy', { number: by.docNumber })}
+    </Chip>
+  );
+}
+
 export function SettlementChip({ status }: { status: SettlementStatus }) {
   const { t } = useTranslation('sales');
   if (status === 'settled')

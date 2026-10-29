@@ -1,5 +1,14 @@
 # Changelog
 
+## Invoices (A4): a cancelled invoice says so in the list (2026-10-29)
+
+**In plain words:** an invoice you cancelled (or edited) with a credit note used to show in the list as "Issued · Paid" like any other, and the "Cancelled" filter found nothing: that filter only found drafts thrown away.
+
+- In the list, a cancelled invoice now shows **"Cancelled · CN-…"** (or **"Replaced (edited) · CN-…"**) in red, instead of "Issued" and "Paid". The invoice page shows the same.
+- The credit note's row says which invoice it belongs to ("for INV-…").
+- The status filter has clear choices: **Draft**, **Issued** (the ones still standing), **Cancelled (by a credit note)** and **Discarded draft**. "All" shows everything except discarded drafts.
+- Nothing changed in the accounts or VAT: the invoice is never changed or deleted; the credit note cancels it (decision 0072).
+
 ## Updates: "Check now", and clearer messages when an update fails (2026-10-28)
 
 **In plain words:**
