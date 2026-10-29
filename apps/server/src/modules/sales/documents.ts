@@ -595,6 +595,14 @@ const CANCELLING_NOTE = sql`
  WHERE n.original_document_id = d.id AND n.status = 'issued'
    AND r.code IN ('INVOICE_CANCELLED', 'INVOICE_EDITED')`;
 
+/**
+ * Decision 0113: issued, not cancelled, not fully settled, and past the due date set at issue from
+ * the customer's payment terms (an "on receipt" cash invoice is overdue from the next day).
+ */
+const OVERDUE = sql`(d.status = 'issued' AND d.doc_type IN ('invoice', 'debit_note')
+  AND d.due_date IS NOT NULL AND d.due_date < sys.business_date(now())
+  AND d.settled_fils < d.total_fils AND NOT EXISTS (SELECT 1 ${CANCELLING_NOTE}))`;
+
 function documentBase(db: Db) {
   return db
     .selectFrom('sales.documents as d')
@@ -628,6 +636,9 @@ function documentBase(db: Db) {
         SELECT jsonb_build_object('id', n.id::text, 'number', n.doc_number,
                                   'edited', r.code = 'INVOICE_EDITED')
         ${CANCELLING_NOTE} ORDER BY n.id LIMIT 1)`.as('cancelled_by'),
+      sql<string>`(SELECT coalesce(sum(a.amount_fils), 0) FROM sales.credit_allocations a
+                    WHERE a.invoice_id = d.id)`.as('credited_fils'),
+      sql<boolean>`${OVERDUE}`.as('overdue'),
     ]);
 }
 
@@ -669,12 +680,23 @@ function documentItem(r: DocumentRow): DocumentItem {
           edited: r.cancelled_by.edited,
         }
       : null,
+    creditedFils: BigInt(r.credited_fils).toString(),
+    overdue: r.overdue,
   };
 }
 
 export async function listDocuments(db: Db, query: DocumentsQuery): Promise<DocumentsResponse> {
   let q = documentBase(db);
   if (query.docType) q = q.where('d.doc_type', '=', query.docType);
+  if (query.group) {
+    q = q.where(
+      'd.doc_type',
+      'in',
+      query.group === 'invoices'
+        ? ['invoice', 'advance_invoice']
+        : [query.group === 'credit_notes' ? 'credit_note' : 'debit_note'],
+    );
+  }
   if (query.status === 'active' || query.status === 'cancelled') {
     q = q.where('d.status', '=', 'issued');
     q = q.where(
@@ -684,7 +706,8 @@ export async function listDocuments(db: Db, query: DocumentsQuery): Promise<Docu
     );
   } else if (query.status) q = q.where('d.status', '=', query.status);
   else q = q.where('d.status', '<>', 'discarded');
-  if (query.settlement === 'unpaid') q = q.where('d.settlement_status', '<>', 'settled');
+  if (query.settlement === 'overdue') q = q.where(sql<boolean>`${OVERDUE}`);
+  else if (query.settlement === 'unpaid') q = q.where('d.settlement_status', '<>', 'settled');
   else if (query.settlement) q = q.where('d.settlement_status', '=', query.settlement);
   if (query.customerId) q = q.where('d.customer_id', '=', BigInt(query.customerId));
   if (query.from) q = q.where('d.issue_date', '>=', query.from);

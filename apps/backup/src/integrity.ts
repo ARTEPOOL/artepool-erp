@@ -104,12 +104,47 @@ async function numberingGaps(client: pg.Client): Promise<CheckResult> {
   return result(rows.map((r) => `${r.code}: ${r.problem}`));
 }
 
+/**
+ * What each document and opening balance has received equals the payments and credit notes
+ * applied to it (a reversal takes back what it reverses). Decision 0113: an invoice's status
+ * comes from these, never from a typed amount.
+ */
+async function settlements(client: pg.Client): Promise<CheckResult> {
+  const { rows } = await client.query<{ k: string }>(
+    `WITH paid AS (SELECT a.document_id, a.opening_balance_id,
+                          sum(CASE WHEN p.payment_kind = 'reversal' THEN -a.amount_fils
+                                   ELSE a.amount_fils END) AS f
+                     FROM sales.payment_allocations a JOIN sales.payments p ON p.id = a.payment_id
+                    GROUP BY 1, 2),
+          credit AS (SELECT invoice_id AS document_id, opening_balance_id, sum(amount_fils) AS f
+                       FROM sales.credit_allocations GROUP BY 1, 2
+                     UNION ALL
+                     SELECT credit_note_id, NULL, sum(amount_fils)
+                       FROM sales.credit_allocations GROUP BY 1),
+          applied AS (SELECT document_id, opening_balance_id, sum(f) AS f
+                        FROM (SELECT * FROM paid UNION ALL SELECT * FROM credit) x GROUP BY 1, 2)
+     SELECT format('document %s: %s fils settled, %s applied', d.id, d.settled_fils,
+                   coalesce(a.f, 0)) AS k
+       FROM sales.documents d
+       LEFT JOIN applied a ON a.document_id = d.id AND a.opening_balance_id IS NULL
+      WHERE d.settled_fils <> coalesce(a.f, 0)
+     UNION ALL
+     SELECT format('opening balance %s: %s fils settled, %s applied', o.id, o.settled_fils,
+                   coalesce(a.f, 0))
+       FROM sales.opening_balances o
+       LEFT JOIN applied a ON a.opening_balance_id = o.id AND a.document_id IS NULL
+      WHERE o.settled_fils <> coalesce(a.f, 0)`,
+  );
+  return result(rows.map((r) => r.k));
+}
+
 const CHECKS: Record<string, (client: pg.Client) => Promise<CheckResult>> = {
   audit_chain: auditChain,
   journals_balanced: journalsBalanced,
   trial_balance: trialBalance,
   stock_vs_ledger: stockVsLedger,
   numbering_gaps: numberingGaps,
+  settlements,
 };
 
 /** Runs every check on the database `client` is connected to. */

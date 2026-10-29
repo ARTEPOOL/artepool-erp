@@ -81,6 +81,8 @@ export async function insertPayment(
     approvalId?: bigint | null;
     quotationId?: bigint | null;
     notes?: string | null;
+    /** Decision 0113: why money stays an advance while invoices are open. */
+    advanceReason?: string | null;
   },
 ) {
   const drawerShift =
@@ -111,6 +113,7 @@ export async function insertPayment(
         approval_id: p.approvalId ?? null,
         quotation_id: p.quotationId ?? null,
         notes: p.notes ?? null,
+        advance_reason: p.advanceReason ?? null,
       }),
     )
     .returning(['id', 'doc_number'])
@@ -272,14 +275,74 @@ async function issueAdvanceInvoice(
   return doc.id;
 }
 
-/** Receives one payment; returns it and the payment invoice its remainder created, if any. */
+type Target = { documentId: bigint } | { openingBalanceId: bigint };
+const targetKey = (t: Target) =>
+  'documentId' in t ? `doc:${t.documentId}` : `ob:${t.openingBalanceId}`;
+
+/**
+ * Receives one payment; returns it and the payment invoice its remainder created, if any.
+ * Decision 0113: the amounts chosen are settled first, and what is left still goes to the other
+ * open debts, oldest first (0052); only the excess, once nothing is left open, becomes an advance.
+ * Keeping money as an advance while debts are still open (`asAdvance`) needs the permission
+ * sales.advance_with_open_invoices and a reason, kept on the receipt and in the audit log.
+ */
 export async function receivePayment(
   trx: Transaction<DB>,
   body: ReceivePaymentRequest,
+  options: { mayAdvanceWithOpenInvoices?: boolean } = {},
 ): Promise<ReceivePaymentResponse> {
   const customerId = BigInt(body.customerId);
   const date = body.paymentDate ?? (await today(trx));
   const amount = BigInt(body.part.amountFils);
+
+  // The whole plan first, so the receipt is saved with its reason when it needs one.
+  const debts = await openDebts(trx, customerId);
+  const due = new Map(debts.map((d) => [targetKey(d), d.left]));
+  const plan: { target: Target; amount: bigint }[] = [];
+  let left = amount;
+  for (const [i, a] of (body.allocations ?? []).entries()) {
+    const share = BigInt(a.amountFils);
+    if (share > left) throw fieldError(`allocations.${i}.amountFils`, 'more_than_payment');
+    if (!a.documentId === !a.openingBalanceId) throw fieldError(`allocations.${i}`, 'one_target');
+    const target: Target = a.documentId
+      ? { documentId: BigInt(a.documentId) }
+      : { openingBalanceId: BigInt(a.openingBalanceId!) };
+    plan.push({ target, amount: share });
+    const key = targetKey(target);
+    if (due.has(key)) due.set(key, due.get(key)! - share);
+    left -= share;
+  }
+  if (!body.asAdvance) {
+    for (const debt of debts) {
+      if (left === 0n) break;
+      const open = due.get(targetKey(debt))!;
+      if (open <= 0n) continue;
+      const share = open < left ? open : left;
+      plan.push({
+        target:
+          'documentId' in debt
+            ? { documentId: debt.documentId }
+            : { openingBalanceId: debt.openingBalanceId },
+        amount: share,
+      });
+      due.set(targetKey(debt), open - share);
+      left -= share;
+    }
+  }
+  const stillOpen = [...due.values()].some((v) => v > 0n);
+  const advanceReason = body.advanceReason?.trim() || null;
+  const exception = left > 0n && stillOpen;
+  if (exception) {
+    if (!options.mayAdvanceWithOpenInvoices) {
+      throw new AppError(
+        'PERMISSION_DENIED',
+        'Missing permission sales.advance_with_open_invoices',
+        { permission: 'sales.advance_with_open_invoices' },
+      );
+    }
+    if (!advanceReason) throw fieldError('advanceReason', 'required');
+  }
+
   const payment = await insertPayment(trx, {
     kind: 'receipt',
     customerId,
@@ -287,35 +350,9 @@ export async function receivePayment(
     date,
     quotationId: body.quotationId ? BigInt(body.quotationId) : null,
     notes: body.notes ?? null,
+    advanceReason: exception ? advanceReason : null,
   });
-
-  let left = amount;
-  if (!body.asAdvance) {
-    if (body.allocations && body.allocations.length > 0) {
-      for (const [i, a] of body.allocations.entries()) {
-        const share = BigInt(a.amountFils);
-        if (share > left) throw fieldError(`allocations.${i}.amountFils`, 'more_than_payment');
-        if (!a.documentId === !a.openingBalanceId)
-          throw fieldError(`allocations.${i}`, 'one_target');
-        await allocate(
-          trx,
-          payment.id,
-          a.documentId
-            ? { documentId: BigInt(a.documentId) }
-            : { openingBalanceId: BigInt(a.openingBalanceId!) },
-          share,
-        );
-        left -= share;
-      }
-    } else {
-      for (const debt of await openDebts(trx, customerId)) {
-        if (left === 0n) break;
-        const share = debt.left < left ? debt.left : left;
-        await allocate(trx, payment.id, debt, share);
-        left -= share;
-      }
-    }
-  }
+  for (const step of plan) await allocate(trx, payment.id, step.target, step.amount);
 
   let advanceId: bigint | null = null;
   if (left > 0n) {
@@ -504,6 +541,7 @@ export async function getPayment(db: Db, id: bigint): Promise<PaymentDetail> {
       'p.cheque_date',
       'p.cheque_bank',
       'p.notes',
+      'p.advance_reason',
       'u.display_name_ar',
       'u.display_name_en',
       sql<string | null>`(SELECT j.id::text FROM gl.journal_entries j
@@ -535,6 +573,7 @@ export async function getPayment(db: Db, id: bigint): Promise<PaymentDetail> {
     chequeDate: row.cheque_date,
     chequeBank: row.cheque_bank,
     notes: row.notes,
+    advanceReason: row.advance_reason,
     receivedByName:
       row.display_name_ar && row.display_name_en
         ? { displayNameAr: row.display_name_ar, displayNameEn: row.display_name_en }

@@ -187,6 +187,8 @@ const doc = (patch: Partial<DocumentItem>): DocumentItem => ({
   vatFils: '5000',
   totalFils: '105000',
   cancelledBy: null,
+  creditedFils: '0',
+  overdue: false,
   ...patch,
 });
 
@@ -221,6 +223,7 @@ const payment = (patch: Partial<PaymentDetail>): PaymentDetail => ({
   chequeDate: '2026-10-20',
   chequeBank: 'Emirates NBD',
   notes: null,
+  advanceReason: null,
   receivedByName: { displayNameAr: 'سارة علي', displayNameEn: 'Sara Ali' },
   allocations: [
     {

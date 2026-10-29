@@ -791,6 +791,7 @@
       "trial_balance": "Debits equal credits",
       "stock_vs_ledger": "Stock matches its movements",
       "numbering_gaps": "Numbering without gaps",
+      "settlements": "Paid amounts match receipts and credit notes",
       "error": "Check error"
     },
     "recent": "Recent requests",

@@ -344,9 +344,14 @@ export function registerSalesRoutes(app: FastifyInstance): void {
     url: '/api/v1/sales/payments',
     access: allow('payments.receive'),
     body: ReceivePaymentRequest,
-    handler: async ({ trx, body }) => ({
+    // Decision 0113: the reason for an advance while invoices are open goes to the audit log too.
+    reason: ({ body }) => body.advanceReason ?? null,
+    handler: async ({ trx, request, body }) => ({
       status: 201,
-      body: await payments.receivePayment(trx, body),
+      body: await payments.receivePayment(trx, body, {
+        mayAdvanceWithOpenInvoices:
+          request.auth?.permissions.has('sales.advance_with_open_invoices') ?? false,
+      }),
     }),
   });
   defineWrite(app, {

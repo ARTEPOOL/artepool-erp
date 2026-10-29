@@ -286,7 +286,13 @@ export const DocumentsQuery = z.object({
    * `discarded`: drafts thrown away. Without a status: everything but discarded drafts.
    */
   status: z.enum(['draft', 'issued', 'active', 'cancelled', 'discarded']).optional(),
-  settlement: z.enum(['open', 'partial', 'settled', 'unpaid']).optional(),
+  /** `unpaid`: not fully settled; `overdue`: past its due date and not fully settled (0113). */
+  settlement: z.enum(['open', 'partial', 'settled', 'unpaid', 'overdue']).optional(),
+  /**
+   * The Invoices section's tabs (0113): `invoices` = invoices and advance payment invoices;
+   * `credit_notes`; `debit_notes`.
+   */
+  group: z.enum(['invoices', 'credit_notes', 'debit_notes']).optional(),
   customerId: IdText.optional(),
   from: DateText.optional(),
   to: DateText.optional(),
@@ -318,6 +324,10 @@ export interface DocumentItem extends Totals {
   rowVersion: number;
   /** The credit note that cancelled (or replaced, `edited`) this issued invoice (0072). */
   cancelledBy: { id: string; docNumber: string; edited: boolean } | null;
+  /** What credit notes applied to this invoice cover (0113: "partially credited"). */
+  creditedFils: string;
+  /** Issued, not cancelled, not fully settled, and its due date has passed (0113). */
+  overdue: boolean;
 }
 
 export interface DocumentDetail extends DocumentItem {
@@ -377,8 +387,13 @@ export const ReceivePaymentRequest = z.object({
     )
     .max(200)
     .optional(),
-  /** Settle nothing: the whole amount is an advance (with its own payment tax invoice). */
+  /**
+   * Keep what the chosen amounts leave as an advance (with its own payment tax invoice) instead of
+   * settling the other open debts. While debts are still open this needs the permission
+   * sales.advance_with_open_invoices and `advanceReason` (decision 0113).
+   */
   asAdvance: z.boolean().optional(),
+  advanceReason: OptionalText(500),
   /** The agreement an advance belongs to (deducted by its final invoice). */
   quotationId: IdText.optional(),
   /** The line of business and VAT category of an advance (default: the quotation's, else 5%). */
@@ -437,6 +452,8 @@ export interface PaymentDetail extends PaymentItem {
   chequeDate: string | null;
   chequeBank: string | null;
   notes: string | null;
+  /** Why this receipt was kept as an advance while invoices were open (decision 0113). */
+  advanceReason: string | null;
   receivedByName: { displayNameAr: string; displayNameEn: string } | null;
   allocations: {
     documentId: string | null;

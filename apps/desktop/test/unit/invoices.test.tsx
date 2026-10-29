@@ -201,6 +201,8 @@ const item = (patch: Partial<DocumentItem>): DocumentItem => ({
   printCount: 0,
   rowVersion: 2,
   cancelledBy: null,
+  creditedFils: '0',
+  overdue: false,
   ...patch,
 });
 
