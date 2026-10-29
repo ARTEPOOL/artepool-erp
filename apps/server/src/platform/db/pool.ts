@@ -40,6 +40,9 @@ export function createPool(connection: PgConnection, max = 20): pg.Pool {
   // An idle connection closed by the database (PostgreSQL restarted, the restore's swap): the pool
   // drops it and opens a new one when needed. Without a listener the process would stop.
   pool.on('error', () => undefined);
+  // The same for a connection cut while it is in use (a power cut or a crash of the database,
+  // M6.2 part I): its query fails and the request answers with an error; the process stays up.
+  pool.on('connect', (client) => client.on('error', () => undefined));
   return pool;
 }
 

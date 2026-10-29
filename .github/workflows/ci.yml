@@ -64,13 +64,16 @@ jobs:
         run: pnpm db:codegen:check
       - name: Chromium for the A4 PDF renderer
         run: pnpm --filter @artepool/server exec playwright-core install --with-deps chromium-headless-shell
-      - name: PostgreSQL 18 client tools (pg_dump / pg_restore for the backup tests)
+      - name: PostgreSQL 18 programs (pg_dump / pg_restore for the backup tests; initdb / pg_ctl for the power-loss test)
         run: |
           sudo install -d /usr/share/postgresql-common/pgdg
           sudo curl -fsSo /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
           echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt noble-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          # The server programs only: no cluster of their own (the tests use the service above).
+          sudo install -d /etc/postgresql-common
+          echo "create_main_cluster = false" | sudo tee /etc/postgresql-common/createcluster.conf
           sudo apt-get update -qq
-          sudo apt-get install -y -qq postgresql-client-18
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq -o Dpkg::Options::=--force-confold postgresql-client-18 postgresql-18
           echo "ARTEPOOL_PG_BIN=/usr/lib/postgresql/18/bin" >> "$GITHUB_ENV"
       - name: Integration tests (database rules, concurrency, server, backups)
         run: pnpm test:integration
