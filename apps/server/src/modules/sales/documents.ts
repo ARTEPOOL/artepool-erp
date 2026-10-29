@@ -821,7 +821,16 @@ export async function getDocument(db: Db, id: bigint): Promise<DocumentDetail> {
   const payments = await db
     .selectFrom('sales.payment_allocations as a')
     .innerJoin('sales.payments as p', 'p.id', 'a.payment_id')
-    .select(['p.id', 'p.doc_number', 'p.payment_date', 'p.payment_kind', 'a.amount_fils'])
+    .innerJoin('md.payment_methods as m', 'm.id', 'p.payment_method_id')
+    .select([
+      'p.id',
+      'p.doc_number',
+      'p.payment_date',
+      'p.payment_kind',
+      'a.amount_fils',
+      'm.name_ar',
+      'm.name_en',
+    ])
     .where('a.document_id', '=', id)
     .orderBy('p.id')
     .execute();
@@ -832,6 +841,23 @@ export async function getDocument(db: Db, id: bigint): Promise<DocumentDetail> {
     .where('a.invoice_id', '=', id)
     .orderBy('n.id')
     .execute();
+  // How each of those credit notes was paid back (refunds allocated to it).
+  const refunds =
+    credits.length === 0
+      ? []
+      : await db
+          .selectFrom('sales.payment_allocations as a')
+          .innerJoin('sales.payments as p', 'p.id', 'a.payment_id')
+          .innerJoin('md.payment_methods as m', 'm.id', 'p.payment_method_id')
+          .select(['a.document_id', 'a.amount_fils', 'm.name_ar', 'm.name_en'])
+          .where(
+            'a.document_id',
+            'in',
+            credits.map((c) => c.id),
+          )
+          .where('p.payment_kind', '=', 'refund')
+          .orderBy('p.id')
+          .execute();
   const notes = await db
     .selectFrom('sales.documents as n')
     .leftJoin('sys.reason_codes as r', 'r.id', 'n.reason_code_id')
@@ -870,6 +896,8 @@ export async function getDocument(db: Db, id: bigint): Promise<DocumentDetail> {
         docNumber: p.doc_number,
         date: p.payment_date,
         amountFils: (p.payment_kind === 'reversal' ? -p.amount_fils : p.amount_fils).toString(),
+        reversal: p.payment_kind === 'reversal',
+        methods: [{ nameAr: p.name_ar, nameEn: p.name_en, amountFils: p.amount_fils.toString() }],
       })),
       ...credits.map((c) => ({
         kind: 'credit_note' as const,
@@ -877,6 +905,14 @@ export async function getDocument(db: Db, id: bigint): Promise<DocumentDetail> {
         docNumber: c.doc_number ?? '',
         date: c.issue_date ?? '',
         amountFils: c.amount_fils.toString(),
+        reversal: false,
+        methods: refunds
+          .filter((r) => r.document_id === c.id)
+          .map((r) => ({
+            nameAr: r.name_ar,
+            nameEn: r.name_en,
+            amountFils: r.amount_fils.toString(),
+          })),
       })),
     ],
   };

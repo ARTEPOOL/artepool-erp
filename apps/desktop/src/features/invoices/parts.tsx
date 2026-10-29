@@ -4,20 +4,24 @@
  */
 import { useEffect, useState } from 'react';
 import {
+  AlarmClock,
   Ban,
   CheckCircle2,
   CircleDashed,
   Clock,
+  FileMinus,
   FilePen,
   FileText,
   Plus,
   ReceiptText,
   Trash2,
+  Wallet,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { MoneyFormatError, parseFils } from '@artepool/shared';
 import type {
   DocStatus,
+  DocumentItem,
   InvoiceFormat,
   PaymentPart,
   SalesPaymentMethod,
@@ -82,6 +86,58 @@ export function SettlementChip({ status }: { status: SettlementStatus }) {
     <Chip tone="warn" icon={<Clock aria-hidden="true" />}>
       {t('settlement.open')}
     </Chip>
+  );
+}
+
+/**
+ * Decision 0113: one status per invoice, worked out from its receipts and credit notes, never
+ * typed: cancelled (with the credit note's number), or unpaid / partially paid / paid, with
+ * overdue and partially credited beside it. An advance payment invoice says so. Notes and drafts
+ * keep their own chips.
+ */
+export function InvoiceStateChips({ doc }: { doc: DocumentItem }) {
+  const { t } = useTranslation('invoices');
+  if (doc.cancelledBy) return <CancelledChip by={doc.cancelledBy} />;
+  const owed =
+    doc.docType === 'invoice' || doc.docType === 'debit_note' || doc.docType === 'advance_invoice';
+  if (doc.status !== 'issued' || !owed) {
+    return (
+      <>
+        <StatusChip status={doc.status} />
+        {doc.status === 'issued' && <SettlementChip status={doc.settlementStatus} />}
+      </>
+    );
+  }
+  const total = BigInt(doc.totalFils);
+  const settled = BigInt(doc.settledFils);
+  const credited = BigInt(doc.creditedFils);
+  const paid = settled - credited;
+  const due = total - settled;
+  return (
+    <>
+      {doc.docType === 'advance_invoice' && (
+        <Chip tone="primary" icon={<Wallet aria-hidden="true" />}>
+          {t('state.advance')}
+        </Chip>
+      )}
+      {due <= 0n && paid <= 0n && total > 0n ? (
+        <Chip tone="info" icon={<FileMinus aria-hidden="true" />}>
+          {t('state.credited')}
+        </Chip>
+      ) : (
+        <SettlementChip status={due <= 0n ? 'settled' : paid > 0n ? 'partial' : 'open'} />
+      )}
+      {doc.overdue && (
+        <Chip tone="danger" icon={<AlarmClock aria-hidden="true" />}>
+          {t('state.overdue')}
+        </Chip>
+      )}
+      {credited > 0n && credited < total && (
+        <Chip tone="info" icon={<FileMinus aria-hidden="true" />}>
+          {t('state.partiallyCredited')}
+        </Chip>
+      )}
+    </>
   );
 }
 

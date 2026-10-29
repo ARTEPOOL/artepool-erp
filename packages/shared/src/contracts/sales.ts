@@ -355,6 +355,13 @@ export interface DocumentDetail extends DocumentItem {
     docNumber: string;
     date: string;
     amountFils: string;
+    /** A payment that reverses an earlier one (a bounced cheque, 0048): its amount is negative. */
+    reversal: boolean;
+    /**
+     * The timeline (decision 0113): a receipt's payment method; for a credit note, how the money
+     * went back (refunds); none means it stays as the customer's credit.
+     */
+    methods: { nameAr: string; nameEn: string; amountFils: string }[];
   }[];
   /** The payment invoices of the same customer that can still be deducted (draft invoices). */
   deductible?: DocumentItem[];

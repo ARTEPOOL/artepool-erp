@@ -21,7 +21,13 @@
     "draftNumber": "مسودة (بلا رقم بعد)",
     "forDocument": "عن {number}",
     "due": "المستحق {amount}",
-    "empty": "لا توجد مستندات تطابق هذه التصفية."
+    "empty": "لا توجد مستندات تطابق هذه التصفية.",
+    "tabsLabel": "نوع المستند",
+    "tabs": {
+      "invoices": "الفواتير",
+      "credit_notes": "الإشعارات الدائنة",
+      "debit_notes": "الإشعارات المدينة"
+    }
   },
   "form": {
     "back": "العودة إلى الفواتير",
@@ -112,7 +118,15 @@
       "credit_note": "إشعار دائن"
     },
     "receive": "استلام دفعة",
-    "soldAtPos": "مبيعة من نقطة البيع — نسخة A4 بنفس الرقم"
+    "soldAtPos": "مبيعة من نقطة البيع — نسخة A4 بنفس الرقم",
+    "timeline": "سجل الفاتورة",
+    "timelineIssued": "صدرت {number}",
+    "timelineReceipt": "إيصال",
+    "timelineReversal": "عكس الإيصال",
+    "timelineCredit": "إشعار دائن",
+    "timelineRefund": "رُدّ المبلغ: {methods}",
+    "timelineKept": "بقي رصيدًا للعميل",
+    "credited": "المخصوم بإشعارات دائنة"
   },
   "notes": {
     "creditButton": "إشعار دائن",
@@ -174,5 +188,11 @@
     "done": "صدر الإشعار الدائن {number}.",
     "cancelledBy": "ملغاة · {number}",
     "replacedBy": "مستبدلة (معدّلة) · {number}"
+  },
+  "state": {
+    "advance": "فاتورة دفعة مقدمة",
+    "overdue": "متأخرة",
+    "partiallyCredited": "مخفّضة جزئيًا بإشعار دائن",
+    "credited": "مغطاة بالكامل بإشعارات دائنة"
   }
 }
