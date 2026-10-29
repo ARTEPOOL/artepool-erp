@@ -14,13 +14,13 @@ const good: DurabilitySettings = {
   fsync: 'on',
   synchronous_commit: 'on',
   full_page_writes: 'on',
-  wal_sync_method: 'fsync_writethrough',
+  wal_sync_method: 'fsync',
   data_checksums: 'on',
 };
 
 describe('the durability settings', () => {
   it('flush through the disk cache on Windows only', () => {
-    expect(requiredDurability(true).wal_sync_method).toBe('fsync_writethrough');
+    expect(requiredDurability(true).wal_sync_method).toBe('fsync');
     expect(requiredDurability(false)).not.toHaveProperty('wal_sync_method');
   });
 
@@ -41,7 +41,7 @@ describe('the durability settings', () => {
     expect(durabilityChanges(off, true)).toEqual({
       fsync: 'on',
       synchronous_commit: 'on',
-      wal_sync_method: 'fsync_writethrough',
+      wal_sync_method: 'fsync',
     });
     expect(durabilityProblems(off, true)).toEqual([
       'fsync',

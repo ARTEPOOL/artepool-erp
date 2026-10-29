@@ -44,7 +44,7 @@ export function postgresqlSettings(options: { port: number; walDir: string }): s
     'fsync = on',
     'synchronous_commit = on',
     'full_page_writes = on',
-    'wal_sync_method = fsync_writethrough',
+    'wal_sync_method = fsync',
     'wal_level = replica',
     'archive_mode = on',
     `archive_command = 'copy "%p" "${wal}\\\\%f"'`,

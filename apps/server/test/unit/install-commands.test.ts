@@ -148,7 +148,7 @@ describe('PostgreSQL', () => {
       'fsync = on',
       'synchronous_commit = on',
       'full_page_writes = on',
-      'wal_sync_method = fsync_writethrough',
+      'wal_sync_method = fsync',
     ])
       expect(conf).toContain(line);
     expect(() => postgresqlSettings({ port: 1, walDir: "C:\\it's" })).toThrow();

@@ -2,8 +2,10 @@
  * What keeps a confirmed sale on the disk through a power cut (M6.2 part I): PostgreSQL writes and
  * flushes the WAL before it says "committed" (fsync, synchronous_commit), writes whole pages after
  * a checkpoint so a half-written page can be repaired (full_page_writes), and on Windows flushes
- * through the disk's own write cache (wal_sync_method = fsync_writethrough). Data checksums (set
- * by initdb, decision 0086) find a damaged page instead of reading it.
+ * through the disk's own write cache (wal_sync_method = fsync: _commit, that is FlushFileBuffers;
+ * the default open_datasync does not, and PostgreSQL 18 no longer accepts fsync_writethrough on
+ * Windows, so a server with it set does not start). Data checksums (set by initdb, decision 0086)
+ * find a damaged page instead of reading it.
  *
  * The server setup writes these into postgresql.conf; an upgrade or a reinstall sets any that are
  * missing with ALTER SYSTEM; System health shows them and alerts the owner if one is off.
@@ -33,7 +35,7 @@ export function requiredDurability(windows: boolean): Partial<DurabilitySettings
     fsync: 'on',
     synchronous_commit: 'on',
     full_page_writes: 'on',
-    ...(windows ? { wal_sync_method: 'fsync_writethrough' } : {}),
+    ...(windows ? { wal_sync_method: 'fsync' } : {}),
   };
 }
 
