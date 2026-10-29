@@ -88,3 +88,4 @@ All accounts, names and mappings are **data in the system**, not code. The accou
 3. Should inventory gains and losses use one account (5600), or two separate accounts?
 4. Do cash over/short (6910) and petty cash expenses (6900) belong in operating expenses?
 5. Is the arrangement for clearing opening balance equity (3900) after go-live acceptable?
+6. **Advance while invoices are open (decision 0113):** a receipt normally settles the customer's open invoices first, oldest first, and only the excess becomes an advance with its own payment tax invoice. As an exception (permission `sales.advance_with_open_invoices`, a reason, audited), a receipt may be kept whole as an advance while an invoice is still open, e.g. a deposit for a new project while an old invoice is disputed. Is this treatment acceptable, and should it need anything more (a limit, or a review report)?
