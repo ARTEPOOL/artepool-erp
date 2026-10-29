@@ -1,5 +1,11 @@
 # Changelog
 
+## Releases: merge and approve, no git commands (2026-10-29)
+
+**In plain words:** to send a new version to the shop, you now merge its pull request and approve it once in GitHub. The git commands (`git tag …`, `git push …`) are no longer needed. A merge that does not change the version sends nothing, and a version is never sent twice. One setting must be changed once: the `release` environment must allow the `main` branch (the updates guide, step 5).
+
+- `.github/workflows/release.yml` runs on every merge to `main`. It releases only when the app's version is not yet published in `ARTEPOOL/artepool-releases`, waits for the owner's approval as before, and adds the version tag afterwards. "Run workflow" starts it again by hand. Decision 0112.
+
 ## Installation, part I: power cuts, and the POS's last invoice (2026-10-29)
 
 **In plain words:**
