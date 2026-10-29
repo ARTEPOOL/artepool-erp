@@ -100,6 +100,10 @@ async function receiveAdvance(page: Page, t: T, customer: string, amount: string
   await page
     .getByRole('button', { name: new RegExp(t('receipts:receive.submit', { amount: '.*' })) })
     .click();
+  // An advance payment invoice is confirmed first (decision 0113).
+  const confirm = page.getByRole('dialog');
+  await expect(confirm.getByTestId('receive-confirm')).toContainText(vat);
+  await confirm.getByRole('button', { name: t('receipts:receive.confirm.yes') }).click();
   // The receipt opens with a link to the payment invoice made for the advance.
   await expect(page.getByRole('heading', { level: 1, name: /RCT-\d+/ })).toBeVisible();
   const invoice = page
