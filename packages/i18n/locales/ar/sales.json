@@ -17,7 +17,7 @@
   "statuses": {
     "draft": "مسودة",
     "issued": "صادرة",
-    "discarded": "ملغاة"
+    "discarded": "مسودة ملغاة"
   },
   "settlement": {
     "open": "غير مدفوعة",

@@ -27,10 +27,12 @@ import { formatDate } from '../../lib/format';
 import { useCan, useErrorText } from '../auth/context';
 import { money } from '../masterdata/format';
 import { useDocuments } from '../sales/api';
-import { SettlementChip, StatusChip, useDebounced } from './parts';
+import { CancelledChip, SettlementChip, StatusChip, useDebounced } from './parts';
 import styles from './invoices.module.css';
 
-const STATUSES = ['draft', 'issued', 'discarded'] as const;
+// "Issued" lists the issued documents still standing; "cancelled" the issued invoices a credit
+// note for all of it cancelled or replaced (0072); "discarded" the drafts thrown away.
+const STATUSES = ['draft', 'active', 'cancelled', 'discarded'] as const;
 const SETTLEMENTS = ['open', 'partial', 'settled', 'unpaid'] as const;
 
 type DocTypeFilter = '' | (typeof DOC_TYPES)[number];
@@ -98,7 +100,7 @@ export function InvoicesPage() {
                 onChange={(v) => setStatus(v as StatusFilter)}
                 options={[
                   { value: '', label: t('list.allStatuses') },
-                  ...STATUSES.map((v) => ({ value: v, label: t(`sales:statuses.${v}`) })),
+                  ...STATUSES.map((v) => ({ value: v, label: t(`list.statuses.${v}`) })),
                 ]}
               />
               <SelectField
@@ -154,7 +156,17 @@ export function InvoicesPage() {
                         ) : (
                           <span className={tbl.sub}>{t('list.draftNumber')}</span>
                         )}
-                        <span className={tbl.sub}>{t(`sales:docTypes.${d.docType}`)}</span>
+                        <span className={tbl.sub}>
+                          {t(`sales:docTypes.${d.docType}`)}
+                          {d.originalDocumentNumber && (
+                            <>
+                              {' · '}
+                              <bdi>
+                                {t('list.forDocument', { number: d.originalDocumentNumber })}
+                              </bdi>
+                            </>
+                          )}
+                        </span>
                       </td>
                       <td>{d.customerName}</td>
                       <td>{d.issueDate ? <bdi>{formatDate(d.issueDate)}</bdi> : '—'}</td>
@@ -175,8 +187,16 @@ export function InvoicesPage() {
                       </td>
                       <td>
                         <div className={styles.chips}>
-                          <StatusChip status={d.status} />
-                          {d.status === 'issued' && <SettlementChip status={d.settlementStatus} />}
+                          {d.cancelledBy ? (
+                            <CancelledChip by={d.cancelledBy} />
+                          ) : (
+                            <>
+                              <StatusChip status={d.status} />
+                              {d.status === 'issued' && (
+                                <SettlementChip status={d.settlementStatus} />
+                              )}
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>

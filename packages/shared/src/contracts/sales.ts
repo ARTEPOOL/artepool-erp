@@ -280,7 +280,12 @@ export interface CancelInvoiceResponse {
 export const DocumentsQuery = z.object({
   q: z.string().trim().max(100).optional(),
   docType: z.enum(DOC_TYPES).optional(),
-  status: z.enum(['draft', 'issued', 'discarded']).optional(),
+  /**
+   * `issued`: every issued document (cancelled ones too); `active`: issued and not cancelled;
+   * `cancelled`: issued and then cancelled or replaced by a credit note for all of it (0072);
+   * `discarded`: drafts thrown away. Without a status: everything but discarded drafts.
+   */
+  status: z.enum(['draft', 'issued', 'active', 'cancelled', 'discarded']).optional(),
   settlement: z.enum(['open', 'partial', 'settled', 'unpaid']).optional(),
   customerId: IdText.optional(),
   from: DateText.optional(),
@@ -311,6 +316,8 @@ export interface DocumentItem extends Totals {
   quotationId: string | null;
   printCount: number;
   rowVersion: number;
+  /** The credit note that cancelled (or replaced, `edited`) this issued invoice (0072). */
+  cancelledBy: { id: string; docNumber: string; edited: boolean } | null;
 }
 
 export interface DocumentDetail extends DocumentItem {
@@ -344,7 +351,6 @@ export interface DocumentDetail extends DocumentItem {
   /** Issued invoices: any credit or debit note already issued against it. */
   hasNotes?: boolean;
   /** Cancelled (or replaced by an edit) with the owner's approval (decision 0072). */
-  cancelledBy?: { id: string; docNumber: string; edited: boolean } | null;
 }
 
 export interface DocumentsResponse {

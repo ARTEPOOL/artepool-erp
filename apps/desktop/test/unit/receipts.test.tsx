@@ -186,6 +186,7 @@ const doc = (patch: Partial<DocumentItem>): DocumentItem => ({
   netFils: '100000',
   vatFils: '5000',
   totalFils: '105000',
+  cancelledBy: null,
   ...patch,
 });
 

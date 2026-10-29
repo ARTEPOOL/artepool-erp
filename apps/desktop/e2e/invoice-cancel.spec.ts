@@ -1,7 +1,8 @@
 /**
  * Editing an issued A4 invoice (decision 0072) against the real server, in Arabic and English:
  * the owner issues a paid invoice, then edits it. A credit note cancels all of it and refunds the
- * cash, the invoice is marked as replaced, and a new draft copied from it opens for changes.
+ * cash, the invoice is marked as replaced (in the list too, under the "cancelled" filter), and a
+ * new draft copied from it opens for changes.
  */
 import { control, expect, signInAsOwner, snap, test } from './fixtures';
 import type { Page } from '@playwright/test';
@@ -66,10 +67,15 @@ test('the owner edits an issued invoice: cancelled by a credit note, a new draft
   await expect(page.getByText(new RegExp(code)).first()).toBeVisible();
   await snap(page, '76-invoice-edit-draft');
 
-  // The original stays, marked as replaced by the credit note.
+  // The original stays, marked as replaced by the credit note in the list too, and found under
+  // the "cancelled" status filter.
   await nav(page)
     .getByRole('link', { name: t('settings:nav.invoices') })
     .click();
+  await page.getByLabel(t('sales:fields.status')).selectOption('cancelled');
+  const cancelled = page.getByRole('row', { name: new RegExp(number) }).first();
+  await expect(cancelled).toContainText(/CN-\d+/);
+  await snap(page, '77-invoice-cancelled-in-list');
   await page
     .getByRole('row', { name: new RegExp(number) })
     .first()

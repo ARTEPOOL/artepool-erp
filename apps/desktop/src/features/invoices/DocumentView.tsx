@@ -15,7 +15,6 @@ import { formatDate, formatDateTime } from '../../lib/format';
 import {
   Button,
   Card,
-  Chip,
   CardHeader,
   cx,
   DefinitionList,
@@ -33,7 +32,7 @@ import { printPdf } from '../sales/print';
 import salesStyles from '../sales/sales.module.css';
 import { CancelInvoiceDialog } from './CancelInvoiceDialog';
 import { NoteDialog } from './NoteDialog';
-import { FormatChip, SettlementChip, StatusChip } from './parts';
+import { CancelledChip, FormatChip, SettlementChip, StatusChip } from './parts';
 import styles from './invoices.module.css';
 
 const qty = (milli: string) => formatQuantity(BigInt(milli)).replace(/\.?0+$/, '') || '0';
@@ -300,14 +299,13 @@ export function DocumentView({ doc }: { doc: DocumentDetail }) {
       label: t('sales:fields.status'),
       value: (
         <span className={styles.chips}>
-          <StatusChip status={doc.status} />
-          {issued && <SettlementChip status={doc.settlementStatus} />}
-          {doc.cancelledBy && (
-            <Chip tone="danger">
-              {t(doc.cancelledBy.edited ? 'cancel.replacedBy' : 'cancel.cancelledBy', {
-                number: doc.cancelledBy.docNumber,
-              })}
-            </Chip>
+          {doc.cancelledBy ? (
+            <CancelledChip by={doc.cancelledBy} />
+          ) : (
+            <>
+              <StatusChip status={doc.status} />
+              {issued && <SettlementChip status={doc.settlementStatus} />}
+            </>
           )}
         </span>
       ),
