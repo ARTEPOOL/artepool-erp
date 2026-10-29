@@ -72,6 +72,11 @@ export interface PosState {
    * null for everyone else, whose count stays blind (0006).
    */
   expectedCashFils: string | null;
+  /**
+   * The last sale of this shift, always shown on the POS (decision 0111): after a power cut the
+   * cashier sees whether the last sale went through before ringing it again, and can reprint it.
+   */
+  lastSale: { id: string; docNumber: string; issuedAt: string; totalFils: string } | null;
 }
 
 // ---------------------------------------------------------------------------------------------

@@ -323,7 +323,6 @@
     "enter": "Enter"
   },
   "newSale": "New sale",
-  "newSaleHint": "Scan a barcode or choose products to add them to the invoice.",
   "vatRate": "VAT {rate}",
   "totalWithVat": "Total incl. VAT",
   "walkIn": "Cash customer",
@@ -336,5 +335,16 @@
   "products": "Products",
   "productsCount": "{count} items",
   "lowStock": "{qty} left",
-  "lockScreen": "Lock screen"
+  "lockScreen": "Lock screen",
+  "lastSale": {
+    "label": "Last invoice: {number} · {time} · {total}",
+    "none": "No invoices in this shift yet.",
+    "reprint": "Reprint",
+    "notPrinted": {
+      "browser": "Printing works in the Windows app only.",
+      "no_printer": "No receipt printer is chosen for this PC (Settings → Devices).",
+      "failed": "The printer did not answer. Check it and print again.",
+      "no_drawer": "The printer did not answer. Check it and print again."
+    }
+  }
 }

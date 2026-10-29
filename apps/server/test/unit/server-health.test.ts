@@ -89,6 +89,11 @@ const healthy: ServerHealth = {
   },
   clock: { serverTime: '2026-10-26T08:00:00.000Z', latestRecordAt: null, isBehind: false },
   ups: { confirmedAt: '2026-10-01T08:00:00.000Z', due: false, reminderDays: 182 },
+  database: {
+    startedAt: '2026-10-26T07:00:00.000Z',
+    durability: { ok: true, off: [] },
+    startCheck: { status: 'ok', finishedAt: '2026-10-26T07:01:00.000Z' },
+  },
 };
 
 describe('owner alerts', () => {
@@ -118,6 +123,7 @@ describe('owner alerts', () => {
         renewalError: 'the check failed',
       },
       ups: { confirmedAt: null, due: true, reminderDays: 182 },
+      database: { ...healthy.database, durability: { ok: false, off: ['fsync'] } },
     });
     expect(alerts.map((a) => [a.type, a.severity, a.which])).toEqual([
       ['disk_urgent', 'critical', 'data'],
@@ -128,6 +134,7 @@ describe('owner alerts', () => {
       ['certificate_renewal_failed', 'warning', 'server'],
       ['root_ca_expiring', 'warning', 'root_ca'],
       ['ups_unconfirmed', 'info', 'ups'],
+      ['durability_off', 'critical', 'database'],
     ]);
   });
 });

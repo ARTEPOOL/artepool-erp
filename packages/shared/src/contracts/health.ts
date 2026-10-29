@@ -1,6 +1,7 @@
 /**
  * The server PC's health in System health (M6.2 part H): disks, services, WAL archiving, the
- * server certificate and the root CA, the clock and the UPS. Owner only.
+ * server certificate and the root CA, the clock and the UPS; the database's power-cut settings
+ * and the integrity check after its last start (part I). Owner only.
  */
 
 /** ok: nothing to do; warning: look at it soon (orange); urgent: act now (red). */
@@ -18,7 +19,9 @@ export type ServerHealthProblem =
   | 'certificate_renewal_failed'
   | 'root_ca_expiring'
   | 'clock_behind'
-  | 'ups_unconfirmed';
+  | 'ups_unconfirmed'
+  | 'durability_off'
+  | 'start_check_failed';
 
 export interface DiskInfo {
   disk: ServerDisk;
@@ -60,4 +63,12 @@ export interface ServerHealth {
   };
   clock: { serverTime: string; latestRecordAt: string | null; isBehind: boolean };
   ups: { confirmedAt: string | null; due: boolean; reminderDays: number };
+  database: {
+    /** When the database last started (after a power cut, a restart or an update). */
+    startedAt: string;
+    /** The settings that keep a confirmed sale through a power cut; `off` lists any that are not. */
+    durability: { ok: boolean; off: string[] };
+    /** The integrity checks run once after that start; null while they have not run yet. */
+    startCheck: { status: 'running' | 'ok' | 'issues' | 'error'; finishedAt: string | null } | null;
+  };
 }

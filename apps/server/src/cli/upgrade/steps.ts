@@ -29,6 +29,7 @@ import { createAppDatabase } from '@artepool/dev-db';
 import { migrate, migrationStatus } from '@artepool/migrate';
 import { connectionArgs, pgTool, runPgTool as run, sha256File } from '@artepool/backup';
 import type { PgConnection } from '@artepool/node-kit';
+import { ensureDurability } from '../../platform/db/durability';
 import type { InstallLog } from '../install/log';
 import type { ServiceKey } from '../install/windows';
 
@@ -334,6 +335,8 @@ export interface ApplyInput {
   log: InstallLog;
   waitHealthy: (caPem: string) => Promise<void>;
   now?: Date;
+  /** The Windows-only power-cut setting (wal_sync_method); the platform by default. */
+  windows?: boolean;
 }
 
 export type UpgradeResult =
@@ -474,6 +477,26 @@ export async function applyUpgrade(input: ApplyInput): Promise<UpgradeResult> {
     await platform.startService('database');
   } catch (error) {
     return fail('services', message(error), false);
+  }
+  // The power-cut settings (M6.2 part I) for installations made before they were written by the
+  // setup. Not a reason to stop the upgrade: System health shows any that stays off.
+  const superuser = new pg.Client({
+    ...connections.superuser,
+    database: 'postgres',
+    application_name: 'artepool-upgrade',
+  });
+  try {
+    await superuser.connect();
+    const changed = await ensureDurability(
+      superuser,
+      input.windows ?? process.platform === 'win32',
+    );
+    if (Object.keys(changed).length > 0)
+      log.line(`Database settings turned on: ${Object.keys(changed).join(', ')}.`);
+  } catch (error) {
+    log.line(`The database settings could not be checked: ${message(error)}`);
+  } finally {
+    await superuser.end().catch(() => undefined);
   }
 
   log.line('The database changes (all or nothing)');

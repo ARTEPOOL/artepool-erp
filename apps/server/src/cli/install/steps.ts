@@ -49,6 +49,7 @@ import { connectionFor, migrationsDir } from '@artepool/node-kit';
 import { createCa, issueServerCert, TLS_FILES, writeTlsFile, type TlsNames } from '@artepool/tls';
 import type { Exec } from '../restore-from-backup';
 import type { InstallLog } from './log';
+import { ensureDurability } from '../../platform/db/durability';
 import { hbaConf, initdbArgs, postgresqlSettings } from './postgres';
 import type { Platform } from './windows';
 
@@ -260,6 +261,12 @@ export async function runInstall(input: InstallInput): Promise<void> {
   await admin.connect();
   try {
     await assertServerVersion(admin);
+    if (reattach) {
+      // Kept data from an older installation gets the power-cut settings too (M6.2 part I).
+      const changed = await ensureDurability(admin, process.platform === 'win32');
+      if (Object.keys(changed).length > 0)
+        log.line(`Database settings turned on: ${Object.keys(changed).join(', ')}.`);
+    }
     await ensureRoles(admin);
     const there = await databaseExists(admin, input.databaseName);
     if (reattach && !there) {

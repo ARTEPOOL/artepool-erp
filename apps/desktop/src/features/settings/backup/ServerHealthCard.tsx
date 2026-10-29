@@ -1,7 +1,8 @@
 /**
  * System health → the server PC (M6.2 part H). Owner only. One line each, green, orange or red:
  * the last backup with its age, the backup key, the disks, the services and WAL archiving, the
- * server certificate (it renews itself) and the root CA (renewed by hand), the clock and the UPS.
+ * server certificate (it renews itself) and the root CA (renewed by hand), the clock, the UPS, and
+ * the protection from power cuts with the integrity check after the database's last start (part I).
  */
 import type { ReactNode } from 'react';
 import {
@@ -10,6 +11,7 @@ import {
   Database,
   HardDrive,
   KeyRound,
+  PlugZap,
   Server,
   ShieldCheck,
 } from 'lucide-react';
@@ -32,6 +34,14 @@ import { formatBytes } from './BackupPanel';
 export const SERVER_HEALTH_KEY = ['settings', 'server-health'] as const;
 
 const TONE: Record<HealthLevel, Tone> = { ok: 'ok', warning: 'warn', urgent: 'danger' };
+
+/** Red when a power-cut setting is off or the check after the last start found problems. */
+function databaseLevel(d: ServerHealth['database']): HealthLevel {
+  if (!d.durability.ok) return 'urgent';
+  if (d.startCheck && (d.startCheck.status === 'issues' || d.startCheck.status === 'error'))
+    return 'urgent';
+  return 'ok';
+}
 
 /** "3 hours ago", "2 days ago": the age of the last backup. */
 function ageText(iso: string, t: (key: string, o?: Record<string, unknown>) => string): string {
@@ -233,6 +243,28 @@ export function ServerHealthCard(props: { backup: HealthResponse; onCreateKey: (
                   chip(s.ups.due ? 'warning' : 'ok')
                 )
               }
+            />
+            <Line
+              testId="health-database"
+              icon={<PlugZap aria-hidden="true" />}
+              tone={TONE[databaseLevel(s.database)]}
+              title={t('serverHealth.database.title')}
+              detail={
+                <>
+                  {s.database.durability.ok
+                    ? t('serverHealth.database.on')
+                    : t('serverHealth.database.off', {
+                        list: s.database.durability.off.join(', '),
+                      })}
+                  <br />
+                  {t('serverHealth.database.started', {
+                    time: formatDateTime(s.database.startedAt),
+                  })}
+                  {' · '}
+                  {t(`serverHealth.database.check.${s.database.startCheck?.status ?? 'pending'}`)}
+                </>
+              }
+              end={chip(databaseLevel(s.database))}
             />
           </>
         )}

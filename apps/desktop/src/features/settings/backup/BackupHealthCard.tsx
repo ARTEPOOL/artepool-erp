@@ -19,6 +19,8 @@ const URGENT: ReadonlySet<ServerHealthProblem> = new Set([
   'backup_service_down',
   'wal_archive_failed',
   'clock_behind',
+  'durability_off',
+  'start_check_failed',
 ]);
 
 /** Red when it needs acting on now; orange when it needs looking at soon. */

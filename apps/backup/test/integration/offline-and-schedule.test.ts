@@ -90,11 +90,12 @@ describe('the external-drive copy', () => {
 });
 
 describe('the schedule', () => {
-  it('makes the hourly copy and the nightly check once, and carries out the owner’s requests', async () => {
+  it('makes the hourly copy, the checks after a start and at night once, and carries out the owner’s requests', async () => {
     const now = new Date();
     const anyHour = { nightlyFromHour: 0 };
-    // A copy was just made by the drive test: only the nightly check is due.
-    expect(await tick(client, config, now, anyHour)).toEqual(['integrity']);
+    // A copy was just made by the drive test: only the check after the database's start (none
+    // yet since it started, M6.2 part I) and the nightly check are due.
+    expect(await tick(client, config, now, anyHour)).toEqual(['start-check', 'integrity']);
     // Neither is due again.
     expect(await tick(client, config, now, anyHour)).toEqual([]);
     // An hour after the last copy, the next one is due.

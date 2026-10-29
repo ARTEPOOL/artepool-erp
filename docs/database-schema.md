@@ -230,7 +230,7 @@ Written in the same transaction as the operation. Insert-only (a trigger stamps 
 | Column | Type | Rules |
 |---|---|---|
 | id | bigint PK | |
-| alert_type | text | `CHECK IN ('low_stock','oversell_review','cash_drop_due','cash_variance','repeated_variance','drawer_left_open','backup_failed','backup_stale','restore_test_due','integrity_issue','audit_chain_broken','clock_skew','clock_backwards','period_missing','kiosk_lock_off','kiosk_lock_on','kiosk_exit_attempt','kiosk_code_blocked','offline_copy_due')` (kiosk types: migration 0034; `offline_copy_due`: 0036) |
+| alert_type | text | `CHECK IN ('low_stock','oversell_review','cash_drop_due','cash_variance','repeated_variance','drawer_left_open','backup_failed','backup_stale','restore_test_due','integrity_issue','audit_chain_broken','clock_skew','clock_backwards','period_missing','kiosk_lock_off','kiosk_lock_on','kiosk_exit_attempt','kiosk_code_blocked','offline_copy_due','ups_unconfirmed','disk_low','disk_urgent','service_down','wal_archive_failed','certificate_expiring','certificate_renewal_failed','root_ca_expiring','durability_off')` (kiosk types: migration 0034; `offline_copy_due`: 0036; the server PC's health: 0045; `durability_off`: 0047) |
 | severity | text | `CHECK IN ('info','warning','critical')` |
 | entity_type, entity_id | text? | |
 | params | jsonb | Values for the translated message |
@@ -1576,7 +1576,7 @@ Every local copy, off-site upload, external-drive copy and restore test ([0086](
 | Column | Type | Rules |
 |---|---|---|
 | id | bigint PK | |
-| run_kind | text | `CHECK IN ('nightly','restore_test','manual')` |
+| run_kind | text | `CHECK IN ('nightly','restore_test','manual','after_start')` (`after_start`: once after every database start, migration 0047, decision 0111) |
 | database_name | text | The live database or the throwaway restore database |
 | backup_run_id | bigint? → ops.backup_runs | For a restore test |
 | started_at, finished_at | timestamptz | |

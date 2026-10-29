@@ -805,6 +805,11 @@ describe('Settings → System health (decision 0086)', () => {
       },
       clock: { serverTime: new Date().toISOString(), latestRecordAt: null, isBehind: false },
       ups: { confirmedAt: null, due: true, reminderDays: 182 },
+      database: {
+        startedAt: new Date().toISOString(),
+        durability: { ok: false, off: ['fsync'] },
+        startCheck: { status: 'ok', finishedAt: new Date().toISOString() },
+      },
     };
     const bridge = signedInBridge([
       ...OWNER_PERMISSIONS,
@@ -834,6 +839,11 @@ describe('Settings → System health (decision 0086)', () => {
       'بتتجدد بإيد الدعم الفني',
     );
     expect(within(card).getByTestId('health-key').textContent).toContain('لسه ماتعملش');
+    // Part I: a power-cut setting that is off is red, with the check after the last start.
+    const database = within(card).getByTestId('health-database');
+    expect(database.textContent).toContain('متوقفة (fsync)');
+    expect(database.textContent).toContain('فحص السلامة بعده سليم');
+    expect(within(database).getByText('دلوقتي')).toBeTruthy();
     const ups = within(card).getByTestId('health-ups');
     expect(ups.textContent).toContain('جهاز السيرفر متوصل بـ UPS؟');
     fireEvent.click(within(ups).getByRole('button', { name: 'أيوه، متوصل بـ UPS' }));

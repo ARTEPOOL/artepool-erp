@@ -17,6 +17,7 @@ import {
   Pause,
   Pencil,
   Plus,
+  Printer,
   ScanBarcode,
   Search,
   ShoppingCart,
@@ -30,8 +31,15 @@ import {
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { formatQuantity, roundDiv } from '@artepool/shared';
-import type { CategoryItem, HeldCart, ItemListItem, PosState } from '@artepool/shared/contracts';
-import { useSave } from '../../api/hooks';
+import type {
+  CategoryItem,
+  HeldCart,
+  ItemListItem,
+  PosState,
+  ReceiptData,
+} from '@artepool/shared/contracts';
+import { useApi, useSave } from '../../api/hooks';
+import { formatTime } from '../../lib/format';
 import {
   Alert,
   Button,
@@ -43,6 +51,7 @@ import {
   Note,
   PageHeader,
   Tile,
+  useToast,
   type Tone,
 } from '../../ui';
 import { useAuthController, useDisplayName, useErrorText } from '../auth/context';
@@ -66,6 +75,8 @@ import { LineDialog } from './LineDialog';
 import { PaymentDialog } from './PaymentDialog';
 import { ReturnDialog } from './ReturnDialog';
 import { useGlobalScan, useScanInput } from '../items/scan';
+import { useReceiptLogo } from './receipt/logo';
+import { printReceipt } from './receipt/printer';
 import { OpenShiftCard } from './shift/OpenShiftCard';
 import styles from './pos.module.css';
 
@@ -91,6 +102,52 @@ export function PosPage() {
       <PageHeader title={t('title')} subtitle={t('subtitle')} />
       {body}
     </>
+  );
+}
+
+/**
+ * The last invoice of this shift, always in view (decision 0111): after a power cut the cashier
+ * sees whether the last sale went through before ringing it again, and can print it again.
+ */
+function LastSale({ last }: { last: PosState['lastSale'] }) {
+  const { t, i18n } = useTranslation('pos');
+  const api = useApi();
+  const logo = useReceiptLogo();
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  if (!last) return <span data-testid="last-sale">{t('lastSale.none')}</span>;
+  const reprint = async () => {
+    setBusy(true);
+    try {
+      // The receipt as the server has it: after a first print, it is marked as a copy.
+      const receipt = await api.get<ReceiptData>(POS_PATHS.receipt(last.id));
+      const { outcome } = await printReceipt(receipt, { logo, i18n, kickDrawer: false });
+      if (outcome.printed) {
+        await api.post(
+          POS_PATHS.receiptPrinted(last.id),
+          {},
+          { idempotencyKey: crypto.randomUUID() },
+        );
+        toast(t('done.printed'));
+      } else toast(t(`lastSale.notPrinted.${outcome.reason}`));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <span className={styles.lastSale} data-testid="last-sale">
+      <span>
+        {t('lastSale.label', {
+          number: last.docNumber,
+          time: formatTime(last.issuedAt),
+          total: `${money(BigInt(last.totalFils))} ${t('currency')}`,
+        })}
+      </span>
+      <Button variant="ghost" busy={busy} onPress={() => void reprint()}>
+        <Printer className={iconClass.sm} aria-hidden="true" />
+        {t('lastSale.reprint')}
+      </Button>
+    </span>
   );
 }
 
@@ -162,7 +219,7 @@ function Register({ state }: { state: PosState }) {
     <div className={styles.register}>
       <PageHeader
         title={t('newSale')}
-        subtitle={t('newSaleHint')}
+        subtitle={<LastSale last={state.lastSale} />}
         tools={
           <div className={styles.tools}>
             <Chip tone="ok" icon={<Clock aria-hidden="true" />}>

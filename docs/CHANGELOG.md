@@ -1,5 +1,18 @@
 # Changelog
 
+## Installation, part I: power cuts, and the POS's last invoice (2026-10-29)
+
+**In plain words:**
+
+- **A sale the program confirmed survives a power cut.** The database writes every sale to the disk before saying "done". The server setup sets this up, and an update turns it back on if anything turned it off.
+- **A sale cut off half way leaves nothing behind.** There is no half invoice, no number is used, and stock and cash do not move. Pressing "Pay" again makes exactly one sale.
+- **After every start of the server** (after a power cut too), the integrity checks run once by themselves. Before, they ran only at night.
+- Settings → System health → Server PC has a new line, **"Protection from power cuts"**. It shows whether the protection is on, when the database last started, and the result of the check after that start. If anything is off, the owner gets an alert.
+- **The POS always shows the shift's last invoice** under "New sale": number, time, total, and a **Reprint** button. After a power cut the cart is empty, and this line tells the cashier whether the last sale went through before ringing it again.
+
+- Migration 0047 (integrity run kind `after_start`, alert `durability_off`). Decision 0111.
+- Tests: a sale whose database connection is killed while it waits for its number, and a real database stopped the way a power cut stops it, then recovered. Both check that nothing is half done, the books balance and the numbering has no gap. Plus unit, desktop and screen tests in both languages. CI installs the PostgreSQL 18 server for the power-cut test.
+
 ## Invoices (A4): a cancelled invoice says so in the list (2026-10-29)
 
 **In plain words:** an invoice you cancelled (or edited) with a credit note used to show in the list as "Issued · Paid" like any other, and the "Cancelled" filter found nothing: that filter only found drafts thrown away.

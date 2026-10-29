@@ -739,3 +739,11 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* The last invoice of the shift, always in view under the title (decision 0111). */
+.lastSale {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}

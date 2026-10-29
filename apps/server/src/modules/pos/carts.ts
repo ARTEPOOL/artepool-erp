@@ -43,6 +43,18 @@ export async function posState(db: Db, request: FastifyRequest): Promise<PosStat
   const dropDue = cash !== null && limit !== null ? cash > limit : false;
   // The owner sees the expected cash on "My shift"; everyone else counts blind (0006, 0080).
   const owner = cash !== null && (await isOwner(db, userId));
+  const last = mine
+    ? await db
+        .selectFrom('sales.documents')
+        .select(['id', 'doc_number', 'issued_at', 'total_fils'])
+        .where('shift_id', '=', mine.id)
+        .where('doc_type', '=', 'invoice')
+        .where('status', '=', 'issued')
+        .orderBy('issued_at', 'desc')
+        .orderBy('id', 'desc')
+        .limit(1)
+        .executeTakeFirst()
+    : undefined;
   return {
     isPosDevice: isPos,
     registerId: register?.id.toString() ?? null,
@@ -69,6 +81,15 @@ export async function posState(db: Db, request: FastifyRequest): Promise<PosStat
     receiptLanguage: language,
     dropDue,
     expectedCashFils: owner && cash !== null ? cash.toString() : null,
+    lastSale:
+      last && last.doc_number && last.issued_at
+        ? {
+            id: last.id.toString(),
+            docNumber: last.doc_number,
+            issuedAt: last.issued_at.toISOString(),
+            totalFils: last.total_fils.toString(),
+          }
+        : null,
   };
 }
 

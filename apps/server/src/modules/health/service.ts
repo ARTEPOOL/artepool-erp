@@ -18,6 +18,7 @@ import type {
   ServerHealthProblem,
 } from '@artepool/shared/contracts';
 import { TLS_FILES } from '@artepool/tls';
+import { durabilityProblems, readDurability } from '../../platform/db/durability';
 import { withBusinessTx } from '../../platform/db/tx';
 import type { DB } from '../../platform/db/schema.generated';
 import type { AppDeps } from '../../platform/http/deps';
@@ -115,23 +116,59 @@ async function walArchiving(deps: AppDeps): Promise<ServerHealth['wal']> {
   };
 }
 
-export async function serverHealth(deps: AppDeps, now = Date.now()): Promise<ServerHealth> {
-  const { dataDir, tlsDir } = deps.health;
-  const [data, backups, system, heartbeat, wal, server, rootCa, clock, row] = await Promise.all([
-    disk('data', dataDir),
-    disk('backups', deps.backup.backupDir),
-    disk('system', systemDrive()),
-    readHeartbeat(deps.backup.backupDir),
-    walArchiving(deps),
-    certificate(join(tlsDir, TLS_FILES.serverCert), CERT_LEVELS, now),
-    certificate(join(tlsDir, TLS_FILES.caCert), ROOT_CA_LEVELS, now),
-    clockStatus(deps.db),
-    deps.db
-      .selectFrom('ops.server_health')
-      .selectAll()
-      .where('id', '=', 1)
-      .executeTakeFirstOrThrow(),
+/**
+ * The database's last start, its power-cut settings and the integrity checks run after that start
+ * (M6.2 part I). `windows`: the Windows-only setting is checked (the server PC).
+ */
+async function databaseState(deps: AppDeps, windows: boolean): Promise<ServerHealth['database']> {
+  const [settings, started] = await Promise.all([
+    readDurability(deps.db),
+    sql<{ at: Date }>`SELECT pg_postmaster_start_time() AS at`.execute(deps.db),
   ]);
+  const startedAt = started.rows[0]!.at;
+  const check = await deps.db
+    .selectFrom('ops.integrity_runs')
+    .select(['status', 'finished_at'])
+    .where('run_kind', '=', 'after_start')
+    .where('started_at', '>=', startedAt)
+    .orderBy('id', 'desc')
+    .executeTakeFirst();
+  const off = durabilityProblems(settings, windows);
+  return {
+    startedAt: startedAt.toISOString(),
+    durability: { ok: off.length === 0, off },
+    startCheck: check
+      ? {
+          status: check.status as 'running' | 'ok' | 'issues' | 'error',
+          finishedAt: check.finished_at?.toISOString() ?? null,
+        }
+      : null,
+  };
+}
+
+export async function serverHealth(
+  deps: AppDeps,
+  now = Date.now(),
+  windows = process.platform === 'win32',
+): Promise<ServerHealth> {
+  const { dataDir, tlsDir } = deps.health;
+  const [data, backups, system, heartbeat, wal, server, rootCa, clock, row, database] =
+    await Promise.all([
+      disk('data', dataDir),
+      disk('backups', deps.backup.backupDir),
+      disk('system', systemDrive()),
+      readHeartbeat(deps.backup.backupDir),
+      walArchiving(deps),
+      certificate(join(tlsDir, TLS_FILES.serverCert), CERT_LEVELS, now),
+      certificate(join(tlsDir, TLS_FILES.caCert), ROOT_CA_LEVELS, now),
+      clockStatus(deps.db),
+      deps.db
+        .selectFrom('ops.server_health')
+        .selectAll()
+        .where('id', '=', 1)
+        .executeTakeFirstOrThrow(),
+      databaseState(deps, windows),
+    ]);
   const disks = [data, backups, system].filter((d): d is DiskInfo => d !== null);
   const backupRunning = heartbeat !== null && now - heartbeat.getTime() <= HEARTBEAT_STALE_MS;
   const ups = { confirmedAt: row.ups_confirmed_at, due: upsDue(row.ups_confirmed_at, now) };
@@ -146,6 +183,9 @@ export async function serverHealth(deps: AppDeps, now = Date.now()): Promise<Ser
   if (rootCa && rootCa.level !== 'ok') problems.add('root_ca_expiring');
   if (clock.isBehind) problems.add('clock_behind');
   if (ups.due) problems.add('ups_unconfirmed');
+  if (!database.durability.ok) problems.add('durability_off');
+  if (database.startCheck && ['issues', 'error'].includes(database.startCheck.status))
+    problems.add('start_check_failed');
 
   return {
     problems: [...problems],
@@ -169,6 +209,7 @@ export async function serverHealth(deps: AppDeps, now = Date.now()): Promise<Ser
       due: ups.due,
       reminderDays: UPS_REMINDER_DAYS,
     },
+    database,
   };
 }
 
@@ -231,6 +272,15 @@ export function healthAlerts(health: ServerHealth): Alert[] {
     });
   }
   if (health.ups.due) alerts.push({ type: 'ups_unconfirmed', severity: 'info', which: 'ups' });
+  if (!health.database.durability.ok) {
+    alerts.push({
+      type: 'durability_off',
+      severity: 'critical',
+      which: 'database',
+      params: { off: health.database.durability.off },
+    });
+  }
+  // A failed check after a start raises 'integrity_issue' through the backup health (0086).
   return alerts;
 }
 

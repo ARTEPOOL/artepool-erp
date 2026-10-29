@@ -133,7 +133,7 @@ export const allOk = (results: CheckResults): boolean => Object.values(results).
 export async function recordIntegrityRun(
   live: pg.Client,
   run: {
-    kind: 'nightly' | 'restore_test' | 'manual';
+    kind: 'nightly' | 'restore_test' | 'manual' | 'after_start';
     database: string;
     backupRunId?: string | null;
   },
@@ -154,11 +154,30 @@ export async function recordIntegrityRun(
   });
 }
 
-/** The nightly check of the live database. */
-export async function nightlyIntegrity(live: pg.Client): Promise<{ id: string; status: string }> {
+/**
+ * A check of the live database: every night, and once after every start of the database (after a
+ * power cut too, M6.2 part I).
+ */
+export async function liveIntegrity(
+  live: pg.Client,
+  kind: 'nightly' | 'after_start' = 'nightly',
+): Promise<{ id: string; status: string }> {
   const { rows } = await live.query<{ db: string }>('SELECT current_database() AS db');
   const results = await runChecks(live).catch((error: unknown) =>
     error instanceof Error ? error : new Error(String(error)),
   );
-  return recordIntegrityRun(live, { kind: 'nightly', database: rows[0]!.db }, results);
+  return recordIntegrityRun(live, { kind, database: rows[0]!.db }, results);
+}
+
+/** The nightly check of the live database. */
+export const nightlyIntegrity = (live: pg.Client) => liveIntegrity(live, 'nightly');
+
+/** The database started after the last check made after a start: one is due now. */
+export async function startCheckDue(live: pg.Client): Promise<boolean> {
+  const { rows } = await live.query<{ due: boolean }>(
+    `SELECT NOT EXISTS (SELECT 1 FROM ops.integrity_runs
+                         WHERE run_kind = 'after_start'
+                           AND started_at >= pg_postmaster_start_time()) AS due`,
+  );
+  return rows[0]!.due;
 }

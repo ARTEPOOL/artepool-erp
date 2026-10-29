@@ -5,7 +5,7 @@
  * sale again with the approval; a PC without a shift asks for the float; the blind count shows
  * the expected amount only after counting. Arabic (RTL) and English.
  */
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type {
   BridgeRequest,
@@ -73,6 +73,7 @@ const SHIFT: ShiftSummary = {
 };
 
 const STATE: PosState = {
+  lastSale: null,
   isPosDevice: true,
   registerId: '4',
   shift: SHIFT,
@@ -366,6 +367,34 @@ describe('POS sale', () => {
     expect(bridge.callsTo('POST', '/api/v1/approvals')[0]!.body).toMatchObject({
       permission: 'pos.oversell',
     });
+  });
+
+  it('the shift’s last invoice is always in view and prints again (0111)', async () => {
+    printed.receipts.length = 0;
+    const empty = bridgeFor('/pos');
+    await signIn(empty, 'Z-000042');
+    expect((await screen.findByTestId('last-sale')).textContent).toBe(
+      'No invoices in this shift yet.',
+    );
+    cleanup();
+
+    const bridge = bridgeFor('/pos', {
+      ...STATE,
+      lastSale: {
+        id: '900',
+        docNumber: 'POS-000124',
+        issuedAt: '2026-10-13T06:15:00Z',
+        totalFils: '25200',
+      },
+    }).on('GET', '/api/v1/pos/receipts/900', ok(RECEIPT));
+    await signIn(bridge, 'Z-000042');
+    const last = await screen.findByTestId('last-sale');
+    expect(last.textContent).toMatch(/Last invoice: POS-000124 · .+ · 252\.00/);
+    fireEvent.click(within(last).getByRole('button', { name: 'Reprint' }));
+    await waitFor(() => expect(printed.receipts).toEqual([{ data: RECEIPT, kick: false }]));
+    // In a browser nothing reaches a printer: it says so, and no print is counted.
+    expect(await screen.findByText('Printing works in the Windows app only.')).toBeTruthy();
+    expect(bridge.callsTo('POST', '/api/v1/pos/receipts/900/printed')).toHaveLength(0);
   });
 
   it('Arabic: the POS reads right to left with Arabic labels', async () => {
