@@ -1,5 +1,21 @@
 # Changelog
 
+## Receipts settle the invoice they are for; one clear status per invoice (2026-10-29)
+
+**In plain words:**
+
+- **"Receive payment" on an invoice now pays that invoice.** The receipt opens with the amount still due filled in, and says before saving: "Settles INV-… with AED …". In the owner's test, the money had become a separate advance payment invoice instead.
+- **A payment always pays open invoices first** (the oldest first). Only money left over, once nothing is open, becomes an advance payment invoice. Before that invoice is made, the screen shows its amount and VAT and asks you to confirm.
+- **"Choose invoices" with nothing typed** is now an error message, not an advance by surprise.
+- **Keeping a payment as an advance while the customer still owes** (for example a deposit for a new project while an old invoice is disputed) needs a special permission (owner and accountant), a reason, and shows the open invoices first. The reason is kept on the receipt and in the audit log. This is on the list of questions for the accountant.
+- **Each invoice shows one status, worked out from its receipts and credit notes:** unpaid, partly paid or paid; **overdue** after its due date (cash customers: from the next day); partially credited; or cancelled with the credit note's number.
+- **Invoices (A4) has tabs:** Invoices (advance payment invoices are marked) / Credit notes / Debit notes. The payment filter has "Overdue".
+- **The invoice page shows its history:** issued, each receipt with its payment method, each credit note and how the money went back.
+- **A new nightly check:** what each invoice has received matches its receipts and credit notes.
+
+- Migration 0048 (the permission `sales.advance_with_open_invoices`, `sales.payments.advance_reason`). Decision 0113.
+- Tests: the server rules (the owner's scenario, partial payments, an overpayment, chosen amounts with the rest spread, the exception, overdue, credit notes, the integrity check); the receipt and invoice screens; a screen test of the owner's scenario in Arabic and English.
+
 ## Releases: merge and approve, no git commands (2026-10-29)
 
 **In plain words:** to send a new version to the shop, you now merge its pull request and approve it once in GitHub. The git commands (`git tag …`, `git push …`) are no longer needed. A merge that does not change the version sends nothing, and a version is never sent twice. One setting must be changed once: the `release` environment must allow the `main` branch (the updates guide, step 5).

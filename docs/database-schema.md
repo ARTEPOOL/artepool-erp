@@ -1217,9 +1217,10 @@ The money columns work exactly as in `sales.document_lines` (item lines only).
 | allocated_fils | bigint | `DEFAULT 0`, `0..amount_fils` |
 | approval_id | bigint? → auth.approvals | Refunds, reversals |
 | notes | text? | |
+| advance_reason | text? | 3–500 characters. Why a receipt was kept as an advance while the customer still had open invoices (permission `sales.advance_with_open_invoices`; migration 0048, decision [0113](decisions/0113-receipts-settle-invoices-first.md)) |
 | [ins] | | |
 
-**Deferred check at commit:** `allocated_fils = amount_fils`. **Money is never left unallocated:** any part of a receipt that does not settle an issued tax invoice becomes an advance/progress payment with its own `advance_invoice`, in the same transaction ([0013](decisions/0013-advance-and-progress-payments-vat.md)).
+**Receipts settle open invoices first (decision 0113):** the amounts chosen per invoice, then what is left goes to the other open debts oldest first; only the excess becomes an advance. **Deferred check at commit:** `allocated_fils = amount_fils`. **Money is never left unallocated:** any part of a receipt that does not settle an issued tax invoice becomes an advance/progress payment with its own `advance_invoice`, in the same transaction ([0013](decisions/0013-advance-and-progress-payments-vat.md)).
 
 **Reversing a receipt that created an advance invoice** also issues a credit note against that advance invoice, in the same operation.
 
