@@ -1,5 +1,19 @@
 # Changelog
 
+## Faster updates: an instant check, an instant start, a progress bar (2026-10-31)
+
+**In plain words:**
+
+- **"Check now" answers in seconds.** It says straight away whether there is a new version, or that you have the latest one, or that there is no internet right now. It used to take up to 5 minutes.
+- **A new version starts downloading as soon as it is found**, in the background, so it is ready before you press "Install now". The server PC also checks by itself every hour (it was every 6 hours).
+- **A progress bar** shows the download: the percentage, the megabytes received of the total, and the time left. If the internet cuts, the download continues from where it stopped when it is back, instead of starting again.
+- **"Install now" starts at once** (when no shift is open), instead of waiting up to 5 minutes.
+- Safety is the same as before: every update is checked against its signature and its SHA-256, a checked backup is made first, and the old version comes back if anything fails.
+- **This update itself still comes the old way** (the old program downloads it). The ones after it are fast. Smaller downloads and step-by-step install progress come in 0.9.0.
+
+- Migration 0050 (the download's progress, not audited; the server records the result of "Check now" for the owner). The updater task: every minute as a fallback, one run at a time, and the server may start it at once. Decision 0115.
+- Tests: resumable downloads against a real HTTP server; the updater (hourly check, download after the server's check, resume after a cut, progress never audited, at most one progress write a second); the API (result at once, no internet, wake only after the commit); the task definition and its security descriptor; the progress bar in Arabic and English. Windows CI checks the task.
+
 ## The customer's balance wherever a customer is chosen (2026-10-29)
 
 **In plain words:**
