@@ -69,11 +69,23 @@ const receipts = createRoute({
 const receipt = createRoute({
   getParentRoute: () => root,
   path: 'receipts/$paymentId',
-  // `new?customerId=…` opens the form with the customer chosen (from an invoice or a customer).
-  validateSearch: (search: Record<string, unknown>): { customerId?: string } =>
-    typeof search.customerId === 'string' && /^[1-9][0-9]*$/.test(search.customerId)
-      ? { customerId: search.customerId }
-      : {},
+  // `new?customerId=…` opens the form with the customer chosen (from an invoice or a customer);
+  // `&documentId=…` sets it on that invoice (decision 0113).
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { customerId?: string; documentId?: string } => {
+    // The router reads `41` in the address as a number: ids are kept as text.
+    const id = (v: unknown) => {
+      const text = typeof v === 'number' ? String(v) : v;
+      return typeof text === 'string' && /^[1-9][0-9]*$/.test(text) ? text : undefined;
+    };
+    const customerId = id(search.customerId);
+    const documentId = id(search.documentId);
+    return {
+      ...(customerId ? { customerId } : {}),
+      ...(customerId && documentId ? { documentId } : {}),
+    };
+  },
   component: ReceiptPage,
 });
 const pos = createRoute({ getParentRoute: () => root, path: 'pos', component: PosPage });

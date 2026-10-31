@@ -595,6 +595,14 @@ const CANCELLING_NOTE = sql`
  WHERE n.original_document_id = d.id AND n.status = 'issued'
    AND r.code IN ('INVOICE_CANCELLED', 'INVOICE_EDITED')`;
 
+/**
+ * Decision 0113: issued, not cancelled, not fully settled, and past the due date set at issue from
+ * the customer's payment terms (an "on receipt" cash invoice is overdue from the next day).
+ */
+const OVERDUE = sql`(d.status = 'issued' AND d.doc_type IN ('invoice', 'debit_note')
+  AND d.due_date IS NOT NULL AND d.due_date < sys.business_date(now())
+  AND d.settled_fils < d.total_fils AND NOT EXISTS (SELECT 1 ${CANCELLING_NOTE}))`;
+
 function documentBase(db: Db) {
   return db
     .selectFrom('sales.documents as d')
@@ -628,6 +636,9 @@ function documentBase(db: Db) {
         SELECT jsonb_build_object('id', n.id::text, 'number', n.doc_number,
                                   'edited', r.code = 'INVOICE_EDITED')
         ${CANCELLING_NOTE} ORDER BY n.id LIMIT 1)`.as('cancelled_by'),
+      sql<string>`(SELECT coalesce(sum(a.amount_fils), 0) FROM sales.credit_allocations a
+                    WHERE a.invoice_id = d.id)`.as('credited_fils'),
+      sql<boolean>`${OVERDUE}`.as('overdue'),
     ]);
 }
 
@@ -669,12 +680,23 @@ function documentItem(r: DocumentRow): DocumentItem {
           edited: r.cancelled_by.edited,
         }
       : null,
+    creditedFils: BigInt(r.credited_fils).toString(),
+    overdue: r.overdue,
   };
 }
 
 export async function listDocuments(db: Db, query: DocumentsQuery): Promise<DocumentsResponse> {
   let q = documentBase(db);
   if (query.docType) q = q.where('d.doc_type', '=', query.docType);
+  if (query.group) {
+    q = q.where(
+      'd.doc_type',
+      'in',
+      query.group === 'invoices'
+        ? ['invoice', 'advance_invoice']
+        : [query.group === 'credit_notes' ? 'credit_note' : 'debit_note'],
+    );
+  }
   if (query.status === 'active' || query.status === 'cancelled') {
     q = q.where('d.status', '=', 'issued');
     q = q.where(
@@ -684,7 +706,8 @@ export async function listDocuments(db: Db, query: DocumentsQuery): Promise<Docu
     );
   } else if (query.status) q = q.where('d.status', '=', query.status);
   else q = q.where('d.status', '<>', 'discarded');
-  if (query.settlement === 'unpaid') q = q.where('d.settlement_status', '<>', 'settled');
+  if (query.settlement === 'overdue') q = q.where(sql<boolean>`${OVERDUE}`);
+  else if (query.settlement === 'unpaid') q = q.where('d.settlement_status', '<>', 'settled');
   else if (query.settlement) q = q.where('d.settlement_status', '=', query.settlement);
   if (query.customerId) q = q.where('d.customer_id', '=', BigInt(query.customerId));
   if (query.from) q = q.where('d.issue_date', '>=', query.from);
@@ -798,7 +821,16 @@ export async function getDocument(db: Db, id: bigint): Promise<DocumentDetail> {
   const payments = await db
     .selectFrom('sales.payment_allocations as a')
     .innerJoin('sales.payments as p', 'p.id', 'a.payment_id')
-    .select(['p.id', 'p.doc_number', 'p.payment_date', 'p.payment_kind', 'a.amount_fils'])
+    .innerJoin('md.payment_methods as m', 'm.id', 'p.payment_method_id')
+    .select([
+      'p.id',
+      'p.doc_number',
+      'p.payment_date',
+      'p.payment_kind',
+      'a.amount_fils',
+      'm.name_ar',
+      'm.name_en',
+    ])
     .where('a.document_id', '=', id)
     .orderBy('p.id')
     .execute();
@@ -809,6 +841,23 @@ export async function getDocument(db: Db, id: bigint): Promise<DocumentDetail> {
     .where('a.invoice_id', '=', id)
     .orderBy('n.id')
     .execute();
+  // How each of those credit notes was paid back (refunds allocated to it).
+  const refunds =
+    credits.length === 0
+      ? []
+      : await db
+          .selectFrom('sales.payment_allocations as a')
+          .innerJoin('sales.payments as p', 'p.id', 'a.payment_id')
+          .innerJoin('md.payment_methods as m', 'm.id', 'p.payment_method_id')
+          .select(['a.document_id', 'a.amount_fils', 'm.name_ar', 'm.name_en'])
+          .where(
+            'a.document_id',
+            'in',
+            credits.map((c) => c.id),
+          )
+          .where('p.payment_kind', '=', 'refund')
+          .orderBy('p.id')
+          .execute();
   const notes = await db
     .selectFrom('sales.documents as n')
     .leftJoin('sys.reason_codes as r', 'r.id', 'n.reason_code_id')
@@ -847,6 +896,8 @@ export async function getDocument(db: Db, id: bigint): Promise<DocumentDetail> {
         docNumber: p.doc_number,
         date: p.payment_date,
         amountFils: (p.payment_kind === 'reversal' ? -p.amount_fils : p.amount_fils).toString(),
+        reversal: p.payment_kind === 'reversal',
+        methods: [{ nameAr: p.name_ar, nameEn: p.name_en, amountFils: p.amount_fils.toString() }],
       })),
       ...credits.map((c) => ({
         kind: 'credit_note' as const,
@@ -854,6 +905,14 @@ export async function getDocument(db: Db, id: bigint): Promise<DocumentDetail> {
         docNumber: c.doc_number ?? '',
         date: c.issue_date ?? '',
         amountFils: c.amount_fils.toString(),
+        reversal: false,
+        methods: refunds
+          .filter((r) => r.document_id === c.id)
+          .map((r) => ({
+            nameAr: r.name_ar,
+            nameEn: r.name_en,
+            amountFils: r.amount_fils.toString(),
+          })),
       })),
     ],
   };

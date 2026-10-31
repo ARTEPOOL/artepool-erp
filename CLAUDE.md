@@ -148,6 +148,7 @@ It runs client–server on the local network: PostgreSQL and the API service on 
 - **Printing:** M4 uses a default A4 design and stores the template version; the designer screen is M4b. (0050)
 - **Customer opening balances:** once at go-live, owner only (`customers.opening`). (0051)
 - **Payments** without chosen invoices settle the oldest first; the rest is an advance with its own tax invoice. (0052)
+- **Receipts settle open invoices first:** chosen amounts first, then the rest to the other open invoices, oldest first; only the excess becomes an advance. "Receive payment" on an invoice opens on that invoice; the screen says what saving will do and an advance payment invoice is confirmed. An advance while invoices are open only with `sales.advance_with_open_invoices` + reason (audited; pending accountant review). One worked-out status per invoice (unpaid / partly paid / paid, overdue after the due date set from the payment terms, partially credited, cancelled); Invoices tabs (invoices with advance payment invoices / credit notes / debit notes) and a history on the invoice page; the integrity check `settlements`. (0113)
 
 **Reports**
 - **Owner dashboard** (side menu → Reports, owner only): total sales, sales without VAT, VAT due (no input VAT until purchases exist), gross profit from the cost stored on each line; period with comparison; daily chart; POS/A4, payment methods, unpaid, per employee; top items/customers; cash in drawers and safe, receivables and overdue, stock value and reorder. (0039, 0081)

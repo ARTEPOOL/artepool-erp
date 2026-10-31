@@ -1,13 +1,14 @@
 /**
- * Invoices (A4): the list of tax invoices, payment invoices and notes (decision 0045), with
- * filters by type, status and payment, and a search by number or customer. A row opens the
- * document; "New invoice" opens an empty draft.
+ * Invoices (A4): tabs for invoices (with advance payment invoices), credit notes and debit notes
+ * (decisions 0045, 0113); receipts have their own section. Filters by status and payment
+ * (overdue too), and a search by number or customer. Each invoice shows one worked-out status.
+ * A row opens the document; "New invoice" opens an empty draft.
  */
 import { useState } from 'react';
 import { FileText, Lock, Plus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from '@tanstack/react-router';
-import { DOC_TYPES, type DocumentItem, type DocumentsQuery } from '@artepool/shared/contracts';
+import type { DocumentItem, DocumentsQuery } from '@artepool/shared/contracts';
 import {
   Alert,
   Button,
@@ -19,6 +20,7 @@ import {
   pageClasses,
   PageHeader,
   SearchField,
+  Segmented,
   SelectField,
   tableClasses as tbl,
   ToolBar,
@@ -27,15 +29,16 @@ import { formatDate } from '../../lib/format';
 import { useCan, useErrorText } from '../auth/context';
 import { money } from '../masterdata/format';
 import { useDocuments } from '../sales/api';
-import { CancelledChip, SettlementChip, StatusChip, useDebounced } from './parts';
+import { InvoiceStateChips, useDebounced } from './parts';
 import styles from './invoices.module.css';
 
 // "Issued" lists the issued documents still standing; "cancelled" the issued invoices a credit
 // note for all of it cancelled or replaced (0072); "discarded" the drafts thrown away.
 const STATUSES = ['draft', 'active', 'cancelled', 'discarded'] as const;
-const SETTLEMENTS = ['open', 'partial', 'settled', 'unpaid'] as const;
+const SETTLEMENTS = ['open', 'partial', 'settled', 'unpaid', 'overdue'] as const;
+const GROUPS = ['invoices', 'credit_notes', 'debit_notes'] as const;
 
-type DocTypeFilter = '' | (typeof DOC_TYPES)[number];
+type Group = (typeof GROUPS)[number];
 type StatusFilter = '' | (typeof STATUSES)[number];
 type SettlementFilter = '' | (typeof SETTLEMENTS)[number];
 
@@ -50,13 +53,13 @@ export function InvoicesPage() {
   const allowed = can('invoices.view');
   const [search, setSearch] = useState('');
   const q = useDebounced(search);
-  const [docType, setDocType] = useState<DocTypeFilter>('');
+  const [group, setGroup] = useState<Group>('invoices');
   const [status, setStatus] = useState<StatusFilter>('');
   const [settlement, setSettlement] = useState<SettlementFilter>('');
 
   const query: Partial<DocumentsQuery> = {
     ...(q ? { q } : {}),
-    ...(docType ? { docType } : {}),
+    group,
     ...(status ? { status } : {}),
     ...(settlement ? { settlement } : {}),
   };
@@ -80,19 +83,15 @@ export function InvoicesPage() {
         <InfoBar icon={<Lock aria-hidden="true" />}>{t('sales:noAccess')}</InfoBar>
       ) : (
         <>
+          <Segmented<Group>
+            label={t('list.tabsLabel')}
+            value={group}
+            onChange={setGroup}
+            options={GROUPS.map((g) => ({ value: g, label: t(`list.tabs.${g}`) }))}
+          />
           <ToolBar index={1}>
             <SearchField label={t('list.search')} value={search} onChange={setSearch} />
             <div className={styles.filters}>
-              <SelectField
-                id="invoices-type"
-                label={t('list.type')}
-                value={docType}
-                onChange={(v) => setDocType(v as DocTypeFilter)}
-                options={[
-                  { value: '', label: t('list.allTypes') },
-                  ...DOC_TYPES.map((v) => ({ value: v, label: t(`sales:docTypes.${v}`) })),
-                ]}
-              />
               <SelectField
                 id="invoices-status"
                 label={t('sales:fields.status')}
@@ -112,7 +111,12 @@ export function InvoicesPage() {
                   { value: '', label: t('list.allSettlements') },
                   ...SETTLEMENTS.map((v) => ({
                     value: v,
-                    label: v === 'unpaid' ? t('list.notFullyPaid') : t(`sales:settlement.${v}`),
+                    label:
+                      v === 'unpaid'
+                        ? t('list.notFullyPaid')
+                        : v === 'overdue'
+                          ? t('state.overdue')
+                          : t(`sales:settlement.${v}`),
                   })),
                 ]}
               />
@@ -187,16 +191,7 @@ export function InvoicesPage() {
                       </td>
                       <td>
                         <div className={styles.chips}>
-                          {d.cancelledBy ? (
-                            <CancelledChip by={d.cancelledBy} />
-                          ) : (
-                            <>
-                              <StatusChip status={d.status} />
-                              {d.status === 'issued' && (
-                                <SettlementChip status={d.settlementStatus} />
-                              )}
-                            </>
-                          )}
+                          <InvoiceStateChips doc={d} />
                         </div>
                       </td>
                     </tr>

@@ -201,6 +201,8 @@ const item = (patch: Partial<DocumentItem>): DocumentItem => ({
   printCount: 0,
   rowVersion: 2,
   cancelledBy: null,
+  creditedFils: '0',
+  overdue: false,
   ...patch,
 });
 
@@ -224,7 +226,15 @@ const detail = (patch: Partial<DocumentDetail>): DocumentDetail => ({
   journalEntryId: '900',
   lines: [line({})],
   settlements: [
-    { kind: 'payment', id: '70', docNumber: 'RCT-000070', date: '2026-10-10', amountFils: '10000' },
+    {
+      kind: 'payment',
+      id: '70',
+      docNumber: 'RCT-000070',
+      date: '2026-10-10',
+      amountFils: '10000',
+      reversal: false,
+      methods: [{ nameAr: 'نقدي', nameEn: 'Cash', amountFils: '10000' }],
+    },
   ],
   ...patch,
 });
@@ -378,7 +388,7 @@ const OFFICE = [
 // ---------------------------------------------------------------------------------------------
 
 describe('Invoices (A4): the list', () => {
-  it('filters by type, status, payment and search, and a row opens the document', async () => {
+  it('tabs, filters (overdue too) and search; one worked-out status per invoice (0113); a row opens the document', async () => {
     const LIST = [
       item({}),
       item({
@@ -390,16 +400,31 @@ describe('Invoices (A4): the list', () => {
         settlementStatus: 'open',
       }),
       item({
-        id: '103',
-        docType: 'credit_note',
-        docNumber: 'CN-000004',
+        id: '104',
+        docNumber: 'INV-000104',
+        settledFils: '0',
+        settlementStatus: 'open',
+        overdue: true,
+      }),
+      item({
+        id: '105',
+        docNumber: 'INV-000105',
+        totalFils: '21000',
+        settledFils: '10500',
+        settlementStatus: 'partial',
+        creditedFils: '10500',
+      }),
+      item({
+        id: '106',
+        docType: 'advance_invoice',
+        docNumber: 'INV-000106',
         totalFils: '5250',
         settledFils: '5250',
         settlementStatus: 'settled',
       }),
     ];
     const bridge = bridgeFor(OFFICE, '/invoices')
-      .on('GET', '/api/v1/sales/documents', ok({ documents: LIST, total: 3 }))
+      .on('GET', '/api/v1/sales/documents', ok({ documents: LIST, total: 5 }))
       .on('GET', '/api/v1/sales/documents/101', ok(detail({})));
     await signIn(bridge, 'A4 invoices');
 
@@ -409,18 +434,32 @@ describe('Invoices (A4): the list', () => {
     expect(within(first).getByText('262.50')).toBeTruthy();
     expect(within(first).getByText('100.00')).toBeTruthy();
     expect(within(first).getByText('Due 162.50')).toBeTruthy();
-    expect(within(first).getByText('Issued')).toBeTruthy();
+    // One status, worked out: no separate "Issued" chip on an invoice.
     expect(within(first).getByText('Partly paid')).toBeTruthy();
+    expect(within(first).queryByText('Issued')).toBeNull();
     const draft = within(table).getByText('Draft (no number yet)').closest('tr')!;
     expect(within(draft).getByText('Draft')).toBeTruthy();
-    const note = within(table).getByText('CN-000004').closest('tr')!;
-    expect(within(note).getByText('Credit note')).toBeTruthy();
-    expect(within(note).getByText('Paid')).toBeTruthy();
+    const late = within(table).getByText('INV-000104').closest('tr')!;
+    expect(within(late).getByText('Unpaid')).toBeTruthy();
+    expect(within(late).getByText('Overdue')).toBeTruthy();
+    // 105.00 credited of 210.00, nothing paid yet: unpaid and partially credited.
+    const credited = within(table).getByText('INV-000105').closest('tr')!;
+    expect(within(credited).getByText('Unpaid')).toBeTruthy();
+    expect(within(credited).getByText('Partially credited')).toBeTruthy();
+    const advance = within(table).getByText('INV-000106').closest('tr')!;
+    expect(within(advance).getByText('Advance payment invoice')).toBeTruthy();
+    expect(within(advance).getByText('Paid')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'New invoice' })).toBeTruthy();
+    expect(
+      Object.fromEntries(queryOf(bridge.callsTo('GET', '/api/v1/sales/documents')[0]!)),
+    ).toEqual({
+      pageSize: '100',
+      group: 'invoices',
+    });
 
-    fireEvent.change(screen.getByLabelText('Type'), { target: { value: 'credit_note' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Credit notes' }));
     fireEvent.change(screen.getByLabelText('Status'), { target: { value: 'active' } });
-    fireEvent.change(screen.getByLabelText('Payment'), { target: { value: 'partial' } });
+    fireEvent.change(screen.getByLabelText('Payment'), { target: { value: 'overdue' } });
     fireEvent.change(screen.getByRole('searchbox', { name: 'Number or customer' }), {
       target: { value: 'Lagoon' },
     });
@@ -429,9 +468,9 @@ describe('Invoices (A4): the list', () => {
       expect(Object.fromEntries(queryOf(last))).toEqual({
         pageSize: '100',
         q: 'Lagoon',
-        docType: 'credit_note',
+        group: 'credit_notes',
         status: 'active',
-        settlement: 'partial',
+        settlement: 'overdue',
       });
     });
 
@@ -941,6 +980,54 @@ describe('Invoices (A4): an issued document', () => {
       true,
     );
     expect(screen.getByText('Reprinting needs the reprint permission.')).toBeTruthy();
+  });
+
+  it('the invoice page shows its history: issued, the receipt with its method, the credit note refunded (0113)', async () => {
+    const DOC = detail({
+      settledFils: '15750',
+      settlementStatus: 'partial',
+      creditedFils: '5750',
+      settlements: [
+        {
+          kind: 'payment',
+          id: '70',
+          docNumber: 'RCT-000070',
+          date: '2026-10-10',
+          amountFils: '10000',
+          reversal: false,
+          methods: [{ nameAr: 'نقدي', nameEn: 'Cash', amountFils: '10000' }],
+        },
+        {
+          kind: 'credit_note',
+          id: '400',
+          docNumber: 'CN-000400',
+          date: '2026-10-12',
+          amountFils: '5750',
+          reversal: false,
+          methods: [{ nameAr: 'بطاقة', nameEn: 'Card', amountFils: '5750' }],
+        },
+      ],
+    });
+    const bridge = bridgeFor(OFFICE, '/invoices/101').on(
+      'GET',
+      '/api/v1/sales/documents/101',
+      ok(DOC),
+    );
+    await signIn(bridge, 'INV-000101');
+    const history = await screen.findByRole('list', { name: 'Invoice history' });
+    const items = within(history)
+      .getAllByRole('listitem')
+      .map((li) => li.textContent);
+    expect(items).toEqual([
+      'Issued INV-000101' + '10/10/2026 · 262.50',
+      'Receipt RCT-000070' + '10/10/2026 · 100.00 · Cash 100.00',
+      'Credit note CN-000400' + '12/10/2026 · 57.50 · Refunded: Card 57.50',
+    ]);
+    expect(within(history).getByRole('link', { name: 'RCT-000070' }).getAttribute('href')).toBe(
+      '/receipts/70',
+    );
+    expect(screen.getByText('Credited by credit notes')).toBeTruthy();
+    expect(screen.getByText('Partially credited')).toBeTruthy();
   });
 
   it('a credit note returning one pump as defective, with the supervisor approval', async () => {

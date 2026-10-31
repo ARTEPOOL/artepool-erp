@@ -33,8 +33,8 @@
       "advance": "Advance only"
     },
     "modeHint": {
-      "auto": "The amount pays the oldest unpaid invoices first. Anything left becomes an advance.",
-      "manual": "Type how much goes to each invoice. Anything left becomes an advance.",
+      "auto": "The amount settles the oldest unpaid invoices first; only the excess becomes an advance.",
+      "manual": "Type the amount for each invoice you choose. What is left settles the other open invoices, oldest first; only the excess becomes an advance.",
       "advance": "The whole amount is an advance, for example a payment on a quotation before the work."
     },
     "chooseCustomer": "Choose the customer first.",
@@ -54,7 +54,21 @@
     "advanceExplain": "The advance gets its own payment tax invoice (INV-) with VAT included. The final invoice deducts it later.",
     "submit": "Receive {amount} AED",
     "done": "Payment received: {number}.",
-    "doneAdvance": "Payment received: {number}. Payment invoice issued: {invoice}."
+    "doneAdvance": "Payment received: {number}. Payment invoice issued: {invoice}.",
+    "openWarning": "The customer has open invoices that this payment will not settle:",
+    "advanceReason": "Reason for keeping it as an advance",
+    "advanceNotAllowed": "Keeping the amount as an advance while the customer has open invoices needs a special permission. Choose \"Oldest first\".",
+    "effects": {
+      "title": "When saved:",
+      "settles": "Settles {number} with AED {amount}",
+      "advance": "Issues an advance payment invoice of AED {amount} (VAT AED {vat})"
+    },
+    "confirm": {
+      "title": "Issue an advance payment invoice",
+      "body": "A tax invoice for the advance payment (INV-) will be issued for AED {amount}, VAT AED {vat}. Are you sure?",
+      "yes": "Yes, receive and issue the invoice",
+      "back": "Back"
+    }
   },
   "problems": {
     "required": "Required.",
@@ -64,7 +78,9 @@
     "method": "Choose the payment method.",
     "more_than_due": "More than what is due.",
     "over": "The amounts chosen add up to more than the payment.",
-    "shares": "Correct the amounts marked in red."
+    "shares": "Correct the amounts marked in red.",
+    "nothingChosen": "Type an amount for at least one invoice, or choose \"Oldest first\".",
+    "advanceReason": "Type the reason (at least 3 characters)."
   },
   "detail": {
     "kind": "Kind",
@@ -80,7 +96,8 @@
       "receipt": "Payment receipt",
       "refund": "Refund to the customer",
       "reversal": "Reversal of a payment"
-    }
+    },
+    "advanceReason": "Reason for the advance"
   },
   "reverse": {
     "button": "Reverse (bounced cheque)",

@@ -187,6 +187,8 @@ const doc = (patch: Partial<DocumentItem>): DocumentItem => ({
   vatFils: '5000',
   totalFils: '105000',
   cancelledBy: null,
+  creditedFils: '0',
+  overdue: false,
   ...patch,
 });
 
@@ -221,6 +223,7 @@ const payment = (patch: Partial<PaymentDetail>): PaymentDetail => ({
   chequeDate: '2026-10-20',
   chequeBank: 'Emirates NBD',
   notes: null,
+  advanceReason: null,
   receivedByName: { displayNameAr: 'سارة علي', displayNameEn: 'Sara Ali' },
   allocations: [
     {
@@ -493,8 +496,22 @@ describe('Receive payment', () => {
     // 400.00 × 5 ÷ 105 = 19.0476… → 19.05 (VAT inside the advance, decision 0013).
     expect(within(preview).getByText('19.05')).toBeTruthy();
     expect(screen.getByText(/The advance gets its own payment tax invoice/)).toBeTruthy();
+    // What saving will do, before saving (decision 0113).
+    const effects = screen.getByTestId('receive-effects');
+    expect(within(effects).getByText('Settles OB-1 with AED 500.00')).toBeTruthy();
+    expect(within(effects).getByText('Settles INV-000012 with AED 2,100.00')).toBeTruthy();
+    expect(
+      within(effects).getByText('Issues an advance payment invoice of AED 400.00 (VAT AED 19.05)'),
+    ).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: 'Receive 4,000.00 AED' }));
+    // An advance payment invoice is confirmed first; nothing is sent before.
+    expect(await screen.findByTestId('receive-confirm')).toHaveProperty(
+      'textContent',
+      'A tax invoice for the advance payment (INV-) will be issued for AED 400.00, VAT AED 19.05. Are you sure?',
+    );
+    expect(bridge.callsTo('POST', '/api/v1/sales/payments')).toHaveLength(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Yes, receive and issue the invoice' }));
     await screen.findByRole('heading', { name: 'RCT-000060', level: 1 });
     const call = bridge.callsTo('POST', '/api/v1/sales/payments')[0]!;
     expect(call.body).toEqual({
@@ -510,7 +527,7 @@ describe('Receive payment', () => {
     expect(link.getAttribute('href')).toBe('/invoices/45');
   });
 
-  it('manual: sends the chosen amounts (opening balance and an invoice); refuses more than the payment', async () => {
+  it('manual: sends the chosen amounts; what is left settles the oldest open debt; refuses more than the payment', async () => {
     const created = payment({ paymentMethodId: '2', methodKind: 'bank_transfer' });
     const bridge = bridgeFor(ACCOUNTANT, '/receipts/new')
       .on(
@@ -526,6 +543,11 @@ describe('Receive payment', () => {
     fireEvent.change(screen.getByLabelText('Payment method'), { target: { value: '2' } });
     fireEvent.change(screen.getByLabelText(/Amount received/), { target: { value: '500' } });
     fireEvent.click(screen.getByRole('button', { name: 'Choose invoices' }));
+    // Choosing nothing is never an advance by surprise (decision 0113).
+    fireEvent.click(screen.getByRole('button', { name: 'Receive 500.00 AED' }));
+    expect(
+      await screen.findByText('Type an amount for at least one invoice, or choose "Oldest first".'),
+    ).toBeTruthy();
 
     fireEvent.change(screen.getByLabelText('Amount for INV-000012'), { target: { value: '600' } });
     fireEvent.change(screen.getByLabelText('Amount for OB-1'), { target: { value: '100' } });
@@ -539,9 +561,12 @@ describe('Receive payment', () => {
 
     fireEvent.change(screen.getByLabelText('Amount for INV-000012'), { target: { value: '300' } });
     fireEvent.change(screen.getByLabelText(/Reference/), { target: { value: 'TRX-778' } });
+    // 300 + 100 chosen; the 100 left goes to the oldest open debt (OB-1), not to an advance.
     const preview = previewOf();
-    expect(within(preview).getByText('400.00')).toBeTruthy();
-    expect(within(preview).getByText('100.00')).toBeTruthy();
+    expect(within(preview).getAllByText('500.00')).toHaveLength(2);
+    expect(within(preview).getByText('0.00')).toBeTruthy();
+    const effects = screen.getByTestId('receive-effects');
+    expect(within(effects).getByText('Settles OB-1 with AED 200.00')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Receive 500.00 AED' }));
     await screen.findByRole('heading', { name: 'RCT-000060', level: 1 });
     expect(bridge.callsTo('POST', '/api/v1/sales/payments')[0]!.body).toEqual({
@@ -567,9 +592,46 @@ describe('Receive payment', () => {
     expect(bridge.callsTo('GET', '/api/v1/customers/12').length).toBeGreaterThan(0);
   });
 
-  it('advance only, on an accepted quotation: VAT inside the amount, asAdvance and the quotation', async () => {
+  it('from an invoice: set on that invoice with what is due; settles it, no advance (decision 0113)', async () => {
+    const created = payment({ paymentMethodId: '1', methodKind: 'cash', reference: null });
+    const bridge = bridgeFor(ACCOUNTANT, '/receipts/new?customerId=12&documentId=41')
+      .on('POST', '/api/v1/sales/payments', receiveAnswer(created, null))
+      .on('GET', '/api/v1/sales/payments/60', ok(created));
+    await signIn(bridge, 'Receive payment');
+    await waitFor(() =>
+      expect(screen.getByLabelText<HTMLInputElement>('Amount for INV-000012').value).toBe(
+        '2100.00',
+      ),
+    );
+    expect(screen.getByLabelText<HTMLInputElement>(/Amount received/).value).toBe('2100.00');
+    const effects = screen.getByTestId('receive-effects');
+    expect(
+      within(effects)
+        .getAllByRole('listitem')
+        .map((li) => li.textContent),
+    ).toEqual(['Settles INV-000012 with AED 2,100.00']);
+    fireEvent.click(screen.getByRole('button', { name: 'Receive 2,100.00 AED' }));
+    await screen.findByRole('heading', { name: 'RCT-000060', level: 1 });
+    expect(screen.queryByTestId('receive-confirm')).toBeNull();
+    expect(bridge.callsTo('POST', '/api/v1/sales/payments')[0]!.body).toEqual({
+      customerId: '12',
+      paymentDate: TODAY,
+      part: { paymentMethodId: '1', amountFils: '210000' },
+      allocations: [{ documentId: '41', amountFils: '210000' }],
+    });
+  });
+
+  it('"advance only" while invoices are open: not offered without the permission', async () => {
+    const bridge = bridgeFor(ACCOUNTANT, '/receipts/new');
+    await signIn(bridge, 'Receive payment');
+    await chooseHotel();
+    await within(await debtsTable()).findByText('INV-000012');
+    expect(screen.queryByRole('button', { name: 'Advance only' })).toBeNull();
+  });
+
+  it('advance only, on an accepted quotation, while invoices are open: the warning, a reason, then the confirmation', async () => {
     const created = payment({ amountFils: '3150000', allocations: [], advanceDocumentId: '46' });
-    const bridge = bridgeFor(ACCOUNTANT, '/receipts/new')
+    const bridge = bridgeFor([...ACCOUNTANT, 'sales.advance_with_open_invoices'], '/receipts/new')
       .on(
         'POST',
         '/api/v1/sales/payments',
@@ -589,13 +651,26 @@ describe('Receive payment', () => {
       expect(within(quotation).getByRole('option', { name: /Q-000005/ })).toBeTruthy(),
     );
     fireEvent.change(quotation, { target: { value: '80' } });
+    // The open invoices it will not settle are listed; a reason is required.
+    const warning = screen.getByTestId('receive-open-warning');
+    expect(within(warning).getByText('INV-000012')).toBeTruthy();
+    expect(within(warning).getByText('OB-1')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Receive 31,500.00 AED' }));
+    expect(await screen.findByText('Type the reason (at least 3 characters).')).toBeTruthy();
+    fireEvent.change(screen.getByLabelText(/Reason for keeping it as an advance/), {
+      target: { value: 'Deposit for the new pool' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Receive 31,500.00 AED' }));
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Yes, receive and issue the invoice' }),
+    );
     await screen.findByRole('heading', { name: 'RCT-000060', level: 1 });
     expect(bridge.callsTo('POST', '/api/v1/sales/payments')[0]!.body).toEqual({
       customerId: '12',
       paymentDate: TODAY,
       part: { paymentMethodId: '1', amountFils: '3150000' },
       asAdvance: true,
+      advanceReason: 'Deposit for the new pool',
       quotationId: '80',
     });
     expect(
@@ -644,6 +719,7 @@ describe('Receive payment', () => {
     );
     await signIn(bridge, 'Receive payment');
     await chooseHotel();
+    await within(await debtsTable()).findByText('INV-000012');
     fireEvent.change(screen.getByLabelText(/Amount received/), { target: { value: '10' } });
     fireEvent.click(screen.getByRole('button', { name: 'Receive 10.00 AED' }));
     expect(

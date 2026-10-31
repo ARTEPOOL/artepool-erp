@@ -53,6 +53,7 @@ describe('the restore test', () => {
       'audit_chain',
       'journals_balanced',
       'numbering_gaps',
+      'settlements',
       'stock_vs_ledger',
       'trial_balance',
     ]);

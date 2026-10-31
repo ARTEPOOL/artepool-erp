@@ -1073,3 +1073,227 @@ describe('cancelling or editing an issued A4 invoice (decision 0072)', () => {
     expect(balance.balanceFils).toBe('0');
   });
 });
+
+describe('receipts settle open invoices first; one worked-out status (decision 0113)', () => {
+  const walkIn = async () =>
+    (
+      await sql<{ id: string }>`SELECT id::text FROM md.customers WHERE is_walk_in`.execute(
+        server.db,
+      )
+    ).rows[0]!.id;
+  /** An unpaid invoice (the clerk, with a supervisor's credit approval, 0046). */
+  async function unpaid(customerId: string, price4dp: string, extra: Record<string, unknown> = {}) {
+    phone += 1;
+    const svc = await item(`R113-${phone}`, 'service', price4dp);
+    const d = await draft(clerk, {
+      customerId,
+      lines: [{ itemId: svc.id, quantityMilli: '1000' }],
+      ...extra,
+    });
+    return ok<DocumentDetail>(
+      issue(clerk, d, { creditApprovalId: await approval('sales.credit_over_limit') }),
+    );
+  }
+  const receive = (who: Actor, body: Record<string, unknown>) =>
+    who('POST', '/api/v1/sales/payments', body);
+  const doc = (id: string) => ok<DocumentDetail>(owner('GET', `/api/v1/sales/documents/${id}`));
+
+  it("the owner's test: paying an invoice from its page settles it; no extra invoice row", async () => {
+    const cust = await walkIn();
+    const inv = await unpaid(cust, '571429'); // 57.1429 + 5% = 60.00
+    expect(inv).toMatchObject({ totalFils: '6000', settlementStatus: 'open', overdue: false });
+    const r = await ok<ReceivePaymentResponse>(
+      receive(accountant, {
+        customerId: cust,
+        part: cash('6000'),
+        allocations: [{ documentId: inv.id, amountFils: '6000' }],
+      }),
+      201,
+    );
+    expect(r.advanceInvoice).toBeNull();
+    expect(r.payment.allocations.map((a) => [a.docNumber, a.amountFils])).toEqual([
+      [inv.docNumber, '6000'],
+    ]);
+    expect(await doc(inv.id)).toMatchObject({ settlementStatus: 'settled', settledFils: '6000' });
+    const list = await ok<DocumentsResponse>(
+      owner('GET', `/api/v1/sales/documents?customerId=${cust}&group=invoices&pageSize=200`),
+    );
+    expect(list.documents.filter((d) => d.docType === 'advance_invoice')).toEqual([]);
+  });
+
+  it('partial payments: partially paid, then paid', async () => {
+    const cust = await customer('Partial payer', { credit: '10000000' });
+    const inv = await unpaid(cust, '1000000'); // 105.00
+    await ok(receive(accountant, { customerId: cust, part: cash('4000') }), 201);
+    expect(await doc(inv.id)).toMatchObject({ settlementStatus: 'partial', settledFils: '4000' });
+    const r = await ok<ReceivePaymentResponse>(
+      receive(accountant, { customerId: cust, part: cash('6500') }),
+      201,
+    );
+    expect(r.advanceInvoice).toBeNull();
+    expect(await doc(inv.id)).toMatchObject({ settlementStatus: 'settled', settledFils: '10500' });
+  });
+
+  it('an overpayment: the invoice is paid and only the excess becomes an advance', async () => {
+    const cust = await customer('Overpayer', { credit: '10000000' });
+    const inv = await unpaid(cust, '1000000'); // 105.00
+    const r = await ok<ReceivePaymentResponse>(
+      receive(accountant, { customerId: cust, part: cash('50000') }),
+      201,
+    );
+    expect(r.payment.allocations.map((a) => [a.documentId, a.amountFils])).toEqual([
+      [inv.id, '10500'],
+      [r.advanceInvoice!.id, '39500'],
+    ]);
+    expect(r.payment.advanceReason).toBeNull();
+  });
+
+  it('amounts chosen per invoice first; what is left still pays the other open invoices', async () => {
+    const cust = await customer('Chooser', { credit: '10000000' });
+    const older = await unpaid(cust, '1000000'); // 105.00
+    const newer = await unpaid(cust, '1000000'); // 105.00
+    const r = await ok<ReceivePaymentResponse>(
+      receive(accountant, {
+        customerId: cust,
+        part: cash('25000'),
+        allocations: [{ documentId: newer.id, amountFils: '3000' }],
+      }),
+      201,
+    );
+    expect(r.payment.allocations.map((a) => [a.documentId, a.amountFils])).toEqual([
+      [newer.id, '3000'],
+      [older.id, '10500'],
+      [newer.id, '7500'],
+      [r.advanceInvoice!.id, '4000'],
+    ]);
+  });
+
+  it('an advance while invoices are open: the permission, a reason, kept and audited', async () => {
+    const cust = await customer('Disputed contractor', { credit: '10000000' });
+    const old = await unpaid(cust, '1000000');
+    const deposit = { customerId: cust, part: cash('50000'), asAdvance: true };
+    // The cashier receives payments but may not keep one as an advance while invoices are open.
+    expect(await refusal(receive(cashier, deposit))).toMatchObject({ status: 403 });
+    expect(await refusal(receive(accountant, deposit))).toMatchObject({
+      code: 'VALIDATION_FAILED',
+    });
+    const r = await ok<ReceivePaymentResponse>(
+      receive(accountant, { ...deposit, advanceReason: 'Deposit for the new pool; INV disputed' }),
+      201,
+    );
+    expect(r.payment.allocations.map((a) => [a.documentId, a.amountFils])).toEqual([
+      [r.advanceInvoice!.id, '50000'],
+    ]);
+    expect(r.payment.advanceReason).toBe('Deposit for the new pool; INV disputed');
+    expect(await doc(old.id)).toMatchObject({ settlementStatus: 'open' });
+    const { rows } = await sql<{ reason: string | null }>`
+      SELECT reason FROM audit.log
+       WHERE entity_type = 'sales.payments' AND entity_id = ${r.payment.id}
+         AND action = 'insert'`.execute(server.db);
+    expect(rows[0]?.reason).toBe('Deposit for the new pool; INV disputed');
+    // With nothing open, an advance needs neither (decision 0013 as before).
+    const clean = await customer('Clean deposit', { credit: '10000000' });
+    const plain = await ok<ReceivePaymentResponse>(
+      receive(cashier, { customerId: clean, part: cash('20000'), asAdvance: true }),
+      201,
+    );
+    expect(plain.advanceInvoice).not.toBeNull();
+    expect(plain.payment.advanceReason).toBeNull();
+  });
+
+  it('overdue after the due date set from the payment terms; never when paid or cancelled', async () => {
+    const cust = await walkIn(); // cash: due on receipt, so overdue from the next day
+    const { rows } = await sql<{ d: string }>`
+      SELECT (sys.business_date(now()) - 1)::text AS d`.execute(server.db);
+    const yesterday = rows[0]!.d;
+    const late = await unpaid(cust, '1000000', { issueDate: yesterday });
+    expect(late).toMatchObject({ dueDate: yesterday, overdue: true });
+    const credit = await customer('Thirty days', { credit: '10000000' });
+    const fresh = await unpaid(credit, '1000000', { issueDate: yesterday });
+    expect(fresh.overdue).toBe(false);
+    expect(fresh.dueDate! > yesterday).toBe(true);
+    const overdue = await ok<DocumentsResponse>(
+      owner('GET', `/api/v1/sales/documents?settlement=overdue&pageSize=200`),
+    );
+    expect(overdue.documents.map((d) => d.id)).toContain(late.id);
+    expect(overdue.documents.map((d) => d.id)).not.toContain(fresh.id);
+    await ok(
+      receive(accountant, {
+        customerId: cust,
+        part: cash('10500'),
+        allocations: [{ documentId: late.id, amountFils: '10500' }],
+      }),
+      201,
+    );
+    expect((await doc(late.id)).overdue).toBe(false);
+    // Cancelled (a credit note for all of it, 0072): cancelled with its number, never overdue.
+    const dropped = await unpaid(cust, '1000000', { issueDate: yesterday });
+    expect(dropped.overdue).toBe(true);
+    const cancel = await ok<CancelInvoiceResponse>(
+      owner('POST', `/api/v1/sales/documents/${dropped.id}/cancel`, {
+        mode: 'cancel',
+        reason: 'Not wanted',
+        rowVersion: dropped.rowVersion,
+      }),
+    );
+    expect(await doc(dropped.id)).toMatchObject({
+      overdue: false,
+      creditedFils: '10500',
+      cancelledBy: { docNumber: cancel.creditNote.docNumber },
+    });
+  });
+
+  it('a credit note made from the invoice: partially credited; Cancel is refused after it (0072)', async () => {
+    const cust = await customer('Credited', { credit: '10000000' });
+    phone += 1;
+    const svc = await item(`R113-CN-${phone}`, 'service', '1000000');
+    const d = await draft(clerk, {
+      customerId: cust,
+      lines: [{ itemId: svc.id, quantityMilli: '2000' }],
+    });
+    const inv = await ok<DocumentDetail>(
+      issue(clerk, d, { creditApprovalId: await approval('sales.credit_over_limit') }),
+    );
+    const note = await ok<DocumentDetail>(
+      accountant('POST', '/api/v1/sales/notes', {
+        kind: 'credit_note',
+        originalDocumentId: inv.id,
+        reasonCodeId: ids.cnReturn,
+        reasonText: 'One not needed',
+        lines: [{ originalLineId: inv.lines[0]!.id, quantityMilli: '1000' }],
+      }),
+      201,
+    );
+    expect(note.originalDocumentId).toBe(inv.id);
+    expect(await doc(inv.id)).toMatchObject({ creditedFils: '10500', cancelledBy: null });
+    const again = await doc(inv.id);
+    expect(
+      await refusal(
+        owner('POST', `/api/v1/sales/documents/${inv.id}/cancel`, {
+          mode: 'cancel',
+          reason: 'Customer cancelled',
+          rowVersion: again.rowVersion,
+        }),
+      ),
+    ).toMatchObject({ status: 422 }); // not when a note exists already (0072)
+  });
+
+  it('every settled amount matches its receipts and credit notes (integrity check)', async () => {
+    const database = (await server.admin.query<{ db: string }>('SELECT current_database() AS db'))
+      .rows[0]!.db;
+    const { Client } = (await import('pg')).default;
+    const { connectionFor } = await import('@artepool/node-kit');
+    const { runChecks } = await import('@artepool/backup');
+    const client = new Client({ ...connectionFor('superuser'), database });
+    await client.connect();
+    try {
+      expect((await runChecks(client)).settlements).toEqual({
+        ok: true,
+        problems: 0,
+        examples: [],
+      });
+    } finally {
+      await client.end();
+    }
+  });
+});

@@ -21,7 +21,13 @@
     "draftNumber": "Draft (no number yet)",
     "forDocument": "for {number}",
     "due": "Due {amount}",
-    "empty": "No documents match these filters."
+    "empty": "No documents match these filters.",
+    "tabsLabel": "Document type",
+    "tabs": {
+      "invoices": "Invoices",
+      "credit_notes": "Credit notes",
+      "debit_notes": "Debit notes"
+    }
   },
   "form": {
     "back": "Back to invoices",
@@ -112,7 +118,15 @@
       "credit_note": "Credit note"
     },
     "receive": "Receive payment",
-    "soldAtPos": "sold at the POS — A4 copy, same number"
+    "soldAtPos": "sold at the POS — A4 copy, same number",
+    "timeline": "Invoice history",
+    "timelineIssued": "Issued {number}",
+    "timelineReceipt": "Receipt",
+    "timelineReversal": "Receipt reversed",
+    "timelineCredit": "Credit note",
+    "timelineRefund": "Refunded: {methods}",
+    "timelineKept": "Kept as customer credit",
+    "credited": "Credited by credit notes"
   },
   "notes": {
     "creditButton": "Credit note",
@@ -174,5 +188,11 @@
     "done": "Credit note {number} issued.",
     "cancelledBy": "Cancelled · {number}",
     "replacedBy": "Replaced (edited) · {number}"
+  },
+  "state": {
+    "advance": "Advance payment invoice",
+    "overdue": "Overdue",
+    "partiallyCredited": "Partially credited",
+    "credited": "Fully credited"
   }
 }

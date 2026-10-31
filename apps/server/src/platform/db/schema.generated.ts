@@ -1182,6 +1182,7 @@ export interface SalesPaymentAllocations {
 }
 
 export interface SalesPayments {
+  advance_reason: string | null;
   allocated_fils: Generated<bigint>;
   amount_fils: bigint;
   approval_id: bigint | null;

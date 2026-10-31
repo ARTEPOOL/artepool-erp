@@ -26,13 +26,14 @@ import {
 import { useCan, useDisplayName } from '../auth/context';
 import { SaveError } from '../inventory/parts';
 import { money, price, rate } from '../masterdata/format';
+import { localName } from '../masterdata/refs';
 import { fetchPdf, SALES_KEYS, SALES_PATHS } from '../sales/api';
 import { TotalsBox } from '../sales/LineEditor';
 import { printPdf } from '../sales/print';
 import salesStyles from '../sales/sales.module.css';
 import { CancelInvoiceDialog } from './CancelInvoiceDialog';
 import { NoteDialog } from './NoteDialog';
-import { CancelledChip, FormatChip, SettlementChip, StatusChip } from './parts';
+import { FormatChip, InvoiceStateChips } from './parts';
 import styles from './invoices.module.css';
 
 const qty = (milli: string) => formatQuantity(BigInt(milli)).replace(/\.?0+$/, '') || '0';
@@ -192,60 +193,67 @@ function DocumentTotals({ doc }: { doc: DocumentDetail }) {
   return <TotalsBox rows={rows} />;
 }
 
-function Settlements({ doc }: { doc: DocumentDetail }) {
-  const { t } = useTranslation('invoices');
+/**
+ * Decision 0113: the invoice's timeline: issued, then each receipt (amount and method), reversal,
+ * and credit note (amount, and how the money went back or that it stays as credit); then what
+ * was paid, credited and is still due.
+ */
+function Timeline({ doc }: { doc: DocumentDetail }) {
+  const { t, i18n } = useTranslation('invoices');
+  const name = localName(i18n.language);
   const total = BigInt(doc.totalFils);
   const settled = BigInt(doc.settledFils);
+  const credited = BigInt(doc.creditedFils);
+  const methodsText = (methods: DocumentDetail['settlements'][number]['methods']) =>
+    methods.map((m) => `${name(m)} ${money(BigInt(m.amountFils))}`).join('، ');
   return (
-    <Card rise index={4} padding="table">
-      <CardHeader title={t('view.settlements')} />
-      {doc.settlements.length === 0 ? (
-        <EmptyState>{t('view.noSettlements')}</EmptyState>
-      ) : (
-        <table className={tbl.table} aria-label={t('view.settlements')}>
-          <thead>
-            <tr>
-              <th>{t('sales:fields.number')}</th>
-              <th>{t('sales:fields.date')}</th>
-              <th className={tbl.num}>{t('sales:fields.amount')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {doc.settlements.map((s) => (
-              <tr key={`${s.kind}-${s.id}`}>
-                <td>
-                  {s.kind === 'credit_note' ? (
-                    <Link
-                      to="/invoices/$documentId"
-                      params={{ documentId: s.id }}
-                      className={styles.link}
-                    >
-                      <bdi>{s.docNumber}</bdi>
-                    </Link>
-                  ) : (
-                    <Link
-                      to="/receipts/$paymentId"
-                      params={{ paymentId: s.id }}
-                      className={styles.link}
-                    >
-                      <bdi>{s.docNumber}</bdi>
-                    </Link>
-                  )}
-                  <span className={tbl.sub}>{t(`view.settlementKinds.${s.kind}`)}</span>
-                </td>
-                <td>{s.date ? <bdi>{formatDate(s.date)}</bdi> : '—'}</td>
-                <td className={tbl.num}>
-                  <bdi>{money(BigInt(s.amountFils))}</bdi>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+    <Card rise index={4}>
+      <CardHeader title={t('view.timeline')} />
       <div className={salesStyles.cardBody}>
+        <ol className={styles.timeline} aria-label={t('view.timeline')}>
+          <li>
+            <b>{t('view.timelineIssued', { number: doc.docNumber ?? '' })}</b>
+            <span className={styles.timelineMeta}>
+              {doc.issueDate && <bdi>{formatDate(doc.issueDate)}</bdi>}
+              {' · '}
+              <bdi>{money(total)}</bdi>
+            </span>
+          </li>
+          {doc.settlements.map((s) => (
+            <li key={`${s.kind}-${s.id}`}>
+              <b>
+                {s.kind === 'credit_note'
+                  ? t('view.timelineCredit')
+                  : s.reversal
+                    ? t('view.timelineReversal')
+                    : t('view.timelineReceipt')}{' '}
+                <Link
+                  to={s.kind === 'credit_note' ? '/invoices/$documentId' : '/receipts/$paymentId'}
+                  params={s.kind === 'credit_note' ? { documentId: s.id } : { paymentId: s.id }}
+                  className={styles.link}
+                >
+                  <bdi>{s.docNumber}</bdi>
+                </Link>
+              </b>
+              <span className={styles.timelineMeta}>
+                {s.date && <bdi>{formatDate(s.date)}</bdi>}
+                {' · '}
+                <bdi>{money(BigInt(s.amountFils))}</bdi>
+                {' · '}
+                {s.kind === 'credit_note'
+                  ? s.methods.length > 0
+                    ? t('view.timelineRefund', { methods: methodsText(s.methods) })
+                    : t('view.timelineKept')
+                  : methodsText(s.methods)}
+              </span>
+            </li>
+          ))}
+        </ol>
+        {doc.settlements.length === 0 && <EmptyState>{t('view.noSettlements')}</EmptyState>}
         <TotalsBox
           rows={[
-            { label: t('sales:fields.paid'), fils: settled },
+            { label: t('sales:fields.paid'), fils: settled - credited },
+            ...(credited > 0n ? [{ label: t('view.credited'), fils: credited }] : []),
             { label: t('sales:fields.due'), fils: total - settled, strong: true },
           ]}
         />
@@ -299,14 +307,7 @@ export function DocumentView({ doc }: { doc: DocumentDetail }) {
       label: t('sales:fields.status'),
       value: (
         <span className={styles.chips}>
-          {doc.cancelledBy ? (
-            <CancelledChip by={doc.cancelledBy} />
-          ) : (
-            <>
-              <StatusChip status={doc.status} />
-              {issued && <SettlementChip status={doc.settlementStatus} />}
-            </>
-          )}
+          <InvoiceStateChips doc={doc} />
         </span>
       ),
     },
@@ -382,7 +383,7 @@ export function DocumentView({ doc }: { doc: DocumentDetail }) {
         </div>
       </Card>
 
-      {issued && <Settlements doc={doc} />}
+      {issued && <Timeline doc={doc} />}
 
       <Card rise index={5}>
         <div className={salesStyles.cardBody}>
@@ -396,7 +397,7 @@ export function DocumentView({ doc }: { doc: DocumentDetail }) {
                   void navigate({
                     to: '/receipts/$paymentId',
                     params: { paymentId: 'new' },
-                    search: { customerId: doc.customerId },
+                    search: { customerId: doc.customerId, documentId: doc.id },
                   })
                 }
               >
