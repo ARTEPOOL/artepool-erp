@@ -495,4 +495,34 @@ describe('fast updates (decision 0115)', () => {
     expect(s.download_bytes).toBe(String(setup.length));
     expect(Number(s.download_rate)).toBeGreaterThan(0);
   });
+
+  it("the server's role records a check only for the owner, and never the progress", async () => {
+    const api = new pg.Client(connectionFor('api', db.name));
+    await api.connect();
+    try {
+      const cashier = await createUser(su, { username: 'cashier-list', roles: ['cashier'] });
+      await expect(
+        inContext(
+          api,
+          () => api.query(`UPDATE ops.update_state SET available_version = '9.9.9' WHERE id = 1`),
+          cashier,
+        ),
+      ).rejects.toMatchObject({ code: 'AP010' });
+      await inContext(
+        api,
+        () => api.query(`UPDATE ops.update_state SET available_version = '1.1.0' WHERE id = 1`),
+        owner,
+      );
+      // The progress is the updater's alone.
+      await expect(
+        inContext(
+          api,
+          () => api.query('UPDATE ops.update_state SET download_bytes = 1 WHERE id = 1'),
+          owner,
+        ),
+      ).rejects.toMatchObject({ code: '42501' });
+    } finally {
+      await api.end();
+    }
+  });
 });

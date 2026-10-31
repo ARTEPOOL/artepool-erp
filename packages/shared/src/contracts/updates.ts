@@ -51,6 +51,16 @@ export interface UpdateStatus {
   window: { startHour: number; endHour: number };
   /** The owner's latest "Install now". */
   request: { version: string; status: 'pending' | 'running' | 'done' | 'failed' } | null;
+  /**
+   * Decision 0115: the download's progress, written by the updater at most once a second.
+   * `at` is when it was last written: an old one means the download is paused (no internet).
+   */
+  progress: {
+    receivedBytes: number;
+    totalBytes: number | null;
+    bytesPerSecond: number;
+    at: string;
+  } | null;
 }
 
 export const UpdateWindowBody = z

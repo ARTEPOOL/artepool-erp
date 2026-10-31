@@ -8,7 +8,9 @@
  * "Administrators" something else): SYSTEM is S-1-5-18, Administrators S-1-5-32-544. A service's
  * own virtual account is `NT SERVICE\<service name>`, which exists once the service does.
  */
-import { copyFile, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { copyFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Exec } from '../restore-from-backup';
 
@@ -141,26 +143,85 @@ export function firewallRule(port: number): string[][] {
 export const UPDATER_TASK = 'ARTEPOOL Updater';
 
 /**
- * The server PC's updater (decision 0108): every 5 minutes as SYSTEM, one at a time. It reads the
- * update list only every few hours; the short interval is for the owner's "Install now".
+ * A service's own SID (`NT SERVICE\<name>`): S-1-5-80 and the SHA-1 of its name in capitals
+ * (UTF-16LE), read as five little-endian numbers. The same on every PC, so the task's security
+ * descriptor can name it before Windows has ever shown it.
  */
-export function updaterTask(launcher: string): string[] {
+export function serviceSid(name: string): string {
+  const hash = createHash('sha1').update(Buffer.from(name.toUpperCase(), 'utf16le')).digest();
+  const parts = [0, 4, 8, 12, 16].map((at) => hash.readUInt32LE(at));
+  return `S-1-5-80-${parts.join('-')}`;
+}
+
+/**
+ * The server PC's updater (decisions 0108, 0115) as a Task Scheduler definition:
+ * - SYSTEM, one run at a time (a run that is still downloading is never doubled);
+ * - every minute, only as a fallback: the server wakes it at once (`schtasks /Run`) after the
+ *   owner's "Check now" or "Install now";
+ * - its security descriptor: SYSTEM and Administrators in full, and the server's own account
+ *   may read and start it, nothing else (it cannot change what the task runs);
+ * - on AC power only, at most 3 days, as the tasks schtasks made before.
+ */
+export function updaterTaskXml(launcher: string): string {
+  const esc = (s: string) =>
+    s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const sddl = `D:(A;;FA;;;SY)(A;;FA;;;BA)(A;;GRGX;;;${serviceSid(SERVICES.server.name)})`;
   return [
-    '/Create',
-    '/TN',
-    UPDATER_TASK,
-    '/RU',
-    'SYSTEM',
-    '/SC',
-    'MINUTE',
-    '/MO',
-    '5',
-    '/RL',
-    'HIGHEST',
-    '/F',
-    '/TR',
-    `"${launcher}" run updater`,
-  ];
+    '<?xml version="1.0" encoding="UTF-16"?>',
+    '<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">',
+    '  <RegistrationInfo>',
+    '    <Description>ARTEPOOL: checks for updates, downloads them in advance and installs them at a safe time.</Description>',
+    `    <SecurityDescriptor>${sddl}</SecurityDescriptor>`,
+    '  </RegistrationInfo>',
+    '  <Triggers>',
+    '    <TimeTrigger>',
+    '      <Repetition>',
+    '        <Interval>PT1M</Interval>',
+    '        <StopAtDurationEnd>false</StopAtDurationEnd>',
+    '      </Repetition>',
+    '      <StartBoundary>2026-01-01T00:00:00</StartBoundary>',
+    '      <Enabled>true</Enabled>',
+    '    </TimeTrigger>',
+    '  </Triggers>',
+    '  <Principals>',
+    '    <Principal id="Author">',
+    '      <UserId>S-1-5-18</UserId>',
+    '      <RunLevel>HighestAvailable</RunLevel>',
+    '    </Principal>',
+    '  </Principals>',
+    '  <Settings>',
+    '    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>',
+    '    <DisallowStartIfOnBatteries>true</DisallowStartIfOnBatteries>',
+    '    <StopIfGoingOnBatteries>true</StopIfGoingOnBatteries>',
+    '    <AllowHardTerminate>true</AllowHardTerminate>',
+    '    <StartWhenAvailable>true</StartWhenAvailable>',
+    '    <RunOnlyIfNetworkAvailable>false</RunOnlyIfNetworkAvailable>',
+    '    <AllowStartOnDemand>true</AllowStartOnDemand>',
+    '    <Enabled>true</Enabled>',
+    '    <Hidden>false</Hidden>',
+    '    <RunOnlyIfIdle>false</RunOnlyIfIdle>',
+    '    <WakeToRun>false</WakeToRun>',
+    '    <ExecutionTimeLimit>PT72H</ExecutionTimeLimit>',
+    '  </Settings>',
+    '  <Actions Context="Author">',
+    '    <Exec>',
+    `      <Command>${esc(launcher)}</Command>`,
+    '      <Arguments>run updater</Arguments>',
+    '    </Exec>',
+    '  </Actions>',
+    '</Task>',
+    '',
+  ].join('\r\n');
+}
+
+/** Registers (or replaces) the updater task from its definition file. */
+export function updaterTask(xmlFile: string): string[] {
+  return ['/Create', '/TN', UPDATER_TASK, '/XML', xmlFile, '/F'];
+}
+
+/** Starts the updater now (decision 0115); allowed to the server's account by the task's rules. */
+export function wakeUpdaterTask(): string[] {
+  return ['/Run', '/TN', UPDATER_TASK];
 }
 
 /** The Windows things the installation does; a fake one in the tests. */
@@ -277,7 +338,18 @@ export function windowsPlatform(options: {
       await waitStopped(service);
     },
     async registerUpdaterTask() {
-      await exec('schtasks.exe', updaterTask(join(options.programDir, 'artepool-svc.exe')));
+      // Task Scheduler reads its definitions as UTF-16 (with the byte order mark).
+      const file = join(tmpdir(), `artepool-updater-task-${process.pid}.xml`);
+      const xml = updaterTaskXml(join(options.programDir, 'artepool-svc.exe'));
+      await writeFile(
+        file,
+        Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(xml, 'utf16le')]),
+      );
+      try {
+        await exec('schtasks.exe', updaterTask(file));
+      } finally {
+        await rm(file, { force: true });
+      }
     },
     async addFirewallRule(port) {
       const [remove, add] = firewallRule(port);

@@ -10,7 +10,10 @@ import { hbaConf, initdbArgs, postgresqlSettings } from '../../src/cli/install/p
 import { pcNames, windowsBuildOf } from '../../src/cli/install/steps';
 import {
   firewallRule,
+  serviceSid,
   updaterTask,
+  updaterTaskXml,
+  wakeUpdaterTask,
   icaclsGrant,
   icaclsReset,
   icaclsRestrict,
@@ -103,23 +106,46 @@ describe('services', () => {
     expect(add!.join(' ')).not.toContain('5432');
   });
 
-  it("the updater: every 5 minutes as SYSTEM, the launcher's own updater program", () => {
-    expect(updaterTask('C:\\Program Files\\ARTEPOOL\\artepool-svc.exe')).toEqual([
+  it('a service SID is worked out as Windows does (NT SERVICE\\TrustedInstaller)', () => {
+    expect(serviceSid('TrustedInstaller')).toBe(
+      'S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464',
+    );
+    // Case does not matter: Windows takes the name in capitals.
+    expect(serviceSid('trustedinstaller')).toBe(serviceSid('TrustedInstaller'));
+  });
+
+  it('the updater task (0115): SYSTEM, every minute as a fallback, one run at a time', () => {
+    const xml = updaterTaskXml('C:\\Program Files\\ARTEPOOL & Co\\artepool-svc.exe');
+    expect(xml).toContain('<UserId>S-1-5-18</UserId>');
+    expect(xml).toContain('<RunLevel>HighestAvailable</RunLevel>');
+    expect(xml).toContain('<Interval>PT1M</Interval>');
+    expect(xml).toContain('<MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>');
+    expect(xml).toContain(
+      '<Command>C:\\Program Files\\ARTEPOOL &amp; Co\\artepool-svc.exe</Command>',
+    );
+    expect(xml).toContain('<Arguments>run updater</Arguments>');
+    expect(xml.startsWith('<?xml version="1.0" encoding="UTF-16"?>')).toBe(true);
+  });
+
+  it("only the server's own account may start it, besides SYSTEM and Administrators", () => {
+    const sddl = /<SecurityDescriptor>(.*)<\/SecurityDescriptor>/.exec(
+      updaterTaskXml('C:\\A\\artepool-svc.exe'),
+    )![1]!;
+    expect(sddl).toBe(`D:(A;;FA;;;SY)(A;;FA;;;BA)(A;;GRGX;;;${serviceSid('ArtepoolServer')})`);
+    // Read and run, never write: the server cannot change what the task runs.
+    expect(sddl).not.toMatch(/;GW|;GA|;FA;;;S-1-5-80/);
+  });
+
+  it('registered from its definition file, and woken by name', () => {
+    expect(updaterTask('C:\\Windows\\Temp\\t.xml')).toEqual([
       '/Create',
       '/TN',
       'ARTEPOOL Updater',
-      '/RU',
-      'SYSTEM',
-      '/SC',
-      'MINUTE',
-      '/MO',
-      '5',
-      '/RL',
-      'HIGHEST',
+      '/XML',
+      'C:\\Windows\\Temp\\t.xml',
       '/F',
-      '/TR',
-      '"C:\\Program Files\\ARTEPOOL\\artepool-svc.exe" run updater',
     ]);
+    expect(wakeUpdaterTask()).toEqual(['/Run', '/TN', 'ARTEPOOL Updater']);
   });
 });
 

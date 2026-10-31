@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { UpdateWindowBody } from '@artepool/shared/contracts';
 import { defineRoute, defineWrite } from '../../platform/http/route';
 import * as updates from './service';
@@ -15,12 +15,21 @@ export function registerUpdateRoutes(app: FastifyInstance): void {
     access: view,
     handler: () => updates.updateStatus(deps.db),
   });
+  // Decision 0115: the updater is woken right after the commit, not on its next run.
+  const wake = (request: FastifyRequest) =>
+    deps.updates.wake((message) => request.log.warn(message));
   defineWrite(app, {
     method: 'POST',
     url: '/api/v1/system/update/check',
     access: manage,
     reason: () => 'check for updates now',
-    handler: async ({ trx }) => ({ status: 201, body: await updates.checkNow(trx) }),
+    // Read before the transaction (0115): a slow internet never holds it open.
+    prepare: () => updates.readUpdateList(deps.updates.fetchLatest),
+    handler: async ({ trx, prepared }) => ({
+      status: 201,
+      body: await updates.checkNow(trx, prepared),
+    }),
+    afterCommit: wake,
   });
   defineWrite(app, {
     method: 'POST',
@@ -28,6 +37,7 @@ export function registerUpdateRoutes(app: FastifyInstance): void {
     access: manage,
     reason: () => 'install the downloaded update now',
     handler: async ({ trx }) => ({ status: 201, body: await updates.installNow(trx) }),
+    afterCommit: wake,
   });
   defineWrite(app, {
     method: 'PUT',

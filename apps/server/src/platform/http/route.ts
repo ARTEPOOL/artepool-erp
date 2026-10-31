@@ -95,7 +95,13 @@ export interface WriteResult<R> {
  * (golden rules 4 and 6), and an `Idempotency-Key` so a retried request returns the first answer
  * instead of doing the work twice.
  */
-export function defineWrite<P = undefined, Q = undefined, B = undefined, R = unknown>(
+export function defineWrite<
+  P = undefined,
+  Q = undefined,
+  B = undefined,
+  R = unknown,
+  X = undefined,
+>(
   app: FastifyInstance,
   def: Schemas<P, Q, B> & {
     method: 'POST' | 'PUT' | 'PATCH';
@@ -105,7 +111,19 @@ export function defineWrite<P = undefined, Q = undefined, B = undefined, R = unk
     reason?: (input: RouteInput<P, Q, B>) => string | null;
     /** Largest request body in bytes, when the default 1 MB is not enough (Excel imports). */
     bodyLimit?: number;
-    handler: (input: RouteInput<P, Q, B> & { trx: Transaction<DB> }) => Promise<WriteResult<R>>;
+    /**
+     * Work done before the transaction opens, so a slow outside call (the update list, 0115)
+     * never holds it; its result is passed to the handler as `prepared`.
+     */
+    prepare?: (input: RouteInput<P, Q, B>) => Promise<X>;
+    handler: (
+      input: RouteInput<P, Q, B> & { trx: Transaction<DB>; prepared: X },
+    ) => Promise<WriteResult<R>>;
+    /**
+     * After the commit, for a request done now (not a replayed answer): telling another program
+     * to look (the updater, 0115). Its failure never changes the answer.
+     */
+    afterCommit?: (request: FastifyRequest) => void;
   },
 ): void {
   app.route({
@@ -122,6 +140,8 @@ export function defineWrite<P = undefined, Q = undefined, B = undefined, R = unk
         });
       }
       const input = inputOf(def, request, reply);
+      const prepared = (def.prepare ? await def.prepare(input) : undefined) as X;
+      let done = false;
       const scope: IdempotencyScope = {
         key: key.toLowerCase(),
         userId: request.auth!.userId,
@@ -137,7 +157,8 @@ export function defineWrite<P = undefined, Q = undefined, B = undefined, R = unk
           async (trx) => {
             const stored = await findStored(trx, scope);
             if (stored) return stored;
-            const result = await def.handler({ ...input, trx });
+            const result = await def.handler({ ...input, trx, prepared });
+            done = true;
             const status = result.status ?? 200;
             await store(trx, scope, { status, body: result.replay ?? result.body });
             return { status, body: result.replay ?? result.body, live: result.body };
@@ -145,6 +166,7 @@ export function defineWrite<P = undefined, Q = undefined, B = undefined, R = unk
         );
       } catch (error) {
         // The same request arrived twice at once: the other one committed first.
+        done = false;
         const cause = (error as { cause?: { constraint?: string } }).cause;
         if (cause?.constraint !== 'idempotency_keys_pkey') throw error;
         response = await withBusinessTx(app.deps.db, contextOf(request), async (trx) => {
@@ -152,6 +174,13 @@ export function defineWrite<P = undefined, Q = undefined, B = undefined, R = unk
           if (!stored) throw error;
           return stored;
         });
+      }
+      if (done && def.afterCommit) {
+        try {
+          def.afterCommit(request);
+        } catch (error) {
+          request.log.warn({ err: error }, 'after-commit step failed');
+        }
       }
       return reply.code(response.status).send(response.live ?? response.body);
     },

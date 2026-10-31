@@ -43,8 +43,9 @@ beforeAll(async () => {
         : { 'content-length': body.length },
     );
     if (mode === 'cut') {
-      // Half of it, then the connection drops.
-      res.write(body.subarray(0, 100 * 1024), () => res.socket?.destroy());
+      // Part of it, then the connection drops (after the client has had time to read it).
+      res.write(body.subarray(0, 100 * 1024));
+      setTimeout(() => res.socket?.destroy(), 150);
       return;
     }
     res.end(body);

@@ -47,6 +47,8 @@ export async function startTestServer(
     backup?: BackupPaths;
     setupTokenFile?: string;
     health?: { dataDir: string; tlsDir: string };
+    /** Decision 0115: the update list and the updater's wake; the tests never reach the internet. */
+    updates?: Partial<AppDeps['updates']>;
   } = {},
 ): Promise<TestServer> {
   const testDb = await createTestDatabase();
@@ -61,6 +63,12 @@ export async function startTestServer(
     ...(options.backup ? { backup: options.backup } : {}),
     ...(options.setupTokenFile ? { setupTokenFile: options.setupTokenFile } : {}),
     ...(options.health ? { health: options.health } : {}),
+    updates: {
+      fetchLatest:
+        options.updates?.fetchLatest ??
+        (() => Promise.reject(new Error('No internet in the tests'))),
+      wake: options.updates?.wake ?? (() => undefined),
+    },
   });
   const app = buildApp({ logLevel: 'info', logStream: { write: (line) => logs.push(line) } }, deps);
   register?.(app);

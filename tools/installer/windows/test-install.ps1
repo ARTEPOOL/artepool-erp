@@ -188,6 +188,13 @@ Ok ($updater.Principal.UserId -in @('SYSTEM', 'NT AUTHORITY\SYSTEM', 'S-1-5-18')
 # arguments with the program): compare the whole command line without them.
 $updaterCommand = "$($updater.Actions[0].Execute) $($updater.Actions[0].Arguments)".Replace('"', '').Trim()
 Ok ($updaterCommand -eq "$svc run updater") "the updater runs the launcher ($updaterCommand)"
+# Decision 0115: every minute as a fallback, never two runs at once, and the server's own account
+# may start it at once (its security descriptor names NT SERVICE\ArtepoolServer by its SID).
+Ok ($updater.Triggers[0].Repetition.Interval -eq 'PT1M') "the updater runs every minute ($($updater.Triggers[0].Repetition.Interval))"
+Ok ([string]$updater.Settings.MultipleInstances -eq 'IgnoreNew') "the updater never runs twice at once ($($updater.Settings.MultipleInstances))"
+$serverSid = (New-Object System.Security.Principal.NTAccount('NT SERVICE\ArtepoolServer')).Translate([System.Security.Principal.SecurityIdentifier]).Value
+Ok ([string]$updater.SecurityDescriptor -match [regex]::Escape($serverSid)) "the server may start the updater ($($updater.SecurityDescriptor))"
+Ok ([string]$updater.SecurityDescriptor -notmatch "\(A;[^)]*;(FA|GA|GW)[^)]*;;;$([regex]::Escape($serverSid))\)") 'the server cannot change the updater task'
 & $svc run updater
 Ok ($LASTEXITCODE -eq 0) 'the updater runs'
 Ok ((Psql 'SELECT current_version IS NOT NULL FROM ops.update_state') -eq 't') 'the updater records the version running'
