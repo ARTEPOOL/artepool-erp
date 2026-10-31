@@ -4,10 +4,11 @@
  *
  *   1. records the result of the last update (the setup writes updates\last-result.json) and
  *      finishes the owner's "Install now" request it belonged to;
- *   2. every few hours, at once after an update, and at once for the owner's "Check now" (0110)
+ *   2. every hour, at once after an update, and at once for the owner's "Check now" (0110)
  *      or "Install now", reads the public update list. No internet is normal: everything keeps
  *      working and the update waits;
- *   3. downloads a newer server setup in the background into updates\, and keeps it only if its
+ *   3. downloads a newer server setup in the background into updates\ as soon as it is known,
+ *      with its progress (0115), continuing after a cut where it stopped; keeps it only if its
  *      SHA-256 and its signature (the update key) are right;
  *   4. installs it only at a safe time: never while a shift is open; inside the night window, or
  *      at once after "Install now". A version that failed and was rolled back waits for "Install
@@ -24,6 +25,7 @@ import type pg from 'pg';
 import { z } from 'zod';
 import { inSystemTx } from '@artepool/backup';
 import { compareVersions } from '../upgrade/steps';
+import type { Progress } from './download';
 import { verifyFileSignature } from './signature';
 
 const versionText = z.string().regex(/^\d+\.\d+\.\d+$/);
@@ -42,8 +44,10 @@ export const latestSchema = z.object({
 });
 export type Latest = z.infer<typeof latestSchema>;
 
-/** How often the update list is read when nobody asked (the "Install now" reads it at once). */
-export const CHECK_EVERY_MS = 6 * 60 * 60 * 1000;
+/** How often the update list is read when nobody asked (0115; "Check now" reads it at once). */
+export const CHECK_EVERY_MS = 60 * 60 * 1000;
+/** The download's progress is written at most this often (0115). */
+export const PROGRESS_EVERY_MS = 1000;
 /** A setup that has not written its result after this long is not "still installing". */
 export const INSTALL_TIMEOUT_MS = 2 * 60 * 60 * 1000;
 
@@ -58,12 +62,23 @@ export interface UpdaterDeps {
   publicKey: string;
   updatesDir: string;
   fetchLatest: () => Promise<unknown>;
-  download: (url: string, to: string) => Promise<void>;
+  /** Into `to`, continuing a part already there (0115), reporting what has arrived. */
+  download: (url: string, to: string, onProgress: Progress) => Promise<void>;
   /** Starts the server setup silently and does not wait (it replaces this program's folder). */
   runSetup: (file: string) => void;
   now: () => Date;
   log: (line: string) => void;
+  /** A clock in milliseconds for spacing the progress writes (Date.now by default). */
+  clock?: () => number;
 }
+
+/** No download in progress: the progress columns are emptied (0115). */
+const NO_PROGRESS = {
+  download_bytes: null,
+  download_total: null,
+  download_rate: null,
+  progress_at: null,
+};
 
 interface State {
   checked_at: Date | null;
@@ -176,6 +191,7 @@ export async function runUpdater(deps: UpdaterDeps): Promise<UpdaterOutcome> {
         download_status: 'none',
         waiting_reason: null,
         checked_at: null,
+        ...NO_PROGRESS,
       },
       `${installed} is installed`,
     );
@@ -231,7 +247,9 @@ export async function runUpdater(deps: UpdaterDeps): Promise<UpdaterOutcome> {
           notes_ar: newer ? latest.notesAr : null,
           notes_en: newer ? latest.notesEn : null,
           published_at: newer && latest.pub_date ? new Date(latest.pub_date) : null,
-          ...(newer ? {} : { download_status: 'none', waiting_reason: null }),
+          ...(newer ? {} : { download_status: 'none', waiting_reason: null, ...NO_PROGRESS }),
+          // Another version than the one being downloaded: its progress starts again.
+          ...(newer && latest.version !== state.available_version ? NO_PROGRESS : {}),
         },
         'the update list was read',
       );
@@ -254,27 +272,63 @@ export async function runUpdater(deps: UpdaterDeps): Promise<UpdaterOutcome> {
     return 'up_to_date';
   }
 
-  // 3. The download, kept only when its SHA-256 and its signature are right.
+  // 3. The download, in advance as soon as a newer version is known (0115), kept only when its
+  //    SHA-256 and its signature are right. A cut keeps what arrived: the next run continues.
   const file = join(deps.updatesDir, setupFileName(version));
   const sigFile = `${file}.sig`;
   if (!(state.download_status === 'ready' && existsSync(file) && existsSync(sigFile))) {
-    if (!latest || latest.version !== version) return 'offline';
-    await save({ download_status: 'downloading' }, `downloading ${version}`);
+    // The server may have read the list itself for the owner's "Check now" (0115): the address
+    // and the checks always come from the list read here, by the updater.
+    if (!latest) {
+      try {
+        latest = latestSchema.parse(await deps.fetchLatest());
+      } catch (error) {
+        log(`The update list could not be read: ${message(error)}`);
+        return 'offline';
+      }
+    }
+    if (latest.version !== version) return 'offline';
     const partial = `${file}.partial`;
+    // What the part already received belongs to; another address or SHA-256 starts again.
+    const note = `${partial}.json`;
+    const expected = JSON.stringify({ url: latest.server.url, sha256: latest.server.sha256 });
+    if (existsSync(partial) && (!existsSync(note) || (await readFile(note, 'utf8')) !== expected)) {
+      await rm(partial, { force: true });
+    }
+    await writeFile(note, expected);
+    await save({ download_status: 'downloading' }, `downloading ${version}`);
+    const progress = progressWriter(
+      (values) => save(values, 'download progress'),
+      deps.clock ?? Date.now,
+      deps.now,
+    );
     try {
-      await deps.download(latest.server.url, partial);
+      await deps.download(latest.server.url, partial, progress.report);
+    } catch (error) {
+      await progress.flush();
+      log(`The download of ${version} stopped; the next run continues it: ${message(error)}`);
+      await save({ download_status: 'failed' }, `the download of ${version} stopped`);
+      return 'download_failed';
+    }
+    await progress.flush();
+    try {
       if ((await sha256(partial)) !== latest.server.sha256) {
         throw new Error('The downloaded setup does not match its SHA-256.');
       }
       await verifyFileSignature(deps.publicKey, latest.server.signature, partial);
       await writeFile(sigFile, latest.server.signature);
       await rename(partial, file);
+      await rm(note, { force: true });
       await save({ download_status: 'ready' }, `${version} downloaded and checked`);
       log(`${setupFileName(version)} downloaded; its SHA-256 and signature are right.`);
     } catch (error) {
       await rm(partial, { force: true });
+      await rm(note, { force: true });
       log(`The download of ${version} was refused: ${message(error)}`);
-      await save({ download_status: 'failed' }, `the download of ${version} was refused`);
+      await save(
+        { download_status: 'failed', ...NO_PROGRESS },
+        `the download of ${version} was refused`,
+      );
       return 'download_failed';
     }
   }
@@ -313,6 +367,53 @@ export async function runUpdater(deps: UpdaterDeps): Promise<UpdaterOutcome> {
   log(`Installing ${version}.`);
   deps.runSetup(file);
   return 'started';
+}
+
+/**
+ * The download's progress in ops.update_state (0115): what has arrived, the total, the speed since
+ * this run began, written at most once a second (the audit log ignores these columns), and once
+ * more at the end. A failed write never stops the download.
+ */
+function progressWriter(
+  save: (values: Record<string, unknown>) => Promise<unknown>,
+  clock: () => number,
+  now: () => Date,
+) {
+  const began = clock();
+  let firstBytes: number | null = null;
+  let lastWrite = Number.NEGATIVE_INFINITY;
+  let pending: [number, number | null] | null = null;
+  let chain: Promise<unknown> = Promise.resolve();
+  const write = ([received, total]: [number, number | null]) => {
+    const seconds = (clock() - began) / 1000;
+    const rate = seconds > 0 ? Math.round((received - (firstBytes ?? received)) / seconds) : 0;
+    chain = chain
+      .then(() =>
+        save({
+          download_bytes: received,
+          download_total: total,
+          download_rate: Math.max(0, rate),
+          progress_at: now(),
+        }),
+      )
+      .catch(() => undefined);
+  };
+  return {
+    report: (received: number, total: number | null) => {
+      firstBytes ??= received;
+      pending = [received, total];
+      if (clock() - lastWrite >= PROGRESS_EVERY_MS) {
+        lastWrite = clock();
+        write(pending);
+        pending = null;
+      }
+    },
+    flush: async () => {
+      if (pending) write(pending);
+      pending = null;
+      await chain;
+    },
+  };
 }
 
 /**

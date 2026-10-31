@@ -1,15 +1,14 @@
 /**
  * `artepool-svc run updater` — the server PC's updater (decision 0108, M6.2 part G5), run every
- * few minutes as SYSTEM by the scheduled task "ARTEPOOL Updater"; the steps are in
+ * minute as SYSTEM by the scheduled task "ARTEPOOL Updater", and at once when the server wakes it
+ * (decision 0115); the steps are in
  * updater/steps.ts. It also renews the server certificate 60 days before it ends
  * (updater/certificate.ts, M6.2 part H3). Its lines go to `logs\install\updater.log`, only when
  * the outcome changes (no secret is ever written).
  */
 import { spawn } from 'node:child_process';
-import { createWriteStream, mkdirSync, readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { Readable } from 'node:stream';
-import { pipeline } from 'node:stream/promises';
 import pg from 'pg';
 import { LATEST_URL } from '@artepool/release';
 import { connectionFor, loadEnv, resourcePath } from '@artepool/node-kit';
@@ -18,6 +17,7 @@ import { InstallLog } from './install/log';
 import { windowsPlatform } from './install/windows';
 import { exec } from './restore-from-backup';
 import { renewServerCertificate } from './updater/certificate';
+import { resumableDownload } from './updater/download';
 import { outcomeChanged, runUpdater } from './updater/steps';
 
 function required(name: string): string {
@@ -55,11 +55,9 @@ try {
     publicKey: readFileSync(resourcePath('release', 'update-public-key.txt'), 'utf8'),
     updatesDir,
     fetchLatest: async () => (await fetchOk(LATEST_URL, 30_000)).json(),
-    download: async (url, to) => {
-      const response = await fetchOk(url, 60 * 60 * 1000);
-      if (!response.body) throw new Error(`${url}: no content`);
-      await pipeline(Readable.fromWeb(response.body as never), createWriteStream(to));
-    },
+    // Continues a part already received after a cut (0115); an hour at most per try.
+    download: (url, to, onProgress) =>
+      resumableDownload(url, to, { timeoutMs: 60 * 60 * 1000, onProgress }),
     runSetup: (file) => {
       // Detached: the setup replaces this program's folder, so the updater ends first.
       spawn(file, ['/S'], { detached: true, stdio: 'ignore', windowsHide: true }).unref();
