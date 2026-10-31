@@ -1,8 +1,9 @@
 /**
  * System health → updates (decision 0108). Owner only: the version running with "Check now"
- * (0110), a newer version with its release notes (in the screen's language, one point per line),
- * why it is waiting, the last update's result, "Install now" and the night window. Updates come
- * by themselves; without internet they wait.
+ * (0110; answered in seconds since 0115), a newer version with its release notes (in the screen's
+ * language, one point per line), its download as a progress bar (0115), why it is waiting, the
+ * last update's result, "Install now" (the updater is woken at once, 0115) and the night window.
+ * Updates come by themselves; without internet they wait.
  */
 import { useState } from 'react';
 import { Download, RefreshCw } from 'lucide-react';
@@ -30,6 +31,67 @@ import styles from './backup.module.css';
 export const UPDATE_KEY = ['settings', 'update'] as const;
 
 const hour = (h: number) => `${String(h).padStart(2, '0')}:00`;
+
+/** A progress older than this means the download is paused (no internet); it continues by itself. */
+export const PAUSED_AFTER_MS = 15_000;
+
+const megabytes = (bytes: number) => (bytes / 1_000_000).toFixed(bytes < 10_000_000 ? 1 : 0);
+
+/**
+ * The download as a bar from 0 to 100% (decision 0115): the megabytes received of the total and
+ * the time left, from what the updater writes every second.
+ */
+export function DownloadProgress(props: {
+  progress: NonNullable<UpdateStatus['progress']>;
+  now?: number;
+}) {
+  const { t } = useTranslation('settings');
+  const { receivedBytes, totalBytes, bytesPerSecond, at } = props.progress;
+  const percent =
+    totalBytes && totalBytes > 0
+      ? Math.min(100, Math.floor((receivedBytes / totalBytes) * 100))
+      : null;
+  const paused = (props.now ?? Date.now()) - Date.parse(at) > PAUSED_AFTER_MS;
+  const secondsLeft =
+    totalBytes && bytesPerSecond > 0
+      ? Math.ceil((totalBytes - receivedBytes) / bytesPerSecond)
+      : null;
+  const left =
+    secondsLeft === null
+      ? null
+      : secondsLeft < 60
+        ? t('updates.progress.seconds', { count: Math.max(1, secondsLeft) })
+        : t('updates.progress.minutes', { count: Math.ceil(secondsLeft / 60) });
+  return (
+    <div className={styles.progress} data-testid="update-progress">
+      <div
+        className={styles.progressTrack}
+        role="progressbar"
+        aria-label={t('updates.progress.label')}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={percent ?? undefined}
+      >
+        <div className={styles.progressBar} style={{ inlineSize: `${percent ?? 0}%` }} />
+      </div>
+      <div className={styles.muted}>
+        {percent !== null && <bdi>{percent}%</bdi>}
+        {' · '}
+        {totalBytes
+          ? t('updates.progress.of', {
+              received: megabytes(receivedBytes),
+              total: megabytes(totalBytes),
+            })
+          : t('updates.progress.received', { received: megabytes(receivedBytes) })}
+        {paused ? (
+          <> · {t('updates.progress.paused')}</>
+        ) : (
+          left && <> · {t('updates.progress.left', { time: left })}</>
+        )}
+      </div>
+    </div>
+  );
+}
 
 /** "**word**" is shown bold; nothing else in the notes is markup (plain text, never HTML). */
 function Inline({ text }: { text: string }) {
@@ -83,17 +145,35 @@ export function UpdatesCard() {
   const status = useQuery({
     queryKey: UPDATE_KEY,
     queryFn: () => api.get<UpdateStatus>('/api/v1/system/update'),
-    // While a "Check now" or an "Install now" waits or runs, follow it.
+    // While a check, a download or an install is going on, follow it every second (0115).
     refetchInterval: (query) => {
       const data = query.state.data;
       const following =
-        data?.checking || (data?.request && ['pending', 'running'].includes(data.request.status));
-      return following ? 10_000 : 60_000;
+        data?.checking ||
+        data?.downloadStatus === 'downloading' ||
+        (data?.request && ['pending', 'running'].includes(data.request.status));
+      return following ? 1_000 : 60_000;
     },
   });
+  // The server reads the update list itself and says at once what it found (0115).
   const checkNow = useSave(
-    (a, _: null, key) => a.post('/api/v1/system/update/check', {}, { idempotencyKey: key }),
-    { invalidate: [[...UPDATE_KEY]], onSuccess: () => toast(t('updates.checkAsked')) },
+    (a, _: null, key) =>
+      a.post<{ available: string | null; error: string | null }>(
+        '/api/v1/system/update/check',
+        {},
+        { idempotencyKey: key },
+      ),
+    {
+      invalidate: [[...UPDATE_KEY]],
+      onSuccess: (found) =>
+        toast(
+          found.error
+            ? t('updates.checkOffline')
+            : found.available
+              ? t('updates.checkFound', { version: found.available })
+              : t('updates.checkNone'),
+        ),
+    },
   );
   const installNow = useSave(
     (a, _: null, key) => a.post('/api/v1/system/update/install-now', {}, { idempotencyKey: key }),
@@ -171,6 +251,9 @@ export function UpdatesCard() {
                   {u.waitingReason && <> · {t(`updates.waiting.${u.waitingReason}`)}</>}
                   {open && <> · {t(`updates.request.${u.request!.status}`)}</>}
                 </div>
+                {u.progress && ['downloading', 'failed'].includes(u.downloadStatus) && (
+                  <DownloadProgress progress={u.progress} />
+                )}
               </div>
               {manage && (
                 <div className={styles.placeActions}>

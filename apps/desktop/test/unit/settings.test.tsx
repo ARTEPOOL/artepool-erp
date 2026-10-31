@@ -2,7 +2,7 @@
  * T10: the app frame and Settings (design 13) against a scripted server: who sees Settings,
  * users and temporary codes, deactivating with a reason, role permissions, PCs, the audit log.
  */
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type {
   AuditEntry,
@@ -12,6 +12,8 @@ import type {
   UserListItem,
 } from '@artepool/shared/contracts';
 import { App } from '../../src/app/App';
+import { DownloadProgress } from '../../src/features/settings/backup/UpdatesCard';
+import { initI18n } from '../../src/i18n';
 import { FakeBridge, ok, sessionView, signInAnswer, userView } from '../support/fake-bridge';
 
 const OWNER_PERMISSIONS = [
@@ -670,6 +672,7 @@ describe('Settings → System health (decision 0086)', () => {
     },
     window: { startHour: 2, endHour: 5 },
     request: null,
+    progress: null,
     ...patch,
   });
 
@@ -784,6 +787,124 @@ describe('Settings → System health (decision 0086)', () => {
     expect(within(card).getByRole('button', { name: 'افحص دلوقتي' }).hasAttribute('disabled')).toBe(
       true,
     );
+  });
+
+  it('"Check now" says at once what it found; the download shows as a bar with MB and time left (0115)', async () => {
+    const bridge = signedInBridge([
+      ...OWNER_PERMISSIONS,
+      'system.health.view',
+      'system.update.manage',
+    ])
+      .on('GET', '/api/v1/health/system', ok(health()))
+      .on(
+        'GET',
+        '/api/v1/system/update',
+        ok(update({ available: null, lastResult: null })),
+        ok(
+          update({
+            lastResult: null,
+            available: { version: '1.2.0', notesAr: 'أسرع', notesEn: 'Faster', publishedAt: null },
+            downloadStatus: 'downloading',
+            waitingReason: null,
+            progress: {
+              receivedBytes: 120_000_000,
+              totalBytes: 288_000_000,
+              bytesPerSecond: 2_500_000,
+              at: new Date().toISOString(),
+            },
+          }),
+        ),
+      )
+      .on(
+        'POST',
+        '/api/v1/system/update/check',
+        ok({ ok: true, available: '1.2.0', error: null }, 201),
+      );
+    await signIn(bridge);
+    await openSettings();
+    fireEvent.click(screen.getByRole('link', { name: 'النسخ الاحتياطي' }));
+    const card = await screen.findByTestId('updates-card');
+    await within(card).findByText('على آخر نسخة');
+    fireEvent.click(within(card).getByRole('button', { name: 'افحص دلوقتي' }));
+    expect(await screen.findByText('لقينا نسخة جديدة 1.2.0، وبتتحمّل دلوقتي.')).toBeTruthy();
+    const progress = await within(card).findByTestId('update-progress');
+    const bar = within(progress).getByRole('progressbar', { name: 'تحميل التحديث' });
+    expect(bar.getAttribute('aria-valuenow')).toBe('41');
+    expect(progress.textContent).toContain('41%');
+    expect(progress.textContent).toContain('120 من 288 ميجا');
+    // (288 − 120) MB at 2.5 MB a second: 67 seconds, about 2 minutes.
+    expect(progress.textContent).toContain('فاضل حوالي دقيقتين');
+    // While it downloads, "Install now" waits for a checked file.
+    expect(within(card).getByRole('button', { name: 'ثبّت دلوقتي' }).hasAttribute('disabled')).toBe(
+      true,
+    );
+  });
+
+  it('a download that stopped says it continues by itself; no internet for "Check now" is said plainly', async () => {
+    const bridge = signedInBridge([
+      ...OWNER_PERMISSIONS,
+      'system.health.view',
+      'system.update.manage',
+    ])
+      .on('GET', '/api/v1/health/system', ok(health()))
+      .on(
+        'GET',
+        '/api/v1/system/update',
+        ok(
+          update({
+            lastResult: null,
+            downloadStatus: 'failed',
+            waitingReason: null,
+            progress: {
+              receivedBytes: 50_000_000,
+              totalBytes: 288_000_000,
+              bytesPerSecond: 0,
+              at: new Date(Date.now() - 60_000).toISOString(),
+            },
+          }),
+        ),
+      )
+      .on(
+        'POST',
+        '/api/v1/system/update/check',
+        ok({ ok: true, available: null, error: 'getaddrinfo ENOTFOUND' }, 201),
+      );
+    await signIn(bridge);
+    await openSettings();
+    fireEvent.click(screen.getByRole('link', { name: 'النسخ الاحتياطي' }));
+    const card = await screen.findByTestId('updates-card');
+    const progress = await within(card).findByTestId('update-progress');
+    expect(progress.textContent).toContain('17%');
+    expect(progress.textContent).toContain('واقف، وهيكمّل لوحده لما النت يرجع');
+    expect(within(card).getByText('التحميل وقف، وهيكمّل لوحده')).toBeTruthy();
+    fireEvent.click(within(card).getByRole('button', { name: 'افحص دلوقتي' }));
+    expect(
+      await screen.findByText('مفيش إنترنت دلوقتي، وجهاز السيرفر هيفضل يحاول لوحده.'),
+    ).toBeTruthy();
+  });
+
+  it('the progress in English, left to right', async () => {
+    await initI18n('en');
+    try {
+      render(
+        <DownloadProgress
+          now={Date.parse('2026-10-31T12:00:00Z')}
+          progress={{
+            receivedBytes: 270_000_000,
+            totalBytes: 288_000_000,
+            bytesPerSecond: 2_000_000,
+            at: '2026-10-31T11:59:59Z',
+          }}
+        />,
+      );
+      const progress = screen.getByTestId('update-progress');
+      expect(progress.textContent).toContain('93%');
+      expect(progress.textContent).toContain('270 of 288 MB');
+      expect(progress.textContent).toContain('about 9 seconds left');
+    } finally {
+      cleanup();
+      await initI18n('ar');
+    }
   });
 
   it('shows the server PC: disks, services, certificates, clock and the UPS (M6.2 part H)', async () => {
