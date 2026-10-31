@@ -1021,11 +1021,27 @@ export interface OpsUpdateState {
   created_at: Generated<Timestamp>;
   created_by: bigint;
   current_version: string | null;
+  /**
+   * Decision 0115: bytes of the update received so far (not audited; written at most once a second).
+   */
+  download_bytes: bigint | null;
+  /**
+   * Decision 0115: the download speed in bytes per second (for "time left").
+   */
+  download_rate: bigint | null;
   download_status: Generated<string>;
+  /**
+   * Decision 0115: the size of the update being downloaded, when the server said it.
+   */
+  download_total: bigint | null;
   id: Generated<number>;
   last_result: Json | null;
   notes_ar: string | null;
   notes_en: string | null;
+  /**
+   * Decision 0115: when the progress was last written; an old one means the download is paused.
+   */
+  progress_at: Timestamp | null;
   published_at: Timestamp | null;
   row_version: Generated<number>;
   updated_at: Generated<Timestamp>;
