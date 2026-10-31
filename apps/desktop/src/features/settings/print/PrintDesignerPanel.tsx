@@ -9,6 +9,7 @@ import { Lock, Printer, RotateCcw, Save } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  BALANCE_BLOCK_MODES,
   FIELDS_BY_KIND,
   LOCKED_BY_KIND,
   TEMPLATE_TEXTS,
@@ -345,6 +346,21 @@ function Designer({
               />
               {data.bankAccounts.length === 0 && <Note>{t('print.noBank')}</Note>}
             </>
+          )}
+          {kind === 'tax_invoice_a4' && (
+            <div className={styles.choice}>
+              <span aria-hidden="true">{t('print.balanceBlock')}</span>
+              <Segmented
+                label={t('print.balanceBlock')}
+                value={settings.balanceBlock}
+                onChange={(balanceBlock) => set({ balanceBlock })}
+                options={BALANCE_BLOCK_MODES.map((v) => ({
+                  value: v,
+                  label: t(`print.balanceBlocks.${v}`),
+                }))}
+              />
+              <Note>{t('print.balanceBlockHint')}</Note>
+            </div>
           )}
         </Card>
 

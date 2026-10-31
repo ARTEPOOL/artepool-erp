@@ -486,11 +486,13 @@ export async function issueDraft(
     approvalId?: string;
     priceApprovalId?: string;
     creditApprovalId?: string;
+    /** What the caller receives at issue (an invoice's printed balance block, decision 0114). */
+    paidNowFils?: bigint;
   } = {},
 ): Promise<string> {
   const d = await trx
     .selectFrom('sales.documents')
-    .select(['status', 'issue_date', 'doc_type'])
+    .select(['status', 'issue_date', 'doc_type', 'customer_id'])
     .where('id', '=', id)
     .executeTakeFirst();
   if (!d) throw new AppError('NOT_FOUND', 'No such document');
@@ -554,11 +556,37 @@ export async function issueDraft(
       approval_id: approvalId,
       credit_approval_id: creditApprovalId,
       content_hash: await contentHash(trx, id, date),
+      ...(d.doc_type === 'invoice'
+        ? await balanceSnapshot(trx, d.customer_id, opts.paidNowFils)
+        : {}),
     })
     .where('id', '=', id)
     .execute();
   await postDocument(trx, id);
   return date;
+}
+
+/**
+ * Decision 0114: what an invoice's balance block prints, frozen at issue so a reprint shows the
+ * same numbers. The balance is taken while the invoice is still a draft (posted documents only, so
+ * not counting it); none for the walk-in customer.
+ */
+async function balanceSnapshot(trx: Transaction<DB>, customerId: bigint, paidNow = 0n) {
+  const c = await trx
+    .selectFrom('md.customers')
+    .select([
+      'is_walk_in',
+      'credit_mode',
+      sql<string>`sales.customer_balance(${customerId}::bigint)::text`.as('balance'),
+    ])
+    .where('id', '=', customerId)
+    .executeTakeFirstOrThrow();
+  if (c.is_walk_in) return {};
+  return {
+    balance_before_fils: BigInt(c.balance),
+    paid_at_issue_fils: paidNow,
+    credit_customer: c.credit_mode === 'credit',
+  };
 }
 
 export async function issueInvoice(
@@ -571,7 +599,10 @@ export async function issueInvoice(
     parts: NonNullable<IssueRequest['payments']>,
   ) => Promise<void>,
 ): Promise<void> {
-  await issueDraft(trx, id, body);
+  await issueDraft(trx, id, {
+    ...body,
+    paidNowFils: (body.payments ?? []).reduce((s, p) => s + BigInt(p.amountFils), 0n),
+  });
   if (body.payments && body.payments.length > 0) {
     const d = await trx
       .selectFrom('sales.documents')
@@ -599,7 +630,7 @@ const CANCELLING_NOTE = sql`
  * Decision 0113: issued, not cancelled, not fully settled, and past the due date set at issue from
  * the customer's payment terms (an "on receipt" cash invoice is overdue from the next day).
  */
-const OVERDUE = sql`(d.status = 'issued' AND d.doc_type IN ('invoice', 'debit_note')
+export const OVERDUE = sql`(d.status = 'issued' AND d.doc_type IN ('invoice', 'debit_note')
   AND d.due_date IS NOT NULL AND d.due_date < sys.business_date(now())
   AND d.settled_fils < d.total_fils AND NOT EXISTS (SELECT 1 ${CANCELLING_NOTE}))`;
 

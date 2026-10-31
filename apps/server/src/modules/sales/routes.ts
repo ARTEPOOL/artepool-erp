@@ -23,9 +23,11 @@ import {
   SaveInvoiceRequest,
   SaveQuotationRequest,
   StatementQuery,
+  CustomerBalanceQuery,
 } from '@artepool/shared/contracts';
 import { defineRoute, defineWrite } from '../../platform/http/route';
 import { requireAlso } from '../../platform/permissions';
+import { customerBalance } from './balance';
 import * as documents from './documents';
 import { cancelInvoice } from './cancel';
 import { createNote, creditWholeAdvance } from './notes';
@@ -374,7 +376,12 @@ export function registerSalesRoutes(app: FastifyInstance): void {
     url: '/api/v1/customers/:id/balance',
     access: allow('customers.view'),
     params: Params,
-    handler: ({ params }) => statements.customerBalance(db, BigInt(params.id)),
+    query: CustomerBalanceQuery,
+    // Decision 0114: the status for anyone who may see customers; amounts only with the permission.
+    handler: ({ request, params, query }) => {
+      const amounts = request.auth?.permissions.has('customers.balance.view') ?? false;
+      return customerBalance(db, BigInt(params.id), { amounts, detail: query.detail === 'yes' });
+    },
   });
   defineRoute(app, {
     method: 'GET',

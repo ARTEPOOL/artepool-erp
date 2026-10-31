@@ -7,3 +7,4 @@ export { withBusinessTx } from '../../src/platform/db/tx';
 export { resetOwnerPassword, resetOwnerTwoStep } from '../../src/cli/bootstrap';
 export { RateLimiter, type RateLimits } from '../../src/platform/http/rate-limit';
 export { addPosItem } from './pos';
+export { addCreditCustomer } from './customers';

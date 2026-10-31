@@ -1131,9 +1131,14 @@ The money columns work exactly as in `sales.document_lines` (item lines only).
 | advance_used_vat_fils | bigint | `DEFAULT 0`; `<= vat_fils` |
 | content_hash | bytea? | SHA-256 of the canonical issued content |
 | print_count | integer | `DEFAULT 0` |
+| balance_before_fils | bigint? | Invoices to a named customer: the customer's balance just before the invoice (`sales.customer_balance`, posted documents only), set in the issuing update. NULL for the walk-in, other document types and invoices issued before migration 0049 (decision [0114](decisions/0114-customer-balance-everywhere.md)) |
+| paid_at_issue_fils | bigint? | `>= 0`. With `balance_before_fils`: what was received at issue (A4 payments at issue, POS payments) |
+| credit_customer | boolean? | With `balance_before_fils`: whether the customer was on credit then (the A4 "Account summary" prints for credit customers by default) |
 | notes, internal_note | text? | |
 | issued_by | bigint? → auth.users | |
 | [std] | | |
+
+**Account summary (decision 0114):** the A4 invoice prints "Previous balance / This invoice / Paid now / Total due" from the three columns above, never from today's balance, so a reprint shows the same numbers. The template setting `balanceBlock` (`credit_customers` default, `named_customers`, `off`) decides whether it prints.
 
 **Checks:**
 - `CHECK (doc_type = 'advance_invoice' OR (advance_used_net_fils = 0 AND advance_used_vat_fils = 0))`
@@ -1701,7 +1706,7 @@ The API may update only `ups_confirmed_at`; the updater (`artepool_backup`) only
 | system | `system.company.edit`, `system.settings.edit`, `system.series.manage`, `system.devices.manage`, `system.health.view`, `system.backup.restore_test`, `system.integrity.run`, `system.backup.manage` (the last four owner only, 0036) |
 | users | `users.view`, `users.manage`, `users.reset_credentials`, `roles.manage` |
 | audit | `audit.view`, `audit.verify`, `audit.export` |
-| master data | `items.view`, `items.manage`, `prices.manage`, `customers.view`, `customers.manage`, `customers.credit`*, `suppliers.manage`, `technicians.manage`, `payment_methods.manage`, `warehouses.manage`, `data.import` |
+| master data | `items.view`, `items.manage`, `prices.manage`, `customers.view`, `customers.manage`, `customers.credit`*, `customers.balance.view` (balance amounts; owner and accountant, 0114), `suppliers.manage`, `technicians.manage`, `payment_methods.manage`, `warehouses.manage`, `data.import` |
 | inventory | `stock.view`, `stock.view_cost`, `stock.adjust`, `stock.adjust_over_threshold`*, `stock.count`, `stock.count_post`, `stock.defective`, `stock.write_off`, `stock.oversell_review`, `labels.print` |
 | sales (A4) | `invoices.view`, `quotations.manage`, `invoices.create`, `invoices.issue`, `sales.discount_over_limit`*, `sales.price_override`*, `sales.credit_over_limit`*, `credit_notes.issue`*, `debit_notes.issue`, `payments.receive`, `payments.refund`*, `payments.reverse`*, `statements.view`, `documents.reprint` |
 | pos | `pos.sell`, `pos.oversell`*, `pos.no_sale` |

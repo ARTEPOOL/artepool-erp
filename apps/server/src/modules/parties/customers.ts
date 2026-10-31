@@ -6,7 +6,7 @@
  */
 import { matchesWords } from '../../platform/db/search';
 import { sql, type Kysely, type Transaction } from 'kysely';
-import { normalizePhone, normalizeTrn } from '@artepool/shared';
+import { balanceStatus, normalizePhone, normalizeTrn } from '@artepool/shared';
 import type {
   CreateCustomerRequest,
   CreditMode,
@@ -23,6 +23,7 @@ import type { DB } from '../../platform/db/schema.generated';
 import { stamped } from '../../platform/db/stamped';
 import { expectUpdated, fieldError } from '../../platform/db/versioned';
 import { AppError, ruleError } from '../../platform/errors/app-error';
+import { outstandingOf, overdueOf } from '../sales/balance';
 
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 /** The database gives the next free code when none is sent (C00001…, S00001…). */
@@ -59,8 +60,18 @@ function listItem(r: {
 export async function listCustomers(
   db: Kysely<DB>,
   query: CustomersQuery,
+  /** Decision 0114: balance amounts (customers.balance.view). */
+  canSeeAmounts = false,
 ): Promise<CustomersResponse> {
+  if (query.sort === 'outstanding' && !canSeeAmounts) {
+    throw new AppError('PERMISSION_DENIED', 'Missing permission customers.balance.view', {
+      permission: 'customers.balance.view',
+    });
+  }
   let base = db.selectFrom('md.customers');
+  // Decision 0114: only customers with something past its due date.
+  if (query.overdue === 'yes')
+    base = base.where(sql<boolean>`${overdueOf(sql.ref('md.customers.id'))}::bigint > 0`);
   if (query.status !== 'all') base = base.where('is_active', '=', query.status === 'active');
   if (query.vat) base = base.where('is_vat_registered', '=', query.vat === 'registered');
   if (query.q) {
@@ -76,10 +87,20 @@ export async function listCustomers(
   const total = await base
     .select((eb) => eb.fn.countAll<bigint>().as('n'))
     .executeTakeFirstOrThrow();
-  const rows = await base
+  const withBalance = query.balance === 'yes' || query.sort === 'outstanding';
+  // Only when asked: the customer search (pickers) stays cheap.
+  const zero = sql<string>`NULL::text`;
+  let ordered = base
     .selectAll()
-    .orderBy('is_walk_in', 'desc')
-    .orderBy('name')
+    .select([
+      (withBalance ? outstandingOf(sql.ref('md.customers.id')) : zero).as('outstanding'),
+      (withBalance ? overdueOf(sql.ref('md.customers.id')) : zero).as('overdue'),
+    ]);
+  ordered =
+    query.sort === 'outstanding'
+      ? ordered.orderBy(sql`sales.customer_balance(md.customers.id)`, 'desc').orderBy('name')
+      : ordered.orderBy('is_walk_in', 'desc').orderBy('name');
+  const rows = await ordered
     .limit(query.pageSize)
     .offset((query.page - 1) * query.pageSize)
     .execute();
@@ -92,7 +113,23 @@ export async function listCustomers(
     .executeTakeFirstOrThrow();
   return {
     total: Number(total.n),
-    customers: rows.map(listItem),
+    customers: rows.map((r) => {
+      const item = listItem(r);
+      if (!withBalance) return item;
+      const outstanding = BigInt(r.outstanding ?? '0');
+      const overdue = BigInt(r.overdue ?? '0');
+      const limit = r.credit_mode === 'credit' ? r.credit_limit_fils : 0n;
+      item.balance = {
+        status: balanceStatus({
+          outstandingFils: outstanding,
+          overdueFils: overdue,
+          creditLimitFils: limit,
+        }),
+        outstandingFils: canSeeAmounts ? outstanding.toString() : null,
+        overdueFils: canSeeAmounts ? overdue.toString() : null,
+      };
+      return item;
+    }),
     counts: { active: counts.active, vatRegistered: counts.vat },
   };
 }

@@ -4,6 +4,7 @@
  * given separately, with `customers.credit` and a reason (decision 0036).
  */
 import { z } from 'zod';
+import type { BalanceStatus } from '../balance/index';
 import {
   EMIRATES,
   ListQuery,
@@ -32,10 +33,20 @@ export interface CustomerListItem {
   creditMode: CreditMode;
   isWalkIn: boolean;
   isActive: boolean;
+  /**
+   * With `balance=yes` (decision 0114): the status for anyone; the amounts only with
+   * customers.balance.view (null otherwise).
+   */
+  balance?: { status: BalanceStatus; outstandingFils: string | null; overdueFils: string | null };
 }
 
 export const CustomersQuery = ListQuery.extend({
   vat: z.enum(['registered', 'not_registered']).optional(),
+  /** Decision 0114: each row's balance; only customers with overdue invoices; sort by amount. */
+  balance: z.enum(['yes']).optional(),
+  overdue: z.enum(['yes']).optional(),
+  /** `outstanding` (largest first) needs customers.balance.view. */
+  sort: z.enum(['name', 'outstanding']).default('name'),
 });
 export type CustomersQuery = z.infer<typeof CustomersQuery>;
 

@@ -171,6 +171,13 @@ export type TemplateText = (typeof TEMPLATE_TEXTS)[number];
 
 const Text = z.string().trim().max(500);
 
+/**
+ * The A4 invoice's account summary (decision 0114): previous balance, this invoice, paid now and
+ * total due, as frozen at issue. On for credit customers by default; never for the walk-in.
+ */
+export const BALANCE_BLOCK_MODES = ['credit_customers', 'named_customers', 'off'] as const;
+export type BalanceBlockMode = (typeof BALANCE_BLOCK_MODES)[number];
+
 export const TemplateSettings = z.object({
   language: z.enum(['both', 'ar', 'en']),
   logoPosition: z.enum(['beside', 'center', 'opposite']),
@@ -191,6 +198,8 @@ export const TemplateSettings = z.object({
   ),
   /** The bank account printed with "Bank details" (decision 0065). */
   bankAccountId: IdText.nullable(),
+  /** The A4 invoice's account summary (decision 0114). */
+  balanceBlock: z.enum(BALANCE_BLOCK_MODES),
 });
 export type TemplateSettings = z.infer<typeof TemplateSettings>;
 
@@ -238,6 +247,7 @@ export function defaultTemplateSettings(kind: DesignedKind): TemplateSettings {
       footerEn: 'Thank you for your business',
     },
     bankAccountId: null,
+    balanceBlock: 'credit_customers',
   };
 }
 
@@ -265,6 +275,10 @@ export function readTemplateSettings(kind: DesignedKind, raw: unknown): Template
     },
     texts: { ...base.texts, ...(s.texts ?? {}) },
     bankAccountId: typeof s.bankAccountId === 'string' ? s.bankAccountId : null,
+    // Versions saved before decision 0114 take the default.
+    balanceBlock: BALANCE_BLOCK_MODES.includes(s.balanceBlock as BalanceBlockMode)
+      ? s.balanceBlock
+      : base.balanceBlock,
   };
   const parsed = TemplateSettings.safeParse(candidate);
   return parsed.success ? parsed.data : base;

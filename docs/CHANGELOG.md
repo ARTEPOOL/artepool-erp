@@ -1,5 +1,19 @@
 # Changelog
 
+## The customer's balance wherever a customer is chosen (2026-10-29)
+
+**In plain words:**
+
+- **When you choose a customer** on an A4 invoice, a receipt or the POS, a coloured box under the customer shows their balance: **green** nothing due, **yellow** within the limit, **orange** late invoices or 80% of the limit used, **red** over the limit (an unpaid sale then needs a supervisor's approval). A cash customer gets the box only when they owe money; the walk-in customer never.
+- **The owner and the accountant see the amounts:** outstanding, overdue, credit limit, available, and advance payments on their own line. The cashier and the storekeeper see only the colour and the words ("Within limit", "Has overdue invoices", "Over limit — approval needed"). The server never sends them the amounts. The owner can give the permission "View customer balances (amounts)" to anyone.
+- **Advance payments are kept apart:** they are not subtracted from what is owed and do not give more credit. The customer page and the statement show the **net position** (outstanding − advance payments).
+- **Customers list:** a new "Outstanding" column (the owner and accountant can sort it, biggest first) and a filter "Has overdue invoices".
+- **Customer page:** the open invoices with their age and days overdue, and the oldest unpaid date.
+- **A4 invoices can print an "Account summary":** previous balance, this invoice, paid now, total due. It is saved with the invoice when it is issued, so a reprint shows exactly the same numbers. On by default for credit customers; in Settings → Print designer you can choose every named customer or off.
+
+- Migration 0049 (the permission `customers.balance.view`; `sales.documents.balance_before_fils`, `paid_at_issue_fils`, `credit_customer`). A new orange colour token. Decision 0114.
+- Tests: the balance from posted documents (an invoice, a partial payment, a credit note, an opening balance), the colours, the amounts by permission, the list column, filter and sort, the printed block stored and reprinted unchanged, the POS sale, the designer choice, the printed statement; screen tests in Arabic and English.
+
 ## Receipts settle the invoice they are for; one clear status per invoice (2026-10-29)
 
 **In plain words:**

@@ -631,6 +631,13 @@
     },
     "customerAddressLocked": "Always printed on a full tax invoice.",
     "discountLocked": "Always printed when the document has a discount.",
+    "balanceBlock": "Account summary on the invoice",
+    "balanceBlockHint": "Previous balance, this invoice, paid now and total due, as they were when the invoice was issued. Never on the cash customer's invoices.",
+    "balanceBlocks": {
+      "credit_customers": "Credit customers",
+      "named_customers": "Every named customer",
+      "off": "Off"
+    },
     "bankAccount": "Bank account to print",
     "chooseBank": "Choose an account",
     "noBank": "No bank account yet: add one in Settings → Company.",

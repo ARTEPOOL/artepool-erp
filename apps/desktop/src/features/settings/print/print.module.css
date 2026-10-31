@@ -61,6 +61,17 @@
   background: var(--color-surface);
 }
 
+/* The account summary choice (decision 0114): a visible heading over the buttons. */
+.choice {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.choice > span {
+  font-size: var(--text-label);
+  font-weight: 600;
+}
+
 .locked {
   display: grid;
   gap: var(--space-1);

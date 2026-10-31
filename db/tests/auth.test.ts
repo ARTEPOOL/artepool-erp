@@ -103,7 +103,7 @@ describe('roles and permissions', () => {
     const { rows } = await api.query<{ code: string; approvable: boolean }>(
       'SELECT code, approvable FROM auth.permissions ORDER BY code',
     );
-    expect(rows).toHaveLength(77); // 64 + system.backup.manage (0086) + customers.credit (0036) + items.cost (0038) + stock.opening (0042) + customers.opening (0051) + print_templates.manage (0020) + stock.new_item_quantity (0053) + shifts.force_close (0069) + invoices.cancel (0072) + reports.owner_dashboard (0081) + system.update.manage (0108) + system.health.manage (M6.2 H) + sales.advance_with_open_invoices (0113)
+    expect(rows).toHaveLength(78); // 64 + system.backup.manage (0086) + customers.credit (0036) + items.cost (0038) + stock.opening (0042) + customers.opening (0051) + print_templates.manage (0020) + stock.new_item_quantity (0053) + shifts.force_close (0069) + invoices.cancel (0072) + reports.owner_dashboard (0081) + system.update.manage (0108) + system.health.manage (M6.2 H) + sales.advance_with_open_invoices (0113) + customers.balance.view (0114)
     expect(rows.filter((r) => r.approvable).map((r) => r.code)).toEqual([
       'cash.paid_out',
       'cash.variance_accept',
@@ -132,7 +132,7 @@ describe('roles and permissions', () => {
          FROM auth.roles r JOIN auth.role_permissions rp ON rp.role_id = r.id GROUP BY r.code`,
     );
     const perms = Object.fromEntries(rows.map((r) => [r.role, r.perms]));
-    expect(perms.owner).toHaveLength(77);
+    expect(perms.owner).toHaveLength(78);
     expect(perms.accountant).toContain('shifts.force_close'); // decision 0069
     expect(perms.cashier).toEqual([
       'cash.drop',
@@ -168,6 +168,10 @@ describe('roles and permissions', () => {
     // Decision 0113: a whole receipt as an advance while invoices are open, never the cashier.
     expect(perms.accountant).toContain('sales.advance_with_open_invoices');
     expect(perms.cashier).not.toContain('sales.advance_with_open_invoices');
+    // Decision 0114: balance amounts for the owner and the accountant; others see the colour.
+    expect(perms.accountant).toContain('customers.balance.view');
+    expect(perms.cashier).not.toContain('customers.balance.view');
+    expect(perms.storekeeper).not.toContain('customers.balance.view');
     expect(perms.technician).toEqual(['customers.view', 'items.view']);
   });
 

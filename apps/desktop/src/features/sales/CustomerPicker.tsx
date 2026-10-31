@@ -1,7 +1,7 @@
 /**
  * Choosing the customer of a sales document: search by name, phone or TRN. Once chosen, the card
  * shows what decides the document — the invoice format (decision 0010: registered → full tax
- * invoice with the TRN), cash or credit (decision 0046) and the current balance.
+ * invoice with the TRN), cash or credit (decision 0046) and the balance banner (decision 0114).
  */
 import { useState } from 'react';
 import { Search, UserPlus, UserRound } from 'lucide-react';
@@ -10,8 +10,8 @@ import type { CustomerListItem } from '@artepool/shared/contracts';
 import { Button, iconClass } from '../../ui';
 import { useCan } from '../auth/context';
 import { CustomerDialog } from '../customers/CustomerDialog';
-import { money } from '../masterdata/format';
 import { useCustomerBalance, useCustomerSearch } from './api';
+import { BalanceBanner } from './CustomerBalanceBanner';
 import { useSuggest } from './suggest';
 import styles from './sales.module.css';
 
@@ -61,7 +61,9 @@ export function CustomerPicker(props: {
     props.onChange(c);
     box.reset();
   };
-  const balance = useCustomerBalance(props.showBalance && props.value ? props.value.id : null);
+  const balance = useCustomerBalance(
+    props.showBalance && props.value && !props.value.isWalkIn ? props.value.id : null,
+  );
 
   if (props.value) {
     const c = props.value;
@@ -74,15 +76,10 @@ export function CustomerPicker(props: {
             {c.phone && <bdi>{c.phone}</bdi>}
             {c.trn && <span>{t('customerPicker.trn', { trn: c.trn })}</span>}
             <span>{t(c.isVatRegistered ? 'formats.full' : 'formats.simplified')}</span>
-            {b && (
-              <>
-                <span>
-                  {b.creditMode === 'credit'
-                    ? t('customerPicker.credit', { limit: money(BigInt(b.creditLimitFils)) })
-                    : t('customerPicker.cash')}
-                </span>
-                <span>{t('customerPicker.balance', { amount: money(BigInt(b.balanceFils)) })}</span>
-              </>
+            {b && !c.isWalkIn && (
+              <span>
+                {t(b.creditMode === 'credit' ? 'customerPicker.creditOnly' : 'customerPicker.cash')}
+              </span>
             )}
           </div>
         </div>
@@ -97,6 +94,7 @@ export function CustomerPicker(props: {
             {t('customerPicker.change')}
           </Button>
         )}
+        {b && <BalanceBanner balance={b} />}
       </div>
     );
   }

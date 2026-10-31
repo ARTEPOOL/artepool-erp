@@ -500,6 +500,12 @@ describe('POS sales', () => {
     );
     expect(r.document.invoiceFormat).toBe('full');
     expect(r.document.billToTrn).toBe('100987654321003');
+    // Decision 0114: the account summary an A4 reprint shows, frozen at the sale.
+    const { rows } = await sql<{ before: string; paid: string; credit: boolean }>`
+      SELECT balance_before_fils::text AS before, paid_at_issue_fils::text AS paid,
+             credit_customer AS credit
+        FROM sales.documents WHERE id = ${BigInt(r.document.id)}`.execute(server.db);
+    expect(rows[0]).toEqual({ before: '0', paid: '1050', credit: false });
   });
 
   it('lines removed from the cart are written to the audit log with the invoice (0005)', async () => {

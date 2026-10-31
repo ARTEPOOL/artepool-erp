@@ -144,16 +144,35 @@
     "balance": "Balance",
     "opening": "Balance brought forward",
     "closing": "Closing balance",
+    "today": "As of today",
+    "outstanding": "Outstanding",
     "empty": "Nothing moved in these dates.",
     "sign": "A positive balance is what the customer owes; a negative balance is what we owe them.",
     "close": "Close"
   },
   "account": {
     "title": "Account",
-    "balance": "Owes us",
+    "balance": "Outstanding (owes us)",
     "weOwe": "We owe them",
+    "overdue": "Overdue",
     "credit": "Payment terms",
-    "advances": "Unused advances",
+    "available": "Available credit",
+    "advances": "Advance payments",
+    "netPosition": "Net position",
+    "netHint": "Outstanding − advance payments",
+    "oldestUnpaid": "Oldest unpaid since",
+    "openTitle": "Open invoices",
+    "noOpen": "No open invoices.",
+    "openingBalance": "Opening balance",
+    "cols": {
+      "document": "Document",
+      "due": "Due date",
+      "amount": "Still due"
+    },
+    "days_one": "{count} day",
+    "days_other": "{count} days",
+    "overdueBy_one": "{count} day overdue",
+    "overdueBy_other": "{count} days overdue",
     "unavailable": "The balance could not be loaded."
   }
 }

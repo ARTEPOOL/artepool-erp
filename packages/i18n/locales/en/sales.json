@@ -108,10 +108,26 @@
     "change": "Change customer",
     "cash": "Cash (no credit)",
     "credit": "Credit up to {limit}",
-    "balance": "Current balance: {amount}",
+    "creditOnly": "Credit customer",
     "trn": "TRN: {trn}",
     "add": "Add a new customer",
     "walkIn": "Cash customer"
+  },
+  "balance": {
+    "label": "Customer balance",
+    "status": {
+      "nothing_due": "Nothing due",
+      "within_limit": "Within limit",
+      "near_limit": "Near the credit limit",
+      "overdue": "Has overdue invoices",
+      "over_limit": "Over limit — approval needed",
+      "cash_owes": "Cash customer who owes — approval needed"
+    },
+    "outstanding": "Outstanding: AED {amount}",
+    "overdue": "Overdue: AED {amount}",
+    "limit": "Credit limit: AED {amount}",
+    "available": "Available: AED {amount}",
+    "advances": "Advance payments: AED {amount}"
   },
   "print": {
     "print": "Print",

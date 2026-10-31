@@ -58,6 +58,7 @@ import { useAuthController, useDisplayName, useErrorText } from '../auth/context
 import { money, rate } from '../masterdata/format';
 import { localName, useCategories } from '../masterdata/refs';
 import { CustomerPicker, useWalkInCustomer } from '../sales/CustomerPicker';
+import { CustomerBalanceBanner } from '../sales/CustomerBalanceBanner';
 import { useLineRefs, useLinesPreview } from '../sales/LineEditor';
 import { POS_INVALIDATE, POS_PATHS, useCatalog, useHeldCarts, usePosState } from './api';
 import {
@@ -300,6 +301,8 @@ function Register({ state }: { state: PosState }) {
               {isWalkIn ? t('addCustomer') : t('changeCustomer')}
             </span>
           </button>
+          {/* Decision 0114: a named customer's balance, colour and words (amounts by permission). */}
+          <CustomerBalanceBanner customerId={customer?.id ?? null} isWalkIn={isWalkIn} compact />
 
           {cart.lines.length === 0 ? (
             <div className={styles.emptyCart}>

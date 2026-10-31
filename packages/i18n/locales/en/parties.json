@@ -13,6 +13,7 @@
     "filter": "Filter customers",
     "filters": {
       "active": "Active",
+      "overdue": "Has overdue invoices",
       "vat": "VAT-registered",
       "nv": "Not registered",
       "inactive": "Deactivated"
@@ -21,8 +22,10 @@
       "customer": "Customer",
       "type": "Type",
       "vat": "VAT",
-      "payment": "Payment"
+      "payment": "Payment",
+      "outstanding": "Outstanding"
     },
+    "sortByOutstanding": "Show the biggest balances first",
     "empty": "No customers match.",
     "select": "Choose a customer to see their details.",
     "neverDeleted": "Customers are never deleted; they are deactivated and stay in reports. See the Deactivated tab.",
