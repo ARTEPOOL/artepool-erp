@@ -6,7 +6,7 @@
  * "Account summary" choice. A cashier sees the colour and the words, never an amount (the same
  * banner as on the POS).
  */
-import { control, expect, signInAsOwner, snap, test, unique } from './fixtures';
+import { control, expect, signInAsOwner, snap, test } from './fixtures';
 import type { Page } from '@playwright/test';
 
 test.setTimeout(180_000);
@@ -97,8 +97,9 @@ test('the owner: the list, the customer page, the invoice banner and the print c
 });
 
 test('the cashier: the colour and the words, never an amount', async ({ page, open, t, lang }) => {
-  const { name } = await creditCustomer(lang, lang === 'ar' ? '12' : '22');
-  const username = unique('cashier');
+  const { name, n } = await creditCustomer(lang, lang === 'ar' ? '12' : '22');
+  // From the run's number, not Math.random(): the user has a password (CodeQL).
+  const username = `cashier.balance.${lang}.${n}`;
   await control.addUser({
     username,
     password: 'blue-pool-water-7',
