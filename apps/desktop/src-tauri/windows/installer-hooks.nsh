@@ -4,6 +4,9 @@
 ;   sign-in, least privilege); on a PC that is not a point of sale the app closes again at once.
 ; - Before an upgrade or an uninstall, the app and its watchdog are stopped together, so the
 ;   watchdog does not start the app again while its files are replaced or removed.
+; - The quiet updater (decision 0115): the scheduled task "ARTEPOOL App Updater" (SYSTEM; at
+;   sign-in, hourly, on demand) is registered, and removed by the uninstaller; never on the server
+;   PC, whose app is updated with the server.
 ; Only Windows' own tools (taskkill, schtasks through the app): every edition (decision 0106).
 
 !macro NSIS_HOOK_PREINSTALL
@@ -14,11 +17,15 @@
 !macro NSIS_HOOK_POSTINSTALL
   nsExec::Exec '"$INSTDIR\artepool-erp.exe" --register-autostart'
   Pop $0
+  nsExec::Exec '"$INSTDIR\artepool-erp.exe" --register-quiet-updater'
+  Pop $0
 !macroend
 
 !macro NSIS_HOOK_PREUNINSTALL
   nsExec::Exec '"$SYSDIR\taskkill.exe" /F /T /IM artepool-erp.exe'
   Pop $0
   nsExec::Exec '"$INSTDIR\artepool-erp.exe" --unregister-autostart'
+  Pop $0
+  nsExec::Exec '"$INSTDIR\artepool-erp.exe" --unregister-quiet-updater'
   Pop $0
 !macroend

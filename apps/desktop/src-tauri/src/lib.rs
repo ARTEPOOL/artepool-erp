@@ -4,6 +4,7 @@
 //! screens never see the key and cannot open a connection themselves (see tauri.conf.json CSP).
 
 mod autostart;
+mod quiet_update;
 
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -270,6 +271,13 @@ async fn app_update_check(app: tauri::AppHandle) -> Result<serde_json::Value, St
 /// and starts the new version.
 #[tauri::command]
 async fn app_update_install(app: tauri::AppHandle) -> Result<(), String> {
+    // Decision 0115: the quiet updater (SYSTEM) installs it without Windows' permission question
+    // and opens the app again; the app closes normally (the watchdog does not start it again).
+    if quiet_update::install_and_reopen() {
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+        app.exit(0);
+        return Ok(());
+    }
     let Some(update) = pending_update(&app).await? else {
         return Ok(());
     };
@@ -548,7 +556,8 @@ async fn printer_print_label(
 /// The command-line modes that are not the app: the watchdog, and the installer's
 /// `--register-autostart` / `--unregister-autostart`. `Some(exit code)` when one ran.
 pub fn command_line() -> Option<i32> {
-    autostart::command_line(&std::env::args().collect::<Vec<_>>())
+    let args = std::env::args().collect::<Vec<_>>();
+    quiet_update::command_line(&args).or_else(|| autostart::command_line(&args))
 }
 
 /// This PC is enrolled as a point of sale (read before any window opens).
@@ -598,8 +607,14 @@ pub fn run() {
     let emergency = emergency_mode();
     let has = |flag: &str| std::env::args().skip(1).any(|arg| arg == flag);
     let restarted = has("--restarted");
-    // Started by the sign-in task on every PC: only a point of sale stays open.
-    if has("--autostart") && !emergency && !enrolled_as_pos() {
+    // An update is being installed right now (decision 0115): say so instead of opening.
+    if !emergency && quiet_update::being_installed() {
+        quiet_update::tell_being_installed();
+        return;
+    }
+    // Started by the sign-in task on every PC: only a point of sale stays open, or a PC whose
+    // app was just updated after "Install and restart" (decision 0115).
+    if has("--autostart") && !emergency && !enrolled_as_pos() && !quiet_update::reopen_asked_now() {
         return;
     }
     let mut builder = tauri::Builder::default();
@@ -696,7 +711,12 @@ pub fn run() {
             printer_print_label
         ])
         .build(tauri::generate_context!())
-        .expect("ARTÉPOOL ERP could not start")
+        .unwrap_or_else(|error| {
+            // Most often WebView2 missing or broken (decision 0115): a clear message, and the
+            // quiet updater asked for the full setup, which brings WebView2 offline.
+            quiet_update::ask_repair_and_explain();
+            panic!("ARTÉPOOL ERP could not start: {error}");
+        })
         .run(move |_app, event| {
             // A normal exit (the kiosk lock was off): the watchdog does not start it again.
             if let tauri::RunEvent::Exit = event {
