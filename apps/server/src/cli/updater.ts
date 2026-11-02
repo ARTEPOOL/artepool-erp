@@ -6,9 +6,11 @@
  * (updater/certificate.ts, M6.2 part H3). Its lines go to `logs\install\updater.log`, only when
  * the outcome changes (no secret is ever written).
  */
-import { spawn } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { mkdirSync, readFileSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { promisify } from 'node:util';
 import pg from 'pg';
 import { LATEST_URL } from '@artepool/release';
 import { connectionFor, loadEnv, resourcePath } from '@artepool/node-kit';
@@ -58,9 +60,29 @@ try {
     // Continues a part already received after a cut (0115); an hour at most per try.
     download: (url, to, onProgress) =>
       resumableDownload(url, to, { timeoutMs: 60 * 60 * 1000, onProgress }),
-    runSetup: (file) => {
+    // The runtime installed beside the programs (0115); none before 0.9.0: the full setup then.
+    installedRuntime: async () => {
+      try {
+        const { id } = JSON.parse(await readFile(join(programDir, 'runtime.json'), 'utf8')) as {
+          id?: unknown;
+        };
+        return typeof id === 'string' && /^[0-9a-f]{12}$/.test(id) ? id : null;
+      } catch {
+        return null;
+      }
+    },
+    // Windows' own tar (bsdtar reads zip files), by its full path; the names were checked first.
+    unzip: async (zip, to) => {
+      const tar = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe');
+      await promisify(execFile)(tar, ['-xf', zip, '-C', to], {
+        windowsHide: true,
+        timeout: 10 * 60 * 1000,
+      });
+    },
+    runSetup: (file, runtimeDir) => {
       // Detached: the setup replaces this program's folder, so the updater ends first.
-      spawn(file, ['/S'], { detached: true, stdio: 'ignore', windowsHide: true }).unref();
+      const args = ['/S', ...(runtimeDir ? [`/RUNTIME=${runtimeDir}`] : [])];
+      spawn(file, args, { detached: true, stdio: 'ignore', windowsHide: true }).unref();
     },
     now: () => new Date(),
     log: (line) => log.line(line),

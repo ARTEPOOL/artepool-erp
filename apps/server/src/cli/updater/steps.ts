@@ -7,9 +7,12 @@
  *   2. every hour, at once after an update, and at once for the owner's "Check now" (0110)
  *      or "Install now", reads the public update list. No internet is normal: everything keeps
  *      working and the update waits;
- *   3. downloads a newer server setup in the background into updates\ as soon as it is known,
- *      with its progress (0115), continuing after a cut where it stopped; keeps it only if its
- *      SHA-256 and its signature (the update key) are right;
+ *   3. downloads a newer version in the background into updates\ as soon as it is known, with
+ *      its progress (0115), continuing after a cut where it stopped; keeps a file only if its
+ *      SHA-256 and its signature (the update key) are right. The smallest package that fits
+ *      (0115, 0.9.0): the update package alone when this PC has the runtime it needs; with the
+ *      runtime package when not; the full setup when the PC's runtime is unknown, the list has
+ *      no small packages, or a small package was refused or failed for this version;
  *   4. installs it only at a safe time: never while a shift is open; inside the night window, or
  *      at once after "Install now". A version that failed and was rolled back waits for "Install
  *      now". The setup itself makes the checked pre-upgrade backup, runs
@@ -19,12 +22,13 @@
  */
 import { createHash } from 'node:crypto';
 import { createReadStream, existsSync } from 'node:fs';
-import { readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type pg from 'pg';
 import { z } from 'zod';
 import { inSystemTx } from '@artepool/backup';
-import { compareVersions } from '../upgrade/steps';
+import { runtimeFileName, runtimeZipRefusals } from '@artepool/release';
+import { checkRuntime, compareVersions } from '../upgrade/steps';
 import type { Progress } from './download';
 import { verifyFileSignature } from './signature';
 
@@ -83,8 +87,15 @@ export interface UpdaterDeps {
   fetchLatest: () => Promise<unknown>;
   /** Into `to`, continuing a part already there (0115), reporting what has arrived. */
   download: (url: string, to: string, onProgress: Progress) => Promise<void>;
-  /** Starts the server setup silently and does not wait (it replaces this program's folder). */
-  runSetup: (file: string) => void;
+  /** The runtime installed beside the programs (`runtime.json`); null before 0.9.0 (0115). */
+  installedRuntime: () => Promise<string | null>;
+  /** Unpacks a checked runtime package into an empty folder (Windows' own tar, 0115). */
+  unzip: (zip: string, to: string) => Promise<void>;
+  /**
+   * Starts the setup silently and does not wait (it replaces this program's folder); with the
+   * folder of the unpacked runtime package when the update package needs it (0115).
+   */
+  runSetup: (file: string, runtimeDir: string | null) => void;
   now: () => Date;
   log: (line: string) => void;
   /** A clock in milliseconds for spacing the progress writes (Date.now by default). */
@@ -131,6 +142,120 @@ export function inWindow(now: Date, startHour: number, endHour: number): boolean
 }
 
 export const setupFileName = (version: string) => `ARTEPOOL-Server-Setup-${version}.exe`;
+export const updateFileName = (version: string) => `ARTEPOOL-Server-Update-${version}.exe`;
+export const runtimeDirName = (id: string) => `runtime-${id}`;
+/** Beside the downloads: this version is installed with the full setup from now on (0115). */
+export const useFullMarker = (version: string) => `use-full-${version}`;
+
+/** Which package installs the version (decision 0115). */
+export type PackageKind = 'full' | 'update' | 'update_runtime';
+
+export interface PlannedFile {
+  role: 'full' | 'update' | 'runtime';
+  name: string;
+  url: string;
+  signature: string;
+  sha256: string;
+  size: number | null;
+}
+
+export interface Plan {
+  version: string;
+  kind: PackageKind;
+  /** The runtime the update package needs (null for the full setup). */
+  runtimeId: string | null;
+  /** The runtime package first (when needed), the setup last. */
+  files: PlannedFile[];
+}
+
+/**
+ * The smallest package that installs `latest` on this PC (0115): the update package when the PC
+ * has the runtime it needs; with the runtime package when the list has the one it needs; the full
+ * setup otherwise, when the PC's runtime is unknown (installed before 0.9.0), or when a small
+ * package was refused or failed for this version.
+ */
+export function choosePlan(
+  latest: Latest,
+  installedRuntime: string | null,
+  useFull: boolean,
+): Plan {
+  const file = (
+    role: PlannedFile['role'],
+    name: string,
+    f: { url: string; signature: string; sha256: string; size?: number | undefined },
+  ): PlannedFile => ({
+    role,
+    name,
+    url: f.url,
+    signature: f.signature,
+    sha256: f.sha256,
+    size: f.size ?? null,
+  });
+  const v = latest.version;
+  const full: Plan = {
+    version: v,
+    kind: 'full',
+    runtimeId: null,
+    files: [file('full', setupFileName(v), latest.server)],
+  };
+  const update = latest.serverUpdate;
+  if (useFull || !update || !installedRuntime) return full;
+  const updateFile = file('update', updateFileName(v), update);
+  if (update.runtime === installedRuntime) {
+    return { version: v, kind: 'update', runtimeId: update.runtime, files: [updateFile] };
+  }
+  if (latest.runtime && latest.runtime.id === update.runtime) {
+    return {
+      version: v,
+      kind: 'update_runtime',
+      runtimeId: update.runtime,
+      files: [file('runtime', runtimeFileName(update.runtime), latest.runtime), updateFile],
+    };
+  }
+  return full;
+}
+
+const planSchema = z.object({
+  version: versionText,
+  kind: z.enum(['full', 'update', 'update_runtime']),
+  runtimeId: z
+    .string()
+    .regex(/^[0-9a-f]{12}$/)
+    .nullable(),
+  files: z
+    .array(
+      z.object({
+        role: z.enum(['full', 'update', 'runtime']),
+        name: z.string().regex(/^ARTEPOOL-[A-Za-z0-9.-]+\.(exe|zip)$/),
+        url: z.string(),
+        signature: z.string(),
+        sha256: z.string().regex(/^[0-9a-f]{64}$/),
+        size: z.number().int().nullable(),
+      }),
+    )
+    .min(1),
+});
+
+/** What is downloaded for (or into) the version: `updates\plan.json` (0115). */
+async function readPlan(updatesDir: string, version: string): Promise<Plan | null> {
+  try {
+    const plan = planSchema.parse(
+      JSON.parse(await readFile(join(updatesDir, 'plan.json'), 'utf8')),
+    );
+    return plan.version === version ? plan : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Everything kept for versions that are installed now (0115). */
+const UPDATE_LEFTOVERS = [
+  /^ARTEPOOL-Server-(Setup|Update)-/,
+  /^ARTEPOOL-Runtime-/,
+  /^runtime-[0-9a-f]{12}(\.partial)?$/,
+  /^use-full-/,
+  /^plan\.json$/,
+];
 
 async function sha256(path: string): Promise<string> {
   const hash = createHash('sha256');
@@ -182,6 +307,20 @@ export async function runUpdater(deps: UpdaterDeps): Promise<UpdaterOutcome> {
     };
     if (result.at && result.at !== state.last_result?.at) {
       await save({ last_result: JSON.stringify(result) }, 'the result of the last update');
+      // A small package that did not install (0115): the next try of that version takes the full
+      // setup, whatever the reason.
+      const started = existsSync(marker)
+        ? (JSON.parse(await readFile(marker, 'utf8')) as { version?: string; package?: string })
+        : null;
+      if (!result.ok && result.to && started?.version === result.to && started.package) {
+        if (started.package !== 'full') {
+          await writeFile(join(deps.updatesDir, useFullMarker(result.to)), '');
+          await rm(join(deps.updatesDir, 'plan.json'), { force: true });
+          log(
+            `${result.to} did not install with the ${started.package} package; the full setup is used next.`,
+          );
+        }
+      }
       for (const request of await openRequests()) {
         if (request.status === 'running' && request.version === result.to) {
           await setRequest(
@@ -214,8 +353,11 @@ export async function runUpdater(deps: UpdaterDeps): Promise<UpdaterOutcome> {
       },
       `${installed} is installed`,
     );
-    await rm(join(deps.updatesDir, setupFileName(installed)), { force: true });
-    await rm(join(deps.updatesDir, `${setupFileName(installed)}.sig`), { force: true });
+    for (const name of await readdir(deps.updatesDir)) {
+      if (UPDATE_LEFTOVERS.some((pattern) => pattern.test(name))) {
+        await rm(join(deps.updatesDir, name), { recursive: true, force: true });
+      }
+    }
   }
   if (existsSync(marker)) {
     const started = JSON.parse(await readFile(marker, 'utf8')) as { at: string };
@@ -292,10 +434,15 @@ export async function runUpdater(deps: UpdaterDeps): Promise<UpdaterOutcome> {
   }
 
   // 3. The download, in advance as soon as a newer version is known (0115), kept only when its
-  //    SHA-256 and its signature are right. A cut keeps what arrived: the next run continues.
-  const file = join(deps.updatesDir, setupFileName(version));
-  const sigFile = `${file}.sig`;
-  if (!(state.download_status === 'ready' && existsSync(file) && existsSync(sigFile))) {
+  //    SHA-256 and its signature are right. A cut keeps what arrived: the next run continues. The
+  //    smallest package that fits; the full setup after a small one was refused or failed.
+  const dir = deps.updatesDir;
+  const useFull = existsSync(join(dir, useFullMarker(version)));
+  let plan = await readPlan(dir, version);
+  if (plan && useFull && plan.kind !== 'full') plan = null;
+  const have = (f: PlannedFile) =>
+    existsSync(join(dir, f.name)) && existsSync(join(dir, `${f.name}.sig`));
+  if (!(plan && state.download_status === 'ready' && plan.files.every(have))) {
     // The server may have read the list itself for the owner's "Check now" (0115): the address
     // and the checks always come from the list read here, by the updater.
     if (!latest) {
@@ -307,49 +454,77 @@ export async function runUpdater(deps: UpdaterDeps): Promise<UpdaterOutcome> {
       }
     }
     if (latest.version !== version) return 'offline';
-    const partial = `${file}.partial`;
-    // What the part already received belongs to; another address or SHA-256 starts again.
-    const note = `${partial}.json`;
-    const expected = JSON.stringify({ url: latest.server.url, sha256: latest.server.sha256 });
-    if (existsSync(partial) && (!existsSync(note) || (await readFile(note, 'utf8')) !== expected)) {
-      await rm(partial, { force: true });
-    }
-    await writeFile(note, expected);
-    await save({ download_status: 'downloading' }, `downloading ${version}`);
+    plan = choosePlan(latest, await deps.installedRuntime(), useFull);
+    await writeFile(join(dir, 'plan.json'), `${JSON.stringify(plan, null, 2)}\n`);
+    const sizes = plan.files.map((f) => f.size);
+    const total = sizes.every((n) => n !== null) ? sizes.reduce((a, b) => a + b, 0) : null;
+    await save({ download_status: 'downloading' }, `downloading ${version} (${plan.kind})`);
     const progress = progressWriter(
       (values) => save(values, 'download progress'),
       deps.clock ?? Date.now,
       deps.now,
     );
-    try {
-      await deps.download(latest.server.url, partial, progress.report);
-    } catch (error) {
-      await progress.flush();
-      log(`The download of ${version} stopped; the next run continues it: ${message(error)}`);
-      await save({ download_status: 'failed' }, `the download of ${version} stopped`);
-      return 'download_failed';
+    let offset = 0;
+    for (const f of plan.files) {
+      const target = join(dir, f.name);
+      const sigFile = `${target}.sig`;
+      // Kept from an earlier run, checked then (and again right before it runs).
+      if (have(f) && (await readFile(sigFile, 'utf8')) === f.signature) {
+        offset += (await stat(target)).size;
+        progress.report(offset, total);
+        continue;
+      }
+      const partial = `${target}.partial`;
+      // What the part already received belongs to; another address or SHA-256 starts again.
+      const note = `${partial}.json`;
+      const expected = JSON.stringify({ url: f.url, sha256: f.sha256 });
+      if (
+        existsSync(partial) &&
+        (!existsSync(note) || (await readFile(note, 'utf8')) !== expected)
+      ) {
+        await rm(partial, { force: true });
+      }
+      await writeFile(note, expected);
+      const base = offset;
+      try {
+        await deps.download(f.url, partial, (received, fileTotal) =>
+          progress.report(base + received, total ?? (fileTotal === null ? null : base + fileTotal)),
+        );
+      } catch (error) {
+        await progress.flush();
+        log(`The download of ${version} stopped; the next run continues it: ${message(error)}`);
+        await save({ download_status: 'failed' }, `the download of ${version} stopped`);
+        return 'download_failed';
+      }
+      try {
+        if ((await sha256(partial)) !== f.sha256) {
+          throw new Error(`The downloaded ${f.name} does not match its SHA-256.`);
+        }
+        await verifyFileSignature(deps.publicKey, f.signature, partial);
+        await writeFile(sigFile, f.signature);
+        await rename(partial, target);
+        await rm(note, { force: true });
+      } catch (error) {
+        await progress.flush();
+        await rm(partial, { force: true });
+        await rm(note, { force: true });
+        log(`The download of ${version} was refused: ${message(error)}`);
+        if (f.role !== 'full') {
+          // Never the small package again for this version: the full setup, checked the same way.
+          await writeFile(join(dir, useFullMarker(version)), '');
+          log(`${version} will be installed with the full setup.`);
+        }
+        await save(
+          { download_status: 'failed', ...NO_PROGRESS },
+          `the download of ${version} was refused`,
+        );
+        return 'download_failed';
+      }
+      offset += f.size ?? (await stat(target)).size;
     }
     await progress.flush();
-    try {
-      if ((await sha256(partial)) !== latest.server.sha256) {
-        throw new Error('The downloaded setup does not match its SHA-256.');
-      }
-      await verifyFileSignature(deps.publicKey, latest.server.signature, partial);
-      await writeFile(sigFile, latest.server.signature);
-      await rename(partial, file);
-      await rm(note, { force: true });
-      await save({ download_status: 'ready' }, `${version} downloaded and checked`);
-      log(`${setupFileName(version)} downloaded; its SHA-256 and signature are right.`);
-    } catch (error) {
-      await rm(partial, { force: true });
-      await rm(note, { force: true });
-      log(`The download of ${version} was refused: ${message(error)}`);
-      await save(
-        { download_status: 'failed', ...NO_PROGRESS },
-        `the download of ${version} was refused`,
-      );
-      return 'download_failed';
-    }
+    await save({ download_status: 'ready' }, `${version} downloaded and checked`);
+    log(`${version} downloaded (${plan.kind}); its SHA-256 and signature are right.`);
   }
 
   // 4. A safe time: no open shift; the night window, or the owner's "Install now".
@@ -371,20 +546,57 @@ export async function runUpdater(deps: UpdaterDeps): Promise<UpdaterOutcome> {
     await save({ waiting_reason: 'outside_window' }, 'waiting for the night window');
     return 'waiting';
   }
-  // Checked again right before it runs: the file on disk is what was verified.
-  try {
-    await verifyFileSignature(deps.publicKey, await readFile(sigFile, 'utf8'), file);
-  } catch (error) {
-    await rm(file, { force: true });
-    await save({ download_status: 'failed' }, 'the downloaded setup changed on disk');
-    log(`The downloaded setup was refused before running: ${message(error)}`);
-    return 'download_failed';
+  // Checked again right before it runs: the files on disk are what was verified.
+  for (const f of plan.files) {
+    try {
+      await verifyFileSignature(
+        deps.publicKey,
+        await readFile(join(dir, `${f.name}.sig`), 'utf8'),
+        join(dir, f.name),
+      );
+    } catch (error) {
+      await rm(join(dir, f.name), { force: true });
+      await save({ download_status: 'failed' }, 'a downloaded file changed on disk');
+      log(`${f.name} was refused before running: ${message(error)}`);
+      return 'download_failed';
+    }
   }
+  // The runtime package, unpacked now from the file just checked; its names checked first.
+  let runtimeDir: string | null = null;
+  const runtime = plan.files.find((f) => f.role === 'runtime');
+  if (runtime && plan.runtimeId) {
+    const target = join(dir, runtimeDirName(plan.runtimeId));
+    const unpacking = `${target}.partial`;
+    try {
+      const refused = await runtimeZipRefusals(join(dir, runtime.name));
+      if (refused.length > 0) throw new Error(`Refused: ${refused.join('; ')}`);
+      await rm(unpacking, { recursive: true, force: true });
+      await rm(target, { recursive: true, force: true });
+      await mkdir(unpacking, { recursive: true });
+      await deps.unzip(join(dir, runtime.name), unpacking);
+      await checkRuntime(unpacking, plan.runtimeId);
+      await rename(unpacking, target);
+      runtimeDir = target;
+    } catch (error) {
+      await rm(unpacking, { recursive: true, force: true });
+      await rm(join(dir, runtime.name), { force: true });
+      await writeFile(join(dir, useFullMarker(version)), '');
+      await save({ download_status: 'failed', ...NO_PROGRESS }, 'the runtime package was refused');
+      log(
+        `The runtime package of ${version} was refused; the full setup is used next: ${message(error)}`,
+      );
+      return 'download_failed';
+    }
+  }
+  const setupFile = join(dir, plan.files.at(-1)!.name);
   if (requested) await setRequest(requested.id, 'running', null, `installing ${version}`);
-  await writeFile(marker, `${JSON.stringify({ version, at: now.toISOString() })}\n`);
+  await writeFile(
+    marker,
+    `${JSON.stringify({ version, at: now.toISOString(), package: plan.kind })}\n`,
+  );
   await save({ waiting_reason: 'installing' }, `installing ${version}`);
-  log(`Installing ${version}.`);
-  deps.runSetup(file);
+  log(`Installing ${version} (${plan.kind}).`);
+  deps.runSetup(setupFile, runtimeDir);
   return 'started';
 }
 
