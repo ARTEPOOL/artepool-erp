@@ -4,10 +4,10 @@
  * we start (pg_dump, the browser) never inherit a secret.
  */
 import { randomBytes } from 'node:crypto';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   applyInstalledConfig,
   childEnv,
@@ -84,6 +84,77 @@ describe('the settings file', () => {
   it('refuses the development master-key file setting', async () => {
     const env = { ARTEPOOL_CONFIG: await configFile(valid), ARTEPOOL_MASTER_KEY_FILE: 'k' };
     expect(() => applyInstalledConfig(env)).toThrow(/development setting/);
+  });
+});
+
+describe("the app's Google registration shipped beside the programs (decision 0095)", () => {
+  const shipped = {
+    desktop: { clientId: 'new.apps.googleusercontent.com', clientSecret: 'GOCSPX-new' },
+    device: { clientId: 'code.apps.googleusercontent.com', clientSecret: 'GOCSPX-code' },
+  };
+
+  /** <dir>\program\server\resources, with google.json in <dir>\program when given. */
+  async function program(google?: string): Promise<string> {
+    const resources = join(dir, 'program', 'server', 'resources');
+    await mkdir(resources, { recursive: true });
+    if (google !== undefined) await writeFile(join(dir, 'program', 'google.json'), google);
+    return resources;
+  }
+
+  it('wins over the copy the settings file got at the first install', async () => {
+    const env: NodeJS.ProcessEnv = {
+      ARTEPOOL_CONFIG: await configFile(valid),
+      ARTEPOOL_RESOURCES: await program(JSON.stringify(shipped)),
+    };
+    applyInstalledConfig(env);
+    expect(env).toMatchObject({
+      ARTEPOOL_GOOGLE_CLIENT_ID: 'new.apps.googleusercontent.com',
+      ARTEPOOL_GOOGLE_CLIENT_SECRET: 'GOCSPX-new',
+      ARTEPOOL_GOOGLE_DEVICE_CLIENT_ID: 'code.apps.googleusercontent.com',
+      ARTEPOOL_GOOGLE_DEVICE_CLIENT_SECRET: 'GOCSPX-code',
+    });
+  });
+
+  it('reaches a server whose settings file has none (installed before the registration)', async () => {
+    const withoutGoogle: Partial<typeof valid> = { ...valid };
+    delete withoutGoogle.google;
+    const env: NodeJS.ProcessEnv = {
+      ARTEPOOL_CONFIG: await configFile(withoutGoogle),
+      ARTEPOOL_RESOURCES: await program(JSON.stringify({ desktop: shipped.desktop })),
+    };
+    applyInstalledConfig(env);
+    expect(env.ARTEPOOL_GOOGLE_CLIENT_ID).toBe('new.apps.googleusercontent.com');
+    expect(env.ARTEPOOL_GOOGLE_DEVICE_CLIENT_ID).toBeUndefined();
+  });
+
+  it("leaves the settings file's when there is no file beside the programs", async () => {
+    const env: NodeJS.ProcessEnv = {
+      ARTEPOOL_CONFIG: await configFile(valid),
+      ARTEPOOL_RESOURCES: await program(),
+    };
+    applyInstalledConfig(env);
+    expect(env.ARTEPOOL_GOOGLE_CLIENT_ID).toBe('id.apps.googleusercontent.com');
+  });
+
+  it('sets a broken file aside with a warning, and the server still starts', async () => {
+    const warn = vi.spyOn(process, 'emitWarning').mockImplementation(() => undefined);
+    try {
+      for (const broken of ['not json', '{}', JSON.stringify({ desktop: { clientId: 'x' } })]) {
+        await rm(join(dir, 'program'), { recursive: true, force: true });
+        const env: NodeJS.ProcessEnv = {
+          ARTEPOOL_CONFIG: await configFile(valid),
+          ARTEPOOL_RESOURCES: await program(broken),
+        };
+        applyInstalledConfig(env);
+        expect(env.ARTEPOOL_GOOGLE_CLIENT_ID, broken).toBe('id.apps.googleusercontent.com');
+      }
+      expect(warn).toHaveBeenCalledTimes(3);
+      expect(String(warn.mock.calls[0]![0])).toContain(
+        'google.json is not a valid Google registration',
+      );
+    } finally {
+      warn.mockRestore();
+    }
   });
 });
 

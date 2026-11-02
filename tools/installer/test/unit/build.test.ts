@@ -6,6 +6,8 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  googleJson,
+  googleSummary,
   makensisArgs,
   nextPatch,
   officeSetupFileName,
@@ -77,5 +79,64 @@ describe('the release files (0115)', () => {
         windows: { webviewInstallMode: { type: 'embedBootstrapper', silent: true } },
       },
     });
+  });
+});
+
+describe("the app's registration at Google (decision 0095)", () => {
+  // Made-up values shaped like Google's (never a real registration).
+  const id = 'test-desktop.apps.googleusercontent.com';
+  const secret = 'GOCSPX-test-value';
+  const all = {
+    ARTEPOOL_GOOGLE_CLIENT_ID: id,
+    ARTEPOOL_GOOGLE_CLIENT_SECRET: secret,
+    ARTEPOOL_GOOGLE_DEVICE_CLIENT_ID: 'test-code.apps.googleusercontent.com',
+    ARTEPOOL_GOOGLE_DEVICE_CLIENT_SECRET: `${secret}x`,
+  };
+
+  it('is written from the release secrets, trimmed', () => {
+    const json = googleJson({ ...all, ARTEPOOL_GOOGLE_CLIENT_ID: ` ${id}\n` });
+    expect(JSON.parse(json!)).toEqual({
+      desktop: { clientId: id, clientSecret: secret },
+      device: { clientId: all.ARTEPOOL_GOOGLE_DEVICE_CLIENT_ID, clientSecret: `${secret}x` },
+    });
+    expect(googleSummary(json)).toBe(
+      'Google registration: choose the account **yes**, code **yes**.',
+    );
+  });
+
+  it('may carry one client only, or none', () => {
+    const json = googleJson({
+      ARTEPOOL_GOOGLE_CLIENT_ID: id,
+      ARTEPOOL_GOOGLE_CLIENT_SECRET: secret,
+    });
+    expect(Object.keys(JSON.parse(json!) as object)).toEqual(['desktop']);
+    expect(googleSummary(json)).toContain('code **no**');
+    expect(googleJson({})).toBeNull();
+    expect(
+      googleJson({ ARTEPOOL_GOOGLE_CLIENT_ID: '  ', ARTEPOOL_GOOGLE_CLIENT_SECRET: '' }),
+    ).toBeNull();
+    expect(googleSummary(null)).toContain('**none**');
+  });
+
+  it("stops the build on half a client or a value that is not Google's, without showing it", () => {
+    expect(() => googleJson({ ARTEPOOL_GOOGLE_CLIENT_ID: id })).toThrow(
+      'ARTEPOOL_GOOGLE_CLIENT_SECRET is not set, but ARTEPOOL_GOOGLE_CLIENT_ID is',
+    );
+    expect(() => googleJson({ ARTEPOOL_GOOGLE_DEVICE_CLIENT_SECRET: secret })).toThrow(
+      'ARTEPOOL_GOOGLE_DEVICE_CLIENT_ID is not set',
+    );
+    expect(() => googleJson({ ...all, ARTEPOOL_GOOGLE_CLIENT_ID: 'my-client-id' })).toThrow(
+      'ARTEPOOL_GOOGLE_CLIENT_ID does not look like a Google client ID',
+    );
+    let message = '';
+    try {
+      googleJson({ ...all, ARTEPOOL_GOOGLE_CLIENT_SECRET: 'has a space inside' });
+    } catch (error) {
+      message = (error as Error).message;
+    }
+    expect(message).toBe(
+      'ARTEPOOL_GOOGLE_CLIENT_SECRET does not look like a Google client secret.',
+    );
+    expect(message).not.toContain('space inside');
   });
 });

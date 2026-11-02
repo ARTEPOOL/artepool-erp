@@ -18,6 +18,9 @@ const port = z.number().int().min(1).max(65_535);
 const googleClient = z
   .object({ clientId: z.string().min(1), clientSecret: z.string().min(1) })
   .strict();
+const googleClients = z
+  .object({ desktop: googleClient.optional(), device: googleClient.optional() })
+  .strict();
 
 export const installedConfigSchema = z
   .object({
@@ -46,10 +49,7 @@ export const installedConfigSchema = z
     logLevel: z
       .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
       .default('info'),
-    google: z
-      .object({ desktop: googleClient.optional(), device: googleClient.optional() })
-      .strict()
-      .optional(),
+    google: googleClients.optional(),
   })
   .strict();
 
@@ -131,8 +131,41 @@ export function applyInstalledConfig(env: NodeJS.ProcessEnv = process.env): Inst
     }
   }
   const config = readInstalledConfig(file);
-  Object.assign(env, settingsFromConfig(config));
+  const shipped = shippedGoogleClients(env);
+  Object.assign(env, settingsFromConfig(shipped ? { ...config, google: shipped } : config));
   return config;
+}
+
+/**
+ * The app's registration at Google shipped beside the programs (`C:\Program Files\ARTEPOOL\
+ * google.json`, decision 0095). Every release built with it carries it, so it wins over the copy
+ * the settings file got at the first install: a server installed before the registration existed
+ * gets it with its next update. None (no file) leaves the settings file's. A file that is not
+ * valid is set aside with a warning: only the Google Drive connection depends on it, never a sale.
+ */
+export function shippedGoogleClients(
+  env: NodeJS.ProcessEnv = process.env,
+): InstalledConfig['google'] | undefined {
+  const resources = env.ARTEPOOL_RESOURCES;
+  if (!resources) return undefined;
+  // <program folder>\server\resources → <program folder>\google.json
+  const file = join(resources, '..', '..', 'google.json');
+  let text: string;
+  try {
+    text = readFileSync(file, 'utf8');
+  } catch {
+    return undefined;
+  }
+  try {
+    const parsed = googleClients.safeParse(JSON.parse(text));
+    if (parsed.success && (parsed.data.desktop || parsed.data.device)) return parsed.data;
+  } catch {
+    // Not JSON: set aside below.
+  }
+  process.emitWarning(`${file} is not a valid Google registration; it was set aside.`, {
+    code: 'ARTEPOOL_GOOGLE_JSON',
+  });
+  return undefined;
 }
 
 const KEY_BYTES = 32;
