@@ -22,20 +22,11 @@ import { existsSync } from 'node:fs';
 import { copyFile, cp, mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import { repoRoot } from '@artepool/node-kit';
-import { fetchComponent, readComponents, sha256File } from './components';
+import { fetchComponent, PGSQL_EXCLUDE, readComponents, sha256File } from './components';
 
 const out = join(repoRoot, 'dist', 'installer');
 const stage = join(out, 'stage');
 const downloads = join(out, 'downloads');
-
-/** What PostgreSQL's binaries zip holds that the server never uses. */
-const PGSQL_EXCLUDE = [
-  'pgsql/pgAdmin 4',
-  'pgsql/StackBuilder',
-  'pgsql/doc',
-  'pgsql/include',
-  'pgsql/symbols',
-];
 
 /**
  * NSIS 3: MAKENSIS, an installed copy, or the one the desktop app's build (`pnpm build:desktop`,

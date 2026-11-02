@@ -30,17 +30,36 @@ import { verifyFileSignature } from './signature';
 
 const versionText = z.string().regex(/^\d+\.\d+\.\d+$/);
 
-/** What the server PC reads from latest.json (the release workflow writes it). */
+const runtimeId = z.string().regex(/^[0-9a-f]{12}$/);
+
+/** A download in the update list: its address, signature, SHA-256 and size. */
+const listedFile = z.object({
+  url: z.string().url().startsWith('https://'),
+  signature: z.string().min(1),
+  sha256: z.string().regex(/^[0-9a-f]{64}$/),
+  size: z.number().int().positive().optional(),
+});
+
+/**
+ * What the server PC reads from latest.json (the release workflow writes it). `server` is the full
+ * setup; `serverUpdate` (the programs only, for the runtime it names) and `runtime` (PostgreSQL,
+ * Node and WinSW) are the small packages of decision 0115. A list without them, or with a part
+ * that is not right, still gives the full setup: such a part is simply left out.
+ */
 export const latestSchema = z.object({
   version: versionText,
   pub_date: z.string().datetime({ offset: true }).optional(),
   notesAr: z.string().max(4000),
   notesEn: z.string().max(4000),
-  server: z.object({
-    url: z.string().url().startsWith('https://'),
-    signature: z.string().min(1),
-    sha256: z.string().regex(/^[0-9a-f]{64}$/),
-  }),
+  server: listedFile,
+  serverUpdate: listedFile
+    .extend({ runtime: runtimeId })
+    .optional()
+    .catch(() => undefined),
+  runtime: listedFile
+    .extend({ id: runtimeId })
+    .optional()
+    .catch(() => undefined),
 });
 export type Latest = z.infer<typeof latestSchema>;
 
