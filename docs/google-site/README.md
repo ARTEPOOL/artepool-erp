@@ -11,13 +11,13 @@ before the app's registration can be published "In production"
 | `terms.html` | Short terms of use |
 | `site.css` | Plain styles, light and dark |
 
-Before publishing, replace every `{{CONTACT_EMAIL}}` with the public contact address. The pages hold
-no secret and no customer data.
+The contact address on the pages is the software's Google account, `artepooltrading@gmail.com` (the
+owner's choice, 2026-11-02). The pages hold no secret and no customer data.
 
 ## Hosting
 
 - **On an existing website:** upload the four files into a folder (for example `artepool-erp/`).
-- **On GitHub Pages (free):** create a **public** repository in the `ARTEPOOL` organisation named
+- **On GitHub Pages (free, what ARTEPOOL uses: <https://artepool.github.io/>):** create a **public** repository in the `ARTEPOOL` organisation named
   `artepool.github.io`, add the four files at its root, then **Settings → Pages → Build and
   deployment → Deploy from a branch → `main` / `(root)` → Save**. The pages are then at
   `https://artepool.github.io/`. If Google does not accept that address as an authorized domain, buy
