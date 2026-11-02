@@ -1613,9 +1613,10 @@ One row (`id = 1`) kept by the server PC's updater (as `artepool_backup`, SYSTEM
 |---|---|---|
 | current_version | text? | The version running (x.y.z) |
 | checked_at / check_error | timestamptz? / text? | Last read of the public update list; why it failed (no internet is normal) |
-| check_requested_at | timestamptz? | The owner's last "Check now" (migration 0046, decision 0110; owner-only guard, the API may set only this and the window): the updater reads the list on its next run when this is newer than `checked_at` |
-| available_version, notes_ar, notes_en, published_at | text? … | The newest published version and its release notes (null when up to date; cleared as soon as that version is running) |
-| download_status | text | `none`, `downloading`, `ready` (SHA-256 and signature checked), `failed` |
+| check_requested_at | timestamptz? | The owner's last "Check now" (migration 0046, decision 0110; owner-only guard): the updater reads the list on its next run when this is newer than `checked_at` |
+| available_version, notes_ar, notes_en, published_at | text? … | The newest published version and its release notes (null when up to date; cleared as soon as that version is running). Since migration 0050 (decision 0115) the API also records these, with `checked_at` and `check_error`, for the owner's "Check now" (the guard refuses its role for anyone else); the updater still takes the address and the checks from the list it reads itself |
+| download_status | text | `none`, `downloading`, `ready` (SHA-256 and signature checked), `failed` (stopped: continues on the next run, or refused: deleted) |
+| download_bytes, download_total, download_rate, progress_at | bigint? / timestamptz? | The download's progress: bytes received, size, bytes per second, when written (migration 0050, decision 0115). Written by the updater at most once a second; **ignored by the audit trigger**, so a download adds no audit entries; an old `progress_at` means paused |
 | waiting_reason | text? | `open_shift`, `outside_window`, `failed_before` (rolled back once; waits for "Install now"), `installing` |
 | last_result | jsonb? | The setup's `updates\last-result.json`: ok, from, to, at, failed step |
 | window_start_hour / window_end_hour | smallint | Night window in Asia/Dubai hours (default 2–5); owner editable |

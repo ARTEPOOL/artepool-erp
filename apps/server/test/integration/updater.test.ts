@@ -342,3 +342,187 @@ describe('the server PC updater', () => {
     expect(failed.rows[0]!.error_message).toBe('migrate: boom');
   });
 });
+
+describe('fast updates (decision 0115)', () => {
+  const half = Math.floor(setup.length / 2);
+
+  it('reads the list by itself every hour, not every few hours', async () => {
+    let reads = 0;
+    const at = (minutes: number) =>
+      deps({
+        now: () => new Date(NOON.getTime() + minutes * 60_000),
+        fetchLatest: () => {
+          reads++;
+          return Promise.resolve(latest('1.0.0'));
+        },
+      });
+    await runUpdater(at(0));
+    await runUpdater(at(59));
+    expect(reads).toBe(1);
+    await runUpdater(at(60));
+    expect(reads).toBe(2);
+  });
+
+  it('downloads in advance when the server already read the list for "Check now"', async () => {
+    // What the server records for the owner's "Check now": a newer version, nothing downloaded.
+    await inContext(
+      su,
+      () =>
+        su.query(
+          `UPDATE ops.update_state SET checked_at = $1, available_version = '1.1.0',
+             notes_ar = 'تحسينات', notes_en = 'Improvements' WHERE id = 1`,
+          [NOON],
+        ),
+      owner,
+    );
+    let reads = 0;
+    const d = deps({
+      fetchLatest: () => {
+        reads++;
+        return Promise.resolve(latest('1.1.0'));
+      },
+    });
+    // The updater takes the address and the checks from the list it reads itself.
+    expect(await runUpdater(d)).toBe('waiting');
+    expect(reads).toBe(1);
+    expect(await state()).toMatchObject({
+      download_status: 'ready',
+      waiting_reason: 'outside_window',
+    });
+    expect(existsSync(join(dir, setupFileName('1.1.0')))).toBe(true);
+  });
+
+  it('a cut keeps what arrived; the next run continues it; the progress is never audited', async () => {
+    const partial = join(dir, `${setupFileName('1.1.0')}.partial`);
+    let clock = 0;
+    const cut = deps({
+      clock: () => (clock += 400),
+      download: async (_url, to, onProgress) => {
+        await writeFile(to, setup.subarray(0, half));
+        onProgress(half, setup.length);
+        throw new Error('ECONNRESET');
+      },
+    });
+    expect(await runUpdater(cut)).toBe('download_failed');
+    expect(await state()).toMatchObject({
+      download_status: 'failed',
+      download_bytes: String(half),
+      download_total: String(setup.length),
+    });
+    expect((await readFile(partial)).length).toBe(half);
+
+    let continuedFrom = -1;
+    const next = deps({
+      clock: () => (clock += 400),
+      download: async (_url, to, onProgress) => {
+        continuedFrom = (await readFile(to)).length;
+        await writeFile(to, setup);
+        onProgress(setup.length, setup.length);
+      },
+    });
+    expect(await runUpdater(next)).toBe('waiting');
+    expect(continuedFrom).toBe(half);
+    expect(await state()).toMatchObject({
+      download_status: 'ready',
+      download_bytes: String(setup.length),
+      download_total: String(setup.length),
+    });
+    expect(existsSync(partial)).toBe(false);
+    expect(existsSync(`${partial}.json`)).toBe(false);
+
+    // Status changes are in the audit log; the bytes, total, speed and time never are.
+    const { rows } = await su.query<{ keys: string[] }>(
+      `SELECT ARRAY(SELECT jsonb_object_keys(coalesce(new_values, '{}'))) AS keys
+         FROM audit.log WHERE entity_type = 'ops.update_state'`,
+    );
+    const keys = rows.flatMap((r) => r.keys);
+    expect(keys).toContain('download_status');
+    for (const quiet of ['download_bytes', 'download_total', 'download_rate', 'progress_at']) {
+      expect(keys).not.toContain(quiet);
+    }
+  });
+
+  it('a part of another file is thrown away; a wrong file is deleted, not continued', async () => {
+    const partial = join(dir, `${setupFileName('1.1.0')}.partial`);
+    await mkdir(dir, { recursive: true });
+    await writeFile(partial, Buffer.from('left from another version'));
+    await writeFile(
+      `${partial}.json`,
+      JSON.stringify({ url: 'https://old', sha256: 'f'.repeat(64) }),
+    );
+    let startedWith = -1;
+    const fresh = deps({
+      download: async (_url, to) => {
+        startedWith = existsSync(to) ? (await readFile(to)).length : 0;
+        await writeFile(to, Buffer.from('not the setup'));
+      },
+    });
+    expect(await runUpdater(fresh)).toBe('download_failed');
+    expect(startedWith).toBe(0);
+    // Its SHA-256 is wrong: deleted with its note, and the progress is emptied.
+    expect(existsSync(partial)).toBe(false);
+    expect(existsSync(`${partial}.json`)).toBe(false);
+    expect(await state()).toMatchObject({ download_status: 'failed', download_bytes: null });
+  });
+
+  it('the speed is worked out, and the progress is written at most once a second', async () => {
+    let clock = 0;
+    const writes: number[] = [];
+    const d = deps({
+      clock: () => clock,
+      download: async (_url, to, onProgress) => {
+        // Ten reports, 200 ms apart: two seconds in all.
+        for (let i = 1; i <= 10; i++) {
+          clock += 200;
+          onProgress(Math.round((setup.length * i) / 10), setup.length);
+        }
+        await writeFile(to, setup);
+      },
+    });
+    const query = client.query.bind(client);
+    client.query = ((text: unknown, ...rest: unknown[]) => {
+      if (typeof text === 'string' && text.includes('download_bytes')) writes.push(clock);
+      return (query as (...args: unknown[]) => unknown)(text, ...rest);
+    }) as typeof client.query;
+    try {
+      expect(await runUpdater(d)).toBe('waiting');
+    } finally {
+      client.query = query;
+    }
+    // At most one a second while downloading (0, 1000, 2000 ms), plus the last one.
+    expect(writes.length).toBeLessThanOrEqual(4);
+    const s = await state();
+    expect(s.download_bytes).toBe(String(setup.length));
+    expect(Number(s.download_rate)).toBeGreaterThan(0);
+  });
+
+  it("the server's role records a check only for the owner, and never the progress", async () => {
+    const api = new pg.Client(connectionFor('api', db.name));
+    await api.connect();
+    try {
+      const cashier = await createUser(su, { username: 'cashier-list', roles: ['cashier'] });
+      await expect(
+        inContext(
+          api,
+          () => api.query(`UPDATE ops.update_state SET available_version = '9.9.9' WHERE id = 1`),
+          cashier,
+        ),
+      ).rejects.toMatchObject({ code: 'AP010' });
+      await inContext(
+        api,
+        () => api.query(`UPDATE ops.update_state SET available_version = '1.1.0' WHERE id = 1`),
+        owner,
+      );
+      // The progress is the updater's alone.
+      await expect(
+        inContext(
+          api,
+          () => api.query('UPDATE ops.update_state SET download_bytes = 1 WHERE id = 1'),
+          owner,
+        ),
+      ).rejects.toMatchObject({ code: '42501' });
+    } finally {
+      await api.end();
+    }
+  });
+});

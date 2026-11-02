@@ -951,14 +951,13 @@
     "offline": "The internet could not be reached. Everything keeps working; updates wait.",
     "upToDate": "Up to date",
     "checkNow": "Check now",
-    "checking": "Checking for updates… the result shows here within 5 minutes.",
-    "checkAsked": "The server PC checks for updates within 5 minutes.",
+    "checking": "Checking for updates…",
     "available": "New version",
     "download": {
       "none": "Not downloaded yet",
       "downloading": "Downloading in the background…",
       "ready": "Downloaded and checked",
-      "failed": "The download was refused; it is tried again later"
+      "failed": "The download stopped; it continues by itself"
     },
     "waiting": {
       "open_shift": "Waiting: a shift is open",
@@ -967,13 +966,13 @@
       "installing": "Installing now…"
     },
     "request": {
-      "pending": "Install now: starting within a few minutes",
+      "pending": "Install now: starting",
       "running": "Install now: installing",
       "done": "Installed",
       "failed": "Install now did not succeed"
     },
     "installNow": "Install now",
-    "asked": "The update starts within a few minutes, when no shift is open.",
+    "asked": "The update starts now, if no shift is open.",
     "confirm": "Version {version} will be installed now. The system stops for a few minutes while it installs; a checked backup is made first, and if anything goes wrong the previous version comes back by itself. It never starts while a shift is open.",
     "last": "Last update",
     "lastOk": "Updated to {version} on {date}.",
@@ -995,7 +994,21 @@
     "changeWindow": "Change",
     "from": "From",
     "to": "To",
-    "automatic": "The server PC checks for updates by itself every few hours; to check at once, press \"Check now\". It downloads them in the background and installs them at a safe time. The office PCs update after the server."
+    "automatic": "The server PC checks for updates by itself every hour; to check at once, press \"Check now\". It downloads them in the background as soon as they are out and installs them at a safe time. The office PCs update after the server.",
+    "checkFound": "New version {version} found; it is downloading now.",
+    "checkNone": "You have the latest version.",
+    "checkOffline": "No internet right now; the server PC keeps trying by itself.",
+    "progress": {
+      "label": "Update download",
+      "of": "{received} of {total} MB",
+      "received": "{received} MB",
+      "left": "about {time} left",
+      "paused": "paused, it continues by itself when the internet is back",
+      "seconds_one": "{count} second",
+      "seconds_other": "{count} seconds",
+      "minutes_one": "{count} minute",
+      "minutes_other": "{count} minutes"
+    }
   },
   "serverHealth": {
     "title": "Server PC",

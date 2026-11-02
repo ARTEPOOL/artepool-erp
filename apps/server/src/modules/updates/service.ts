@@ -1,7 +1,7 @@
 /**
  * Automatic online updates in System health (decision 0108): what the server PC's updater keeps
- * in ops.update_state, the owner's "Check now" (0110), "Install now" and the night window. Owner
- * only.
+ * in ops.update_state, the owner's "Check now" (0110, read by the server itself since 0115),
+ * "Install now" (the updater is woken at once, 0115) and the night window. Owner only.
  */
 import { sql, type Kysely, type Transaction } from 'kysely';
 import {
@@ -10,6 +10,7 @@ import {
   type UpdateStatus,
   type UpdateWindowBody,
 } from '@artepool/shared/contracts';
+import { latestSchema, type Latest } from '../../cli/updater/steps';
 import { AppError } from '../../platform/errors/app-error';
 import type { DB } from '../../platform/db/schema.generated';
 
@@ -53,10 +54,19 @@ export async function updateStatus(db: Kysely<DB>): Promise<UpdateStatus> {
           status: request.status as 'pending' | 'running' | 'done' | 'failed',
         }
       : null,
+    progress:
+      state.download_bytes !== null && state.progress_at
+        ? {
+            receivedBytes: Number(state.download_bytes),
+            totalBytes: state.download_total === null ? null : Number(state.download_total),
+            bytesPerSecond: Number(state.download_rate ?? 0),
+            at: state.progress_at.toISOString(),
+          }
+        : null,
   };
 }
 
-/** "Install now": the downloaded, checked version; installed within minutes if no shift is open. */
+/** "Install now": the downloaded, checked version; the updater is woken and starts at once (0115). */
 export async function installNow(trx: Transaction<DB>): Promise<{ version: string }> {
   const state = await trx
     .selectFrom('ops.update_state')
@@ -83,14 +93,56 @@ export async function installNow(trx: Transaction<DB>): Promise<{ version: strin
   return { version: state.available_version };
 }
 
-/** "Check now" (0110): the server PC's updater reads the update list on its next run (≤ 5 minutes). */
-export async function checkNow(trx: Transaction<DB>): Promise<{ ok: true }> {
+/** What the server found when it read the update list itself (0115). */
+export type ListRead = { latest: Latest } | { error: string };
+
+/** Reads the update list before the transaction (0115); no internet is an answer, not an error. */
+export async function readUpdateList(fetchLatest: () => Promise<unknown>): Promise<ListRead> {
+  try {
+    return { latest: latestSchema.parse(await fetchLatest()) };
+  } catch (error) {
+    return { error: (error instanceof Error ? error.message : String(error)).slice(0, 500) };
+  }
+}
+
+/**
+ * "Check now" (0110, 0115): the owner's request and, when the server reached the update list,
+ * what it says, in one transaction; the updater is then woken and downloads a newer version at
+ * once. When the server could not reach it, the request stays open for the updater to read it.
+ */
+export async function checkNow(
+  trx: Transaction<DB>,
+  read: ListRead,
+): Promise<{ ok: true; available: string | null; error: string | null }> {
+  const state = await trx
+    .selectFrom('ops.update_state')
+    .select('current_version')
+    .where('id', '=', 1)
+    .executeTakeFirstOrThrow();
+  if ('error' in read) {
+    await trx
+      .updateTable('ops.update_state')
+      .set({ check_requested_at: sql<Date>`now()` })
+      .where('id', '=', 1)
+      .execute();
+    return { ok: true, available: null, error: read.error };
+  }
+  const { latest } = read;
+  const newer = !state.current_version || isNewerVersion(latest.version, state.current_version);
   await trx
     .updateTable('ops.update_state')
-    .set({ check_requested_at: sql<Date>`now()` })
+    .set({
+      check_requested_at: sql<Date>`now()`,
+      checked_at: sql<Date>`now()`,
+      check_error: null,
+      available_version: newer ? latest.version : null,
+      notes_ar: newer ? latest.notesAr : null,
+      notes_en: newer ? latest.notesEn : null,
+      published_at: newer && latest.pub_date ? new Date(latest.pub_date) : null,
+    })
     .where('id', '=', 1)
     .execute();
-  return { ok: true };
+  return { ok: true, available: newer ? latest.version : null, error: null };
 }
 
 export async function setWindow(trx: Transaction<DB>, body: UpdateWindowBody): Promise<void> {

@@ -134,3 +134,24 @@
 .serverCard {
   margin-block-end: var(--space-4);
 }
+
+/* The update's download (decision 0115): a bar from 0 to 100%. */
+.progress {
+  display: grid;
+  gap: var(--space-1);
+  margin-block-start: var(--space-2);
+}
+
+.progressTrack {
+  block-size: 0.5rem;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-muted);
+  overflow: hidden;
+}
+
+.progressBar {
+  block-size: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--color-primary);
+  transition: inline-size 0.4s var(--motion-ease);
+}
