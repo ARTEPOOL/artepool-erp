@@ -383,6 +383,9 @@ importers:
       '@artepool/node-kit':
         specifier: workspace:*
         version: link:../../packages/node-kit
+      '@artepool/release':
+        specifier: workspace:*
+        version: link:../release
     devDependencies:
       age-encryption:
         specifier: 0.3.1

@@ -5,25 +5,32 @@
  *                                           docs/runbooks/updates-setup.md)
  *   pnpm release check                      the release notes (Arabic and English) are there
  *   pnpm release tauri-config <out.json>   the desktop app's release settings (update key, list)
- *   pnpm release prepare                    dist/release: the signed setups, latest.json, SHA256SUMS
+ *   pnpm release prepare                    dist/release: the signed setups and update packages, the
+ *                                           runtime when it changed, latest.json, SHA256SUMS
  *   pnpm release publish                    the check again, then a GitHub release in the public
  *                                           repository (RELEASES_TOKEN, limited to that repository)
  */
 import { execFileSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { copyFile, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { basename, join } from 'node:path';
 import { repoRoot } from '@artepool/node-kit';
 import {
   checkPublishable,
+  LATEST_URL,
   latestJson,
   readReleaseNotes,
+  releaseUrl,
   RELEASES_REPOSITORY,
+  reusableRuntime,
+  RUNTIME_ID,
+  runtimeFileName,
   sha256File,
   tauriReleaseConfig,
   type ReleaseFile,
+  type RuntimeEntry,
 } from './index';
 
 const installerDir = join(repoRoot, 'dist', 'installer');
@@ -36,11 +43,33 @@ async function version(): Promise<string> {
   return pkg.version;
 }
 
-async function officeSignature(): Promise<string> {
-  const dir = join(repoRoot, 'apps', 'desktop', 'src-tauri', 'target', 'release', 'bundle', 'nsis');
-  const sig = (await readdir(dir)).find((f) => f.endsWith('-setup.exe.sig'));
-  if (!sig) throw new Error(`No signed desktop setup in ${dir}: build it with the update key.`);
-  return join(dir, sig);
+/**
+ * One release file from dist/installer with its signature beside it (`<name>.sig`, made by the
+ * release workflow with the update key), copied into dist/release.
+ */
+async function take(name: string): Promise<ReleaseFile> {
+  const from = join(installerDir, name);
+  const sigFile = `${from}.sig`;
+  if (!existsSync(from)) throw new Error(`${from} is missing: build it first.`);
+  if (!existsSync(sigFile)) throw new Error(`${sigFile} is missing: sign it with the update key.`);
+  await copyFile(from, join(releaseDir, name));
+  const signature = (await readFile(sigFile, 'utf8')).trim();
+  await writeFile(join(releaseDir, `${name}.sig`), signature);
+  const to = join(releaseDir, name);
+  return { name, signature, sha256: await sha256File(to), size: (await stat(to)).size };
+}
+
+/** The update list published now, to see whether its runtime is this one (none: null). */
+async function publishedList(): Promise<unknown> {
+  try {
+    const response = await fetch(LATEST_URL, {
+      redirect: 'follow',
+      signal: AbortSignal.timeout(30_000),
+    });
+    return response.ok ? await response.json() : null;
+  } catch {
+    return null;
+  }
 }
 
 async function prepare(): Promise<void> {
@@ -48,25 +77,47 @@ async function prepare(): Promise<void> {
   const notes = await readReleaseNotes(join(repoRoot, 'release-notes'), v);
   await rm(releaseDir, { recursive: true, force: true });
   await mkdir(releaseDir, { recursive: true });
-  const files: Record<'server' | 'office', ReleaseFile> = {} as never;
-  for (const [kind, name, sig] of [
-    [
-      'server',
-      `ARTEPOOL-Server-Setup-${v}.exe`,
-      join(installerDir, `ARTEPOOL-Server-Setup-${v}.exe.sig`),
-    ],
-    ['office', `ARTEPOOL-Office-Setup-${v}.exe`, await officeSignature()],
-  ] as const) {
-    await copyFile(join(installerDir, name), join(releaseDir, name));
-    const signature = (await readFile(sig, 'utf8')).trim();
-    await writeFile(join(releaseDir, `${name}.sig`), signature);
-    files[kind] = { name, signature, sha256: await sha256File(join(releaseDir, name)) };
+  const runtimeId = (
+    JSON.parse(await readFile(join(installerDir, 'runtime.json'), 'utf8')) as { id?: string }
+  ).id;
+  if (!runtimeId || !RUNTIME_ID.test(runtimeId)) {
+    throw new Error(`${join(installerDir, 'runtime.json')} has no runtime id: build it first.`);
   }
-  const list = latestJson({ version: v, notes, pubDate: new Date(), ...files });
+  const server = await take(`ARTEPOOL-Server-Setup-${v}.exe`);
+  const serverUpdate = await take(`ARTEPOOL-Server-Update-${v}.exe`);
+  const office = await take(`ARTEPOOL-Office-Setup-${v}.exe`);
+  const officeUpdate = await take(`ARTEPOOL-Office-Update-${v}.exe`);
+  const files = [server, serverUpdate, office, officeUpdate];
+  // The runtime goes out only with the release that changes it; later lists point to that file.
+  let runtime: RuntimeEntry | null = reusableRuntime(runtimeId, await publishedList());
+  if (runtime) {
+    console.log(`Runtime ${runtimeId} is already published (${runtime.url}): not published again.`);
+  } else {
+    const file = await take(runtimeFileName(runtimeId));
+    files.push(file);
+    runtime = {
+      id: runtimeId,
+      url: releaseUrl(v, file.name),
+      signature: file.signature,
+      sha256: file.sha256,
+      size: file.size,
+    };
+    console.log(`Runtime ${runtimeId} is new: published with ${v}.`);
+  }
+  const list = latestJson({
+    version: v,
+    notes,
+    pubDate: new Date(),
+    server,
+    serverUpdate,
+    office,
+    officeUpdate,
+    runtime,
+  });
   await writeFile(join(releaseDir, 'latest.json'), `${JSON.stringify(list, null, 2)}\n`);
   await writeFile(
     join(releaseDir, 'SHA256SUMS.txt'),
-    `${files.server.sha256}  ${files.server.name}\n${files.office.sha256}  ${files.office.name}\n`,
+    files.map((f) => `${f.sha256}  ${f.name}\n`).join(''),
   );
   await assertPublishable();
   console.log(`Release ${v} prepared in ${releaseDir}.`);

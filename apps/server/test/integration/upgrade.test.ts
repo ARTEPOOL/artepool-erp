@@ -47,6 +47,20 @@ function fakePlatform() {
   return { platform, calls };
 }
 
+/** The steps as they begin and the status page (0115), in the same list as the services. */
+function stepsAndPage(calls: string[]) {
+  return {
+    onStep: (step: string) => void calls.push(`step ${step}`),
+    statusPage: {
+      start: () => Promise.resolve(void calls.push('status page start')),
+      stop: () => {
+        calls.push('status page stop');
+        return Promise.resolve(null);
+      },
+    },
+  };
+}
+
 const quietLog = () => new InstallLog(null, () => undefined);
 
 /** The repository's migrations plus the given new ones, numbered after the last. */
@@ -77,7 +91,13 @@ async function query<T extends pg.QueryResultRow>(sql: string, database = db.nam
 const tableExists = async (name: string) =>
   (await query<{ t: string | null }>(`SELECT to_regclass('${name}')::text AS t`))[0]!.t !== null;
 
-async function prepare(platform: UpgradePlatform, from: string, to: string, now: Date) {
+async function prepare(
+  platform: UpgradePlatform,
+  from: string,
+  to: string,
+  now: Date,
+  extra: Partial<Parameters<typeof prepareUpgrade>[0]> = {},
+) {
   return prepareUpgrade({
     from,
     to,
@@ -91,6 +111,7 @@ async function prepare(platform: UpgradePlatform, from: string, to: string, now:
     platform,
     log: quietLog(),
     now,
+    ...extra,
   });
 }
 
@@ -173,7 +194,7 @@ describe('the server upgrade', () => {
   it('makes a checked pre-upgrade copy, then stops the database for the folder swap', async () => {
     const { platform, calls } = fakePlatform();
     const now = new Date('2026-10-25T09:30:00Z');
-    const prepared = await prepare(platform, '1.0.0', '1.1.0', now);
+    const prepared = await prepare(platform, '1.0.0', '1.1.0', now, stepsAndPage(calls));
 
     expect(prepared.backup).toBe(
       join(root, 'backups', 'pre-upgrade', 'artepool-20261025-093000Z-1.0.0-to-1.1.0.dump'),
@@ -182,7 +203,15 @@ describe('the server upgrade', () => {
     expect(await readFile(`${prepared.backup}.sha256`, 'utf8')).toBe(
       `${prepared.sha256}  artepool-20261025-093000Z-1.0.0-to-1.1.0.dump\n`,
     );
-    expect(calls).toEqual(['stop backup', 'stop server', 'stop database']);
+    // The status page answers from the moment the server stops (0115).
+    expect(calls).toEqual([
+      'step stop',
+      'stop backup',
+      'stop server',
+      'status page start',
+      'step backup',
+      'stop database',
+    ]);
   });
 
   it('keeps only the newest pre-upgrade copies', async () => {
@@ -218,16 +247,21 @@ describe('the server upgrade', () => {
       platform,
       log: quietLog(),
       waitHealthy: (ca) => Promise.resolve(void (healthCa = ca)),
+      ...stepsAndPage(calls),
     });
 
     expect(result).toMatchObject({ ok: true, from: '1.0.0', to: '1.1.0', migrations: 1 });
     currentDir = dir;
     expect(healthCa).toBe('the CA');
+    // The status page gives the port back before the new server starts (0115).
     expect(calls).toEqual([
+      'step database',
       'refresh server',
       'refresh backup',
       'updater task',
       'start database',
+      'step start',
+      'status page stop',
       'start server',
       'start backup',
     ]);
@@ -265,9 +299,17 @@ describe('the server upgrade', () => {
       platform,
       log: quietLog(),
       waitHealthy: () => Promise.resolve(),
+      ...stepsAndPage(calls),
     });
 
     expect(result).toMatchObject({ ok: false, step: 'migrate', databasePutBack: false });
+    // Stopped before the setup starts the previous version again.
+    expect(calls.slice(-4)).toEqual([
+      'status page stop',
+      'stop backup',
+      'stop server',
+      'stop database',
+    ]);
     expect(await tableExists('sys.upgrade_test_two')).toBe(false);
     expect(await query('SELECT count(*)::int AS n FROM sys.schema_migrations')).toEqual(before);
     expect(calls.slice(-3)).toEqual(['stop backup', 'stop server', 'stop database']);
@@ -322,6 +364,29 @@ describe('the server upgrade', () => {
     expect(calls.slice(-3)).toEqual(['stop backup', 'stop server', 'stop database']);
   }, 120_000);
 
+  it('refuses an update package whose runtime is not beside it, before stopping anything (0115)', async () => {
+    const { platform, calls } = fakePlatform();
+    const programDir = join(root, 'programs-without-runtime');
+    await mkdir(programDir, { recursive: true });
+    await expect(
+      prepareUpgrade({
+        from: '1.0.0',
+        to: '1.1.0',
+        dataPgMajor: 18,
+        bundledPgMajor: null,
+        databaseName: db.name,
+        migrationsDir,
+        runtime: { programDir, id: '0123456789ab' },
+        backupsDir: join(root, 'backups'),
+        pgBin,
+        connections,
+        platform,
+        log: quietLog(),
+      }),
+    ).rejects.toMatchObject({ step: 'checks' });
+    expect(calls).toEqual([]);
+  });
+
   it('refuses a version that lacks a migration the database has, before stopping anything', async () => {
     const { platform, calls } = fakePlatform();
     const refused = prepareUpgrade({
@@ -374,12 +439,18 @@ describe('the server upgrade', () => {
     } finally {
       await su.end();
     }
-    await expect(prepare(platform, '1.2.0', '1.3.0', new Date())).rejects.toMatchObject({
+    await expect(
+      prepare(platform, '1.2.0', '1.3.0', new Date(), stepsAndPage(calls)),
+    ).rejects.toMatchObject({
       step: 'open_shift',
     });
+    // The status page goes before the services start again (0115).
     expect(calls).toEqual([
+      'step stop',
       'stop backup',
       'stop server',
+      'status page start',
+      'status page stop',
       'start database',
       'start server',
       'start backup',

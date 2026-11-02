@@ -10,6 +10,7 @@ pub mod connection;
 pub mod emergency;
 pub mod enroll;
 pub mod loopback;
+pub mod quiet_update;
 pub mod restore;
 pub mod rules;
 pub mod setup;

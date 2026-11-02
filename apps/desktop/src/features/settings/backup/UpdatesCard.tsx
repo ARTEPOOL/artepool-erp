@@ -3,7 +3,10 @@
  * (0110; answered in seconds since 0115), a newer version with its release notes (in the screen's
  * language, one point per line), its download as a progress bar (0115), why it is waiting, the
  * last update's result, "Install now" (the updater is woken at once, 0115) and the night window.
- * Updates come by themselves; without internet they wait.
+ * Updates come by themselves; without internet they wait. While a shift is open a ready update
+ * says it installs after the shift is closed, and the owner's "Install now" becomes "Install after
+ * shift close". The last update shows each step with its time, the reason when it failed, and when
+ * the status page answered the PCs (0115, 0.9.0).
  */
 import { useState } from 'react';
 import { Download, RefreshCw } from 'lucide-react';
@@ -11,7 +14,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import type { UpdateStatus, UpdateWindowBody } from '@artepool/shared/contracts';
 import { useApi, useSave } from '../../../api/hooks';
-import { formatDateTime } from '../../../lib/format';
+import { formatDateTime, formatTime } from '../../../lib/format';
 import {
   Alert,
   Button,
@@ -25,6 +28,7 @@ import {
   useToast,
 } from '../../../ui';
 import { useCan, useErrorText } from '../../auth/context';
+import { StepList, useDuration } from '../../updates/StepList';
 import { CardHead, settingsClasses } from '../parts';
 import styles from './backup.module.css';
 
@@ -186,7 +190,11 @@ export function UpdatesCard() {
   );
 
   const u = status.data;
+  const duration = useDuration();
   const manage = can('system.update.manage');
+  // Ready, but a shift is open: it installs after the shift is closed (0115).
+  const afterShift = u?.downloadStatus === 'ready' && u.waitingReason === 'open_shift';
+  const installLabel = afterShift ? t('updates.installAfterShift') : t('updates.installNow');
   const open = u?.request && ['pending', 'running'].includes(u.request.status);
   const notes = u?.available
     ? i18n.language === 'ar'
@@ -246,11 +254,22 @@ export function UpdatesCard() {
                   {t('updates.available')}: <bdi>{u.available.version}</bdi>
                 </b>
                 {notes && <ReleaseNotes text={notes} />}
-                <div className={styles.muted}>
-                  {t(`updates.download.${u.downloadStatus}`)}
-                  {u.waitingReason && <> · {t(`updates.waiting.${u.waitingReason}`)}</>}
-                  {open && <> · {t(`updates.request.${u.request!.status}`)}</>}
-                </div>
+                {afterShift ? (
+                  <div data-testid="update-after-shift">
+                    <b>{t('updates.readyAfterShift')}</b>
+                    {manage && (
+                      <div className={styles.muted}>
+                        {open ? t('updates.startsAfterShift') : t('updates.installAfterShiftNote')}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className={styles.muted}>
+                    {t(`updates.download.${u.downloadStatus}`)}
+                    {u.waitingReason && <> · {t(`updates.waiting.${u.waitingReason}`)}</>}
+                    {open && <> · {t(`updates.request.${u.request!.status}`)}</>}
+                  </div>
+                )}
                 {u.progress && ['downloading', 'failed'].includes(u.downloadStatus) && (
                   <DownloadProgress progress={u.progress} />
                 )}
@@ -263,7 +282,7 @@ export function UpdatesCard() {
                     onPress={() => setConfirming(true)}
                   >
                     <Download className={iconClass.sm} aria-hidden="true" />
-                    {t('updates.installNow')}
+                    {installLabel}
                   </Button>
                 </div>
               )}
@@ -289,6 +308,35 @@ export function UpdatesCard() {
                         }),
                       })}
                 </div>
+                {u.lastResult.steps && (
+                  <div className={styles.lastSteps} data-testid="update-last-steps">
+                    <StepList steps={u.lastResult.steps} durations />
+                    {(() => {
+                      const first = u.lastResult.steps[0]?.startedAt;
+                      const seconds = first
+                        ? Math.round((Date.parse(u.lastResult.at) - Date.parse(first)) / 1000)
+                        : null;
+                      return seconds !== null && seconds >= 0 ? (
+                        <div className={styles.muted}>
+                          {t('updates.took', { duration: duration(seconds) })}
+                        </div>
+                      ) : null;
+                    })()}
+                  </div>
+                )}
+                {!u.lastResult.ok && u.lastResult.detail && (
+                  <div className={styles.muted} data-testid="update-last-reason">
+                    {t('updates.reason', { reason: u.lastResult.detail })}
+                  </div>
+                )}
+                {u.lastResult.statusPage?.startedAt && u.lastResult.statusPage.stoppedAt && (
+                  <div className={styles.muted}>
+                    {t('updates.statusPage', {
+                      start: formatTime(u.lastResult.statusPage.startedAt),
+                      end: formatTime(u.lastResult.statusPage.stoppedAt),
+                    })}
+                  </div>
+                )}
               </div>
               <Chip tone={u.lastResult.ok ? 'ok' : 'danger'}>
                 {u.lastResult.ok ? t('updates.ok') : t('updates.rolledBack')}
@@ -320,7 +368,7 @@ export function UpdatesCard() {
       <Note className={settingsClasses.tableNote}>{t('updates.automatic')}</Note>
 
       {confirming && u?.available && (
-        <Dialog isOpen onClose={() => setConfirming(false)} title={t('updates.installNow')}>
+        <Dialog isOpen onClose={() => setConfirming(false)} title={installLabel}>
           <div className={styles.form}>
             <p className={settingsClasses.helpText}>
               {t('updates.confirm', { version: u.available.version })}
@@ -336,7 +384,7 @@ export function UpdatesCard() {
                   installNow.mutate(null, { onError: (e) => setProblem(errorText(e)) });
                 }}
               >
-                {t('updates.installNow')}
+                {installLabel}
               </Button>
             </DialogFooter>
           </div>

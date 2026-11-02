@@ -4,8 +4,10 @@
  * "Install now" (the updater is woken at once, 0115) and the night window. Owner only.
  */
 import { sql, type Kysely, type Transaction } from 'kysely';
+import { z } from 'zod';
 import {
   isNewerVersion,
+  UPDATE_STEP_NAMES,
   type UpdateResult,
   type UpdateStatus,
   type UpdateWindowBody,
@@ -15,6 +17,59 @@ import { AppError } from '../../platform/errors/app-error';
 import type { DB } from '../../platform/db/schema.generated';
 
 const iso = (value: Date | null) => (value ? value.toISOString() : null);
+
+const optionalText = (max: number) => z.string().max(max).optional().catch(undefined);
+
+/**
+ * The last update's result as the setup wrote it (updates\last-result.json, kept by the updater):
+ * only these fields reach the screen; the steps and the status page's times since 0.9.0 (0115).
+ */
+const lastResultSchema = z.object({
+  ok: z.boolean(),
+  from: z.string().max(20).nullable().catch(null),
+  to: z.string().max(20).nullable().catch(null),
+  at: z.string().max(40),
+  step: optionalText(40),
+  detail: optionalText(2000),
+  databasePutBack: z.boolean().optional().catch(undefined),
+  steps: z
+    .array(
+      z.object({
+        step: z.enum(UPDATE_STEP_NAMES),
+        state: z.enum(['pending', 'running', 'done', 'failed']),
+        startedAt: z.string().max(40).nullable(),
+        endedAt: z.string().max(40).nullable(),
+      }),
+    )
+    .max(UPDATE_STEP_NAMES.length)
+    .optional()
+    .catch(undefined),
+  statusPage: z
+    .object({
+      startedAt: z.string().max(40).nullable(),
+      stoppedAt: z.string().max(40).nullable(),
+      stopReason: z.string().max(40).nullable(),
+    })
+    .nullable()
+    .optional()
+    .catch(undefined)
+    .transform((value) => value ?? undefined),
+});
+
+function lastResultOf(raw: unknown): UpdateResult | null {
+  const parsed = lastResultSchema.safeParse(raw);
+  if (!parsed.success) return null;
+  const result: UpdateResult = {
+    ok: parsed.data.ok,
+    from: parsed.data.from,
+    to: parsed.data.to,
+    at: parsed.data.at,
+  };
+  for (const key of ['step', 'detail', 'databasePutBack', 'steps', 'statusPage'] as const) {
+    if (parsed.data[key] !== undefined) Object.assign(result, { [key]: parsed.data[key] });
+  }
+  return result;
+}
 
 export async function updateStatus(db: Kysely<DB>): Promise<UpdateStatus> {
   const state = await db
@@ -46,7 +101,7 @@ export async function updateStatus(db: Kysely<DB>): Promise<UpdateStatus> {
         : null,
     downloadStatus: state.download_status as UpdateStatus['downloadStatus'],
     waitingReason: state.waiting_reason as UpdateStatus['waitingReason'],
-    lastResult: (state.last_result as UpdateResult | null) ?? null,
+    lastResult: lastResultOf(state.last_result),
     window: { startHour: state.window_start_hour, endHour: state.window_end_hour },
     request: request
       ? {

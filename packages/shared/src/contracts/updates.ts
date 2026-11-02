@@ -20,6 +20,17 @@ export function isNewerVersion(a: string, b: string | null): boolean {
   return false;
 }
 
+/** The five steps of an update as System health shows them (decision 0115, 0.9.0). */
+export const UPDATE_STEP_NAMES = ['prepare', 'stop', 'backup', 'database', 'start'] as const;
+export type UpdateStepName = (typeof UPDATE_STEP_NAMES)[number];
+
+export interface UpdateStepRecord {
+  step: UpdateStepName;
+  state: 'pending' | 'running' | 'done' | 'failed';
+  startedAt: string | null;
+  endedAt: string | null;
+}
+
 export interface UpdateResult {
   ok: boolean;
   from: string | null;
@@ -27,8 +38,14 @@ export interface UpdateResult {
   at: string;
   /** The step that failed (checks, open_shift, backup, migrate, health, put_back, services). */
   step?: string;
+  /** Why it failed, in the upgrade program's words (decision 0115: shown to the owner). */
+  detail?: string;
   /** The previous version is running again (a failed update is always rolled back). */
   databasePutBack?: boolean;
+  /** Each step with its times (decision 0115, 0.9.0; none for updates before it). */
+  steps?: UpdateStepRecord[];
+  /** The status page while the server was stopped: when it started and stopped (0115). */
+  statusPage?: { startedAt: string | null; stoppedAt: string | null; stopReason: string | null };
 }
 
 export interface UpdateStatus {
@@ -71,3 +88,23 @@ export const UpdateWindowBody = z
   .strict()
   .refine((b) => b.startHour !== b.endHour, { path: ['endHour'] });
 export type UpdateWindowBody = z.infer<typeof UpdateWindowBody>;
+
+/** `GET /api/v1/system/version` (decision 0115): the server's version, for enrolled PCs. */
+export interface ServerVersion {
+  version: string;
+}
+
+/**
+ * What the status page answers on `GET /health` while the server is stopped for an update
+ * (decision 0115): HTTP 503 with the versions and the steps, never anything else.
+ */
+export interface UpdatingHealth {
+  status: 'updating';
+  update: {
+    from: string;
+    to: string;
+    startedAt: string;
+    steps: UpdateStepRecord[];
+    result: { ok: boolean; at: string; step: UpdateStepName | null } | null;
+  } | null;
+}

@@ -3,6 +3,9 @@
  * starts and every few hours. While nobody is signed in (the sign-in screen, or "update needed")
  * it installs at once; otherwise it shows a notice with the release notes and "Install and
  * restart", so nobody loses their work. The server PC's app is updated with the server instead.
+ * Since 0.9.0 (decision 0115) installing goes through the quiet updater (a SYSTEM task): no
+ * Windows permission question, and the app opens again by itself; while the app is closed, that
+ * task installs at sign-in or within the hour without asking anyone.
  */
 import { useEffect, useState } from 'react';
 import { Download } from 'lucide-react';

@@ -22,6 +22,60 @@ export interface Component {
 
 export type ComponentName = 'node' | 'postgresql' | 'winsw';
 
+/** What PostgreSQL's binaries zip holds that the server never uses (left out of the runtime). */
+export const PGSQL_EXCLUDE = [
+  'pgsql/pgAdmin 4',
+  'pgsql/StackBuilder',
+  'pgsql/doc',
+  'pgsql/include',
+  'pgsql/symbols',
+];
+
+/**
+ * The runtime's folders in `C:\Program Files\ARTEPOOL` (decision 0115, 0.9.0): what the update
+ * package does not carry. A change in this list, or in what goes into it, raises the layout.
+ */
+export const RUNTIME_FOLDERS = ['node', 'pgsql', 'winsw'] as const;
+export const RUNTIME_LAYOUT = 1;
+
+/** `runtime.json` beside the programs: which runtime is installed. */
+export interface RuntimeManifest {
+  /** 12 hex characters; the same pinned programs always give the same id. */
+  id: string;
+  layout: number;
+  node: string;
+  postgresql: string;
+  winsw: string;
+}
+
+/**
+ * The runtime's id: the SHA-256 of the layout, each pinned program's own SHA-256 and the parts of
+ * PostgreSQL left out, shortened to 12 hex characters. A new Node, PostgreSQL or WinSW, or another
+ * layout, gives another id, so an update package is only ever installed over its own runtime.
+ */
+export function runtimeManifest(components: Record<ComponentName, Component>): RuntimeManifest {
+  const id = createHash('sha256')
+    .update(
+      JSON.stringify({
+        layout: RUNTIME_LAYOUT,
+        folders: RUNTIME_FOLDERS,
+        node: components.node.sha256,
+        postgresql: components.postgresql.sha256,
+        pgsqlExclude: PGSQL_EXCLUDE,
+        winsw: components.winsw.sha256,
+      }),
+    )
+    .digest('hex')
+    .slice(0, 12);
+  return {
+    id,
+    layout: RUNTIME_LAYOUT,
+    node: components.node.version,
+    postgresql: components.postgresql.version,
+    winsw: components.winsw.version,
+  };
+}
+
 export async function readComponents(
   file = join(repoRoot, 'tools', 'installer', 'components.json'),
 ): Promise<Record<ComponentName, Component>> {

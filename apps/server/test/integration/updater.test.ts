@@ -5,9 +5,11 @@
  * SHA-256 and signature are right; it starts only at a safe time (no open shift; the night window
  * or the owner's "Install now"); the result is recorded and a failed version waits for the owner;
  * the version just installed is forgotten at once; the owner's "Check now" (0110) reads the list
- * on the next run.
+ * on the next run. The smallest package that fits (0115, 0.9.0): the update package alone, with
+ * the runtime package, or the full setup; a refused or failed small package means the full setup
+ * for that version.
  */
-import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
@@ -16,7 +18,17 @@ import pg from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { connectionFor } from '@artepool/node-kit';
 import { createTestDatabase, createUser, inContext, type TestDatabase } from '@artepool/testing';
-import { inWindow, runUpdater, setupFileName, type UpdaterDeps } from '../../src/cli/updater/steps';
+import { RUNTIME_FILES } from '../../src/cli/upgrade/steps';
+import {
+  inWindow,
+  runtimeDirName,
+  runUpdater,
+  setupFileName,
+  updateFileName,
+  useFullMarker,
+  type UpdaterDeps,
+} from '../../src/cli/updater/steps';
+import { RUNTIME_ZIP_NAMES, testUpdateKey, zipWith } from '../support/update-key';
 
 const fixtures = join(import.meta.dirname, '..', 'fixtures', 'update-signature');
 const publicKey = await readFile(join(fixtures, 'test.key.pub'), 'utf8');
@@ -60,6 +72,9 @@ function deps(patch: Partial<UpdaterDeps> & { started?: string[] } = {}): Update
     updatesDir: dir,
     fetchLatest: () => Promise.resolve(latest('1.1.0')),
     download: (_url, to) => copyFile(join(fixtures, 'data.bin'), to),
+    // Installed before 0.9.0 unless a test says otherwise: the full setup.
+    installedRuntime: () => Promise.resolve(null),
+    unzip: () => Promise.reject(new Error('no runtime package in this test')),
     runSetup: (file) => void started.push(file),
     now: () => NOON,
     log: () => undefined,
@@ -524,5 +539,243 @@ describe('fast updates (decision 0115)', () => {
     } finally {
       await api.end();
     }
+  });
+});
+
+describe('the smallest package that fits (decision 0115, 0.9.0)', () => {
+  const key = testUpdateKey();
+  const RID = '0123456789ab';
+  const OTHER = 'ba9876543210';
+  const download = (name: string) =>
+    `https://github.com/ARTEPOOL/artepool-releases/releases/download/v1.1.0/${name}`;
+  const bytes = {
+    full: Buffer.from('MZ the full setup, PostgreSQL and Node inside'),
+    update: Buffer.from('MZ the programs only'),
+    runtime: zipWith(RUNTIME_ZIP_NAMES),
+  };
+  const sha = (b: Buffer) => createHash('sha256').update(b).digest('hex');
+  const listed = (name: string, b: Buffer) => ({
+    url: download(name),
+    signature: key.signFile(b, name),
+    sha256: sha(b),
+    size: b.length,
+  });
+  const runtimeName = `ARTEPOOL-Runtime-${RID}.zip`;
+
+  /** A list with every package; `runtimeBytes` replaces the published runtime package. */
+  function smallList(runtimeBytes: Buffer = bytes.runtime) {
+    return {
+      ...latest('1.1.0'),
+      server: listed(setupFileName('1.1.0'), bytes.full),
+      serverUpdate: { ...listed(updateFileName('1.1.0'), bytes.update), runtime: RID },
+      runtime: { id: RID, ...listed(runtimeName, runtimeBytes) },
+    };
+  }
+
+  /** Downloads by address; what was asked is kept in `asked`. */
+  function server(files: Record<string, Buffer>, asked: string[]) {
+    return async (url: string, to: string, onProgress: (r: number, t: number | null) => void) => {
+      asked.push(url.split('/').at(-1)!);
+      const body = files[url.split('/').at(-1)!];
+      if (!body) throw new Error(`404 ${url}`);
+      await writeFile(to, body);
+      onProgress(body.length, body.length);
+    };
+  }
+
+  const published = (runtimeBytes = bytes.runtime) => ({
+    [setupFileName('1.1.0')]: bytes.full,
+    [updateFileName('1.1.0')]: bytes.update,
+    [runtimeName]: runtimeBytes,
+  });
+
+  /** What Windows' tar would unpack: the runtime with this id and its programs. */
+  const unzipRuntime = (id: string) => async (_zip: string, to: string) => {
+    await writeFile(join(to, 'runtime.json'), JSON.stringify({ id, layout: 1 }));
+    for (const parts of RUNTIME_FILES) {
+      await mkdir(join(to, ...parts.slice(0, -1)), { recursive: true });
+      await writeFile(join(to, ...parts), 'MZ');
+    }
+  };
+
+  function small(
+    patch: Partial<UpdaterDeps> & { asked?: string[]; runs?: [string, string | null][] },
+  ) {
+    const runs = patch.runs ?? [];
+    const asked = patch.asked ?? [];
+    return deps({
+      publicKey: key.publicKey,
+      fetchLatest: () => Promise.resolve(smallList()),
+      download: server(published(), asked),
+      installedRuntime: () => Promise.resolve(RID),
+      unzip: unzipRuntime(RID),
+      runSetup: (file, runtimeDir) => void runs.push([file, runtimeDir]),
+      ...patch,
+    });
+  }
+
+  it('the PC has the runtime it needs: only the update package is downloaded and run', async () => {
+    const asked: string[] = [];
+    const runs: [string, string | null][] = [];
+    await installNow('1.1.0');
+    expect(await runUpdater(small({ asked, runs }))).toBe('started');
+    expect(asked).toEqual([updateFileName('1.1.0')]);
+    expect(runs).toEqual([[join(dir, updateFileName('1.1.0')), null]]);
+    expect(await state()).toMatchObject({
+      download_bytes: String(bytes.update.length),
+      download_total: String(bytes.update.length),
+    });
+    const started = JSON.parse(await readFile(join(dir, 'installing.json'), 'utf8')) as {
+      package: string;
+    };
+    expect(started.package).toBe('update');
+  });
+
+  it('another runtime: the runtime package too, one progress bar, unpacked and checked before the setup', async () => {
+    const asked: string[] = [];
+    const runs: [string, string | null][] = [];
+    const d = small({ asked, runs, installedRuntime: () => Promise.resolve(OTHER) });
+    expect(await runUpdater(d)).toBe('waiting');
+    expect(asked).toEqual([runtimeName, updateFileName('1.1.0')]);
+    // One bar for both files.
+    expect(await state()).toMatchObject({
+      download_status: 'ready',
+      download_bytes: String(bytes.runtime.length + bytes.update.length),
+      download_total: String(bytes.runtime.length + bytes.update.length),
+    });
+    // Not unpacked until it is installed.
+    expect(existsSync(join(dir, runtimeDirName(RID)))).toBe(false);
+
+    await installNow('1.1.0');
+    const install = small({ asked, runs, installedRuntime: () => Promise.resolve(OTHER) });
+    expect(await runUpdater(install)).toBe('started');
+    // Nothing downloaded twice.
+    expect(asked).toEqual([runtimeName, updateFileName('1.1.0')]);
+    const runtimeDir = join(dir, runtimeDirName(RID));
+    expect(runs).toEqual([[join(dir, updateFileName('1.1.0')), runtimeDir]]);
+    expect(existsSync(join(runtimeDir, 'pgsql', 'bin', 'postgres.exe'))).toBe(true);
+  });
+
+  it('the full setup when the PC was installed before 0.9.0, or the list has no small packages', async () => {
+    const asked: string[] = [];
+    const runs: [string, string | null][] = [];
+    await installNow('1.1.0');
+    expect(
+      await runUpdater(small({ asked, runs, installedRuntime: () => Promise.resolve(null) })),
+    ).toBe('started');
+    expect(asked).toEqual([setupFileName('1.1.0')]);
+    expect(runs).toEqual([[join(dir, setupFileName('1.1.0')), null]]);
+
+    await reset();
+    const old = { ...smallList(), serverUpdate: undefined, runtime: undefined };
+    const asked2: string[] = [];
+    await installNow('1.1.0');
+    expect(
+      await runUpdater(small({ asked: asked2, fetchLatest: () => Promise.resolve(old) })),
+    ).toBe('started');
+    expect(asked2).toEqual([setupFileName('1.1.0')]);
+  });
+
+  it('a refused update package: the full setup for that version from then on', async () => {
+    const asked: string[] = [];
+    const forged = {
+      ...published(),
+      [updateFileName('1.1.0')]: Buffer.from('MZ something else'),
+    };
+    expect(await runUpdater(small({ asked, download: server(forged, asked) }))).toBe(
+      'download_failed',
+    );
+    expect(existsSync(join(dir, updateFileName('1.1.0')))).toBe(false);
+    expect(existsSync(join(dir, useFullMarker('1.1.0')))).toBe(true);
+    expect((await state()).download_status).toBe('failed');
+
+    const runs: [string, string | null][] = [];
+    await installNow('1.1.0');
+    expect(await runUpdater(small({ asked, runs }))).toBe('started');
+    expect(asked.at(-1)).toBe(setupFileName('1.1.0'));
+    expect(runs).toEqual([[join(dir, setupFileName('1.1.0')), null]]);
+  });
+
+  it('a runtime package holding anything else, or another runtime, is refused before the setup starts', async () => {
+    // Signed and listed as published, but with a program the runtime may not hold.
+    const extra = zipWith([...RUNTIME_ZIP_NAMES, 'server/server.mjs']);
+    const asked: string[] = [];
+    const runs: [string, string | null][] = [];
+    const bad = {
+      asked,
+      runs,
+      installedRuntime: () => Promise.resolve(OTHER),
+      fetchLatest: () => Promise.resolve(smallList(extra)),
+      download: server(published(extra), asked),
+    };
+    await installNow('1.1.0');
+    expect(await runUpdater(small(bad))).toBe('download_failed');
+    expect(runs).toEqual([]);
+    expect(existsSync(join(dir, useFullMarker('1.1.0')))).toBe(true);
+    expect(existsSync(join(dir, runtimeDirName(RID)))).toBe(false);
+    // The next run takes the full setup.
+    expect(await runUpdater(small({ ...bad }))).toBe('started');
+    expect(runs).toEqual([[join(dir, setupFileName('1.1.0')), null]]);
+
+    // A package whose runtime.json names another runtime is refused the same way.
+    await reset();
+    const runs2: [string, string | null][] = [];
+    await installNow('1.1.0');
+    expect(
+      await runUpdater(
+        small({
+          runs: runs2,
+          installedRuntime: () => Promise.resolve(OTHER),
+          unzip: unzipRuntime(OTHER),
+        }),
+      ),
+    ).toBe('download_failed');
+    expect(runs2).toEqual([]);
+    expect(existsSync(join(dir, useFullMarker('1.1.0')))).toBe(true);
+  });
+
+  it('a small package that did not install: the next try of that version takes the full setup', async () => {
+    const runs: [string, string | null][] = [];
+    await installNow('1.1.0');
+    expect(await runUpdater(small({ runs }))).toBe('started');
+    expect(runs.at(-1)![0]).toBe(join(dir, updateFileName('1.1.0')));
+    await writeFile(
+      join(dir, 'last-result.json'),
+      JSON.stringify({
+        ok: false,
+        from: '1.0.0',
+        to: '1.1.0',
+        at: '2026-10-26T08:05:00.000Z',
+        step: 'checks',
+        detail: 'This update needs runtime 0123456789ab',
+      }),
+    );
+    // The result is read (the version waits for the owner), then the owner presses it again.
+    expect(await runUpdater(small({ runs }))).toBe('waiting');
+    expect((await state()).waiting_reason).toBe('failed_before');
+    await installNow('1.1.0');
+    expect(await runUpdater(small({ runs }))).toBe('started');
+    expect(runs.at(-1)).toEqual([join(dir, setupFileName('1.1.0')), null]);
+  });
+
+  it('once the version is installed, everything kept for it goes', async () => {
+    await installNow('1.1.0');
+    expect(await runUpdater(small({ installedRuntime: () => Promise.resolve(OTHER) }))).toBe(
+      'started',
+    );
+    await writeFile(join(dir, useFullMarker('1.0.9')), '');
+    await writeFile(
+      join(dir, 'last-result.json'),
+      JSON.stringify({ ok: true, from: '1.0.0', to: '1.1.0', at: '2026-10-26T08:10:00.000Z' }),
+    );
+    expect(
+      await runUpdater(
+        small({ currentVersion: '1.1.0', fetchLatest: () => Promise.resolve(latest('1.1.0')) }),
+      ),
+    ).toBe('up_to_date');
+    const left = (await readdir(dir)).filter((name) =>
+      /^(ARTEPOOL-|runtime-|use-full-|plan\.json)/.test(name),
+    );
+    expect(left).toEqual([]);
   });
 });

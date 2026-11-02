@@ -275,4 +275,89 @@ describe('fast updates (decision 0115)', () => {
     );
     expect((await get()).json<UpdateStatus>().progress).toBeNull();
   });
+
+  it("shows the last update's steps, its reason and the status page's times, nothing else", async () => {
+    const steps = [
+      {
+        step: 'prepare',
+        state: 'done',
+        startedAt: '2026-11-05T23:00:00Z',
+        endedAt: '2026-11-05T23:00:20Z',
+      },
+      {
+        step: 'stop',
+        state: 'done',
+        startedAt: '2026-11-05T23:00:20Z',
+        endedAt: '2026-11-05T23:00:25Z',
+      },
+      {
+        step: 'backup',
+        state: 'done',
+        startedAt: '2026-11-05T23:00:25Z',
+        endedAt: '2026-11-05T23:01:05Z',
+      },
+      {
+        step: 'database',
+        state: 'failed',
+        startedAt: '2026-11-05T23:01:05Z',
+        endedAt: '2026-11-05T23:01:07Z',
+      },
+      { step: 'start', state: 'pending', startedAt: null, endedAt: null },
+    ];
+    const result = {
+      ok: false,
+      from: '0.9.0',
+      to: '0.9.1',
+      at: '2026-11-05T23:01:30Z',
+      step: 'migrate',
+      detail: 'division by zero The database was not changed.',
+      databasePutBack: false,
+      backup: 'C:\\ProgramData\\ARTEPOOL\\backups\\pre-upgrade\\x.dump',
+      steps,
+      statusPage: {
+        pid: 4242,
+        startedAt: '2026-11-05T23:00:25Z',
+        stoppedAt: '2026-11-05T23:01:08Z',
+        stopReason: 'asked',
+        answers: { status: 40, refused: 2, limited: 0 },
+        error: null,
+      },
+    };
+    await updaterState(`last_result = '${JSON.stringify(result).replace(/'/g, "''")}'`);
+    expect((await get()).json<UpdateStatus>().lastResult).toEqual({
+      ok: false,
+      from: '0.9.0',
+      to: '0.9.1',
+      at: '2026-11-05T23:01:30Z',
+      step: 'migrate',
+      detail: 'division by zero The database was not changed.',
+      databasePutBack: false,
+      steps,
+      statusPage: {
+        startedAt: '2026-11-05T23:00:25Z',
+        stoppedAt: '2026-11-05T23:01:08Z',
+        stopReason: 'asked',
+      },
+    });
+    // A result from before 0.9.0 has no steps; one that is not a result shows nothing.
+    await updaterState(
+      `last_result = '{"ok": true, "from": "0.7.0", "to": "0.8.0", "at": "2026-11-02T06:30:00Z"}'`,
+    );
+    expect((await get()).json<UpdateStatus>().lastResult).toEqual({
+      ok: true,
+      from: '0.7.0',
+      to: '0.8.0',
+      at: '2026-11-02T06:30:00Z',
+    });
+    await updaterState(`last_result = '{"what": "else"}'`);
+    expect((await get()).json<UpdateStatus>().lastResult).toBeNull();
+  });
+
+  it("tells an enrolled PC the server's version, and nobody else (0115)", async () => {
+    const answer = await call(server, 'GET', '/api/v1/system/version', { device: office });
+    expect(answer.statusCode).toBe(200);
+    expect(answer.json<{ version: string }>().version).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(Object.keys(answer.json<object>())).toEqual(['version']);
+    expect(errorCode(await call(server, 'GET', '/api/v1/system/version', {}))).toMatch(/DEVICE/);
+  });
 });

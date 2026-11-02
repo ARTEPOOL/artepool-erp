@@ -1,5 +1,23 @@
 # Changelog
 
+## Small updates, the install steps on every PC, quiet updates on the laptop (2026-11-02)
+
+**In plain words:**
+
+- **Much smaller downloads.** An update of the server PC is now about 10 MB instead of about 270 MB, and the office PCs' and the laptop's about 6 MB. PostgreSQL and Node come again only in a version that changes them. The full setups stay, for a new PC, a USB drive, and as the fallback when a small package cannot be used.
+- **"Updating ARTEPOOL" on every PC.** While the server PC installs an update, every PC shows the steps (prepare, stop, backup, database update, start) instead of a connection error. At the end it says "ARTEPOOL is now on version …", or that the update did not work and the previous version is back.
+- **System health → Last update** shows each step and how long it took, and the reason when a step fails.
+- **An update during an open shift** says so clearly: "Update ready — will install after the shift is closed". The owner's button is "Install after shift close": the update then starts by itself once the shift is closed, without waiting for the night.
+- **The laptop and the office PCs update quietly,** at Windows sign-in and every hour, while the app is closed, without Windows' permission question. Someone working in the app is never interrupted: the notice "Install and restart" closes the app, installs the update and opens it again.
+- **On battery,** a laptop installs normally unless the battery is below 20%; then it waits for the charger.
+- **A PC whose WebView2 is missing or broken** (it happens on older Windows 10) shows a clear message, and the full setup with WebView2 inside is installed by itself.
+- **This update itself still comes the old way, once:** the server PC takes the full setup, and the office PCs take it through the app's notice. The ones after it are small.
+
+- Release files: `Server-Update`, `Office-Update` and `Runtime-<id>.zip` beside the full setups, each signed and listed in `SHA256SUMS.txt`; a runtime is published only when it changes. The runtime's id comes from the pinned programs' SHA-256s (`runtime.json` beside the programs). `latest.json` keeps `server` and `platforms` for 0.8.0 and adds `serverUpdate`, `runtime`, `office`, `officeUpdate` and sizes. No database change. Decision 0115.
+- The server updater picks the update package, the update and runtime packages, or the full setup; every file is checked against its SHA-256 and signature; a refused or failed small package falls back to the full setup. The steps go to `updates\progress.json`; a read-only status page (TLS 1.3, two answers only, 30 requests a minute per address, no business data) runs from the stop of the server until the new one starts.
+- The office setup registers a SYSTEM task "ARTEPOOL App Updater" (sign-in after 2 minutes, hourly, one run at a time); it downloads with resume, checks the update signature, and installs only while the app is closed.
+- Tests: the update list and the release files (runtime zip names, reuse of a published runtime), the package choice and the fallback, the runtime check before anything stops, the steps and the status page (real TLS, the limit, TLS 1.2 refused), the "Updating" screen in Arabic and English, the quiet updater's rules (battery, packages, signature, resume). Windows CI installs the small packages for real: an update package, an update with a runtime package, a broken one put back, a missing runtime refused, and the office updater task.
+
 ## Faster updates: an instant check, an instant start, a progress bar (2026-10-31)
 
 **In plain words:**

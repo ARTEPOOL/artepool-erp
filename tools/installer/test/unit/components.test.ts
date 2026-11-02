@@ -9,7 +9,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { fetchComponent, HashMismatchError, readComponents } from '../../src/components';
+import {
+  fetchComponent,
+  HashMismatchError,
+  readComponents,
+  runtimeManifest,
+} from '../../src/components';
 
 let dir: string;
 beforeAll(async () => {
@@ -58,5 +63,34 @@ describe('pinned components', () => {
       JSON.stringify({ node: { url: 'http://x', sha256: 'x', file: 'n', version: '1' } }),
     );
     await expect(readComponents(file)).rejects.toThrow(/https url/);
+  });
+});
+
+describe('the runtime (decision 0115, 0.9.0)', () => {
+  it('describes the pinned Node, PostgreSQL and WinSW with a stable 12-character id', async () => {
+    const components = await readComponents();
+    const manifest = runtimeManifest(components);
+    expect(manifest.id).toMatch(/^[0-9a-f]{12}$/);
+    expect(manifest).toEqual({
+      id: manifest.id,
+      layout: 1,
+      node: components.node.version,
+      postgresql: components.postgresql.version,
+      winsw: components.winsw.version,
+    });
+    // The same pinned programs always give the same id.
+    expect(runtimeManifest(await readComponents()).id).toBe(manifest.id);
+  });
+
+  it('another program, even with the same version number, gives another id', async () => {
+    const components = await readComponents();
+    const base = runtimeManifest(components).id;
+    for (const name of ['node', 'postgresql', 'winsw'] as const) {
+      const changed = { ...components, [name]: { ...components[name], sha256: 'f'.repeat(64) } };
+      expect(runtimeManifest(changed).id, name).not.toBe(base);
+    }
+    // The version numbers are for people; only the programs themselves decide the id.
+    const renamed = { ...components, node: { ...components.node, version: '24.99.0' } };
+    expect(runtimeManifest(renamed).id).toBe(base);
   });
 });

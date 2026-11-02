@@ -58,6 +58,8 @@ export function useErrorText(): (error: unknown) => string {
       if (!(error instanceof ApiError)) return t('common:errors.INTERNAL');
       if (error.code === 'SERVER_UNREACHABLE') return t('auth:server.down');
       if (error.code === 'SERVER_UNTRUSTED') return t('auth:server.untrusted');
+      // Refused by the status page while the server is updated (decision 0115).
+      if (error.code === 'UPDATING') return t('shell:serverUpdate.refused');
       // A broken business rule names itself (e.g. ACCOUNT_IN_USE), with its own message.
       const rule = error.details.rule;
       if (typeof rule === 'string' && i18n.exists(`common:errors.rules.${rule}`)) {

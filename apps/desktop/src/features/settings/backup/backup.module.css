@@ -155,3 +155,11 @@
   background: var(--color-primary);
   transition: inline-size 0.4s var(--motion-ease);
 }
+
+/* The last update's steps with their times (decision 0115). */
+.lastSteps {
+  display: grid;
+  gap: var(--space-2);
+  margin-block-start: var(--space-2);
+  max-inline-size: 24rem;
+}

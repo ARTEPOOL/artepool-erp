@@ -5,7 +5,8 @@
  * new launcher (`artepool-svc run upgrade prepare|apply`, as administrator):
  *
  *   prepare   (new programs, old folder still in place)
- *     1. checks   newer version; same PostgreSQL major version; the database answers
+ *     1. checks   newer version; the runtime the new programs need is beside them (0115); same
+ *                 PostgreSQL major version; the database answers
  *     2. stops    the server and backup services; refuses (and starts them again) if a shift is open
  *     3. backup   pg_dump into `backups\pre-upgrade\`, checked with pg_restore --list, SHA-256 beside
  *     4. stops    the database service, so the setup can swap the program folders
@@ -22,6 +23,7 @@
  * every service is left stopped and the setup puts the previous program folder back and starts it.
  */
 import { randomUUID } from 'node:crypto';
+import { existsSync } from 'node:fs';
 import { mkdir, readdir, readFile, rename, stat, unlink, writeFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import pg from 'pg';
@@ -32,6 +34,8 @@ import type { PgConnection } from '@artepool/node-kit';
 import { ensureDurability } from '../../platform/db/durability';
 import type { InstallLog } from '../install/log';
 import type { ServiceKey } from '../install/windows';
+import type { UpdateStepName } from './progress';
+import type { StatusPageControl } from './status-page-control';
 
 /** How many pre-upgrade copies stay in `backups\pre-upgrade` (the oldest beyond go). */
 export const KEEP_PRE_UPGRADE = 10;
@@ -126,6 +130,49 @@ export function reinstallCopyName(now: Date): string {
 
 const PRE_UPGRADE_COPY = /^artepool-\d{8}-\d{6}Z-.+\.dump$/;
 
+/** What a runtime folder holds at the least (decision 0115). */
+export const RUNTIME_FILES = [
+  ['node', 'node.exe'],
+  ['pgsql', 'bin', 'postgres.exe'],
+  ['pgsql', 'bin', 'pg_ctl.exe'],
+  ['winsw', 'winsw.exe'],
+] as const;
+
+/**
+ * The new programs' runtime (PostgreSQL, Node and WinSW, decision 0115) is the one they were built
+ * for: `runtime.json` beside them names it, and its programs are there. An update package copies
+ * the runtime from the installed version or from the checked runtime package; anything missing or
+ * another runtime is refused before anything is stopped.
+ */
+export async function checkRuntime(programDir: string, expectedId: string): Promise<void> {
+  const fullSetup =
+    'Install with the full setup (ARTEPOOL-Server-Setup) instead. Nothing was changed.';
+  let id: unknown;
+  try {
+    id = (JSON.parse(await readFile(join(programDir, 'runtime.json'), 'utf8')) as { id?: unknown })
+      .id;
+  } catch {
+    throw new UpgradeError(
+      'checks',
+      `This update needs PostgreSQL, Node and WinSW (runtime ${expectedId}), and this PC's are not described (no runtime.json). ${fullSetup}`,
+    );
+  }
+  if (id !== expectedId) {
+    throw new UpgradeError(
+      'checks',
+      `This update needs runtime ${expectedId}; the programs prepared beside have runtime ${String(id)}. ${fullSetup}`,
+    );
+  }
+  for (const parts of RUNTIME_FILES) {
+    if (!existsSync(join(programDir, ...parts))) {
+      throw new UpgradeError(
+        'checks',
+        `The runtime prepared beside the new programs is missing ${parts.join('\\')}. ${fullSetup}`,
+      );
+    }
+  }
+}
+
 async function openShifts(migrator: PgConnection, database: string): Promise<number> {
   const client = new pg.Client({ ...migrator, database, application_name: 'artepool-upgrade' });
   await client.connect();
@@ -195,12 +242,18 @@ export interface PrepareInput {
   databaseName: string;
   /** The new version's migrations: the applied ones must be its first files. */
   migrationsDir: string;
+  /** The runtime the new programs need, checked in their folder (0115); none: not checked. */
+  runtime?: { programDir: string; id: string };
   backupsDir: string;
   pgBin: string;
   connections: UpgradeConnections;
   platform: UpgradePlatform;
   log: InstallLog;
   now?: Date;
+  /** Each step as it begins (0115): the steps file the status page reads. */
+  onStep?: (step: UpdateStepName) => Promise<void> | void;
+  /** The status page while the server is stopped (0115); none in the tests that do not need it. */
+  statusPage?: StatusPageControl;
 }
 
 export interface PreparedUpgrade {
@@ -282,6 +335,7 @@ export async function prepareUpgrade(input: PrepareInput): Promise<PreparedUpgra
       `Version ${input.to} is not newer than the installed ${input.from}. Nothing was changed.`,
     );
   }
+  if (input.runtime) await checkRuntime(input.runtime.programDir, input.runtime.id);
   if (input.bundledPgMajor !== null && input.bundledPgMajor !== input.dataPgMajor) {
     throw new UpgradeError(
       'checks',
@@ -290,9 +344,12 @@ export async function prepareUpgrade(input: PrepareInput): Promise<PreparedUpgra
   }
   await checkAppliedMigrations(connections.migrator, input.databaseName, input.migrationsDir);
 
+  await input.onStep?.('stop');
   log.line('Stopping the server and backup services');
   await platform.stopService('backup');
   await platform.stopService('server');
+  // From now until the new server starts, the PCs ask the status page how far it has come.
+  await input.statusPage?.start();
   try {
     const open = await openShifts(connections.migrator, input.databaseName);
     if (open > 0) {
@@ -302,6 +359,7 @@ export async function prepareUpgrade(input: PrepareInput): Promise<PreparedUpgra
       );
     }
 
+    await input.onStep?.('backup');
     log.line('Pre-upgrade backup');
     const { backup: path, sha256 } = await preUpgradeCopy({
       fileName: preUpgradeFileName(input.from, input.to, now),
@@ -316,6 +374,8 @@ export async function prepareUpgrade(input: PrepareInput): Promise<PreparedUpgra
     await platform.stopService('database');
     return { backup: path, sha256 };
   } catch (error) {
+    // The port goes back to the server before it starts again.
+    await input.statusPage?.stop();
     await startAll(platform, log);
     throw error;
   }
@@ -337,6 +397,10 @@ export interface ApplyInput {
   now?: Date;
   /** The Windows-only power-cut setting (wal_sync_method); the platform by default. */
   windows?: boolean;
+  /** Each step as it begins (0115). */
+  onStep?: (step: UpdateStepName) => Promise<void> | void;
+  /** The status page `prepare` started (0115): stopped before any server starts again. */
+  statusPage?: StatusPageControl;
 }
 
 export type UpgradeResult =
@@ -465,10 +529,13 @@ export async function applyUpgrade(input: ApplyInput): Promise<UpgradeResult> {
     databasePutBack: boolean,
   ): Promise<UpgradeResult> => {
     log.line(`FAILED (${step}): ${detail}`);
+    // The setup starts the previous version next: the port must be free for it.
+    await input.statusPage?.stop();
     await stopAll(platform, log);
     return { ok: false, ...base, step, detail, databasePutBack };
   };
 
+  await input.onStep?.('database');
   log.line(`Upgrade ${input.from} → ${input.to}: the services of the new version`);
   try {
     await platform.refreshAppService('server');
@@ -528,6 +595,9 @@ export async function applyUpgrade(input: ApplyInput): Promise<UpgradeResult> {
     await client.end().catch(() => undefined);
   }
 
+  await input.onStep?.('start');
+  // The new server takes the port back from the status page.
+  await input.statusPage?.stop();
   log.line('Starting the server and backup services');
   try {
     await platform.startService('server');

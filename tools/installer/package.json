@@ -10,7 +10,8 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@artepool/node-kit": "workspace:*"
+    "@artepool/node-kit": "workspace:*",
+    "@artepool/release": "workspace:*"
   },
   "devDependencies": {
     "age-encryption": "0.3.1"

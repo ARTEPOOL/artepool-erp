@@ -4,10 +4,12 @@
  * launcher gives. It upgrades an empty database, refuses a common password and creates the owner
  * (the bundled password list and the native Argon2 library), and answers /health over TLS 1.3.
  * Without the settings file or the master key it refuses to start, and it never reads a `.env`.
+ * The status page (decision 0115) runs on its own from a copy outside the program folder.
  */
 import { spawn } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
-import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { copyFile, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { get } from 'node:https';
 import { createServer, type AddressInfo } from 'node:net';
 import type { TLSSocket } from 'node:tls';
@@ -17,7 +19,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { migrationsDir, requireEnv } from '@artepool/node-kit';
 import { createEmptyTestDatabase, type TestDatabase } from '@artepool/testing';
 import { TLS_FILES, createCa, issueServerCert, writeTlsFile } from '@artepool/tls';
-import { ENTRY_POINTS, buildServer, type Manifest } from '../../src/build';
+import { ENTRY_POINTS, STANDALONE_ENTRY_POINTS, buildServer, type Manifest } from '../../src/build';
 
 let root: string;
 let outDir: string;
@@ -137,7 +139,7 @@ afterAll(async () => {
 
 describe('the packaged server', () => {
   it('holds the programs, the resources and a manifest of every file', async () => {
-    for (const name of Object.keys(ENTRY_POINTS)) {
+    for (const name of [...Object.keys(ENTRY_POINTS), ...Object.keys(STANDALONE_ENTRY_POINTS)]) {
       expect(manifest.files[`${name}.mjs`], name).toMatch(/^[0-9a-f]{64}$/);
     }
     const paths = Object.keys(manifest.files);
@@ -234,5 +236,76 @@ describe('the packaged server', () => {
       child.kill('SIGTERM');
       await new Promise((resolve) => child.once('close', resolve));
     }
+  });
+
+  it('runs the status page on its own, from a copy outside the program folder (0115)', async () => {
+    const updates = join(dataDir, 'updates');
+    const away = join(updates, 'status-page');
+    await mkdir(away, { recursive: true });
+    await copyFile(join(outDir, 'status-page.mjs'), join(away, 'status-page.mjs'));
+    // Node's own modules only: nothing is loaded from the program folder.
+    const text = await readFile(join(away, 'status-page.mjs'), 'utf8');
+    const imported = [...text.matchAll(/^import\s.*?from\s*["']([^"']+)["']/gm)].map((m) => m[1]);
+    expect(imported.length).toBeGreaterThan(0);
+    expect(imported.filter((name) => !name!.startsWith('node:'))).toEqual([]);
+
+    const tls = join(dataDir, 'secrets', 'tls');
+    const pagePort = await freePort();
+    const record = join(updates, 'status-page.json');
+    const child = spawn(
+      process.execPath,
+      [
+        join(away, 'status-page.mjs'),
+        '--host',
+        '127.0.0.1',
+        '--port',
+        String(pagePort),
+        '--cert',
+        join(tls, TLS_FILES.serverCert),
+        '--key',
+        join(tls, TLS_FILES.serverKey),
+        '--dir',
+        updates,
+        '--minutes',
+        '5',
+      ],
+      { cwd: away, env: { PATH: process.env.PATH }, stdio: 'ignore' },
+    );
+    const exited = new Promise<number | null>((resolve) => child.on('exit', resolve));
+    const read = async () =>
+      JSON.parse(await readFile(record, 'utf8')) as {
+        startedAt: string | null;
+        stoppedAt: string | null;
+        stopReason: string | null;
+      };
+    for (let i = 0; i < 50 && !(existsSync(record) && (await read()).startedAt); i++) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    expect((await read()).startedAt).not.toBeNull();
+
+    const answer = await new Promise<{ status: number; body: unknown }>((resolve, reject) => {
+      const request = get(
+        {
+          host: '127.0.0.1',
+          port: pagePort,
+          path: '/health',
+          ca: caCertPem,
+          servername: 'localhost',
+        },
+        (response) => {
+          let body = '';
+          response.on('data', (chunk: Buffer) => (body += chunk.toString()));
+          response.on('end', () =>
+            resolve({ status: response.statusCode ?? 0, body: JSON.parse(body) as unknown }),
+          );
+        },
+      );
+      request.on('error', reject);
+    });
+    expect(answer).toEqual({ status: 503, body: { status: 'updating', update: null } });
+
+    await writeFile(join(updates, 'status-page.stop'), '');
+    expect(await exited).toBe(0);
+    expect(await read()).toMatchObject({ stopReason: 'asked' });
   });
 });

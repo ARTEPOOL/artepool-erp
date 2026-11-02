@@ -95,6 +95,13 @@ export const control = {
     control.call<{ shiftNumber: string }>('POST', '/stuck-shift', shift),
   stopServer: () => control.call('POST', '/server/stop'),
   startServer: () => control.call('POST', '/server/start'),
+  /** The server stopped for an update to `to`, at this step: the real status page answers. */
+  updating: (step: 'prepare' | 'stop' | 'backup' | 'database' | 'start', to: string) =>
+    control.call('POST', '/server/updating', { step, to }),
+  /** The status page closes (the server is starting). */
+  endUpdate: () => control.call('POST', '/server/updating/end'),
+  serverVersion: async () =>
+    (await control.call<{ version: string }>('GET', '/server/version')).version,
 };
 
 /** A name that is new for each project and run. */

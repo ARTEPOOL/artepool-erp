@@ -1008,7 +1008,14 @@
       "seconds_other": "{count} seconds",
       "minutes_one": "{count} minute",
       "minutes_other": "{count} minutes"
-    }
+    },
+    "readyAfterShift": "Update ready — will install after the shift is closed",
+    "installAfterShift": "Install after shift close",
+    "installAfterShiftNote": "It starts by itself as soon as the shift is closed, instead of waiting for the night.",
+    "startsAfterShift": "It starts as soon as the shift is closed.",
+    "took": "In all: {duration}",
+    "reason": "Reason: {reason}",
+    "statusPage": "The status page answered the PCs from {start} to {end}."
   },
   "serverHealth": {
     "title": "Server PC",
