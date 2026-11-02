@@ -67,7 +67,9 @@ jobs:
       - name: PostgreSQL 18 programs (pg_dump / pg_restore for the backup tests; initdb / pg_ctl for the power-loss test)
         run: |
           sudo install -d /usr/share/postgresql-common/pgdg
-          sudo curl -fsSo /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          # postgresql.org sometimes drops the connection half way: try again (curl's own retries).
+          sudo curl -fsS --retry 5 --retry-all-errors --retry-delay 10 --max-time 120 \
+            -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
           echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt noble-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
           # The server programs only: no cluster of their own (the tests use the service above).
           sudo install -d /etc/postgresql-common
@@ -130,7 +132,9 @@ jobs:
       - name: PostgreSQL 18 client tools (pg_dump / pg_restore for the restore flow)
         run: |
           sudo install -d /usr/share/postgresql-common/pgdg
-          sudo curl -fsSo /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          # postgresql.org sometimes drops the connection half way: try again (curl's own retries).
+          sudo curl -fsS --retry 5 --retry-all-errors --retry-delay 10 --max-time 120 \
+            -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
           echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt noble-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
           # apt.postgresql.org sometimes answers without its Release file for a minute: try again.
           for attempt in 1 2 3 4; do
