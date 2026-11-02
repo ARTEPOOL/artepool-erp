@@ -212,7 +212,14 @@ describe('what may be published', () => {
       'ARTEPOOL-Runtime-0123456789ab.exe',
       'ARTEPOOL-Runtime-1.2.3.zip',
     ]) {
-      const refused = await checkPublishable(await folder({ ...good, [name]: 'x' }));
+      // Windows ignores the case of file names (the release workflow runs these tests there):
+      // `…AB.zip` would overwrite the good `…ab.zip` instead of standing beside it.
+      const others = Object.entries(good).filter(
+        ([file]) => file.toLowerCase() !== name.toLowerCase(),
+      );
+      const refused = await checkPublishable(
+        await folder({ ...Object.fromEntries(others), [name]: 'x' }),
+      );
       expect(refused, name).toEqual([{ file: name, reason: 'not an allowed release file' }]);
     }
     const withFolder = await folder(good);
