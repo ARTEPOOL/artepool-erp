@@ -17,6 +17,12 @@
 # Update packages (decision 0115, the programs only): on a PC with nothing installed, refused; one
 # whose migration fails puts the previous version back; one that works copies PostgreSQL, Node
 # and WinSW from the installed version; one built for another runtime is refused, nothing changed.
+# The working update package takes PostgreSQL, Node and WinSW from an unpacked runtime package
+# (/RUNTIME=, as the updater passes it), the others copy them from the installed version.
+# The laptop's and office PCs' quiet updater (0115): never registered on the server PC; on an
+# office PC its SYSTEM task (sign-in, hourly, on demand, people may only start it), its folder that
+# people can only read, a run that changes nothing when nothing newer is published, and the
+# uninstaller removes it.
 # Reinstall over the kept data (part G3): an older setup refused, the same version's setup uses
 # the database and the CA as they were, no wizard. Deleting the data (part G4): refused without
 # the owner's password; with it the database, secrets and settings go and the backups stay.
@@ -72,7 +78,7 @@ function Uninstall-Server([string]$label, [bool]$dataKept = $true) {
 
 $uninstallKey = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\ARTEPOOL-Server'
 function Installed-Version { (Get-ItemProperty $uninstallKey).DisplayVersion }
-function Run-Setup([string]$file) { (Start-Process -FilePath $file -ArgumentList '/S' -Wait -PassThru).ExitCode }
+function Run-Setup([string]$file, [string[]]$more = @()) { (Start-Process -FilePath $file -ArgumentList (@('/S') + $more) -Wait -PassThru).ExitCode }
 function Version-Of([IO.FileInfo]$setup) { $setup.BaseName -replace '^ARTEPOOL-Server-(Setup|Update)-', '' -replace '-TEST$', '' }
 
 function Secret([string]$name) {
@@ -217,6 +223,8 @@ Ok ($task.Principal.RunLevel -eq 'Limited') 'without administrator rights'
 Ok ($task.Actions[0].Execute -eq $appExe -and $task.Actions[0].Arguments -eq '--autostart') 'it runs the app with --autostart'
 $desktopLog = "$data\logs\install\desktop-app.log"
 Ok ((Get-Content $desktopLog -Raw) -match 'start at sign-in \(scheduled task "ARTEPOOL ERP"\): exit code 0') "the desktop app's installer wrote its log"
+# The server PC's app is updated with the server: no quiet updater here (0115).
+Ok ($null -eq (Get-ScheduledTask -TaskName 'ARTEPOOL App Updater' -ErrorAction SilentlyContinue)) 'no quiet updater on the server PC'
 
 $stateFile = Join-Path $env:LOCALAPPDATA 'ARTEPOOL\kiosk-state.json'
 New-Item -ItemType Directory -Force -Path (Split-Path $stateFile) | Out-Null
@@ -418,15 +426,26 @@ foreach ($name in 'ArtepoolDatabase', 'ArtepoolServer', 'ArtepoolBackup') {
 $result = Get-Content "$data\updates\last-result.json" -Raw | ConvertFrom-Json
 Ok ((@($result.steps | Where-Object { $_.state -eq 'failed' }) | ForEach-Object step) -eq 'database') 'the failed step is recorded (database update)'
 Ok ($null -ne $result.statusPage.startedAt -and $null -ne $result.statusPage.stoppedAt) 'the status page answered, then stopped before the previous version started'
-$exit = Run-Setup $updates[1].FullName
+# The runtime package, unpacked as the updater does it (Windows' own tar), with a mark inside so
+# the copy can be told apart from the installed one.
+$runtimeZip = Get-ChildItem (Split-Path $Installer) -Filter 'ARTEPOOL-Runtime-*.zip' | Select-Object -First 1
+Ok ($null -ne $runtimeZip -and $runtimeZip.BaseName -eq "ARTEPOOL-Runtime-$runtimeId") "the runtime package is built for this runtime ($($runtimeZip.Name))"
+$unpacked = Join-Path $work "runtime-$runtimeId"
+Remove-Item -Recurse -Force $unpacked -ErrorAction SilentlyContinue
+New-Item -ItemType Directory -Force -Path $unpacked | Out-Null
+& "$env:SystemRoot\System32\tar.exe" -xf $runtimeZip.FullName -C $unpacked
+Ok ($LASTEXITCODE -eq 0 -and (Test-Path "$unpacked\pgsql\bin\postgres.exe") -and (Test-Path "$unpacked\runtime.json")) 'the runtime package unpacks with Windows tar'
+Set-Content -Path "$unpacked\pgsql\share\ci-runtime-package.txt" -Value 'from the runtime package'
+$exit = Run-Setup $updates[1].FullName @("/RUNTIME=$unpacked")
 if ($exit -ne 0) { Show-Logs }
 Ok ($exit -eq 0) "upgrade $installed -> $(Version-Of $updates[1]) with the update package (exit $exit)"
+Ok (Test-Path "$pf\pgsql\share\ci-runtime-package.txt") 'PostgreSQL, Node and WinSW came from the runtime package (/RUNTIME)'
 Ok ((Installed-Version) -eq (Version-Of $updates[1])) 'the new version is installed'
 Check-Health 'after the update package'
 Ok ((Psql "SELECT to_regclass('sys.ci_upgrade_update') IS NOT NULL") -eq 't') "the update package's migration is applied"
 Ok ((Psql "SELECT count(*) FROM auth.users WHERE username = 'ciowner'") -eq '1') 'the data is kept'
 foreach ($file in 'node\node.exe', 'pgsql\bin\postgres.exe', 'pgsql\bin\pg_ctl.exe', 'pgsql\lib', 'winsw\winsw.exe') {
-  Ok (Test-Path "$pf\$file") "$file was copied from the installed version"
+  Ok (Test-Path "$pf\$file") "$file is in place"
 }
 Ok ((Get-Content "$pf\runtime.json" -Raw | ConvertFrom-Json).id -eq $runtimeId) 'the same runtime is recorded'
 Ok (Test-Path "$pf.previous\pgsql\bin\postgres.exe") 'the previous programs are kept beside, with their runtime'
@@ -448,8 +467,34 @@ Check-Logs-Hold-No-Secret 'after the update packages:'
 
 # ---- 6. Uninstall again: the data stays; then the desktop app's own uninstaller ----
 Uninstall-Server 'second'
+
+# ---- The quiet updater on an office PC (decision 0115): now that no server is installed here ----
+$officeUpdate = Get-ChildItem (Split-Path $Installer) -Filter 'ARTEPOOL-Office-Update-*.exe' | Select-Object -First 1
+$exit = Run-Setup $officeUpdate.FullName
+Ok ($exit -eq 0) "the small office update installs silently (exit $exit)"
+$quiet = Get-ScheduledTask -TaskName 'ARTEPOOL App Updater' -ErrorAction SilentlyContinue
+Ok ($null -ne $quiet) 'the quiet updater is registered on an office PC'
+Ok ($quiet.Principal.UserId -match '^(SYSTEM|S-1-5-18|NT AUTHORITY\\SYSTEM)$') "it runs as SYSTEM ($($quiet.Principal.UserId))"
+Ok (@($quiet.Triggers | Where-Object { $_.CimClass.CimClassName -eq 'MSFT_TaskLogonTrigger' -and $_.Delay -eq 'PT2M' }).Count -eq 1) 'two minutes after any person signs in'
+Ok (@($quiet.Triggers | Where-Object { $_.Repetition.Interval -eq 'PT1H' }).Count -eq 1) 'and every hour'
+Ok ([string]$quiet.Settings.MultipleInstances -eq 'IgnoreNew') 'never twice at once'
+$quietCommand = "$($quiet.Actions[0].Execute) $($quiet.Actions[0].Arguments)".Replace('"', '').Trim()
+Ok ($quietCommand -eq "$appExe --quiet-update") "it runs the app with --quiet-update ($quietCommand)"
+$sddl = [string]$quiet.SecurityDescriptor
+Ok ($sddl -match ';;;IU\)') "people signed in may start it ($sddl)"
+Ok ($sddl -notmatch '\(A;[^)]*;(FA|GA|GW)[^)]*;;;IU\)') 'people signed in cannot change it'
+Ok ([string]$quiet.Settings.DisallowStartIfOnBatteries -eq 'False') 'it may run on battery (the 20% rule is its own)'
+$updatesFolder = Join-Path $data 'app-updates'
+Ok (Test-Path "$updatesFolder\requests") 'its folder is made'
+$folderAcl = (& icacls.exe $updatesFolder) -join ' '
+Ok ($folderAcl -match 'BUILTIN\\Users:\(OI\)\(CI\)\(RX\)' -or $folderAcl -match 'S-1-5-32-545:\(OI\)\(CI\)\(RX\)') "people can only read its folder ($folderAcl)"
+$p = Start-Process -FilePath $appExe -ArgumentList '--quiet-update' -Wait -PassThru
+Ok ($p.ExitCode -eq 0) "a run with nothing newer published changes nothing (exit $($p.ExitCode))"
+Ok (Test-Path "$updatesFolder\updater.log") 'it writes its log'
+Ok (@(Get-ChildItem $updatesFolder -Filter 'ARTEPOOL-Office-*.exe').Count -eq 0) 'nothing was downloaded or installed'
 $p = Start-Process -FilePath "$appDir\uninstall.exe" -ArgumentList '/S', "_?=$appDir" -Wait -PassThru
 Ok ($p.ExitCode -eq 0) "the desktop app's uninstaller (exit $($p.ExitCode))"
 Ok ($null -eq (Get-ScheduledTask -TaskName 'ARTEPOOL ERP' -ErrorAction SilentlyContinue)) 'the start at sign-in is removed'
+Ok ($null -eq (Get-ScheduledTask -TaskName 'ARTEPOOL App Updater' -ErrorAction SilentlyContinue)) 'the quiet updater is removed'
 Ok ((Get-Content "$data\logs\install\desktop-app.log" -Raw) -match 'uninstalled; start at sign-in removed') "the desktop app's uninstaller wrote its log"
 Write-Host 'All installer checks passed.'
