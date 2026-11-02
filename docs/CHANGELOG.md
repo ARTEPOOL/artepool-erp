@@ -1,5 +1,18 @@
 # Changelog
 
+## Google Drive: the app's registration reaches the server, and a warning when Google refuses (2026-11-02)
+
+**In plain words:**
+
+- **Every update now carries the program's registration at Google**, so **Connect Google Drive** works on the server PC. Until now no version had it.
+- **The four Google values are kept only in GitHub's protected secrets**, never in the code or a chat. A wrong or half-entered value stops the release, so a registration that does not work never reaches the shop.
+- **A warning when Google stops accepting the saved access.** The program asks Google at every upload, and every 6 hours in between. If Google ended the access (for example, the registration left in "Testing", or the access removed from the account), the backup screen and the dashboard show it in red with a **"Connect Google Drive again"** button. If Google refused the registration itself, it says to call support. Before, it only said "the last upload failed".
+- **No internet is not a refusal:** it still shows as a late off-site copy, as before.
+- The registration is published **"In production"**, with its home page, privacy policy and terms at artepool.github.io (Arabic and English). The Arabic guide is `docs/runbooks/google-registration.md`.
+
+- Decision 0095 updated. `release.yml` passes `ARTEPOOL_GOOGLE_*` from the `release` environment to the build; `google.json` in both server setups; the installed server reads it at every start (it wins over the settings file's copy). The backup service records Google's answer in `.drive-access` (the error code only); System health problems `drive_access_ended` and `drive_registration_refused`, with the daily `backup_failed` alert (which `drive_access` / `google_registration`). No database change.
+- Tests: the build's checks; the shipped registration reaching an existing server; against a fake Google, an expired token, a deleted client, an unreachable Google, and the 6-hour check, which uploads nothing; the health answer and alert, cleared by connecting again; both screens in Arabic.
+
 ## Small updates, the install steps on every PC, quiet updates on the laptop (2026-11-02)
 
 **In plain words:**
