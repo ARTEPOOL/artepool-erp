@@ -251,6 +251,12 @@ FunctionEnd
 !macroend
 
 !macro StartServices
+  ; The status page (decision 0115) gives the port back first; `upgrade apply` normally stopped it.
+  ${If} ${FileExists} "$DataDir\updates\status-page.json"
+    FileOpen $9 "$DataDir\updates\status-page.stop" w
+    FileClose $9
+    Sleep 2000
+  ${EndIf}
   nsExec::ExecToLog '"$SYSDIR\sc.exe" start ArtepoolDatabase'
   Pop $1
   nsExec::ExecToLog '"$SYSDIR\sc.exe" start ArtepoolServer'

@@ -7,6 +7,9 @@
  *   the console tools (`owner-create.mjs`, `device-code.mjs`, `owner-reset-2fa.mjs`,
  *   `owner-reset-password.mjs`) and the restore from a backup (`restore.mjs`, started by the
  *   first-run wizard), bundled by esbuild with their shared code in chunk files;
+ * - `status-page.mjs`, the status page while the server is stopped for an update (decision 0115):
+ *   bundled on its own, with Node's own modules only, because it runs from a copy outside the
+ *   program folder;
  * - `node_modules/` with only the packages that cannot be bundled (the Argon2 native library, the
  *   PDF browser driver);
  * - `resources/` with the files read at run time, at the same paths as in the repository;
@@ -38,6 +41,11 @@ export const ENTRY_POINTS: Record<string, string> = {
   upgrade: 'apps/server/src/cli/upgrade.ts',
   'delete-data': 'apps/server/src/cli/delete-data.ts',
   updater: 'apps/server/src/cli/updater.ts',
+};
+
+/** Bundled alone, without shared chunks: it runs from a copy outside this folder (0115). */
+export const STANDALONE_ENTRY_POINTS: Record<string, string> = {
+  'status-page': 'apps/server/src/cli/status-page.ts',
 };
 
 /** Packages kept as files: a native library, and the browser driver that loads its own files. */
@@ -185,6 +193,24 @@ export async function buildServer(options: BuildOptions): Promise<Manifest> {
     metafile: false,
   });
   for (const warning of result.warnings) log(`warning: ${warning.text}`);
+  const standalone = await build({
+    absWorkingDir: repoRoot,
+    entryPoints: Object.fromEntries(
+      Object.entries(STANDALONE_ENTRY_POINTS).map(([name, file]) => [name, join(repoRoot, file)]),
+    ),
+    outdir: outDir,
+    outExtension: { '.js': '.mjs' },
+    bundle: true,
+    splitting: false,
+    format: 'esm',
+    platform: 'node',
+    target: 'node24',
+    // Node's own modules and what is bundled in: nothing from node_modules at run time.
+    packages: 'bundle',
+    legalComments: 'linked',
+    logLevel: 'silent',
+  });
+  for (const warning of standalone.warnings) log(`warning: ${warning.text}`);
 
   log('Copying the packages that are not bundled…');
   const nodeModules = join(outDir, 'node_modules');

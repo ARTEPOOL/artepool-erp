@@ -34,6 +34,8 @@ import type { PgConnection } from '@artepool/node-kit';
 import { ensureDurability } from '../../platform/db/durability';
 import type { InstallLog } from '../install/log';
 import type { ServiceKey } from '../install/windows';
+import type { UpdateStepName } from './progress';
+import type { StatusPageControl } from './status-page-control';
 
 /** How many pre-upgrade copies stay in `backups\pre-upgrade` (the oldest beyond go). */
 export const KEEP_PRE_UPGRADE = 10;
@@ -248,6 +250,10 @@ export interface PrepareInput {
   platform: UpgradePlatform;
   log: InstallLog;
   now?: Date;
+  /** Each step as it begins (0115): the steps file the status page reads. */
+  onStep?: (step: UpdateStepName) => Promise<void> | void;
+  /** The status page while the server is stopped (0115); none in the tests that do not need it. */
+  statusPage?: StatusPageControl;
 }
 
 export interface PreparedUpgrade {
@@ -338,9 +344,12 @@ export async function prepareUpgrade(input: PrepareInput): Promise<PreparedUpgra
   }
   await checkAppliedMigrations(connections.migrator, input.databaseName, input.migrationsDir);
 
+  await input.onStep?.('stop');
   log.line('Stopping the server and backup services');
   await platform.stopService('backup');
   await platform.stopService('server');
+  // From now until the new server starts, the PCs ask the status page how far it has come.
+  await input.statusPage?.start();
   try {
     const open = await openShifts(connections.migrator, input.databaseName);
     if (open > 0) {
@@ -350,6 +359,7 @@ export async function prepareUpgrade(input: PrepareInput): Promise<PreparedUpgra
       );
     }
 
+    await input.onStep?.('backup');
     log.line('Pre-upgrade backup');
     const { backup: path, sha256 } = await preUpgradeCopy({
       fileName: preUpgradeFileName(input.from, input.to, now),
@@ -364,6 +374,8 @@ export async function prepareUpgrade(input: PrepareInput): Promise<PreparedUpgra
     await platform.stopService('database');
     return { backup: path, sha256 };
   } catch (error) {
+    // The port goes back to the server before it starts again.
+    await input.statusPage?.stop();
     await startAll(platform, log);
     throw error;
   }
@@ -385,6 +397,10 @@ export interface ApplyInput {
   now?: Date;
   /** The Windows-only power-cut setting (wal_sync_method); the platform by default. */
   windows?: boolean;
+  /** Each step as it begins (0115). */
+  onStep?: (step: UpdateStepName) => Promise<void> | void;
+  /** The status page `prepare` started (0115): stopped before any server starts again. */
+  statusPage?: StatusPageControl;
 }
 
 export type UpgradeResult =
@@ -513,10 +529,13 @@ export async function applyUpgrade(input: ApplyInput): Promise<UpgradeResult> {
     databasePutBack: boolean,
   ): Promise<UpgradeResult> => {
     log.line(`FAILED (${step}): ${detail}`);
+    // The setup starts the previous version next: the port must be free for it.
+    await input.statusPage?.stop();
     await stopAll(platform, log);
     return { ok: false, ...base, step, detail, databasePutBack };
   };
 
+  await input.onStep?.('database');
   log.line(`Upgrade ${input.from} → ${input.to}: the services of the new version`);
   try {
     await platform.refreshAppService('server');
@@ -576,6 +595,9 @@ export async function applyUpgrade(input: ApplyInput): Promise<UpgradeResult> {
     await client.end().catch(() => undefined);
   }
 
+  await input.onStep?.('start');
+  // The new server takes the port back from the status page.
+  await input.statusPage?.stop();
   log.line('Starting the server and backup services');
   try {
     await platform.startService('server');

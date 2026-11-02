@@ -413,6 +413,11 @@ Ok ((Psql 'SELECT count(*) FROM sys.schema_migrations') -eq $migrations) 'the da
 foreach ($name in 'ArtepoolDatabase', 'ArtepoolServer', 'ArtepoolBackup') {
   Ok ((Get-Service $name).Status -eq 'Running') "$name runs again after the failed update package"
 }
+# The steps (decision 0115): the failed one is named; the status page stopped before the old
+# version started again.
+$result = Get-Content "$data\updates\last-result.json" -Raw | ConvertFrom-Json
+Ok ((@($result.steps | Where-Object { $_.state -eq 'failed' }) | ForEach-Object step) -eq 'database') 'the failed step is recorded (database update)'
+Ok ($null -ne $result.statusPage.startedAt -and $null -ne $result.statusPage.stoppedAt) 'the status page answered, then stopped before the previous version started'
 $exit = Run-Setup $updates[1].FullName
 if ($exit -ne 0) { Show-Logs }
 Ok ($exit -eq 0) "upgrade $installed -> $(Version-Of $updates[1]) with the update package (exit $exit)"
@@ -425,6 +430,11 @@ foreach ($file in 'node\node.exe', 'pgsql\bin\postgres.exe', 'pgsql\bin\pg_ctl.e
 }
 Ok ((Get-Content "$pf\runtime.json" -Raw | ConvertFrom-Json).id -eq $runtimeId) 'the same runtime is recorded'
 Ok (Test-Path "$pf.previous\pgsql\bin\postgres.exe") 'the previous programs are kept beside, with their runtime'
+$result = Get-Content "$data\updates\last-result.json" -Raw | ConvertFrom-Json
+Ok ($result.ok -eq $true -and @($result.steps | Where-Object { $_.state -eq 'done' }).Count -eq 5) 'every step is recorded as done, with its times'
+Ok ($null -ne $result.statusPage.startedAt -and $null -ne $result.statusPage.stoppedAt) "the status page answered while the server was stopped ($($result.statusPage.startedAt) to $($result.statusPage.stoppedAt))"
+$pages = @(Get-CimInstance Win32_Process -Filter "Name = 'node.exe'" | Where-Object { $_.ExecutablePath -like '*\updates\status-page\*' })
+Ok ($pages.Count -eq 0) 'no status page is left running'
 foreach ($name in 'ArtepoolDatabase', 'ArtepoolServer', 'ArtepoolBackup') {
   Ok ((Get-Service $name).Status -eq 'Running') "$name runs after the update package"
 }

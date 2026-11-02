@@ -8,11 +8,14 @@
  * standard output and to `logs\install\upgrade-<time>.log`; the last line is the JSON result.
  * A failure also leaves `updates\last-failure.txt` (the step, then why, one line each), which the
  * setup copies into its own log and shows in its message.
+ * The steps (decision 0115) go into `updates\progress.json` as they begin; while the server is
+ * stopped, the status page started by `prepare` reads it, and `apply` stops it before any server
+ * starts again. The result keeps the steps with their times and the status page's record.
  * Exit code 0: done; 1: failed (after `prepare`, nothing changed and the services run again; after
  * `apply`, every service is stopped so the setup can put the previous programs back).
  */
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { connectionFor, loadEnv, migrationsDir } from '@artepool/node-kit';
@@ -21,6 +24,23 @@ import { exec } from './restore-from-backup';
 import { waitHealthy } from './install/health';
 import { InstallLog, logFileName } from './install/log';
 import { windowsPlatform } from './install/windows';
+import {
+  beginProgress,
+  finishProgress,
+  readProgress,
+  startStep,
+  stepOfFailure,
+  writeProgress,
+  type StepRecord,
+  type UpdateProgress,
+  type UpdateStepName,
+} from './upgrade/progress';
+import {
+  readStatusPageRecord,
+  statusPageControl,
+  statusPageFiles,
+  type StatusPageRecord,
+} from './upgrade/status-page-control';
 import {
   applyUpgrade,
   failureText,
@@ -45,6 +65,9 @@ interface Pending {
 
 const print = (value: unknown) => process.stdout.write(`${JSON.stringify(value)}\n`);
 
+/** What System health shows of an update: its result, its steps and the status page's record. */
+type SavedResult = UpgradeResult & { steps?: StepRecord[]; statusPage?: StatusPageRecord | null };
+
 loadEnv();
 const phase = process.argv[2];
 const { values } = parseArgs({
@@ -57,9 +80,45 @@ const updatesDir = join(dataDir, 'updates');
 const pendingFile = join(updatesDir, 'pending-upgrade.json');
 const resultFile = join(updatesDir, 'last-result.json');
 const failureFile = join(updatesDir, 'last-failure.txt');
-const saveResult = (result: UpgradeResult) => {
+const saveResult = (result: SavedResult) => {
   mkdirSync(updatesDir, { recursive: true });
   writeFileSync(resultFile, `${JSON.stringify(result, null, 2)}\n`);
+};
+const statusFiles = statusPageFiles(updatesDir);
+let progress: UpdateProgress | null = null;
+const onStep = async (step: UpdateStepName) => {
+  if (!progress) return;
+  progress = startStep(progress, step, new Date());
+  await writeProgress(statusFiles.progress, progress).catch(() => undefined);
+};
+/** The steps end; the result keeps them with the status page's record. */
+const finish = async (result: UpgradeResult): Promise<SavedResult> => {
+  if (progress) {
+    progress = finishProgress(
+      progress,
+      new Date(),
+      result.ok
+        ? { ok: true }
+        : { ok: false, step: stepOfFailure(result.step), detail: result.detail },
+    );
+    await writeProgress(statusFiles.progress, progress).catch(() => undefined);
+  }
+  return {
+    ...result,
+    steps: progress?.steps,
+    statusPage: await readStatusPageRecord(statusFiles.record),
+  };
+};
+/** When the updater started the setup (its installing.json): "prepare" began then. */
+const setupStartedAt = (): Date | undefined => {
+  try {
+    const at = (
+      JSON.parse(readFileSync(join(updatesDir, 'installing.json'), 'utf8')) as { at?: string }
+    ).at;
+    return at ? new Date(at) : undefined;
+  } catch {
+    return undefined;
+  }
 };
 const saveFailure = (step: string, detail: string) => {
   try {
@@ -84,6 +143,17 @@ try {
     migrator: connectionFor('migrator'),
     superuser: connectionFor('superuser'),
   };
+  const tlsDir = required('ARTEPOOL_TLS_DIR');
+  const statusPage = statusPageControl({
+    updatesDir,
+    nodeExe: process.execPath,
+    script: join(programDir, 'server', 'status-page.mjs'),
+    host: process.env.SERVER_HOST ?? '0.0.0.0',
+    port: Number(required('SERVER_PORT')),
+    certFile: join(tlsDir, TLS_FILES.serverCert),
+    keyFile: join(tlsDir, TLS_FILES.serverKey),
+    log: (line) => log?.line(line),
+  });
 
   if (phase === 'prepare') {
     const from = values.from;
@@ -103,6 +173,12 @@ try {
     } catch {
       bundled = null;
     }
+    // A new update: its own steps, and no record of an earlier status page.
+    mkdirSync(updatesDir, { recursive: true });
+    rmSync(statusFiles.record, { force: true });
+    rmSync(statusFiles.stop, { force: true });
+    progress = beginProgress(from, to, new Date(), setupStartedAt());
+    await writeProgress(statusFiles.progress, progress).catch(() => undefined);
     try {
       const prepared = await prepareUpgrade({
         from,
@@ -118,6 +194,8 @@ try {
         connections,
         platform,
         log,
+        onStep,
+        statusPage,
       });
       mkdirSync(updatesDir, { recursive: true });
       const pending: Pending = { from, to, ...prepared };
@@ -138,13 +216,16 @@ try {
         detail,
         databasePutBack: false,
       };
-      saveResult(result);
+      saveResult(await finish(result));
       print({ result });
       process.exitCode = 1;
     }
   } else if (phase === 'apply') {
     const pending = JSON.parse(readFileSync(pendingFile, 'utf8')) as Pending;
     const serverPort = Number(required('SERVER_PORT'));
+    progress =
+      (existsSync(statusFiles.progress) ? await readProgress(statusFiles.progress) : null) ??
+      beginProgress(pending.from, pending.to, new Date());
     const result = await applyUpgrade({
       from: pending.from,
       to: pending.to,
@@ -152,7 +233,7 @@ try {
       databaseName,
       migrationsDir,
       pgBin,
-      tlsCaFile: join(required('ARTEPOOL_TLS_DIR'), TLS_FILES.caCert),
+      tlsCaFile: join(tlsDir, TLS_FILES.caCert),
       connections,
       platform,
       log,
@@ -160,8 +241,10 @@ try {
         serverPort,
         () => new Error('The new version did not answer within two minutes; see logs\\server.'),
       ),
+      onStep,
+      statusPage,
     });
-    saveResult(result);
+    saveResult(await finish(result));
     if (!result.ok) saveFailure(result.step, result.detail);
     print({ result });
     process.exitCode = result.ok ? 0 : 1;
