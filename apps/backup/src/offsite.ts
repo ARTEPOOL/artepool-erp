@@ -16,7 +16,8 @@ import type pg from 'pg';
 import { SecretBox } from '@artepool/node-kit';
 import { encryptBundle } from './bundle';
 import type { BackupConfig } from './config';
-import { Drive, loadDriveCredentials } from './google';
+import { openDrive } from './drive-access';
+import { loadDriveCredentials } from './google';
 import { latestLocalCopy, localBackup } from './local';
 import { filesToRemove } from './retention';
 import { failRun, finishRun, startRun } from './runs';
@@ -72,7 +73,7 @@ export async function offsiteUpload(
       recipient,
     );
     const fileName = `${basename(copy)}.age`;
-    const drive = await Drive.open(config.google, credentials);
+    const drive = await openDrive(config, credentials, options.now);
     const uploaded = await drive.upload(fileName, sealed);
     const files = await drive.list();
     const old = new Set(

@@ -70,6 +70,10 @@ export async function startFakeGoogle(): Promise<FakeGoogle> {
           return json(200, { refresh_token: 'refresh-xyz', access_token: 'access-1' });
         }
         if (fields.get('grant_type') === 'refresh_token') {
+          // The publisher deleted this client in Google Cloud (decision 0095).
+          if (fields.get('client_id') === 'deleted-client') {
+            return json(401, { error: 'deleted_client' });
+          }
           return fields.get('refresh_token') === 'refresh-xyz'
             ? json(200, { access_token: 'access-1' })
             : json(400, { error: 'invalid_grant' });

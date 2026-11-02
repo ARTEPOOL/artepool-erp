@@ -752,7 +752,9 @@
       "restore_test_due": "A restore test is due.",
       "restore_test_failed": "The last restore test failed.",
       "integrity_issues": "The integrity checks found a problem: see below.",
-      "disk_low": "The backup disk is nearly full."
+      "disk_low": "The backup disk is nearly full.",
+      "drive_access_ended": "Google ended the saved Google Drive access, so the off-site copies have stopped: press “Connect Google Drive again” and choose the backup account.",
+      "drive_registration_refused": "Google refused the program's own registration, so the off-site copies have stopped: call support (a new registration and an update are needed)."
     },
     "allGood": "Everything is in order.",
     "lastLocal": "Last local copy",
@@ -785,6 +787,7 @@
     "uploadNow": "Upload now",
     "disconnect": "Disconnect",
     "connectDrive": "Connect Google Drive",
+    "reconnectDrive": "Connect Google Drive again",
     "externalDrive": "External drive",
     "lastCopy": "Last copy {date}",
     "noCopyYet": "No copy yet",

@@ -752,7 +752,9 @@
       "restore_test_due": "تجربة الاسترجاع مستحقة.",
       "restore_test_failed": "آخر تجربة استرجاع فشلت.",
       "integrity_issues": "فحص السلامة لقى مشكلة: شوف تحت.",
-      "disk_low": "هارد النسخ قرب يتملي."
+      "disk_low": "هارد النسخ قرب يتملي.",
+      "drive_access_ended": "Google وقّف الوصول المحفوظ لـ Google Drive، فالنسخ الخارجية واقفة: دوس «اربط Google Drive تاني» واختار حساب النسخ.",
+      "drive_registration_refused": "Google رفض تسجيل البرنامج نفسه، فالنسخ الخارجية واقفة: كلّم الدعم الفني (محتاج تسجيل جديد وتحديث)."
     },
     "allGood": "كل حاجة تمام.",
     "lastLocal": "آخر نسخة محلية",
@@ -785,6 +787,7 @@
     "uploadNow": "ارفع الآن",
     "disconnect": "فك الربط",
     "connectDrive": "ربط Google Drive",
+    "reconnectDrive": "اربط Google Drive تاني",
     "externalDrive": "الهارد الخارجي",
     "lastCopy": "آخر نسخة {date}",
     "noCopyYet": "لسه مفيش نسخة",

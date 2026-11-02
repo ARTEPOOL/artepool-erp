@@ -566,6 +566,7 @@ describe('Settings → System health (decision 0086)', () => {
       keySet: false,
       driveConnected: false,
       google: { chooseAccount: true, code: true },
+      driveAccess: null,
     },
     offline: { last: null, intervalDays: 7 },
     restoreTest: { last: null, intervalDays: 30 },
@@ -620,6 +621,57 @@ describe('Settings → System health (decision 0086)', () => {
     await waitFor(() =>
       expect(bridge.callsTo('POST', '/api/v1/backup/key/confirm')[0]?.body).toEqual({ recipient }),
     );
+  });
+
+  it('says when Google ended the saved Drive access, and offers to connect again', async () => {
+    const refused = health({
+      problems: ['drive_access_ended', 'offsite_failed'],
+      offsite: {
+        last: run(),
+        lastFailure: run({ status: 'failed', errorMessage: 'Google answered 400 (invalid_grant)' }),
+        maxAgeHours: 30,
+        keySet: true,
+        driveConnected: true,
+        google: { chooseAccount: true, code: true },
+        driveAccess: { checkedAt: new Date().toISOString(), problem: 'access_ended' },
+      },
+    });
+    const bridge = signedInBridge([
+      ...OWNER_PERMISSIONS,
+      'system.health.view',
+      'system.backup.manage',
+    ]).on('GET', '/api/v1/health/system', ok(refused));
+    await signIn(bridge);
+    await openSettings();
+    fireEvent.click(screen.getByRole('link', { name: 'النسخ الاحتياطي' }));
+    expect(await screen.findByText(/Google وقّف الوصول المحفوظ لـ Google Drive/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'اربط Google Drive تاني' }));
+    expect(await screen.findByRole('dialog')).toBeTruthy();
+  });
+
+  it('says when Google refused the registration itself: support, not a new connection', async () => {
+    const refused = health({
+      problems: ['drive_registration_refused'],
+      offsite: {
+        last: run(),
+        lastFailure: null,
+        maxAgeHours: 30,
+        keySet: true,
+        driveConnected: true,
+        google: { chooseAccount: true, code: true },
+        driveAccess: { checkedAt: new Date().toISOString(), problem: 'registration_refused' },
+      },
+    });
+    const bridge = signedInBridge([
+      ...OWNER_PERMISSIONS,
+      'system.health.view',
+      'system.backup.manage',
+    ]).on('GET', '/api/v1/health/system', ok(refused));
+    await signIn(bridge);
+    await openSettings();
+    fireEvent.click(screen.getByRole('link', { name: 'النسخ الاحتياطي' }));
+    expect(await screen.findByText(/Google رفض تسجيل البرنامج نفسه/)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'اربط Google Drive تاني' })).toBeNull();
   });
 
   it('connects Google Drive without typing any ID (the code way, in a browser)', async () => {

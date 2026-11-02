@@ -5,7 +5,7 @@
  * problem per day.
  */
 import { randomUUID } from 'node:crypto';
-import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, stat, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -14,6 +14,7 @@ import type {
   DriveConnectResponse,
   HealthResponse,
 } from '@artepool/shared/contracts';
+import { writeDriveAccess } from '@artepool/backup';
 import { authorizeDrive, raiseBackupAlerts } from '../../src/modules/backup/service';
 import { addOwnerWithTwoStep } from '../support/https';
 import {
@@ -220,5 +221,43 @@ describe('system health', () => {
         { alert_type: 'restore_test_due', n: 1 },
       ]),
     );
+  });
+
+  it('says when Google refused the saved Drive access, until the owner connects again', async () => {
+    const credentials = join(dir, 'secrets', 'google-drive.sealed');
+    await mkdir(join(dir, 'secrets'), { recursive: true });
+    await writeFile(credentials, 'sealed');
+    const hourAgo = new Date(Date.now() - 3600 * 1000);
+    await utimes(credentials, hourAgo, hourAgo);
+    await writeDriveAccess(dir, {
+      checkedAt: new Date().toISOString(),
+      problem: 'access_ended',
+      code: 'invalid_grant',
+    });
+    let health = (await get()).json<HealthResponse>();
+    expect(health.problems).toContain('drive_access_ended');
+    expect(health.offsite.driveAccess).toMatchObject({ problem: 'access_ended' });
+    await raiseBackupAlerts(server.deps);
+    const { rows } = await server.admin.query<{ which: string; severity: string }>(
+      `SELECT params ->> 'which' AS which, severity FROM sys.alerts WHERE alert_type = 'backup_failed'`,
+    );
+    expect(rows).toContainEqual({ which: 'drive_access', severity: 'warning' });
+
+    await writeDriveAccess(dir, {
+      checkedAt: new Date().toISOString(),
+      problem: 'registration_refused',
+      code: 'deleted_client',
+    });
+    health = (await get()).json<HealthResponse>();
+    expect(health.problems).toContain('drive_registration_refused');
+    expect(health.problems).not.toContain('drive_access_ended');
+
+    // The owner connects again: the old answer no longer counts; the next check answers.
+    const later = new Date(Date.now() + 60 * 1000);
+    await utimes(credentials, later, later);
+    health = (await get()).json<HealthResponse>();
+    expect(health.problems).not.toContain('drive_registration_refused');
+    expect(health.offsite.driveAccess).toBeNull();
+    await rm(credentials);
   });
 });
