@@ -27,5 +27,43 @@
     "install": "Install and restart",
     "installing": "Installing…",
     "failed": "The update could not be installed now; it is tried again later."
+  },
+  "serverUpdate": {
+    "title": "Updating ARTEPOOL",
+    "versions": "From {from} to {to}",
+    "wait": "ARTEPOOL comes back by itself when the update ends. Do not turn off the server PC.",
+    "restarting": "The server is starting…",
+    "refused": "ARTEPOOL is being updated; nothing was saved. Wait until the update ends.",
+    "step": {
+      "prepare": "Prepare",
+      "stop": "Stop the program",
+      "backup": "Backup",
+      "database": "Database update",
+      "start": "Start"
+    },
+    "state": {
+      "pending": "Not yet",
+      "running": "Running now",
+      "done": "Done",
+      "failed": "Failed"
+    },
+    "seconds": "{n} s",
+    "minutes": "{minutes} min {seconds} s",
+    "done": {
+      "ok": {
+        "title": "ARTEPOOL is updated",
+        "text": "ARTEPOOL is now on version {to}."
+      },
+      "failed": {
+        "title": "The update did not succeed",
+        "text": "The previous version {from} is back and running, and your data is as it was.",
+        "owner": "The reason is in Settings → System health."
+      },
+      "back": {
+        "title": "ARTEPOOL is back",
+        "text": "The server answers again. You can carry on."
+      }
+    },
+    "ok": "OK"
   }
 }

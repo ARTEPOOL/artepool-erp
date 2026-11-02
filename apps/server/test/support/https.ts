@@ -3,10 +3,13 @@
  * the PC side over the network: the desktop dev bridge and the Playwright screen tests.
  */
 import { randomUUID } from 'node:crypto';
+import type { Server } from 'node:https';
 import type { AddressInfo } from 'node:net';
 import type { FastifyInstance } from 'fastify';
 import { createCa, issueServerCert, type PemPair } from '@artepool/tls';
 import { buildApp } from '../../src/app';
+import type { UpdateProgress } from '../../src/cli/upgrade/progress';
+import { createStatusServer } from '../../src/cli/upgrade/status-server';
 import { newTotpSecret } from '../../src/platform/auth/totp';
 import { normalizeCode } from '../../src/platform/crypto/codes';
 import { withBusinessTx } from '../../src/platform/db/tx';
@@ -20,6 +23,12 @@ export interface HttpsTestServer {
   /** Stops answering (the "main server unreachable" case); `start()` brings it back. */
   stop(): Promise<void>;
   start(): Promise<void>;
+  /**
+   * The server is being updated (decision 0115): it stops, and the real status page answers on
+   * its port with these steps; called again, the steps change. `endUpdate()` closes the page.
+   */
+  showUpdate(progress: UpdateProgress): Promise<void>;
+  endUpdate(): Promise<void>;
   close(): Promise<void>;
 }
 
@@ -53,8 +62,33 @@ export async function listenHttps(
     app = null;
     await current?.close();
   };
+  let page: Server | null = null;
+  let progress: UpdateProgress | null = null;
+  const showUpdate = async (next: UpdateProgress) => {
+    progress = next;
+    if (page) return;
+    await stop();
+    const statusPage = createStatusServer({
+      cert: cert.certPem,
+      key: cert.keyPem,
+      readProgress: () => Promise.resolve(progress),
+      // Several screens in one test run ask often; the limit itself is tested on its own.
+      perMinute: 10_000,
+    });
+    await new Promise<void>((resolve) => statusPage.listen(port, '127.0.0.1', resolve));
+    page = statusPage;
+  };
+  const endUpdate = async () => {
+    const current = page;
+    page = null;
+    if (!current) return;
+    current.closeAllConnections();
+    await new Promise<void>((resolve) => current.close(() => resolve()));
+  };
   await start();
   return {
+    showUpdate,
+    endUpdate,
     get url() {
       return `https://localhost:${port}`;
     },

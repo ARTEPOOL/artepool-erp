@@ -8,3 +8,5 @@ export { resetOwnerPassword, resetOwnerTwoStep } from '../../src/cli/bootstrap';
 export { RateLimiter, type RateLimits } from '../../src/platform/http/rate-limit';
 export { addPosItem } from './pos';
 export { addCreditCustomer } from './customers';
+export { beginProgress, startStep, UPDATE_STEPS } from '../../src/cli/upgrade/progress';
+export { serverVersion } from '../../src/platform/version';

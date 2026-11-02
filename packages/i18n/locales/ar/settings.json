@@ -1016,7 +1016,14 @@
       "minutes_few": "{count} دقايق",
       "minutes_many": "{count} دقيقة",
       "minutes_other": "{count} دقيقة"
-    }
+    },
+    "readyAfterShift": "التحديث جاهز — هيتسطّب بعد قفل الوردية",
+    "installAfterShift": "ثبّت بعد قفل الوردية",
+    "installAfterShiftNote": "هيبدأ لوحده أول ما الوردية تتقفل، من غير ما يستنى الليل.",
+    "startsAfterShift": "هيبدأ أول ما الوردية تتقفل.",
+    "took": "المدة كلها: {duration}",
+    "reason": "السبب: {reason}",
+    "statusPage": "صفحة الحالة ردّت على الأجهزة من {start} لـ {end}."
   },
   "serverHealth": {
     "title": "جهاز السيرفر",

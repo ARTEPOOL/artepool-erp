@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { UpdateWindowBody } from '@artepool/shared/contracts';
 import { defineRoute, defineWrite } from '../../platform/http/route';
+import { serverVersion } from '../../platform/version';
 import * as updates from './service';
 
 /** System health → updates (decision 0108): owner only, enforced by owner-only permissions. */
@@ -14,6 +15,14 @@ export function registerUpdateRoutes(app: FastifyInstance): void {
     url: '/api/v1/system/update',
     access: view,
     handler: () => updates.updateStatus(deps.db),
+  });
+  // Decision 0115: after an update, every enrolled PC compares this with the version the status
+  // page announced, to say whether it worked. Enrolled PCs only; nothing else is in it.
+  defineRoute(app, {
+    method: 'GET',
+    url: '/api/v1/system/version',
+    access: { kind: 'device' },
+    handler: () => Promise.resolve({ version: serverVersion() }),
   });
   // Decision 0115: the updater is woken right after the commit, not on its next run.
   const wake = (request: FastifyRequest) =>

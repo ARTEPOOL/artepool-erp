@@ -352,4 +352,12 @@ describe('fast updates (decision 0115)', () => {
     await updaterState(`last_result = '{"what": "else"}'`);
     expect((await get()).json<UpdateStatus>().lastResult).toBeNull();
   });
+
+  it("tells an enrolled PC the server's version, and nobody else (0115)", async () => {
+    const answer = await call(server, 'GET', '/api/v1/system/version', { device: office });
+    expect(answer.statusCode).toBe(200);
+    expect(answer.json<{ version: string }>().version).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(Object.keys(answer.json<object>())).toEqual(['version']);
+    expect(errorCode(await call(server, 'GET', '/api/v1/system/version', {}))).toMatch(/DEVICE/);
+  });
 });

@@ -2,7 +2,7 @@
  * Typed calls to the API through the bridge. The session token lives here, in memory only: it
  * is never written to disk or browser storage, so closing the app always ends the sign-in.
  */
-import type { BridgeRequest } from '@artepool/shared/contracts';
+import type { BridgeRequest, BridgeResponse } from '@artepool/shared/contracts';
 import type { Bridge } from './bridge';
 
 /** Problems found on this PC rather than by the server. */
@@ -60,6 +60,14 @@ export class ApiClient {
 
   get<T>(path: string, options: CallOptions = {}): Promise<T> {
     return this.send<T>({ method: 'GET', path }, options);
+  }
+
+  /**
+   * The server's answer as it is, without a sign-in token, never thrown and never reported to
+   * the error listeners: asking how far an update has come (decision 0115).
+   */
+  probe(path: string): Promise<BridgeResponse> {
+    return this.bridge.request({ method: 'GET', path, background: true });
   }
 
   post<T>(path: string, body?: unknown, options: CallOptions = {}): Promise<T> {

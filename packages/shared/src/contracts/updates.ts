@@ -88,3 +88,23 @@ export const UpdateWindowBody = z
   .strict()
   .refine((b) => b.startHour !== b.endHour, { path: ['endHour'] });
 export type UpdateWindowBody = z.infer<typeof UpdateWindowBody>;
+
+/** `GET /api/v1/system/version` (decision 0115): the server's version, for enrolled PCs. */
+export interface ServerVersion {
+  version: string;
+}
+
+/**
+ * What the status page answers on `GET /health` while the server is stopped for an update
+ * (decision 0115): HTTP 503 with the versions and the steps, never anything else.
+ */
+export interface UpdatingHealth {
+  status: 'updating';
+  update: {
+    from: string;
+    to: string;
+    startedAt: string;
+    steps: UpdateStepRecord[];
+    result: { ok: boolean; at: string; step: UpdateStepName | null } | null;
+  } | null;
+}

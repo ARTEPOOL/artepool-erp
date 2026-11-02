@@ -281,6 +281,20 @@ const routes: Record<string, (input: Record<string, unknown>) => Promise<unknown
     await https.start();
     return {};
   },
+  // Decision 0115: the server stopped for an update, the real status page in its place.
+  'POST /server/updating': async (input) => {
+    const { to, step } = input as { to: string; step: (typeof support.UPDATE_STEPS)[number] };
+    const now = new Date();
+    let progress = support.beginProgress('0.0.1', to, new Date(now.getTime() - 60_000));
+    if (step !== 'prepare') progress = support.startStep(progress, step, now);
+    await https.showUpdate(progress);
+    return {};
+  },
+  'GET /server/version': () => Promise.resolve({ version: support.serverVersion() }),
+  'POST /server/updating/end': async () => {
+    await https.endUpdate();
+    return {};
+  },
 };
 
 const control = createServer((request, response) => {

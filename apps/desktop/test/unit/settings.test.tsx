@@ -907,6 +907,82 @@ describe('Settings → System health (decision 0086)', () => {
     }
   });
 
+  it('a ready update while a shift is open: it installs after the shift is closed (0115)', async () => {
+    const bridge = signedInBridge([
+      ...OWNER_PERMISSIONS,
+      'system.health.view',
+      'system.update.manage',
+    ])
+      .on('GET', '/api/v1/health/system', ok(health()))
+      .on('GET', '/api/v1/system/update', ok(update({ waitingReason: 'open_shift' })))
+      .on('POST', '/api/v1/system/update/install-now', ok({ version: '1.1.0' }, 201));
+    await signIn(bridge);
+    await openSettings();
+    fireEvent.click(screen.getByRole('link', { name: 'النسخ الاحتياطي' }));
+    const card = await screen.findByTestId('updates-card');
+    const afterShift = await within(card).findByTestId('update-after-shift');
+    expect(afterShift.textContent).toContain('التحديث جاهز — هيتسطّب بعد قفل الوردية');
+    expect(afterShift.textContent).toContain('هيبدأ لوحده أول ما الوردية تتقفل');
+    fireEvent.click(within(card).getByRole('button', { name: 'ثبّت بعد قفل الوردية' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'ثبّت بعد قفل الوردية' }));
+    await waitFor(() =>
+      expect(bridge.callsTo('POST', '/api/v1/system/update/install-now')).toHaveLength(1),
+    );
+  });
+
+  it('the last update: each step with its time, in all, the reason and the status page (0115)', async () => {
+    const at = (s: number) => new Date(Date.UTC(2026, 10, 5, 23, 0, s)).toISOString();
+    const bridge = signedInBridge([...OWNER_PERMISSIONS, 'system.health.view'])
+      .on('GET', '/api/v1/health/system', ok(health()))
+      .on(
+        'GET',
+        '/api/v1/system/update',
+        ok(
+          update({
+            available: null,
+            lastResult: {
+              ok: false,
+              from: '0.9.0',
+              to: '0.9.1',
+              at: at(130),
+              step: 'migrate',
+              detail: 'division by zero The database was not changed.',
+              steps: [
+                { step: 'prepare', state: 'done', startedAt: at(0), endedAt: at(20) },
+                { step: 'stop', state: 'done', startedAt: at(20), endedAt: at(25) },
+                { step: 'backup', state: 'done', startedAt: at(25), endedAt: at(125) },
+                { step: 'database', state: 'failed', startedAt: at(125), endedAt: at(127) },
+                { step: 'start', state: 'pending', startedAt: null, endedAt: null },
+              ],
+              statusPage: { startedAt: at(25), stoppedAt: at(128), stopReason: 'asked' },
+            },
+          }),
+        ),
+      );
+    await signIn(bridge);
+    await openSettings();
+    fireEvent.click(screen.getByRole('link', { name: 'النسخ الاحتياطي' }));
+    const card = await screen.findByTestId('updates-card');
+    const steps = await within(card).findByTestId('update-last-steps');
+    const items = within(steps).getAllByRole('listitem');
+    expect(items.map((li) => li.getAttribute('aria-label'))).toEqual([
+      'تجهيز: خلصت',
+      'إيقاف البرنامج: خلصت',
+      'نسخة احتياطية: خلصت',
+      'تحديث قاعدة البيانات: ما نجحتش',
+      'تشغيل: لسه',
+    ]);
+    expect(items[0]!.textContent).toContain('20 ث');
+    expect(items[2]!.textContent).toContain('1 د 40 ث');
+    expect(items[4]!.textContent).not.toMatch(/ث/);
+    expect(steps.textContent).toContain('المدة كلها: 2 د 10 ث');
+    expect(within(card).getByTestId('update-last-reason').textContent).toBe(
+      'السبب: division by zero The database was not changed.',
+    );
+    expect(within(card).getByText(/صفحة الحالة ردّت على الأجهزة من/)).toBeTruthy();
+  });
+
   it('shows the server PC: disks, services, certificates, clock and the UPS (M6.2 part H)', async () => {
     const GB = 1024 ** 3;
     const serverHealth = {
