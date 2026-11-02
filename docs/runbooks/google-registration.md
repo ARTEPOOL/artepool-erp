@@ -39,6 +39,24 @@
 
 > **ما ترفعش لوجو** في **Branding**. اللوجو بيخلّي Google يطلب مراجعة الاسم واللوجو قبل ما يظهروا، وإحنا مش محتاجين لوجو.
 
+## 3ب) الموقع وصفحة الخصوصية (Google بيطلبهم قبل In production)
+
+Google بيطلب 3 لينكات لأي تطبيق **External** هيبقى **In production**: صفحة رئيسية، وسياسة خصوصية، وشروط استعمال. ولازم يكونوا على **دومين (موقع) إنت مالكه**.
+
+الصفحات التلاتة جاهزة بالعربي والإنجليزي في المستودع، في فولدر `docs/google-site/` (الشرح في `docs/google-site/README.md`). اللي محتاجه بس:
+
+1. **الإيميل اللي هيظهر للناس** في الصفحات. اكتبه مكان `{{CONTACT_EMAIL}}`، أو قولّي عليه وأنا أحطه.
+2. **مكان تترفع فيه الصفحات:**
+   - **لو عندكم موقع:** ارفع الملفات الأربعة في فولدر اسمه `artepool-erp` على الموقع. اللينكات هتبقى مثلًا `https://الدومين/artepool-erp/` و`.../privacy.html` و`.../terms.html`.
+   - **لو مفيش موقع:** GitHub Pages ببلاش، والشرح في `docs/google-site/README.md`. لو Google رفض دومين GitHub، اشتري دومين `.com` بحوالي 40 درهم في السنة، واربطه بـ GitHub Pages ببلاش.
+3. **إثبات إن الدومين بتاعك:** افتح <https://search.google.com/search-console> **بنفس حساب البرنامج** ← **Add property** ← **Domain** أو **URL prefix** ← واعمل الخطوات اللي هيقولها (سطر TXT في الدومين، أو ملف بيترفع على الموقع).
+4. ارجع للكونسول ← **Google Auth Platform** ← **Branding**:
+   - **App domain** ← **Application home page**: لينك الصفحة الرئيسية.
+   - **Application privacy policy link**: لينك `privacy.html`.
+   - **Application terms of service link**: لينك `terms.html`.
+   - **Authorized domains** ← **Add domain**: الدومين بس، من غير `https://` (مثلًا `example.com`).
+   - **Save**.
+
 ## 4) الصلاحية: `drive.file` بس
 
 دي الصلاحية اللي بتخلّي البرنامج يشوف **الملفات اللي هو عملها بس** في Drive المحل، ومش بيشوف أي ملف تاني.
