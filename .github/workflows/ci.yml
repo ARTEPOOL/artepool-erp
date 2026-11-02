@@ -72,7 +72,12 @@ jobs:
           # The server programs only: no cluster of their own (the tests use the service above).
           sudo install -d /etc/postgresql-common
           echo "create_main_cluster = false" | sudo tee /etc/postgresql-common/createcluster.conf
-          sudo apt-get update -qq
+          # apt.postgresql.org sometimes answers without its Release file for a minute: try again.
+          for attempt in 1 2 3 4; do
+            sudo apt-get update -qq && break
+            [ "$attempt" -lt 4 ] || exit 1
+            sleep $((attempt * 20))
+          done
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq -o Dpkg::Options::=--force-confold postgresql-client-18 postgresql-18
           echo "ARTEPOOL_PG_BIN=/usr/lib/postgresql/18/bin" >> "$GITHUB_ENV"
       - name: Integration tests (database rules, concurrency, server, backups)
@@ -127,7 +132,12 @@ jobs:
           sudo install -d /usr/share/postgresql-common/pgdg
           sudo curl -fsSo /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
           echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt noble-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
-          sudo apt-get update -qq
+          # apt.postgresql.org sometimes answers without its Release file for a minute: try again.
+          for attempt in 1 2 3 4; do
+            sudo apt-get update -qq && break
+            [ "$attempt" -lt 4 ] || exit 1
+            sleep $((attempt * 20))
+          done
           sudo apt-get install -y -qq postgresql-client-18
           echo "ARTEPOOL_PG_BIN=/usr/lib/postgresql/18/bin" >> "$GITHUB_ENV"
       - name: Screen flows against the real API (throwaway database)
