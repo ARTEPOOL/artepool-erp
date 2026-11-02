@@ -322,6 +322,29 @@ describe('the server upgrade', () => {
     expect(calls.slice(-3)).toEqual(['stop backup', 'stop server', 'stop database']);
   }, 120_000);
 
+  it('refuses an update package whose runtime is not beside it, before stopping anything (0115)', async () => {
+    const { platform, calls } = fakePlatform();
+    const programDir = join(root, 'programs-without-runtime');
+    await mkdir(programDir, { recursive: true });
+    await expect(
+      prepareUpgrade({
+        from: '1.0.0',
+        to: '1.1.0',
+        dataPgMajor: 18,
+        bundledPgMajor: null,
+        databaseName: db.name,
+        migrationsDir,
+        runtime: { programDir, id: '0123456789ab' },
+        backupsDir: join(root, 'backups'),
+        pgBin,
+        connections,
+        platform,
+        log: quietLog(),
+      }),
+    ).rejects.toMatchObject({ step: 'checks' });
+    expect(calls).toEqual([]);
+  });
+
   it('refuses a version that lacks a migration the database has, before stopping anything', async () => {
     const { platform, calls } = fakePlatform();
     const refused = prepareUpgrade({

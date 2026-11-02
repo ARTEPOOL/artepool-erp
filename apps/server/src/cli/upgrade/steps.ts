@@ -5,7 +5,8 @@
  * new launcher (`artepool-svc run upgrade prepare|apply`, as administrator):
  *
  *   prepare   (new programs, old folder still in place)
- *     1. checks   newer version; same PostgreSQL major version; the database answers
+ *     1. checks   newer version; the runtime the new programs need is beside them (0115); same
+ *                 PostgreSQL major version; the database answers
  *     2. stops    the server and backup services; refuses (and starts them again) if a shift is open
  *     3. backup   pg_dump into `backups\pre-upgrade\`, checked with pg_restore --list, SHA-256 beside
  *     4. stops    the database service, so the setup can swap the program folders
@@ -22,6 +23,7 @@
  * every service is left stopped and the setup puts the previous program folder back and starts it.
  */
 import { randomUUID } from 'node:crypto';
+import { existsSync } from 'node:fs';
 import { mkdir, readdir, readFile, rename, stat, unlink, writeFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import pg from 'pg';
@@ -126,6 +128,49 @@ export function reinstallCopyName(now: Date): string {
 
 const PRE_UPGRADE_COPY = /^artepool-\d{8}-\d{6}Z-.+\.dump$/;
 
+/** What a runtime folder holds at the least (decision 0115). */
+export const RUNTIME_FILES = [
+  ['node', 'node.exe'],
+  ['pgsql', 'bin', 'postgres.exe'],
+  ['pgsql', 'bin', 'pg_ctl.exe'],
+  ['winsw', 'winsw.exe'],
+] as const;
+
+/**
+ * The new programs' runtime (PostgreSQL, Node and WinSW, decision 0115) is the one they were built
+ * for: `runtime.json` beside them names it, and its programs are there. An update package copies
+ * the runtime from the installed version or from the checked runtime package; anything missing or
+ * another runtime is refused before anything is stopped.
+ */
+export async function checkRuntime(programDir: string, expectedId: string): Promise<void> {
+  const fullSetup =
+    'Install with the full setup (ARTEPOOL-Server-Setup) instead. Nothing was changed.';
+  let id: unknown;
+  try {
+    id = (JSON.parse(await readFile(join(programDir, 'runtime.json'), 'utf8')) as { id?: unknown })
+      .id;
+  } catch {
+    throw new UpgradeError(
+      'checks',
+      `This update needs PostgreSQL, Node and WinSW (runtime ${expectedId}), and this PC's are not described (no runtime.json). ${fullSetup}`,
+    );
+  }
+  if (id !== expectedId) {
+    throw new UpgradeError(
+      'checks',
+      `This update needs runtime ${expectedId}; the programs prepared beside have runtime ${String(id)}. ${fullSetup}`,
+    );
+  }
+  for (const parts of RUNTIME_FILES) {
+    if (!existsSync(join(programDir, ...parts))) {
+      throw new UpgradeError(
+        'checks',
+        `The runtime prepared beside the new programs is missing ${parts.join('\\')}. ${fullSetup}`,
+      );
+    }
+  }
+}
+
 async function openShifts(migrator: PgConnection, database: string): Promise<number> {
   const client = new pg.Client({ ...migrator, database, application_name: 'artepool-upgrade' });
   await client.connect();
@@ -195,6 +240,8 @@ export interface PrepareInput {
   databaseName: string;
   /** The new version's migrations: the applied ones must be its first files. */
   migrationsDir: string;
+  /** The runtime the new programs need, checked in their folder (0115); none: not checked. */
+  runtime?: { programDir: string; id: string };
   backupsDir: string;
   pgBin: string;
   connections: UpgradeConnections;
@@ -282,6 +329,7 @@ export async function prepareUpgrade(input: PrepareInput): Promise<PreparedUpgra
       `Version ${input.to} is not newer than the installed ${input.from}. Nothing was changed.`,
     );
   }
+  if (input.runtime) await checkRuntime(input.runtime.programDir, input.runtime.id);
   if (input.bundledPgMajor !== null && input.bundledPgMajor !== input.dataPgMajor) {
     throw new UpgradeError(
       'checks',

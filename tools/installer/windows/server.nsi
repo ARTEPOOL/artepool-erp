@@ -20,6 +20,13 @@
 ;
 ; Over data an uninstall kept, with no program installed, it installs again and uses that data
 ; (part G3): the secrets must open on this PC; no new database, no new CA; `run install --reattach`.
+;
+; Built with /DUPDATE_ONLY it is the small update package (decision 0115,
+; ARTEPOOL-Server-Update-<v>.exe): the programs only, no PostgreSQL, Node or WinSW. It only
+; upgrades (exit code 7 on a PC with nothing installed). The runtime is copied beside the new
+; programs from the checked runtime package the updater unpacked (/RUNTIME=<folder>) or else from
+; the installed programs; `upgrade prepare --runtime <id>` then checks it is the runtime this
+; version was built for (/DRUNTIME_ID), before anything is stopped.
 
 Unicode true
 ManifestSupportedOS all
@@ -41,8 +48,15 @@ SetCompressor /SOLID lzma
 !ifndef STAGE
   !error "STAGE is required (/DSTAGE=folder)"
 !endif
+!ifndef RUNTIME_ID
+  !error "RUNTIME_ID is required (/DRUNTIME_ID=<12 hex>, tools/installer runtimeManifest)"
+!endif
 !ifndef OUTFILE
-  !define OUTFILE "ARTEPOOL-Server-Setup-${VERSION}.exe"
+  !ifdef UPDATE_ONLY
+    !define OUTFILE "ARTEPOOL-Server-Update-${VERSION}.exe"
+  !else
+    !define OUTFILE "ARTEPOOL-Server-Setup-${VERSION}.exe"
+  !endif
 !endif
 
 !define PRODUCT "ARTEPOOL ERP Server"
@@ -64,7 +78,11 @@ InstallDir "$PROGRAMFILES64\ARTEPOOL"
 VIProductVersion "${VERSION}.0"
 VIAddVersionKey /LANG=1033 "ProductName" "${PRODUCT}"
 VIAddVersionKey /LANG=1033 "FileVersion" "${VERSION}"
-VIAddVersionKey /LANG=1033 "FileDescription" "ARTEPOOL ERP server setup"
+!ifdef UPDATE_ONLY
+  VIAddVersionKey /LANG=1033 "FileDescription" "ARTEPOOL ERP server update"
+!else
+  VIAddVersionKey /LANG=1033 "FileDescription" "ARTEPOOL ERP server setup"
+!endif
 VIAddVersionKey /LANG=1033 "LegalCopyright" "ARTEPOOL"
 
 !define MUI_ABORTWARNING
@@ -111,6 +129,10 @@ LangString DeleteDataText ${LANG_ARABIC} "إلغاء التسطيب بيشيل �
 LangString DeleteDataText ${LANG_ENGLISH} "Uninstalling removes the program only. The database and the settings stay in C:\ProgramData\ARTEPOOL, and a new installation finds them as they are.$\r$\n$\r$\nTo delete the data for good, tick this box: you will be asked to type DELETE and the owner's password. The backups folder always stays."
 LangString DeleteDataBox ${LANG_ARABIC} "امسح البيانات كمان (فولدر النسخ الاحتياطية بيفضل)"
 LangString DeleteDataBox ${LANG_ENGLISH} "Also delete the data (the backups folder stays)"
+LangString UpdateNeedsInstall ${LANG_ARABIC} "الملف ده بيحدّث سيرفر آرتيبول متسطّب بس، ومفيش حاجة اتغيرت. للتسطيب على جهاز جديد استخدم ARTEPOOL-Server-Setup."
+LangString UpdateNeedsInstall ${LANG_ENGLISH} "This file only updates an installed ARTEPOOL server, and nothing was changed. To install on a new PC, use ARTEPOOL-Server-Setup."
+LangString RuntimeCopyFailed ${LANG_ARABIC} "PostgreSQL وNode وWinSW ما اتنسخوش جنب البرامج الجديدة. سطّب بالملف الكامل ARTEPOOL-Server-Setup."
+LangString RuntimeCopyFailed ${LANG_ENGLISH} "PostgreSQL, Node and WinSW could not be copied beside the new programs. Install with the full setup ARTEPOOL-Server-Setup."
 LangString EmergencyTool ${LANG_ARABIC} "آرتيبول - أداة الطوارئ"
 LangString EmergencyTool ${LANG_ENGLISH} "ARTEPOOL - Emergency tool"
 
@@ -195,7 +217,7 @@ Function .onInit
         ${EndIf}
       ${EndIf}
       StrCpy $Mode "reattach"
-      Return
+      Goto modeKnown
     ${EndIf}
     ; 1: this setup is newer.
     ${VersionCompare} "${VERSION}" "$OldVersion" $0
@@ -206,6 +228,15 @@ Function .onInit
     ${EndIf}
     StrCpy $Mode "upgrade"
   ${EndIf}
+  modeKnown:
+  !ifdef UPDATE_ONLY
+    ; The update package has no PostgreSQL, Node or WinSW of its own: it only upgrades.
+    ${If} $Mode != "upgrade"
+      MessageBox MB_ICONSTOP|MB_OK "$(UpdateNeedsInstall)" /SD IDOK
+      SetErrorLevel 7
+      Abort
+    ${EndIf}
+  !endif
 FunctionEnd
 
 !macro WriteUninstallKey
@@ -263,6 +294,37 @@ FunctionEnd
   Abort
 !macroend
 
+!ifdef UPDATE_ONLY
+; PostgreSQL, Node and WinSW (decision 0115): from the checked runtime package the updater
+; unpacked (/RUNTIME=<folder>), or else from the installed programs, copied on the same disk.
+; runtime.json comes along when there is one; `upgrade prepare --runtime` decides if it is right.
+Function CopyRuntime
+  ${GetParameters} $R0
+  ClearErrors
+  ${GetOptions} $R0 "/RUNTIME=" $R1
+  ${If} ${Errors}
+  ${OrIf} $R1 == ""
+    StrCpy $R1 "$INSTDIR"
+  ${EndIf}
+  !insertmacro Log "PostgreSQL, Node and WinSW from $R1"
+  CreateDirectory "$INSTDIR.new\node"
+  CreateDirectory "$INSTDIR.new\winsw"
+  ClearErrors
+  CopyFiles /SILENT "$R1\node\node.exe" "$INSTDIR.new\node"
+  CopyFiles /SILENT "$R1\winsw\winsw.exe" "$INSTDIR.new\winsw"
+  CopyFiles /SILENT "$R1\pgsql" "$INSTDIR.new"
+  ${If} ${Errors}
+    StrCpy $FailStep "checks"
+    StrCpy $FailDetail "$(RuntimeCopyFailed)"
+    !insertmacro UpgradeNotDone "the runtime could not be copied from $R1"
+  ${EndIf}
+  ${If} ${FileExists} "$R1\runtime.json"
+    CopyFiles /SILENT "$R1\runtime.json" "$INSTDIR.new"
+  ${EndIf}
+  ClearErrors
+FunctionEnd
+!endif
+
 Function Upgrade
   !insertmacro Log "Upgrade $OldVersion -> ${VERSION}"
   !insertmacro Log "Unpacking the new programs to $INSTDIR.new"
@@ -272,12 +334,15 @@ Function Upgrade
   WriteUninstaller "$INSTDIR.new\uninstall.exe"
   ; Out of the folder, so it can be renamed.
   SetOutPath "$TEMP"
+  !ifdef UPDATE_ONLY
+    Call CopyRuntime
+  !endif
 
   ; The desktop app is closed (its own installer runs at the end); the services stop in prepare.
   nsExec::ExecToLog '"$SYSDIR\taskkill.exe" /F /T /IM artepool-erp.exe'
   Pop $0
   !insertmacro Log "Checks, services stopped, pre-upgrade backup"
-  nsExec::ExecToLog '"$INSTDIR.new\artepool-svc.exe" --data "$DataDir" run upgrade prepare --from $OldVersion --to ${VERSION}'
+  nsExec::ExecToLog '"$INSTDIR.new\artepool-svc.exe" --data "$DataDir" run upgrade prepare --from $OldVersion --to ${VERSION} --runtime ${RUNTIME_ID}'
   Pop $0
   ${If} $0 != 0
     Call ReadFailure

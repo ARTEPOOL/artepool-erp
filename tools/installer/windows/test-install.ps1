@@ -14,6 +14,9 @@
 # --test-upgrade` makes: one that works (data kept, its migration applied, a checked pre-upgrade
 # copy, the previous programs kept), an older setup refused, and one whose migration fails (the
 # database unchanged, the previous version back and answering).
+# Update packages (decision 0115, the programs only): on a PC with nothing installed, refused; one
+# whose migration fails puts the previous version back; one that works copies PostgreSQL, Node
+# and WinSW from the installed version; one built for another runtime is refused, nothing changed.
 # Reinstall over the kept data (part G3): an older setup refused, the same version's setup uses
 # the database and the CA as they were, no wizard. Deleting the data (part G4): refused without
 # the owner's password; with it the database, secrets and settings go and the backups stay.
@@ -70,7 +73,7 @@ function Uninstall-Server([string]$label, [bool]$dataKept = $true) {
 $uninstallKey = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\ARTEPOOL-Server'
 function Installed-Version { (Get-ItemProperty $uninstallKey).DisplayVersion }
 function Run-Setup([string]$file) { (Start-Process -FilePath $file -ArgumentList '/S' -Wait -PassThru).ExitCode }
-function Version-Of([IO.FileInfo]$setup) { $setup.BaseName -replace '^ARTEPOOL-Server-Setup-', '' -replace '-TEST$', '' }
+function Version-Of([IO.FileInfo]$setup) { $setup.BaseName -replace '^ARTEPOOL-Server-(Setup|Update)-', '' -replace '-TEST$', '' }
 
 function Secret([string]$name) {
   $entropy = [Text.Encoding]::UTF8.GetBytes("ARTEPOOL secrets v1/$name")
@@ -285,6 +288,10 @@ $tests = @(Get-ChildItem (Join-Path (Split-Path $Installer) 'test') -Filter 'ART
   Sort-Object { [version](Version-Of $_) })
 Ok ($tests.Count -eq 2) 'the two test upgrades were built'
 Ok (@($tests | Where-Object { $_.BaseName -notlike '*-TEST' }).Count -eq 0) 'the test upgrades are named -TEST'
+$updates = @(Get-ChildItem (Join-Path (Split-Path $Installer) 'test') -Filter 'ARTEPOOL-Server-Update-*.exe' |
+  Sort-Object { [version](Version-Of $_) })
+Ok ($updates.Count -eq 3) 'the three test update packages were built'
+Ok (@($updates | Where-Object { $_.BaseName -notlike '*-TEST' }).Count -eq 0) 'the test update packages are named -TEST'
 $firstVersion = Installed-Version
 $users = Psql 'SELECT count(*) FROM auth.users'
 $exit = Run-Setup $tests[0].FullName
@@ -366,6 +373,9 @@ Check-Logs-Hold-No-Secret 'after deleting the data:'
 Uninstall-Server 'after deleting the data:' $false
 Remove-Item -Recurse -Force $data
 Ok (-not (Test-Path $data)) 'the data is wiped, as on a new PC'
+$exit = Run-Setup $updates[1].FullName
+Ok ($exit -eq 7) "an update package on a PC with nothing installed changes nothing (exit $exit)"
+Ok (-not (Test-Path "$pf\artepool-svc.exe")) 'nothing was installed'
 
 # ---- 5. The new PC: install, then restore the copy as administrator ----
 Install-Server 'second'
@@ -387,6 +397,44 @@ Ok ((Psql "SELECT count(*) FROM auth.users WHERE username = 'ciowner'") -eq '1')
 Ok ((Psql "SELECT state FROM sys.setup_state") -eq 'complete') 'the first-run setup stays locked'
 Ok (-not (Test-Path "$data\setup\token")) 'the setup token is gone'
 Check-Logs-Hold-No-Secret 'after the restore:'
+
+# ---- Update packages (decision 0115): the programs only; the runtime from the installed version ----
+Ok (Test-Path "$pf\runtime.json") 'the full setup records its runtime'
+$runtimeId = (Get-Content "$pf\runtime.json" -Raw | ConvertFrom-Json).id
+Ok ($runtimeId -match '^[0-9a-f]{12}$') "the runtime id ($runtimeId)"
+$installed = Installed-Version
+$migrations = Psql 'SELECT count(*) FROM sys.schema_migrations'
+$exit = Run-Setup $updates[0].FullName
+if ($exit -ne 6) { Show-Logs }
+Ok ($exit -eq 6) "a failing update package puts the previous version back (exit $exit)"
+Ok ((Installed-Version) -eq $installed) 'the previous version is installed again'
+Check-Health 'after the failed update package'
+Ok ((Psql 'SELECT count(*) FROM sys.schema_migrations') -eq $migrations) 'the database is unchanged'
+foreach ($name in 'ArtepoolDatabase', 'ArtepoolServer', 'ArtepoolBackup') {
+  Ok ((Get-Service $name).Status -eq 'Running') "$name runs again after the failed update package"
+}
+$exit = Run-Setup $updates[1].FullName
+if ($exit -ne 0) { Show-Logs }
+Ok ($exit -eq 0) "upgrade $installed -> $(Version-Of $updates[1]) with the update package (exit $exit)"
+Ok ((Installed-Version) -eq (Version-Of $updates[1])) 'the new version is installed'
+Check-Health 'after the update package'
+Ok ((Psql "SELECT to_regclass('sys.ci_upgrade_update') IS NOT NULL") -eq 't') "the update package's migration is applied"
+Ok ((Psql "SELECT count(*) FROM auth.users WHERE username = 'ciowner'") -eq '1') 'the data is kept'
+foreach ($file in 'node\node.exe', 'pgsql\bin\postgres.exe', 'pgsql\bin\pg_ctl.exe', 'pgsql\lib', 'winsw\winsw.exe') {
+  Ok (Test-Path "$pf\$file") "$file was copied from the installed version"
+}
+Ok ((Get-Content "$pf\runtime.json" -Raw | ConvertFrom-Json).id -eq $runtimeId) 'the same runtime is recorded'
+Ok (Test-Path "$pf.previous\pgsql\bin\postgres.exe") 'the previous programs are kept beside, with their runtime'
+foreach ($name in 'ArtepoolDatabase', 'ArtepoolServer', 'ArtepoolBackup') {
+  Ok ((Get-Service $name).Status -eq 'Running') "$name runs after the update package"
+}
+$exit = Run-Setup $updates[2].FullName
+Ok ($exit -eq 5) "an update package built for another runtime changes nothing (exit $exit)"
+Ok ((Installed-Version) -eq (Version-Of $updates[1])) 'the version stays'
+$reason = Get-Content "$data\updates\last-failure.txt" -Raw
+Ok ($reason -match 'runtime 000000000000') "the reason names the runtime it needs ($($reason.Trim()))"
+Check-Health 'after the refused update package'
+Check-Logs-Hold-No-Secret 'after the update packages:'
 
 # ---- 6. Uninstall again: the data stays; then the desktop app's own uninstaller ----
 Uninstall-Server 'second'

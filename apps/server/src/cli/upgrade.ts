@@ -1,6 +1,6 @@
 /**
- * `artepool-svc run upgrade prepare --from <x.y.z> --to <x.y.z>` and `artepool-svc run upgrade
- * apply` — the two phases of an upgrade of the server PC (decision 0103, M6.2 part G2), started
+ * `artepool-svc run upgrade prepare --from <x.y.z> --to <x.y.z> [--runtime <id>]` and
+ * `artepool-svc run upgrade apply` — the two phases of an upgrade of the server PC (decision 0103, M6.2 part G2), started
  * by the server setup as administrator; the steps are in upgrade/steps.ts.
  *
  * `prepare` writes `updates\pending-upgrade.json` (versions and the pre-upgrade copy) for `apply`;
@@ -49,7 +49,7 @@ loadEnv();
 const phase = process.argv[2];
 const { values } = parseArgs({
   args: process.argv.slice(3),
-  options: { from: { type: 'string' }, to: { type: 'string' } },
+  options: { from: { type: 'string' }, to: { type: 'string' }, runtime: { type: 'string' } },
 });
 let log: InstallLog | null = null;
 const dataDir = process.env.ARTEPOOL_DATA_DIR ?? '';
@@ -111,6 +111,8 @@ try {
         bundledPgMajor: bundled,
         databaseName,
         migrationsDir,
+        // The runtime the setup was built for (0115): an update package copies it beside.
+        runtime: values.runtime ? { programDir, id: values.runtime } : undefined,
         backupsDir: required('ARTEPOOL_BACKUP_DIR'),
         pgBin,
         connections,
