@@ -48,8 +48,13 @@ Google بيطلب 3 لينكات لأي تطبيق **External** هيبقى **In 
 1. **الإيميل اللي هيظهر للناس** في الصفحات: إيميل حساب البرنامج `artepooltrading@gmail.com` (اتحط خلاص).
 2. **مكان تترفع فيه الصفحات:**
    - **لو عندكم موقع:** ارفع الملفات الأربعة في فولدر اسمه `artepool-erp` على الموقع. اللينكات هتبقى مثلًا `https://الدومين/artepool-erp/` و`.../privacy.html` و`.../terms.html`.
-   - **لو مفيش موقع:** GitHub Pages ببلاش، والشرح في `docs/google-site/README.md`. لو Google رفض دومين GitHub، اشتري دومين `.com` بحوالي 40 درهم في السنة، واربطه بـ GitHub Pages ببلاش.
-3. **إثبات إن الدومين بتاعك:** افتح <https://search.google.com/search-console> **بنفس حساب البرنامج** ← **Add property** ← **Domain** أو **URL prefix** ← واعمل الخطوات اللي هيقولها (سطر TXT في الدومين، أو ملف بيترفع على الموقع).
+   - **لو مفيش موقع (ده اللي عملناه):** GitHub Pages ببلاش على <https://artepool.github.io/>، والشرح في `docs/google-site/README.md`. لو Google رفض دومين GitHub، اشتري دومين `.com` بحوالي 40 درهم في السنة، واربطه بـ GitHub Pages ببلاش.
+3. **إثبات إن الموقع بتاعك (Search Console)، بنفس حساب البرنامج `artepooltrading@gmail.com`:**
+   1. افتح <https://search.google.com/search-console> ← **Add property** (أو **Start now** أول مرة).
+   2. اختار المربع اللي على اليمين **URL prefix**، واكتب `https://artepool.github.io/` ← **Continue**.
+   3. اختار طريقة **HTML file** ← دوس على الملف عشان ينزل (اسمه زي `google1234abcd.html`).
+   4. ارفعه في مستودع **ARTEPOOL/artepool.github.io**: **Add file ← Upload files** ← اسحب الملف ← **Commit changes**. (أو ابعتلي اسم الملف وأنا أحطه: ده مش سر.)
+   5. استنى دقيقة، وارجع لـ Search Console ← **Verify**. لازم تظهر **Ownership verified**.
 4. ارجع للكونسول ← **Google Auth Platform** ← **Branding**:
    - **App domain** ← **Application home page**: لينك الصفحة الرئيسية.
    - **Application privacy policy link**: لينك `privacy.html`.
