@@ -98,7 +98,9 @@ export function npmFindings(audit: unknown): Finding[] {
 export function cratesFromTree(text: string): { name: string; version: string }[] {
   const seen = new Map<string, { name: string; version: string }>();
   for (const line of text.split('\n')) {
-    const m = /^([A-Za-z0-9_-]+) v(\d+\.\d+\.\d+[^\s]*)(.*)$/.exec(line.trim());
+    // A version is digits, then a "-rc.1" / "+build" tail, then a space before the rest (a path,
+    // "(*)"): no two parts can take the same characters, so a long odd line cannot make it slow.
+    const m = /^([A-Za-z0-9_-]+) v(\d+\.\d+\.\d+(?:[-+]\S*)?)(?: (.*))?$/.exec(line.trim());
     if (!m || /\(\//.test(m[3] ?? '') || /\([A-Za-z]:\\/.test(m[3] ?? '')) continue;
     seen.set(`${m[1]}@${m[2]}`, { name: m[1]!, version: m[2]! });
   }

@@ -80,6 +80,22 @@ describe('the Windows programs’ crates', () => {
       { name: 'zip', version: '9.0.5' },
     ]);
   });
+
+  it('read a pre-release version and a "(*)" mark, and stay fast on a long odd line', () => {
+    expect(cratesFromTree('ring v0.17.14-rc.1 (*)\nserde v1.0.228')).toEqual([
+      { name: 'ring', version: '0.17.14-rc.1' },
+      { name: 'serde', version: '1.0.228' },
+    ]);
+    // A line that cannot match (a line separator inside it) is where a slow pattern backtracks.
+    const odd = [
+      `- v0.0.0${'!'.repeat(50_000)}\u2028x`,
+      `- v0.0.0${'0'.repeat(50_000)}\u2028x`,
+      `- v0.0.0-${'0'.repeat(50_000)}\u2028x`,
+    ].join('\n');
+    const started = performance.now();
+    expect(cratesFromTree(odd)).toEqual([]);
+    expect(performance.now() - started).toBeLessThan(500);
+  });
 });
 
 describe('CVSS 3 base scores (FIRST’s examples)', () => {
