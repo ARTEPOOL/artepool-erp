@@ -1,7 +1,7 @@
 /* Settings → System health (design 13, backup panel). Tokens and logical properties only. */
 .kpis {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
   gap: var(--space-4);
   margin-block-end: var(--space-4);
 }
@@ -12,9 +12,17 @@
   align-items: flex-start;
 }
 
+/* The text may shrink with the tile: a long value (a date and a time) wraps between the date and
+   the time instead of spilling out of the card (it overflowed into the next tile in Arabic). */
+.kpiText {
+  flex: 1;
+  min-inline-size: 0;
+}
+
 .kpi b {
   display: block;
   font-size: var(--text-h3);
+  overflow-wrap: break-word;
 }
 
 .muted {

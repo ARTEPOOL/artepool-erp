@@ -1,10 +1,14 @@
 # Changelog
 
-## Backup screen: says why "Upload now" waits (2026-11-03)
+## Backup screen: says why "Upload now" waits; the last copy's date stays in its tile (2026-11-03)
 
-**In plain words:** when Google Drive is connected but the backup key has not been created yet, the Google Drive line now says "Create the backup key first (the line above) so that Upload now works", instead of a grey button with no reason. It ships with the next version.
+**In plain words:**
 
-- `BackupPanel`: the note next to "Connected" while `offsite.keySet` is false; Arabic and English. Tests: the note without a key, none with one.
+- When Google Drive is connected but the backup key has not been created yet, the Google Drive line now says "Create the backup key first (the line above) so that Upload now works", instead of a grey button with no reason.
+- The date and time of the last copy ("03/11/2026 18:18") no longer spill out of their tile in Arabic. They go on two lines when the tile is narrow.
+- Both ship with the next version.
+
+- `BackupPanel`: the note next to "Connected" while `offsite.keySet` is false; the tiles' text box may shrink (`min-inline-size: 0`) and wraps between the date and the time; tiles are at least 12rem wide. Arabic and English. Tests: the note without a key, none with one; checked in a browser at three widths.
 
 ## Google Drive: the app's registration reaches the server, and a warning when Google refuses (2026-11-02)
 
