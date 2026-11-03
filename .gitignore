@@ -23,3 +23,6 @@ apps/desktop/src-tauri/bridge/target/
 
 # Local backups made in development (pnpm backup:run)
 .backups/
+
+# The weekly dependency check's summary (pnpm deps:check)
+deps-check-summary.md

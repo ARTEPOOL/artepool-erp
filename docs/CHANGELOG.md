@@ -1,5 +1,18 @@
 # Changelog
 
+## Library updates, and a weekly check of the libraries (2026-11-03)
+
+**In plain words:**
+
+- **The libraries with known security warnings are updated:** the Windows app's update library (and the zip reader inside it), the server's data checks (zod), the server itself (fastify), and the secure connection libraries (rustls). Smaller ones too (time, tokio, and a few that only some parts use). Nothing changes on the screens.
+- **The updater still checks every download's signature** and refuses a file without a valid signature, as before. The tests that prove it pass.
+- **A weekly check every Monday morning** looks for new warnings in the libraries that are installed on the shop's PCs. When one is serious (critical or high), the check turns red and opens one issue in Arabic on GitHub, so you get an email. A smaller warning, or one in a tool only used to build and test the program, does not stop anything. When all is well again, the issue closes by itself.
+- One medium warning stays (minimatch, inside the Excel library). It has no fix yet, and the part it is about is not used by the program.
+
+- Rust: `tauri-plugin-updater` 2.14.1 (zip 9.0.5), rustls 0.23.46, rustls-webpki 0.103.16, time 0.3.55, tokio 1.54.1, plist 1.10.3 / quick-xml 0.42.0, serde_with 3.24.0; `rust-version` 1.90 in every crate (Tauri needs it already; it lets cargo pick the fixed versions). JavaScript: zod 4.6.7, fastify 5.12.7, overrides for fast-uri, seroval and undici. Separate commits from the backup screen changes.
+- Checked: the Windows programs' crates (`cargo tree` for the Windows target) contain no Linux-only crate (glib, gtk, webkit2gtk, zbus…); the server bundle and the screens contain neither undici nor jsdom (jsdom is a test tool; its name appears only as text in the source map's copy of `package.json`).
+- `pnpm deps:check` (`tools/deps-check`) and `.github/workflows/dependency-check.yml`: `pnpm audit --prod` and OSV for the crates linked into the Windows programs; the Arabic summary goes to the run's page and to the issue. Tests: what counts as shipped, CVSS 3 scores, OSV ratings and aliases, "unmaintained" notes never failing, the summary.
+
 ## Backup screen: says why "Upload now" waits; the last copy's date stays in its tile (2026-11-03)
 
 **In plain words:**

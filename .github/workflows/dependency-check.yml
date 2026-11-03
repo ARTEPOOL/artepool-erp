@@ -1,0 +1,69 @@
+# The weekly dependency check (pnpm deps:check, tools/deps-check): known security advisories in
+# the libraries that reach the installed programs (server, screens, Windows parts). It fails only
+# for a critical or high advisory in shipped code, or when the check itself could not run; the
+# owner then gets one Arabic issue (later failures comment on it; a clean run closes it).
+name: Dependency check
+
+on:
+  schedule:
+    # Mondays 04:17 UTC = 08:17 in Dubai.
+    - cron: '17 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dependency-check
+  cancel-in-progress: false
+
+env:
+  ISSUE_TITLE: 'تحذير مكتبات: محتاج تحديث'
+
+jobs:
+  check:
+    name: Check the shipped libraries
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Check the libraries (JavaScript and Rust)
+        run: pnpm deps:check
+
+      - name: Tell the owner (an issue in Arabic)
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          [ -f deps-check-summary.md ] || printf '## فحص المكتبات الأسبوعي\n\n**الفحص ما كملش** قبل ما يكتب النتيجة.\n' > deps-check-summary.md
+          printf '\n[تفاصيل التشغيل](%s)\n' "$RUN_URL" >> deps-check-summary.md
+          open=$(gh issue list --state open --limit 100 --json number,title \
+            --jq "map(select(.title == \"$ISSUE_TITLE\")) | .[0].number // empty")
+          if [ -n "$open" ]; then
+            gh issue comment "$open" --body-file deps-check-summary.md
+          else
+            gh issue create --title "$ISSUE_TITLE" --body-file deps-check-summary.md
+          fi
+
+      - name: Close the issue when all is well again
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          open=$(gh issue list --state open --limit 100 --json number,title \
+            --jq "map(select(.title == \"$ISSUE_TITLE\")) | .[0].number // empty")
+          if [ -n "$open" ]; then
+            gh issue close "$open" --comment "$(cat deps-check-summary.md)"
+          fi
