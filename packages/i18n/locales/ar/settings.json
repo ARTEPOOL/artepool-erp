@@ -785,6 +785,7 @@
     "driveConnected": "مربوط",
     "driveNotConnected": "مش مربوط",
     "uploadNow": "ارفع الآن",
+    "keyFirst": "اعمل مفتاح النسخ الأول (السطر اللي فوق) عشان «ارفع الآن» يشتغل.",
     "disconnect": "فك الربط",
     "connectDrive": "ربط Google Drive",
     "reconnectDrive": "اربط Google Drive تاني",

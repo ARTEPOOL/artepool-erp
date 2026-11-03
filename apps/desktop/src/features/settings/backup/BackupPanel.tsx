@@ -272,6 +272,12 @@ export function BackupPanel() {
                     {h.offsite.driveConnected
                       ? t('backup.driveConnected')
                       : t('backup.driveNotConnected')}
+                    {h.offsite.driveConnected && !h.offsite.keySet && (
+                      <>
+                        {' '}
+                        · <span data-testid="key-first">{t('backup.keyFirst')}</span>
+                      </>
+                    )}
                     {h.offsite.lastFailure?.errorMessage && has('offsite_failed') && (
                       <>
                         {' '}

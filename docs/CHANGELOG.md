@@ -1,5 +1,11 @@
 # Changelog
 
+## Backup screen: says why "Upload now" waits (2026-11-03)
+
+**In plain words:** when Google Drive is connected but the backup key has not been created yet, the Google Drive line now says "Create the backup key first (the line above) so that Upload now works", instead of a grey button with no reason. It ships with the next version.
+
+- `BackupPanel`: the note next to "Connected" while `offsite.keySet` is false; Arabic and English. Tests: the note without a key, none with one.
+
 ## Google Drive: the app's registration reaches the server, and a warning when Google refuses (2026-11-02)
 
 **In plain words:**
