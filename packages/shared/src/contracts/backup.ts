@@ -24,7 +24,11 @@ export type HealthProblem =
   | 'restore_test_due'
   | 'restore_test_failed'
   | 'integrity_issues'
-  | 'disk_low';
+  | 'disk_low'
+  /** Google ended the saved Drive access (decision 0095): connect Google Drive again. */
+  | 'drive_access_ended'
+  /** Google refused the app's registration itself: a new client and the next update. */
+  | 'drive_registration_refused';
 
 export const BACKUP_REQUEST_KINDS = [
   'backup_now',
@@ -65,6 +69,11 @@ export interface HealthResponse {
     driveConnected: boolean;
     /** Whether this installation carries the app's Google registration (decision 0095). */
     google: { chooseAccount: boolean; code: boolean };
+    /** Google's last answer to the saved access (every upload, and every 6 hours between). */
+    driveAccess: {
+      checkedAt: string;
+      problem: 'access_ended' | 'registration_refused' | null;
+    } | null;
   };
   offline: { last: BackupRunInfo | null; intervalDays: number };
   restoreTest: { last: BackupRunInfo | null; intervalDays: number };

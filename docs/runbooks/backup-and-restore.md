@@ -134,13 +134,12 @@ are the last resort.
 
 ## 8) For the software publisher: the app's registration at Google (once, for every installation)
 
-Decision [0095](../decisions/0095-google-drive-connect-by-choosing-the-account.md). Done **once** by whoever publishes ARTÉPOOL ERP, with a Google account that belongs to the software (for example `artepool.software@gmail.com`), **not** a shop's backup account. Shops never do this.
+Decision [0095](../decisions/0095-google-drive-connect-by-choosing-the-account.md). Done **once** by whoever publishes ARTÉPOOL ERP, with a Google account that belongs to the software, **not** a shop's backup account. Shops never do this.
 
-1. <https://console.cloud.google.com> → new project `ARTEPOOL ERP`.
-2. **APIs & Services → Library → Google Drive API → Enable.**
-3. **OAuth consent screen:** External; app name `ARTEPOOL ERP`; support email; scope `.../auth/drive.file` only; then **Publish app** (otherwise Google ends the connection after 7 days). `drive.file` is a non-sensitive scope: no security review; Google may ask to verify the name and logo once many shops use it.
-4. **Credentials → Create credentials → OAuth client ID** twice:
-   - type **Desktop app**, name `ARTEPOOL ERP desktop` → `ARTEPOOL_GOOGLE_CLIENT_ID` / `ARTEPOOL_GOOGLE_CLIENT_SECRET`;
-   - type **TVs and Limited Input devices**, name `ARTEPOOL ERP code` → `ARTEPOOL_GOOGLE_DEVICE_CLIENT_ID` / `ARTEPOOL_GOOGLE_DEVICE_CLIENT_SECRET`.
-5. Give the four values to the installer build (M6.2); in development put them in `.env`. Google treats them as not secret for desktop apps; they never give access to any shop's Drive.
+The exact steps, in Arabic: **[google-registration.md](google-registration.md)**. In short:
+
+- a project with the Google Drive API;
+- an External consent screen with the `drive.file` scope only, **published "In production"** (in "Testing" Google ends every connection after 7 days);
+- a "Desktop app" client and a "TVs and Limited Input devices" client;
+- the four values stored only as secrets of the `release` environment in GitHub (`ARTEPOOL_GOOGLE_CLIENT_ID`, `ARTEPOOL_GOOGLE_CLIENT_SECRET`, `ARTEPOOL_GOOGLE_DEVICE_CLIENT_ID`, `ARTEPOOL_GOOGLE_DEVICE_CLIENT_SECRET`), never in the repository or a chat. In development they go in `.env`.
 

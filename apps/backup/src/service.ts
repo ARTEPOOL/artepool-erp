@@ -3,6 +3,8 @@
  * - a local copy when the last good one is an hour old;
  * - the off-site copy once a day, when the key and Google Drive are set up (retried hourly
  *   after a failure);
+ * - whether Google still accepts the saved Google Drive access, every 6 hours between uploads and
+ *   right after the owner connects again (decision 0095);
  * - the integrity checks of the live database once after every start of the database (after a
  *   power cut too, M6.2 part I), and every night after 02:00 (Dubai);
  * - the owner's requests (back up now, upload now, restore test, drive copy), oldest first.
@@ -11,6 +13,7 @@ import { stat } from 'node:fs/promises';
 import type pg from 'pg';
 import type { BackupConfig } from './config';
 import { inSystemTx } from './db';
+import { checkDriveAccess, driveCheckDue } from './drive-access';
 import { liveIntegrity, nightlyIntegrity, startCheckDue } from './integrity';
 import { localBackup } from './local';
 import { offlineCopy } from './offline';
@@ -119,6 +122,9 @@ export async function tick(
     olderThan(await lastRunAt(client, 'offsite_upload', 'any'), HOUR, now)
   ) {
     await attempt('offsite', () => offsiteUpload(client, config, { now }));
+  }
+  if (await driveCheckDue(config, now)) {
+    await attempt('drive-check', () => checkDriveAccess(config, now));
   }
   const { date, hour } = dubai(now);
   if (hour >= (options.nightlyFromHour ?? 2)) {

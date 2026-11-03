@@ -144,27 +144,53 @@ function bundleSmallDesktopApp(): void {
   );
 }
 
-function googleJson(): string | null {
-  const desktop =
-    process.env.ARTEPOOL_GOOGLE_CLIENT_ID && process.env.ARTEPOOL_GOOGLE_CLIENT_SECRET;
-  const device =
-    process.env.ARTEPOOL_GOOGLE_DEVICE_CLIENT_ID &&
-    process.env.ARTEPOOL_GOOGLE_DEVICE_CLIENT_SECRET;
-  if (!desktop && !device) return null;
+/** The release's secrets that hold the app's registration at Google (decision 0095). */
+export const GOOGLE_SETTINGS = {
+  desktop: ['ARTEPOOL_GOOGLE_CLIENT_ID', 'ARTEPOOL_GOOGLE_CLIENT_SECRET'],
+  device: ['ARTEPOOL_GOOGLE_DEVICE_CLIENT_ID', 'ARTEPOOL_GOOGLE_DEVICE_CLIENT_SECRET'],
+} as const;
+
+const GOOGLE_CLIENT_ID = /^[0-9A-Za-z-]+\.apps\.googleusercontent\.com$/;
+const GOOGLE_CLIENT_SECRET = /^[!-~]{8,200}$/;
+
+/**
+ * `google.json` for the stage: the app's registration at Google (decision 0095), from the release
+ * environment's secrets, or null when none is set. Pasted values are trimmed. A client with only
+ * one of its two values, or a value that cannot be Google's, stops the build: a registration that
+ * does not work must not reach the shops. The message names the setting, never its value.
+ */
+export function googleJson(env: NodeJS.ProcessEnv = process.env): string | null {
   const value: Record<string, { clientId: string; clientSecret: string }> = {};
-  if (desktop) {
-    value.desktop = {
-      clientId: process.env.ARTEPOOL_GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.ARTEPOOL_GOOGLE_CLIENT_SECRET!,
-    };
+  for (const [kind, [idName, secretName]] of Object.entries(GOOGLE_SETTINGS)) {
+    const clientId = env[idName]?.trim() ?? '';
+    const clientSecret = env[secretName]?.trim() ?? '';
+    if (!clientId && !clientSecret) continue;
+    if (!clientId || !clientSecret) {
+      throw new Error(
+        `${clientId ? secretName : idName} is not set, but ${clientId ? idName : secretName} is: set both, or neither.`,
+      );
+    }
+    if (!GOOGLE_CLIENT_ID.test(clientId)) {
+      throw new Error(
+        `${idName} does not look like a Google client ID (…apps.googleusercontent.com).`,
+      );
+    }
+    if (!GOOGLE_CLIENT_SECRET.test(clientSecret)) {
+      throw new Error(`${secretName} does not look like a Google client secret.`);
+    }
+    value[kind] = { clientId, clientSecret };
   }
-  if (device) {
-    value.device = {
-      clientId: process.env.ARTEPOOL_GOOGLE_DEVICE_CLIENT_ID!,
-      clientSecret: process.env.ARTEPOOL_GOOGLE_DEVICE_CLIENT_SECRET!,
-    };
+  return Object.keys(value).length ? `${JSON.stringify(value, null, 2)}\n` : null;
+}
+
+/** One line for the release's summary: which parts of the registration it carries, no value. */
+export function googleSummary(json: string | null): string {
+  if (!json) {
+    return 'Google registration: **none** (Connect Google Drive will say this installation has no registration).';
   }
-  return `${JSON.stringify(value, null, 2)}\n`;
+  const parts = JSON.parse(json) as Record<string, unknown>;
+  const mark = (kind: string) => (kind in parts ? 'yes' : 'no');
+  return `Google registration: choose the account **${mark('desktop')}**, code **${mark('device')}**.`;
 }
 
 export interface SetupBuild {
@@ -347,6 +373,10 @@ export async function buildInstaller(options: { testUpgrade?: boolean } = {}): P
   );
   const google = googleJson();
   if (google) await writeFile(join(stage, 'google.json'), google);
+  console.log(googleSummary(google));
+  if (process.env.GITHUB_STEP_SUMMARY) {
+    appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${googleSummary(google)}\n\n`);
+  }
 
   // Windows 10 and 11 ship bsdtar, which reads zip files.
   const unpack = join(out, 'pgsql-unpack');

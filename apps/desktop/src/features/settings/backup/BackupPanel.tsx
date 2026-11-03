@@ -119,6 +119,7 @@ export function BackupPanel() {
     ask.mutate(body, { onError: (e) => setProblem(errorText(e)) });
   };
   const has = (p: HealthResponse['problems'][number]) => h?.problems.includes(p) ?? false;
+  const driveRefused = has('drive_access_ended') || has('drive_registration_refused');
 
   return (
     <>
@@ -262,7 +263,7 @@ export function BackupPanel() {
               </div>
 
               <div className={styles.place}>
-                <Tile tone={h.offsite.driveConnected ? 'ok' : 'warn'}>
+                <Tile tone={driveRefused ? 'danger' : h.offsite.driveConnected ? 'ok' : 'warn'}>
                   <Cloud aria-hidden="true" />
                 </Tile>
                 <div>
@@ -282,6 +283,11 @@ export function BackupPanel() {
                 <div className={styles.placeActions}>
                   {h.offsite.driveConnected ? (
                     <>
+                      {has('drive_access_ended') && (
+                        <Button onPress={() => setConnecting(true)}>
+                          {t('backup.reconnectDrive')}
+                        </Button>
+                      )}
                       <Button
                         isDisabled={!h.offsite.keySet}
                         onPress={() => request({ kind: 'offsite_now' })}

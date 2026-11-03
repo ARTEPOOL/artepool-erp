@@ -12,6 +12,7 @@ import {
   finishAccountChoice,
   finishDeviceSignIn,
   GoogleError,
+  readDriveAccess,
   saveDriveCredentials,
   startAccountChoice,
   startDeviceSignIn,
@@ -96,20 +97,45 @@ const exists = (path: string) =>
     () => false,
   );
 
+/**
+ * Google's last answer to the saved Drive access (decision 0095), unless the owner connected again
+ * after it: then the next check answers for the new access.
+ */
+async function driveAccess(deps: AppDeps): Promise<HealthResponse['offsite']['driveAccess']> {
+  const [state, credentials] = await Promise.all([
+    readDriveAccess(deps.backup.backupDir),
+    stat(deps.backup.driveCredentialsFile).catch(() => null),
+  ]);
+  if (!state || !credentials) return null;
+  if (credentials.mtime.getTime() > Date.parse(state.checkedAt)) return null;
+  return { checkedAt: state.checkedAt, problem: state.problem };
+}
+
 export async function healthStatus(deps: AppDeps, now = Date.now()): Promise<HealthResponse> {
   const { db } = deps;
-  const [localOk, localFail, offOk, offFail, offline, restoreOk, restoreFail, key, driveConnected] =
-    await Promise.all([
-      runs(db, 'logical_dump', 'success'),
-      runs(db, 'logical_dump', 'failed'),
-      runs(db, 'offsite_upload', 'success'),
-      runs(db, 'offsite_upload', 'failed'),
-      runs(db, 'offline_copy', 'success'),
-      runs(db, 'restore_test', 'success'),
-      runs(db, 'restore_test', 'failed'),
-      recipient(db),
-      exists(deps.backup.driveCredentialsFile),
-    ]);
+  const [
+    localOk,
+    localFail,
+    offOk,
+    offFail,
+    offline,
+    restoreOk,
+    restoreFail,
+    key,
+    driveConnected,
+    access,
+  ] = await Promise.all([
+    runs(db, 'logical_dump', 'success'),
+    runs(db, 'logical_dump', 'failed'),
+    runs(db, 'offsite_upload', 'success'),
+    runs(db, 'offsite_upload', 'failed'),
+    runs(db, 'offline_copy', 'success'),
+    runs(db, 'restore_test', 'success'),
+    runs(db, 'restore_test', 'failed'),
+    recipient(db),
+    exists(deps.backup.driveCredentialsFile),
+    driveAccess(deps),
+  ]);
   const [maxLocal, maxOffsite, restoreDays, offlineDays] = await Promise.all([
     deps.settings.number('backup.max_age_minutes.local'),
     deps.settings.number('backup.max_age_hours.offsite'),
@@ -139,6 +165,8 @@ export async function healthStatus(deps: AppDeps, now = Date.now()): Promise<Hea
   if (!offsiteSetUp) problems.push('offsite_not_set_up');
   else if (age(offOk, now) > maxOffsite * HOUR) problems.push('offsite_stale');
   if (failedSince(offFail, offOk)) problems.push('offsite_failed');
+  if (access?.problem === 'access_ended') problems.push('drive_access_ended');
+  if (access?.problem === 'registration_refused') problems.push('drive_registration_refused');
   if (age(offline, now) > offlineDays * DAY) problems.push('offline_due');
   if (age(restoreOk, now) > restoreDays * DAY) problems.push('restore_test_due');
   if (failedSince(restoreFail, restoreOk)) problems.push('restore_test_failed');
@@ -165,6 +193,7 @@ export async function healthStatus(deps: AppDeps, now = Date.now()): Promise<Hea
         chooseAccount: deps.backup.googleClients.desktop !== null,
         code: deps.backup.googleClients.device !== null,
       },
+      driveAccess: access,
     },
     offline: { last: offline, intervalDays: offlineDays },
     restoreTest: { last: restoreOk ?? restoreFail, intervalDays: restoreDays },
@@ -416,6 +445,9 @@ const ALERT_OF: Partial<Record<HealthProblem, { type: string; which: string }>> 
   restore_test_due: { type: 'restore_test_due', which: 'restore_test' },
   offline_due: { type: 'offline_copy_due', which: 'offline' },
   integrity_issues: { type: 'integrity_issue', which: 'integrity' },
+  // Decision 0095: the off-site copies stop until the owner (or the publisher) acts.
+  drive_access_ended: { type: 'backup_failed', which: 'drive_access' },
+  drive_registration_refused: { type: 'backup_failed', which: 'google_registration' },
 };
 
 /**

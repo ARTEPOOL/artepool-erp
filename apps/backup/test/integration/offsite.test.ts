@@ -4,7 +4,7 @@
  * opens it; old copies go to the Drive trash; the device sign-in waits for the owner's approval.
  */
 import { randomBytes } from 'node:crypto';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, unlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Decrypter, generateX25519Identity, identityToRecipient } from 'age-encryption';
@@ -15,6 +15,13 @@ import { SecretBox } from '@artepool/node-kit';
 import { createTestDatabase, inContext, type TestDatabase } from '@artepool/testing';
 import { configFromEnv, type BackupConfig } from '../../src/config';
 import { connect } from '../../src/db';
+import {
+  checkDriveAccess,
+  DRIVE_ACCESS_FILE,
+  driveCheckDue,
+  readDriveAccess,
+  writeDriveAccess,
+} from '../../src/drive-access';
 import {
   finishDeviceSignIn,
   loadDriveCredentials,
@@ -141,5 +148,72 @@ describe('the off-site copy', () => {
     // Retention: the very old copy went to the trash, yesterday's stays.
     expect(google.files.find((f) => f.id === 'old')!.trashed).toBe(true);
     expect(google.files.find((f) => f.id === 'recent')!.trashed).toBe(false);
+  });
+});
+
+describe('whether Google still accepts the saved access (decision 0095)', () => {
+  const connect = (clientId: string, refreshToken: string) =>
+    saveDriveCredentials(config.driveCredentialsFile, box, {
+      clientId,
+      clientSecret: 'secret-1',
+      refreshToken,
+      connectedAt: new Date().toISOString(),
+    });
+  const stateFile = () => readFile(join(config.backupDir, DRIVE_ACCESS_FILE), 'utf8');
+
+  it('is recorded as accepted after an upload', async () => {
+    expect(await readDriveAccess(config.backupDir)).toMatchObject({ problem: null, code: null });
+  });
+
+  it('tells an ended access from a refused registration; the upload fails and says why', async () => {
+    await connect('client-1', 'expired-token');
+    await expect(offsiteUpload(client, config)).rejects.toThrow(/invalid_grant/);
+    expect(await readDriveAccess(config.backupDir)).toMatchObject({
+      problem: 'access_ended',
+      code: 'invalid_grant',
+    });
+    expect(await stateFile()).not.toContain('expired-token');
+    expect(await lastRun()).toMatchObject({ status: 'failed' });
+
+    await connect('deleted-client', 'refresh-xyz');
+    await expect(offsiteUpload(client, config)).rejects.toThrow(/deleted_client/);
+    expect(await readDriveAccess(config.backupDir)).toMatchObject({
+      problem: 'registration_refused',
+      code: 'deleted_client',
+    });
+    expect(await stateFile()).not.toContain('refresh-xyz');
+  });
+
+  it('keeps the last answer when Google cannot be reached (that is a late copy, not a refusal)', async () => {
+    const before = await readDriveAccess(config.backupDir);
+    const unreachable = 'http://127.0.0.1:9';
+    const offline: BackupConfig = {
+      ...config,
+      google: { auth: unreachable, oauth: unreachable, api: unreachable, upload: unreachable },
+    };
+    await expect(offsiteUpload(client, offline)).rejects.toThrow(/could not be reached/);
+    expect(await readDriveAccess(config.backupDir)).toEqual(before);
+  });
+
+  it('is checked every 6 hours between uploads, and right after connecting again', async () => {
+    const hourAgo = new Date(Date.now() - 3600 * 1000);
+    await writeDriveAccess(config.backupDir, {
+      checkedAt: hourAgo.toISOString(),
+      problem: 'access_ended',
+      code: 'invalid_grant',
+    });
+    await connect('client-1', 'refresh-xyz');
+    expect(await driveCheckDue(config)).toBe(true); // connected after the last answer
+    expect(await checkDriveAccess(config)).toMatchObject({ problem: null, code: null });
+    const now = new Date();
+    expect(await driveCheckDue(config, now)).toBe(false);
+    expect(await driveCheckDue(config, new Date(now.getTime() + 5 * 3600 * 1000))).toBe(false);
+    expect(await driveCheckDue(config, new Date(now.getTime() + 6 * 3600 * 1000))).toBe(true);
+    expect(google.files.filter((f) => !f.trashed).length).toBeGreaterThan(0);
+    const filesBefore = google.files.length;
+    await checkDriveAccess(config);
+    expect(google.files.length).toBe(filesBefore); // a check uploads nothing
+    await unlink(join(config.backupDir, DRIVE_ACCESS_FILE));
+    expect(await driveCheckDue({ ...config, driveCredentialsFile: join(dir, 'none') })).toBe(false);
   });
 });

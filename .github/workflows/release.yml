@@ -96,6 +96,13 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: pnpm --filter @artepool/desktop exec tauri build --config src-tauri/release.conf.json
       - name: Build the setups, the update packages and the runtime (decision 0115)
+        env:
+          # The app's registration at Google (decision 0095), only from this environment's
+          # secrets; the build puts it in google.json beside the server's programs.
+          ARTEPOOL_GOOGLE_CLIENT_ID: ${{ secrets.ARTEPOOL_GOOGLE_CLIENT_ID }}
+          ARTEPOOL_GOOGLE_CLIENT_SECRET: ${{ secrets.ARTEPOOL_GOOGLE_CLIENT_SECRET }}
+          ARTEPOOL_GOOGLE_DEVICE_CLIENT_ID: ${{ secrets.ARTEPOOL_GOOGLE_DEVICE_CLIENT_ID }}
+          ARTEPOOL_GOOGLE_DEVICE_CLIENT_SECRET: ${{ secrets.ARTEPOOL_GOOGLE_DEVICE_CLIENT_SECRET }}
         run: pnpm build:installer
       - name: Sign every release file with the update key
         shell: pwsh
