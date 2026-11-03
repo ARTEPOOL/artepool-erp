@@ -165,6 +165,7 @@ It runs client–server on the local network: PostgreSQL and the API service on 
 
 - **Plan first.** For any non-trivial task, propose the plan (files, schema changes, tests) and wait for approval before writing code.
 - **Small steps.** One feature or fix at a time; run tests; then commit with a clear message.
+- **Pull requests only when the owner's batch is complete** (owner, 2026-11-03). Keep collecting the owner's requests on one branch (a draft pull request at most, so CI runs) and mark it ready for merging only after the owner says nothing more will be added. Merging is always the owner's.
 - **Ask, don't assume,** for anything that affects accounting treatment, VAT, document layout or security. List the question instead of guessing.
 - **Explain in plain language.** The owner is not a software engineer. Summarise what changed and why in simple terms, and say how to test it by hand.
 - **Never run destructive commands** on a database that may hold real data (drop, truncate, reset) without explicit confirmation.
