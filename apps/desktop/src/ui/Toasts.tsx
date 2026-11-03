@@ -1,4 +1,13 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { AlertCircle, Check } from 'lucide-react';
 import styles from './Toasts.module.css';
 
@@ -15,10 +24,23 @@ const ToastContext = createContext<(message: string, tone?: 'ok' | 'warn') => vo
 /** Short confirmations at the bottom of the screen (the design's toasts), read out politely. */
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
+  // The timers that hide each toast; stopped when the provider goes away, so none fires afterwards.
+  const timers = useRef(new Set<ReturnType<typeof setTimeout>>());
+  useEffect(() => {
+    const pending = timers.current;
+    return () => {
+      for (const timer of pending) clearTimeout(timer);
+      pending.clear();
+    };
+  }, []);
   const push = useCallback((message: string, tone: 'ok' | 'warn' = 'ok') => {
     const id = Date.now() + Math.random();
     setToasts((list) => [...list.slice(-2), { id, message, tone }]);
-    setTimeout(() => setToasts((list) => list.filter((t) => t.id !== id)), 3200);
+    const timer = setTimeout(() => {
+      timers.current.delete(timer);
+      setToasts((list) => list.filter((t) => t.id !== id));
+    }, 3200);
+    timers.current.add(timer);
   }, []);
   const value = useMemo(() => push, [push]);
   return (
