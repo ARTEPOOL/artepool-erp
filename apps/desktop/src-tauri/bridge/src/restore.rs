@@ -94,10 +94,10 @@ pub fn find_copies(places: &[(PathBuf, Place)]) -> Vec<RestoreCopy> {
                 continue;
             };
             for entry in entries.flatten() {
-                if let Some(copy) = copy_at(&entry.path(), *place) {
-                    if !found.iter().any(|c| c.path == copy.path) {
-                        found.push(copy);
-                    }
+                if let Some(copy) = copy_at(&entry.path(), *place)
+                    && !found.iter().any(|c| c.path == copy.path)
+                {
+                    found.push(copy);
                 }
             }
         }
@@ -152,11 +152,11 @@ impl RestoreRun {
         if let Some(step) = message.get("step").and_then(Value::as_str) {
             let step = step.to_string();
             self.update(|s| s.step = Some(step));
-        } else if let Some(result) = message.get("result") {
-            if result.get("ok").and_then(Value::as_bool).is_some() {
-                let result = result.clone();
-                self.update(|s| s.result = Some(result));
-            }
+        } else if let Some(result) = message.get("result")
+            && result.get("ok").and_then(Value::as_bool).is_some()
+        {
+            let result = result.clone();
+            self.update(|s| s.result = Some(result));
         }
     }
 
