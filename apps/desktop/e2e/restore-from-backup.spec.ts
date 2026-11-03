@@ -75,6 +75,10 @@ test('restore the shop from its Google Drive copy, then sign in as before', asyn
   await page.getByLabel(t('auth:signIn.username'), { exact: true }).fill(username);
   await page.getByLabel(t('auth:signIn.password'), { exact: true }).fill(password);
   await page.getByRole('button', { name: t('auth:signIn.submit'), exact: true }).click();
+  // The code screen first: typed any earlier, the digits would land in the sign-in form still showing.
+  await expect(page.getByRole('heading', { name: t('auth:secondFactor.title') })).toBeVisible({
+    timeout: 30_000,
+  });
   await typeCode(page, await control.codeFor(person.id));
   await page.getByRole('button', { name: t('auth:secondFactor.confirm') }).click();
   await expect(page.getByRole('button', { name: t('settings:user.menu') })).toBeVisible({
