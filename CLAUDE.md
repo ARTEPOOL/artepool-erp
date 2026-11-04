@@ -159,7 +159,8 @@ It runs client–server on the local network: PostgreSQL and the API service on 
 - **Periods** are monthly and are locked after close. Nothing is ever deleted. (0016)
 - **Fiscal year** runs January–December. Months are kept 3 months ahead. (0035)
 - **Chart of accounts and posting map** are provisional and **pending accountant review**; go-live waits for the approval. Account mappings must stay configurable data, never hard-coded. (0018, 0035)
-- **E-invoicing** goes through an accredited service provider API. The ERP stays the system of record. The go-live date is **pending** and lives in the setting `einvoice.mandatory_from`. (0019)
+- **E-invoicing** goes through an accredited service provider API. The ERP stays the system of record. The go-live date is **pending** and lives in the setting `einvoice.mandatory_from`; the owner's deadline: **ready before 1 July 2027**. (0019, 0116)
+- **Order after go-live:** P2 (money: purchases and suppliers, expenses, accounting screens and reports, VAT return) first; then the **AI & Online track** (stages 2A–2D; its own track, never called "Phase 2") interleaved with P3 (contracts, visits, service jobs, projects) as the owner decides. (0116)
 
 ## How to work
 

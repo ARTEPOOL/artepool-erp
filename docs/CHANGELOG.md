@@ -1,5 +1,30 @@
 # Changelog
 
+## Install guides, the M6.4 plan, the accountant pack, and the order after go-live (2026-11-04)
+
+**In plain words:**
+
+- **Two Arabic guides:**
+  - **Installing the server PC:** naming the PC, the router reservation, checking the downloaded file, the "Windows protected your PC" message (**More info → Run anyway**) and why it is safe, the installer and the first-run setup.
+  - **The laptop:** installing it, enrolling it with a code from the server, signing in, and revoking it if it is lost.
+- **The plan for locking the cashier's Windows account (M6.4)** is written and waits for your approval. Nothing is built yet.
+- **The accountant pack:** the chart of accounts, the posting map, five sample documents made and printed by the program itself with their journal entries, a VAT summary, and the open questions:
+  - VAT per line or on the total (e-invoicing);
+  - the final invoice after advance payments;
+  - an advance payment while invoices are open;
+  - the format of an advance payment invoice.
+- **The order after go-live:**
+  - Phase 2 (money: purchases and suppliers, expenses, accounting screens and reports, VAT return) comes first;
+  - then the **AI & Online track** (stages 2A–2D, a track of its own, not "Phase 2"), mixed with Phase 3 as you decide;
+  - e-invoicing ready **before 1 July 2027**.
+
+- **Files and records:**
+  - Guides: `docs/runbooks/install-server.md`, `docs/runbooks/install-office.md` (M6.2 part J).
+  - Plan: `docs/milestones/m6.4-cashier-windows-account.md`.
+  - Pack: `docs/accounting/accountant-pack-ar.md`. Its sample invoices were made on a throwaway test database by the real sales engine and printed by the A4 renderer.
+  - Decision 0116; decision 0019 updated with the deadline; PRD 1.48 (§10.4, §13 and the open questions); CLAUDE.md.
+- No code change.
+
 ## Library updates, and a weekly check of the libraries (2026-11-03)
 
 **In plain words:**

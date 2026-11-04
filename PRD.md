@@ -1,7 +1,7 @@
 # ARTÉPOOL ERP — Product Requirements Document (PRD)
 
-**Version:** 1.16
-**Date:** 2026-10-07
+**Version:** 1.48
+**Date:** 2026-11-04
 **Owner:** Mohammed Yasser Al Huraidi (partner, ARTÉPOOL)
 **Status:** Scope approved. Owner and accountant decisions applied (see `docs/decisions/`). **Phase 1 plan approved (2026-10-07).**
 
@@ -387,7 +387,7 @@ Phase tags: **[P1]** to **[P4]** (see section 13).
 - The **ERP remains the system of record**. E-invoicing will be done by **integrating with an accredited service provider (ASP) via API**. The provider only transmits documents to the tax authority.
 - Every issued tax document gets a UUID and is stored in a structured form that can be converted to the required e-invoice format.
 - An **outbox** table (in the P1 schema) queues documents for transmission when internet is available, with status, retries and responses stored.
-- **ARTÉPOOL's go-live date is pending from the accountant** (configurable setting). It may move the integration earlier than P4.
+- **Ready before 1 July 2027** (owner, [0116](docs/decisions/0116-order-after-go-live.md)): e-invoicing no longer waits for P4. The exact legal date for ARTÉPOOL is confirmed by the accountant and kept in the setting `einvoice.mandatory_from`; the provider is chosen early enough to build and test the integration before it.
 
 ---
 
@@ -427,9 +427,16 @@ Exact models must be chosen before Phase 1 POS work (milestone M6) so they can b
 | **P1 — Core** | Architecture, database, migrations, security, users/roles/audit, master data, inventory, quotations, invoices (POS- and INV-), advance/progress payment tax invoices, credit notes, POS, cash drawer and shifts, **automatic double-entry postings (ledger core)**, backups, i18n | A full day of real-style sales on 2+ terminals reconciles exactly: stock, cash count, invoices, VAT, journals and audit chain all verified. A backup is restored successfully to a test database. |
 | **P2 — Money** | Purchasing, suppliers, expenses, accounting screens, reports, VAT return, quarterly VAT export package and annual archive, dashboard | The accountant reproduces a month's VAT return and P&L from the system without manual fixes |
 | **P3 — Operations** | Pool profiles, maintenance/cleaning contracts, visits, technician stock, service jobs, construction projects | One real contract, one service job and one project run end to end and bill correctly |
-| **P4 — Extensions** | E-invoicing integration (may move earlier, depending on the go-live date), WhatsApp/email sending, promotions, loyalty, multi-warehouse UI, standby server | Each feature accepted individually |
+| **P4 — Extensions** | WhatsApp/email sending, promotions, loyalty, multi-warehouse UI, standby server | Each feature accepted individually |
+| **AI & Online track (2A–2D)** | A separate track, not "Phase 2": its stages 2A–2D are described in its own plan (`docs/ai-online-track.md`, to be added from the owner's draft) | Each stage accepted individually |
+| **E-invoicing (UAE)** | The ASP integration of [10.4](#104-e-invoicing-0019) | **Ready before 1 July 2027**, sending real documents through the provider |
 
 Each phase ends with automated tests passing, a security review, an accountant review (P1–P2) and a written changelog.
+
+**Order after go-live** (owner, 2026-11-04, [0116](docs/decisions/0116-order-after-go-live.md)):
+1. **P2 — Money first:** purchases and suppliers, expenses, accounting screens and reports, the VAT return. Input VAT recovery and the quarterly VAT return depend on it.
+2. **Then the AI & Online track (stages 2A–2D), interleaved with P3** (maintenance contracts, visits, service jobs, construction projects), in the order the owner decides each time.
+3. **E-invoicing ready before 1 July 2027,** whatever phase the rest of the work is in.
 
 ---
 
@@ -438,7 +445,7 @@ Each phase ends with automated tests passing, a security review, an accountant r
 | # | Question | Status |
 |---|---|---|
 | 1 | Tax invoice layout and chart of accounts | Invoice content decided (10.2). **Chart of accounts and posting map: pending accountant review** ([0018](docs/decisions/0018-chart-of-accounts-and-posting-map.md)). |
-| 2 | E-invoicing obligations and dates | Approach decided (ASP via API). **Go-live date: pending accountant** ([0019](docs/decisions/0019-einvoicing-via-accredited-provider.md)). |
+| 2 | E-invoicing obligations and dates | Approach decided (ASP via API). **Go-live date: pending accountant**; the owner's deadline: ready before 1 July 2027 ([0116](docs/decisions/0116-order-after-go-live.md)) ([0019](docs/decisions/0019-einvoicing-via-accredited-provider.md)). |
 | 3 | Hardware models (printer, drawer, scanner, label printer) | Receipt printer type decided (standard 80 mm ESC/POS, drawer on the printer, [0055](docs/decisions/0055-thermal-printer-esc-pos.md)); the exact model is bought later and checked with the manual hardware test checklist |
 | 4 | Existing data to migrate (items, customers, opening balances) and its format | Open: needed before go-live (Excel import templates are provided in P1) |
 | 5 | Whether retention (withholding) is used in construction contracts | Open: needed before P3 |
@@ -457,6 +464,7 @@ Each phase ends with automated tests passing, a security review, an accountant r
 | 1.42 | 2026-10-29 | Decision 0112: a new version is released by merging the pull request that raises the app's version, with the owner's one approval; no git commands. |
 | 1.45 | 2026-10-31 | Decision 0115: fast updates — "Check now" in seconds, "Install now" starts at once, a progress bar, resumable downloads fetched in advance, an hourly check (0.8.0); split update packages, step-by-step install progress and laptop updates at sign-in planned for 0.9.0. |
 | 1.47 | 2026-11-02 | Decision 0095 updated, 0.9.1: the app's Google registration published "In production" with public pages (artepool.github.io), its values only as release secrets, carried by every release and read beside the programs at every start; an alert when Google refuses the saved Drive access. |
+| 1.48 | 2026-11-04 | Decision 0116: the order after go-live — P2 (money) first; then the AI & Online track (stages 2A–2D, its own track, not "Phase 2") interleaved with P3 as the owner decides; e-invoicing ready before 1 July 2027 (out of P4). M6.4 plan proposed; Arabic install guides; the accountant pack. |
 | 1.46 | 2026-11-02 | Decision 0115, 0.9.0: small update packages (the server about 10 MB, the office app about 6 MB; PostgreSQL/Node only when they change), step-by-step install progress with a read-only status page while the server restarts, "Install after shift close", quiet laptop and office updates at sign-in (battery rule, WebView2 fallback). |
 | 1.44 | 2026-10-29 | Decision 0114: the customer's balance wherever a customer is chosen (banner by colour, amounts by permission), customers list column and overdue filter, customer page with open invoices and net position, the A4 invoice's account summary frozen at issue. |
 | 1.43 | 2026-10-29 | Decision 0113: receipts settle open invoices first (an advance only for the excess, or with its own permission and a reason); receiving from an invoice opens on it with a preview; one worked-out invoice status with overdue; Invoices tabs and a history on the invoice page. |
