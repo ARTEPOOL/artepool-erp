@@ -352,7 +352,7 @@ $before = Cashier 'check'
 Ok ($before.state -eq 'not_set_up') "cashier: not set up on a new installation ($($before.state))"
 Ok (Test-Path "$data\device") 'cashier: the new installation made the shared enrollment folder'
 $setup = Cashier 'setup'
-Ok ($cashierExit -eq 0) "cashier: set up (exit $cashierExit: $($setup | ConvertTo-Json -Compress))"
+Ok ($cashierExit -eq 0) "cashier: set up (exit $($cashierExit): $($setup | ConvertTo-Json -Compress))"
 # No app has shared an enrollment on the runner: that is the only item missing.
 Ok ((@($setup.missing) -join ',') -eq 'enrollment') "cashier: everything is right but the enrollment ($(@($setup.missing) -join ','); open: $(@($setup.openFolders) -join ', ') $(@($setup.openServices) -join ', '))"
 $account = Get-LocalUser -Name 'artepool-pos'
