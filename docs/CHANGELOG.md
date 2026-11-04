@@ -1,5 +1,21 @@
 # Changelog
 
+## Printed documents never come out blank; unit price excluding VAT; one spelling of the name (2026-11-04)
+
+**In plain words:**
+
+- **The blank credit note in the accountant pack:**
+  - The cause was not the credit note: the printer program made the PDF before the letters' font had finished loading, so any document could, at random, come out with only its lines and boxes (5 in 20 prints in a test).
+  - Now it waits until every font is ready, and stops with a message instead of ever printing an empty page.
+  - A new test prints every kind of document (simplified and full invoice, credit note, debit note, advance payment invoice, final invoice, receipt, quotation, statement) and fails if a required field is missing, in the PDF itself. A credit or debit note must show the original invoice's number and date.
+- **Unit price on A4 documents is now excluding VAT** (189.00 including VAT prints as 180.00), the same basis as the taxable amount beside it and as e-invoicing. The discount is printed excluding VAT too. The shelf price, the label and the POS keep the price the customer pays.
+- **One spelling of the company name:** آرتيبول.
+
+- **Files and records:**
+  - Renderer: `apps/server/src/modules/printing/render.ts`. Test: `apps/server/test/integration/print-documents.test.ts`; CI installs `poppler-utils` for it.
+  - Unit price: `unitPriceExclVat4dp` in `packages/shared/src/money/line.ts`, used by `printing/service.ts`. Decision 0117; PRD 1.49; CLAUDE.md.
+  - The accountant pack's sample (أ) shows the unit price excluding VAT.
+
 ## Install guides, the M6.4 plan, the accountant pack, and the order after go-live (2026-11-04)
 
 **In plain words:**
