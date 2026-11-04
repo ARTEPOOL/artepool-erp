@@ -203,13 +203,14 @@ pub fn generate_password() -> Result<Zeroizing<String>, SvcError> {
     Ok(Zeroizing::new(text))
 }
 
-pub fn password_strong(password: &str) -> bool {
-    password.len() >= 32
-        && password.bytes().all(|b| b.is_ascii_graphic())
-        && password.bytes().any(|b| b.is_ascii_uppercase())
-        && password.bytes().any(|b| b.is_ascii_lowercase())
-        && password.bytes().any(|b| b.is_ascii_digit())
-        && password.bytes().any(|b| !b.is_ascii_alphanumeric())
+/// 32 printable characters or more, with a capital, a small letter, a digit and a symbol.
+pub fn strong_enough(text: &str) -> bool {
+    text.len() >= 32
+        && text.bytes().all(|b| b.is_ascii_graphic())
+        && text.bytes().any(|b| b.is_ascii_uppercase())
+        && text.bytes().any(|b| b.is_ascii_lowercase())
+        && text.bytes().any(|b| b.is_ascii_digit())
+        && text.bytes().any(|b| !b.is_ascii_alphanumeric())
 }
 
 /// The Winlogon values for automatic sign-in to the account. The password itself is never
@@ -444,11 +445,13 @@ mod tests {
         assert_ne!(a.as_str(), b.as_str());
         for _ in 0..200 {
             let p = generate_password().unwrap();
-            assert!(password_strong(&p), "{}", p.len());
+            assert!(strong_enough(&p), "{}", p.len());
             assert!(!p.contains(' ') && !p.contains('"') && !p.contains('\\'));
         }
-        assert!(!password_strong("short1A!"));
-        assert!(!password_strong(&"a".repeat(40)));
+        // Too short, and one kind of character only: built, not written as a literal.
+        let short: String = generate_password().unwrap().chars().take(8).collect();
+        assert!(!strong_enough(&short));
+        assert!(!strong_enough(&"a".repeat(40)));
     }
 
     #[test]

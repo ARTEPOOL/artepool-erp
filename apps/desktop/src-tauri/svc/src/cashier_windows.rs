@@ -4,9 +4,11 @@
 //! and the security APIs to read folder and service rules. Run as administrator (or SYSTEM).
 
 use std::ffi::{OsStr, c_void};
+use std::mem::MaybeUninit;
 use std::os::windows::ffi::OsStrExt;
 use std::path::Path;
 use std::process::Command;
+use std::ptr::NonNull;
 
 use zeroize::Zeroizing;
 
@@ -303,13 +305,22 @@ unsafe fn read_wide(text: *const u16) -> String {
     String::from_utf16_lossy(unsafe { std::slice::from_raw_parts(text, len) })
 }
 
+/// A pointer a Windows call wrote back, or None if it is empty.
+///
+/// # Safety
+/// Only after the call said it succeeded: a successful call has written the slot.
+unsafe fn filled<T>(slot: MaybeUninit<*mut T>) -> Option<NonNull<T>> {
+    NonNull::new(unsafe { slot.assume_init() })
+}
+
 fn sid_to_text(sid: *const c_void) -> Option<String> {
-    let mut text: *mut u16 = std::ptr::null_mut();
-    if unsafe { ConvertSidToStringSidW(sid, &mut text) } == 0 {
+    let mut out = MaybeUninit::<*mut u16>::uninit();
+    if unsafe { ConvertSidToStringSidW(sid, out.as_mut_ptr()) } == 0 {
         return None;
     }
-    let value = unsafe { read_wide(text) };
-    unsafe { LocalFree(text.cast()) };
+    let text = unsafe { filled(out) }?;
+    let value = unsafe { read_wide(text.as_ptr()) };
+    unsafe { LocalFree(text.as_ptr().cast()) };
     Some(value)
 }
 
@@ -377,23 +388,28 @@ fn computer_name() -> String {
 /// The account's flags, or None if there is no such account.
 fn account_flags() -> Result<Option<u32>, SvcError> {
     let name = wide(ACCOUNT);
-    let mut buf: *mut u8 = std::ptr::null_mut();
-    let status = unsafe { NetUserGetInfo(std::ptr::null(), name.as_ptr(), 1, &mut buf) };
+    let mut out = MaybeUninit::<*mut u8>::uninit();
+    let status = unsafe { NetUserGetInfo(std::ptr::null(), name.as_ptr(), 1, out.as_mut_ptr()) };
     if status == NERR_USER_NOT_FOUND {
         return Ok(None);
     }
     if status != NERR_SUCCESS {
         return Err(net_error("The cashier account could not be read", status));
     }
-    let flags = unsafe { (*(buf as *const UserInfo1)).flags };
-    unsafe { NetApiBufferFree(buf.cast()) };
+    let Some(info) = (unsafe { filled(out) }) else {
+        return Err(SvcError::Io(
+            "The cashier account could not be read: Windows gave no answer".into(),
+        ));
+    };
+    let flags = unsafe { info.cast::<UserInfo1>().as_ref() }.flags;
+    unsafe { NetApiBufferFree(info.as_ptr().cast()) };
     Ok(Some(flags))
 }
 
 /// The local groups the account is in, by SID.
 fn account_groups() -> Result<Vec<String>, SvcError> {
     let name = wide(ACCOUNT);
-    let mut buf: *mut u8 = std::ptr::null_mut();
+    let mut out = MaybeUninit::<*mut u8>::uninit();
     let (mut read, mut total) = (0u32, 0u32);
     let status = unsafe {
         NetUserGetLocalGroups(
@@ -401,7 +417,7 @@ fn account_groups() -> Result<Vec<String>, SvcError> {
             name.as_ptr(),
             0,
             LG_INCLUDE_INDIRECT,
-            &mut buf,
+            out.as_mut_ptr(),
             MAX_PREFERRED_LENGTH,
             &mut read,
             &mut total,
@@ -413,13 +429,17 @@ fn account_groups() -> Result<Vec<String>, SvcError> {
             status,
         ));
     }
-    let entries =
-        unsafe { std::slice::from_raw_parts(buf as *const LocalGroupUsersInfo0, read as usize) };
+    let Some(buf) = (unsafe { filled(out) }) else {
+        return Ok(Vec::new());
+    };
+    let entries = unsafe {
+        std::slice::from_raw_parts(buf.cast::<LocalGroupUsersInfo0>().as_ptr(), read as usize)
+    };
     let names: Vec<String> = entries
         .iter()
         .map(|e| unsafe { read_wide(e.name) })
         .collect();
-    unsafe { NetApiBufferFree(buf.cast()) };
+    unsafe { NetApiBufferFree(buf.as_ptr().cast()) };
     // Compare by SID: the names are in the PC's language.
     let users = group_name(USERS)?;
     let administrators = group_name(ADMINISTRATORS)?;
@@ -628,19 +648,20 @@ fn secret_present() -> bool {
     };
     let mut key_text = wide(LSA_DEFAULT_PASSWORD);
     let mut key = lsa_string(&mut key_text);
-    let mut data: *mut LsaUnicodeString = std::ptr::null_mut();
-    let status = unsafe { LsaRetrievePrivateData(policy.0, &mut key, &mut data) };
-    if status != 0 || data.is_null() {
+    let mut out = MaybeUninit::<*mut LsaUnicodeString>::uninit();
+    let status = unsafe { LsaRetrievePrivateData(policy.0, &mut key, out.as_mut_ptr()) };
+    if status != 0 {
         return false;
     }
-    let present = unsafe { (*data).length } > 0;
-    unsafe {
-        let value = &*data;
-        if !value.buffer.is_null() {
-            std::ptr::write_bytes(value.buffer, 0, usize::from(value.length) / 2);
-        }
-        LsaFreeMemory(data.cast());
+    let Some(data) = (unsafe { filled(out) }) else {
+        return false;
+    };
+    let value = unsafe { data.as_ref() };
+    let present = value.length > 0;
+    if !value.buffer.is_null() {
+        unsafe { std::ptr::write_bytes(value.buffer, 0, usize::from(value.length) / 2) };
     }
+    unsafe { LsaFreeMemory(data.as_ptr().cast()) };
     present
 }
 
@@ -788,9 +809,10 @@ fn read_value(key: &Key, name: &str) -> Option<RegValue> {
             buf[0], buf[1], buf[2], buf[3],
         ]))),
         REG_SZ => {
-            let units: Vec<u16> = buf[..size as usize]
-                .chunks_exact(2)
-                .map(|c| u16::from_le_bytes([c[0], c[1]]))
+            let (pairs, _) = buf[..size as usize].as_chunks::<2>();
+            let units: Vec<u16> = pairs
+                .iter()
+                .map(|pair| u16::from_le_bytes(*pair))
                 .take_while(|&u| u != 0)
                 .collect();
             Some(RegValue::Text(String::from_utf16_lossy(&units)))
@@ -852,19 +874,21 @@ unsafe fn rules_of(dacl: *const AclHeader) -> Option<Vec<Rule>> {
     let count = unsafe { (*dacl).ace_count };
     let mut rules = Vec::with_capacity(usize::from(count));
     for index in 0..u32::from(count) {
-        let mut ace: *mut AceHeader = std::ptr::null_mut();
-        if unsafe { GetAce(dacl, index, &mut ace) } == 0 {
+        let mut out = MaybeUninit::<*mut AceHeader>::uninit();
+        if unsafe { GetAce(dacl, index, out.as_mut_ptr()) } == 0 {
             return None;
         }
-        let header = unsafe { &*ace };
+        let ace = unsafe { filled(out) }?;
+        let header = unsafe { ace.as_ref() };
         let allow = match header.ace_type {
             ACCESS_ALLOWED_ACE_TYPE => true,
             ACCESS_DENIED_ACE_TYPE => false,
             _ => continue,
         };
         // ACCESS_ALLOWED_ACE / ACCESS_DENIED_ACE: header (4 bytes), mask (4), then the SID.
-        let mask = unsafe { std::ptr::read_unaligned(ace.cast::<u8>().add(4).cast::<u32>()) };
-        let sid = sid_to_text(unsafe { ace.cast::<u8>().add(8) }.cast())?;
+        let base = ace.as_ptr().cast::<u8>();
+        let mask = unsafe { std::ptr::read_unaligned(base.add(4).cast::<u32>()) };
+        let sid = sid_to_text(unsafe { base.add(8) }.cast())?;
         rules.push(Rule {
             sid,
             mask,
@@ -878,8 +902,8 @@ unsafe fn rules_of(dacl: *const AclHeader) -> Option<Vec<Rule>> {
 /// A folder's rules; None when they cannot be read (counted as not closed).
 fn folder_rules(path: &Path) -> Option<Vec<Rule>> {
     let name: Vec<u16> = path.as_os_str().encode_wide().chain(Some(0)).collect();
-    let mut dacl: *mut AclHeader = std::ptr::null_mut();
-    let mut descriptor: *mut c_void = std::ptr::null_mut();
+    let mut dacl = MaybeUninit::<*mut AclHeader>::uninit();
+    let mut descriptor = MaybeUninit::<*mut c_void>::uninit();
     let status = unsafe {
         GetNamedSecurityInfoW(
             name.as_ptr(),
@@ -887,14 +911,16 @@ fn folder_rules(path: &Path) -> Option<Vec<Rule>> {
             DACL_SECURITY_INFORMATION,
             std::ptr::null_mut(),
             std::ptr::null_mut(),
-            &mut dacl,
+            dacl.as_mut_ptr(),
             std::ptr::null_mut(),
-            &mut descriptor,
+            descriptor.as_mut_ptr(),
         )
     };
     if status != 0 {
         return None;
     }
+    // Written by the successful call; an empty list of rules (null) means everyone.
+    let (dacl, descriptor) = unsafe { (dacl.assume_init(), descriptor.assume_init()) };
     let rules = unsafe { rules_of(dacl) };
     unsafe { LocalFree(descriptor) };
     rules
@@ -934,15 +960,20 @@ fn service_rules(name: &str) -> Option<Vec<Rule>> {
             return None;
         }
         let (mut present, mut defaulted) = (0i32, 0i32);
-        let mut dacl: *mut AclHeader = std::ptr::null_mut();
+        let mut dacl = MaybeUninit::<*mut AclHeader>::uninit();
         if unsafe {
-            GetSecurityDescriptorDacl(buf.as_ptr().cast(), &mut present, &mut dacl, &mut defaulted)
+            GetSecurityDescriptorDacl(
+                buf.as_ptr().cast(),
+                &mut present,
+                dacl.as_mut_ptr(),
+                &mut defaulted,
+            )
         } == 0
             || present == 0
         {
             return None;
         }
-        unsafe { rules_of(dacl) }
+        unsafe { rules_of(dacl.assume_init()) }
     })();
     unsafe {
         if !service.is_null() {
