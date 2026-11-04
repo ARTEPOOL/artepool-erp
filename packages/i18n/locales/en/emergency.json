@@ -29,6 +29,11 @@
       "body": "The database, the server, the backups, the protected secrets.",
       "open": "Check now"
     },
+    "cashier": {
+      "title": "The cashier's Windows account",
+      "body": "The PC signs in by itself to the standard (not administrator) account «الكاشير», and the app opens on the PIN screen. The first time, or when System health says \"Needs repair\".",
+      "open": "Set up / repair the cashier account"
+    },
     "logs": {
       "title": "The logs folder",
       "body": "C:\\ProgramData\\ARTEPOOL\\logs — send it to support when asked.",
@@ -101,6 +106,37 @@
     "ownerTwoStepOff": "{username} · no phone code",
     "allGood": "Everything works.",
     "notAllGood": "Something does not work. Restart the PC; if it stays red, open the logs folder and send it to support."
+  },
+  "cashier": {
+    "title": "The cashier's Windows account",
+    "subtitle": "Sets up or repairs the «الكاشير» account: a standard account, not an administrator; automatic sign-in with a random password kept in Windows' protected store; the PC's enrollment shared by both accounts; the data folders closed to it; and Windows Update never restarting from 08:00 to 24:00.",
+    "submit": "Set up / repair the cashier account",
+    "ok": "Done. The «الكاشير» account is ready.",
+    "repair": "Still missing: {list}. Press the button again; if it stays, send the logs folder to support.",
+    "notSetUp": "The account was not created.",
+    "unknown": "The check after the set-up did not run.",
+    "failed": "The set-up stopped: {detail}",
+    "moved": "The PC's enrollment was moved so your account and the cashier's share it (no new enrollment).",
+    "notRecorded": "Done, but not written to the audit log and System health (the database did not answer). Try again after checking the system.",
+    "next": {
+      "title": "Next:",
+      "restart": "Restart the PC: it signs in to «الكاشير» by itself and the app opens on the PIN screen.",
+      "printer": "The first time only: on the cashier's screen, sign in to the app with your account and choose the receipt printer.",
+      "password": "Write down your own Windows password and keep it in the safe."
+    },
+    "items": {
+      "account": "the account",
+      "enabled": "the account is disabled",
+      "standard": "it is an administrator",
+      "password_expiry": "its password expires",
+      "auto_sign_in": "automatic sign-in",
+      "password_stored": "the stored password",
+      "plain_password": "a password in plain text",
+      "enrollment": "the shared PC enrollment",
+      "folders": "the folder rules",
+      "services": "the services' rules",
+      "active_hours": "Windows Update active hours"
+    }
   },
   "errors": {
     "not_server_pc": "This is not the server PC.",

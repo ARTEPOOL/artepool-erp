@@ -17,6 +17,8 @@ import {
   icaclsGrant,
   icaclsReset,
   icaclsRestrict,
+  icaclsDataRoot,
+  icaclsSharedDevice,
   pgCtlRegister,
   scConfigure,
   winswXml,
@@ -48,6 +50,23 @@ describe('folder access rules', () => {
     expect(icaclsReset('D:\\x')).toEqual(['D:\\x', '/reset', '/T', '/C', '/Q']);
     // Never "Users" or "Everyone".
     expect(icaclsRestrict('D:\\x').join(' ')).not.toMatch(/Users|Everyone|S-1-1-0|S-1-5-32-545/);
+  });
+
+  it('the ARTEPOOL folder: standard accounts read and list it only, nothing passed down (M6.4)', () => {
+    expect(icaclsDataRoot('C:\\ProgramData\\ARTEPOOL')).toEqual([
+      'C:\\ProgramData\\ARTEPOOL',
+      '/inheritance:r',
+      '/grant:r',
+      '*S-1-5-18:(OI)(CI)F',
+      '*S-1-5-32-544:(OI)(CI)F',
+      '*S-1-5-32-545:RX',
+      '/C',
+      '/Q',
+    ]);
+    // The shared enrollment: the PC's accounts read and renew it; never Everyone.
+    const device = icaclsSharedDevice('C:\\ProgramData\\ARTEPOOL\\device');
+    expect(device).toContain('*S-1-5-32-545:(OI)(CI)M');
+    expect(device.join(' ')).not.toMatch(/Everyone|S-1-1-0|S-1-5-11/);
   });
 });
 

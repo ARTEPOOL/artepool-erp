@@ -111,4 +111,55 @@ describe('emergency tool actions (decision 0107)', () => {
       .executeTakeFirstOrThrow();
     expect(row.origin).toBe('console');
   });
+
+  it("records the cashier account's set-up (M6.4): System health at once, one audit entry", async () => {
+    const health = () =>
+      server.db
+        .selectFrom('ops.server_health')
+        .select([
+          'cashier_account_state',
+          'cashier_account_missing',
+          'cashier_account_checked_at',
+          'cashier_account_setup_at',
+        ])
+        .executeTakeFirstOrThrow();
+    // Anything not in the expected shape changes nothing.
+    for (const bad of [
+      {},
+      { check: { state: 'fine', missing: [] }, setupError: null, enrollmentMoved: false },
+      { check: { state: 'ok', missing: ['x'] }, setupError: null, enrollmentMoved: false },
+      { check: null, setupError: 'x'.repeat(501), enrollmentMoved: false },
+    ]) {
+      expect(await run('cashier-account', bad)).toEqual({ ok: false, reason: 'bad_input' });
+    }
+    expect((await health()).cashier_account_setup_at).toBeNull();
+
+    const answer = await run('cashier-account', {
+      check: { state: 'ok', missing: [] },
+      setupError: null,
+      enrollmentMoved: true,
+    });
+    expect(answer).toEqual({
+      ok: true,
+      result: { state: 'ok', missing: [], setupError: null, enrollmentMoved: true },
+    });
+    const after = await health();
+    expect(after).toMatchObject({ cashier_account_state: 'ok', cashier_account_missing: [] });
+    expect(after.cashier_account_setup_at).not.toBeNull();
+    expect(after.cashier_account_checked_at).not.toBeNull();
+    const event = await lastEvent('system.cashier_account_setup');
+    expect(event?.reason).toMatch(
+      /^emergency tool — cashier account set up \/ repaired by .+: ok$/,
+    );
+
+    // A set-up that stopped half way is recorded too, with its reason; the last check stays.
+    const stopped = await run('cashier-account', {
+      check: null,
+      setupError: 'The cashier account could not be created: Access is denied.',
+      enrollmentMoved: false,
+    });
+    expect(stopped.ok).toBe(true);
+    expect((await health()).cashier_account_state).toBe('ok');
+    expect((await lastEvent('system.cashier_account_setup'))?.reason).toMatch(/: failed$/);
+  });
 });

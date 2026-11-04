@@ -5,6 +5,7 @@
  */
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import type {
+  CashierAccountResult,
   EmergencyAnswer,
   EmergencyCheck,
   EmergencyFailure,
@@ -18,6 +19,8 @@ export interface EmergencyBridge {
   run<T>(request: EmergencyRun): Promise<EmergencyAnswer<T>>;
   /** Opens `C:\ProgramData\ARTEPOOL\logs` in File Explorer. */
   openLogs(): Promise<boolean>;
+  /** «اعمل / صلّح حساب الكاشير» (M6.4): set up, share the enrollment, check, record. */
+  cashierAccount(): Promise<EmergencyAnswer<CashierAccountResult>>;
 }
 
 const NOT_EMERGENCY: EmergencyInfo = { emergency: false, serverPc: false };
@@ -55,6 +58,16 @@ export const tauriEmergency: EmergencyBridge = {
       return true;
     } catch {
       return false;
+    }
+  },
+  async cashierAccount() {
+    try {
+      return {
+        ok: true,
+        result: await invoke<CashierAccountResult>('emergency_cashier_account'),
+      };
+    } catch (error) {
+      return failed(error);
     }
   },
 };
@@ -102,6 +115,10 @@ export const devServerEmergency: EmergencyBridge = {
     } catch {
       return false;
     }
+  },
+  // A Windows account cannot be set up from a development browser.
+  cashierAccount() {
+    return Promise.resolve(failed('The cashier account is set up on the Windows server PC only.'));
   },
 };
 

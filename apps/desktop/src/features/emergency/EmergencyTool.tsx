@@ -1,14 +1,15 @@
 /**
  * "ARTÉPOOL – Emergency tool" (decision 0107): the window the owner opens from the Start menu of
- * the server PC, through Windows' administrator prompt. Five actions, each the console's own
- * program run by the native side: the owner's password, the owner's phone code, an enrollment
- * code, a check of the system, and the logs folder. Nobody signs in here; a temporary password is
+ * the server PC, through Windows' administrator prompt. Six actions, each run by the native side:
+ * the owner's password, the owner's phone code, an enrollment code, the cashier's Windows account
+ * (M6.4), a check of the system, and the logs folder. Nobody signs in here; a temporary password is
  * shown once and forgotten when the person presses "Done".
  */
 import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CheckCircle2, XCircle } from 'lucide-react';
 import type {
+  CashierAccountResult,
   EmergencyAnswer,
   EmergencyCheck,
   EmergencyDeviceCode,
@@ -24,7 +25,7 @@ import { Hello } from '../auth/parts';
 import type { EmergencyBridge } from './bridge';
 import styles from './emergency.module.css';
 
-type View = 'menu' | 'password' | 'twoStep' | 'code' | 'check';
+type View = 'menu' | 'password' | 'twoStep' | 'code' | 'cashier' | 'check';
 type Failure = Extract<EmergencyAnswer<unknown>, { ok: false }>;
 
 export function EmergencyTool({ bridge }: { bridge: EmergencyBridge }) {
@@ -58,6 +59,8 @@ export function EmergencyTool({ bridge }: { bridge: EmergencyBridge }) {
     body = <TwoStepReset bridge={bridge} onBack={menu} />;
   } else if (view === 'code') {
     body = <DeviceCode bridge={bridge} onBack={menu} />;
+  } else if (view === 'cashier') {
+    body = <CashierAccount bridge={bridge} onBack={menu} />;
   } else if (view === 'check') {
     body = <SystemCheck bridge={bridge} onBack={menu} />;
   } else {
@@ -69,6 +72,7 @@ export function EmergencyTool({ bridge }: { bridge: EmergencyBridge }) {
           <Action name="password" onPress={() => setView('password')} />
           <Action name="twoStep" onPress={() => setView('twoStep')} />
           <Action name="code" onPress={() => setView('code')} />
+          <Action name="cashier" onPress={() => setView('cashier')} />
           <Action name="check" onPress={() => setView('check')} />
           <Action name="logs" onPress={() => void openLogs()} />
         </div>
@@ -87,7 +91,7 @@ function Action({
   name,
   onPress,
 }: {
-  name: 'password' | 'twoStep' | 'code' | 'check' | 'logs';
+  name: 'password' | 'twoStep' | 'code' | 'cashier' | 'check' | 'logs';
   onPress: () => void;
 }) {
   const { t } = useTranslation('emergency');
@@ -290,6 +294,67 @@ function DeviceCode({ bridge, onBack }: { bridge: EmergencyBridge; onBack: () =>
       <div className={styles.buttons}>
         <Button variant={code ? 'default' : 'primary'} busy={busy} onPress={() => void make()}>
           {t('code.submit')}
+        </Button>
+        <Button variant="ghost" onPress={onBack}>
+          {t('back')}
+        </Button>
+      </div>
+    </>
+  );
+}
+
+/** «اعمل / صلّح حساب الكاشير» (M6.4): one button; the result in plain words, then what to do. */
+function CashierAccount({ bridge, onBack }: { bridge: EmergencyBridge; onBack: () => void }) {
+  const { t, i18n } = useTranslation('emergency');
+  const [busy, setBusy] = useState(false);
+  const [failure, setFailure] = useState<Failure | null>(null);
+  const [result, setResult] = useState<CashierAccountResult | null>(null);
+
+  const run = async () => {
+    setBusy(true);
+    setFailure(null);
+    const answer = await bridge.cashierAccount();
+    setBusy(false);
+    if (answer.ok) setResult(answer.result);
+    else setFailure(answer);
+  };
+  const items = (r: CashierAccountResult) =>
+    new Intl.ListFormat(i18n.language).format(r.missing.map((m) => t(`cashier.items.${m}`)));
+  const ok = result?.state === 'ok' && !result.setupError;
+  return (
+    <>
+      <Hello title={t('cashier.title')} subtitle={t('cashier.subtitle')} />
+      {result && (
+        <div className={styles.result} data-testid="cashier-result">
+          {result.setupError && (
+            <Alert>
+              <bdi>{t('cashier.failed', { detail: result.setupError })}</bdi>
+            </Alert>
+          )}
+          {result.state === 'ok' && <Good ok>{t('cashier.ok')}</Good>}
+          {result.state === 'repair' && (
+            <Alert>{t('cashier.repair', { list: items(result) })}</Alert>
+          )}
+          {result.state === 'not_set_up' && <Alert>{t('cashier.notSetUp')}</Alert>}
+          {result.state === null && <Alert>{t('cashier.unknown')}</Alert>}
+          {result.enrollmentMoved && <Note>{t('cashier.moved')}</Note>}
+          {!result.recorded && <Alert>{t('cashier.notRecorded')}</Alert>}
+          {ok && (
+            <div>
+              <b>{t('cashier.next.title')}</b>
+              <ol>
+                <li>{t('cashier.next.password')}</li>
+                <li>{t('cashier.next.restart')}</li>
+                <li>{t('cashier.next.printer')}</li>
+              </ol>
+            </div>
+          )}
+        </div>
+      )}
+      <FailureAlert failure={failure} />
+      <div className={styles.buttons}>
+        <Button variant={ok ? 'default' : 'primary'} busy={busy} onPress={() => void run()}>
+          {t('cashier.submit')}
         </Button>
         <Button variant="ghost" onPress={onBack}>
           {t('back')}

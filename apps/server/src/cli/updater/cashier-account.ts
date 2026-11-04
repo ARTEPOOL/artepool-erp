@@ -12,11 +12,11 @@ import { CASHIER_ACCOUNT_ITEMS, CASHIER_ACCOUNT_STATES } from '@artepool/shared/
 
 export const CASHIER_CHECK_EVERY_MS = 60 * 60 * 1000;
 
-const checkSchema = z.object({
+export const cashierCheckSchema = z.object({
   state: z.enum(CASHIER_ACCOUNT_STATES),
   missing: z.array(z.enum(CASHIER_ACCOUNT_ITEMS)).max(CASHIER_ACCOUNT_ITEMS.length),
 });
-export type CashierCheck = z.infer<typeof checkSchema>;
+export type CashierCheck = z.infer<typeof cashierCheckSchema>;
 
 /** The launcher's JSON line (the last one printed); an error answer or anything else is null. */
 export function parseCashierCheck(output: string): CashierCheck | null {
@@ -27,7 +27,7 @@ export function parseCashierCheck(output: string): CashierCheck | null {
     .find((l) => l.startsWith('{'));
   if (!line) return null;
   try {
-    const parsed = checkSchema.safeParse(JSON.parse(line));
+    const parsed = cashierCheckSchema.safeParse(JSON.parse(line));
     return parsed.success ? parsed.data : null;
   } catch {
     return null;

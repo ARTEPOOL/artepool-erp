@@ -9,7 +9,9 @@
  *   5. roles and data  the ARTÉPOOL roles, the empty database, the migrations
  *   6. certificates    the ARTÉPOOL CA and the server certificate; setup\ca.crt, setup\token
  *   7. services        ArtepoolServer and ArtepoolBackup under their own accounts, started
- *   8. firewall        the API port, local subnet, private networks; the updater's scheduled task
+ *   8. firewall        the API port, local subnet, private networks; the updater's scheduled task;
+ *                      the ARTEPOOL folder read-only for standard accounts and the shared `device`
+ *                      folder of the PC's enrollment (M6.4)
  *   9. ready           /health answers over TLS 1.3
  *
  * Every step is written to the install log (log.ts, secrets filtered). A failure stops at once with
@@ -358,9 +360,14 @@ export async function runInstall(input: InstallInput): Promise<void> {
   await platform.startService('server');
   await platform.startService('backup');
 
-  step(8, 'the firewall and the updater');
+  step(8, 'the firewall, the updater and the ARTEPOOL folder');
   await platform.addFirewallRule(input.serverPort);
   await platform.registerUpdaterTask();
+  // After initdb (it runs without administrator rights and creates its folder in this one).
+  await platform.closeDataRoot(paths.dataDir);
+  const device = join(paths.dataDir, 'device');
+  await mkdir(device, { recursive: true });
+  await platform.sharedDeviceFolder(device);
 
   step(9, 'the server answers');
   await input.waitHealthy(await readFile(join(paths.tls, TLS_FILES.caCert), 'utf8'));

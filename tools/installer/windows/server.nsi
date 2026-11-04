@@ -525,6 +525,9 @@ Section "Uninstall"
     !insertmacro Log "The data in $DataDir is kept (database, backups, secrets, settings)."
   ${EndIf}
 
+  ; M6.4: the PC no longer signs in to the cashier's Windows account by itself; the account is
+  ; disabled, never deleted (a reinstall and "Set up / repair" in the emergency tool turn it on).
+  !insertmacro UnStep "Turn off the cashier account's automatic sign-in and disable it" '"$INSTDIR\artepool-svc.exe" --data "$DataDir" cashier-account disable'
   !insertmacro UnStep "Stop ArtepoolBackup" '"$SYSDIR\sc.exe" stop ArtepoolBackup'
   !insertmacro UnStep "Stop ArtepoolServer" '"$SYSDIR\sc.exe" stop ArtepoolServer'
   Sleep 3000

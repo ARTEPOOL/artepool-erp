@@ -30,6 +30,7 @@ export interface Grant {
 
 const SYSTEM = '*S-1-5-18';
 const ADMINISTRATORS = '*S-1-5-32-544';
+const USERS = '*S-1-5-32-545';
 const RIGHTS: Record<Access, string> = { read: 'RX', modify: 'M', full: 'F' };
 
 export const serviceAccount = (service: ServiceKey) => `NT SERVICE\\${SERVICES[service].name}`;
@@ -55,6 +56,41 @@ export function icaclsRestrict(folder: string, grants: Grant[] = []): string[] {
     `${SYSTEM}:(OI)(CI)F`,
     `${ADMINISTRATORS}:(OI)(CI)F`,
     ...grants.map((g) => `${serviceAccount(g.service)}:(OI)(CI)${RIGHTS[g.access]}`),
+    '/C',
+    '/Q',
+  ];
+}
+
+/**
+ * The ARTEPOOL data folder itself (M6.4): SYSTEM and Administrators in full; standard accounts may
+ * read and list it, nothing more, and nothing of theirs is passed down (ProgramData's default let
+ * any account create files in it, the SYSTEM updater's folder included).
+ */
+export function icaclsDataRoot(folder: string): string[] {
+  return [
+    folder,
+    '/inheritance:r',
+    '/grant:r',
+    `${SYSTEM}:(OI)(CI)F`,
+    `${ADMINISTRATORS}:(OI)(CI)F`,
+    `${USERS}:RX`,
+    '/C',
+    '/Q',
+  ];
+}
+
+/**
+ * The PC's shared enrollment (`device`, M6.4): the owner's and the cashier's Windows accounts read
+ * it and renew the device key in it; the file itself is sealed for this PC only.
+ */
+export function icaclsSharedDevice(folder: string): string[] {
+  return [
+    folder,
+    '/inheritance:r',
+    '/grant:r',
+    `${SYSTEM}:(OI)(CI)F`,
+    `${ADMINISTRATORS}:(OI)(CI)F`,
+    `${USERS}:(OI)(CI)M`,
     '/C',
     '/Q',
   ];
@@ -236,6 +272,9 @@ export interface Platform {
   addFirewallRule(port: number): Promise<void>;
   /** The scheduled task of the server PC's updater (decision 0108); replaced if it exists. */
   registerUpdaterTask(): Promise<void>;
+  /** The data folder read-only for standard accounts, and the shared enrollment folder (M6.4). */
+  closeDataRoot(dataDir: string): Promise<void>;
+  sharedDeviceFolder(folder: string): Promise<void>;
 }
 
 /** What an upgrade adds (M6.2 part G2). */
@@ -350,6 +389,12 @@ export function windowsPlatform(options: {
       } finally {
         await rm(file, { force: true });
       }
+    },
+    async closeDataRoot(dataDir) {
+      await exec('icacls.exe', icaclsDataRoot(dataDir));
+    },
+    async sharedDeviceFolder(folder) {
+      await exec('icacls.exe', icaclsSharedDevice(folder));
     },
     async addFirewallRule(port) {
       const [remove, add] = firewallRule(port);

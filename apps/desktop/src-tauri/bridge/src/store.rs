@@ -336,18 +336,32 @@ pub fn machine_folder() -> std::path::PathBuf {
         .join("device")
 }
 
-/// Opens this PC's store; on the server PC it first moves an enrollment still kept in this
-/// Windows account (the owner's, from before M6.4) to the whole-PC file.
+/// On the server PC, moves an enrollment still kept in this Windows account (the owner's, from
+/// before M6.4) to the whole-PC file. Returns whether it moved; elsewhere it does nothing.
+#[cfg(windows)]
+pub fn share_enrollment(service: &str, account: &str) -> Result<bool, StoreError> {
+    let folder = machine_folder();
+    if !folder.is_dir() {
+        return Ok(false);
+    }
+    let credentials = CredentialStore::new(service, account)?;
+    let machine = MachineStore::new(folder.join("enrollment.dat"), MachineDpapi);
+    move_to_machine(&machine, &credentials, || credentials.forget())
+}
+
+/// Opens this PC's store: the whole-PC file on the server PC (after moving the account's copy
+/// there), otherwise this Windows account's Credential Manager.
 #[cfg(windows)]
 pub fn pc_store(service: &str, account: &str) -> Result<PcStore, StoreError> {
     let folder = machine_folder();
-    let credentials = CredentialStore::new(service, account)?;
     if !folder.is_dir() {
-        return Ok(PcStore::Account(credentials));
+        return Ok(PcStore::Account(CredentialStore::new(service, account)?));
     }
-    let machine = MachineStore::new(folder.join("enrollment.dat"), MachineDpapi);
-    move_to_machine(&machine, &credentials, || credentials.forget())?;
-    Ok(PcStore::Machine(machine))
+    share_enrollment(service, account)?;
+    Ok(PcStore::Machine(MachineStore::new(
+        folder.join("enrollment.dat"),
+        MachineDpapi,
+    )))
 }
 
 /// Development builds on other systems: a file readable by its owner only.

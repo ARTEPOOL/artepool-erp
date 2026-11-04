@@ -2,15 +2,31 @@
  * The actions behind "ARTÉPOOL – Emergency tool" (decision 0107): the same server code as the
  * console commands (decisions 0022, 0025, 0029), with JSON answers for the window instead of
  * prompts. Each change is written to the audit log with its reason, as from the console.
+ *
+ * `cashier-account` (M6.4) records what the window's "Set up / repair the cashier account" did:
+ * the window ran `artepool-svc cashier-account setup`, moved the PC's enrollment and ran the
+ * check; this writes the result to System health and one audit entry, with the Windows
+ * administrator who ran it (read here, not sent by the window).
  */
+import { randomUUID } from 'node:crypto';
+import { hostname, userInfo } from 'node:os';
 import { sql } from 'kysely';
 import { z } from 'zod';
+import { recordEvent } from '../platform/audit/events';
+import { withBusinessTx } from '../platform/db/tx';
 import type { SecretHasher } from '../platform/crypto/hashing';
 import type { Db } from '../platform/db/pool';
 import type { SettingsCache } from '../platform/settings';
 import { activeOwner, createConsoleCode, resetOwnerPassword, resetOwnerTwoStep } from './bootstrap';
+import { cashierCheckSchema } from './updater/cashier-account';
 
-export const EMERGENCY_ACTIONS = ['status', 'reset-password', 'reset-2fa', 'device-code'] as const;
+export const EMERGENCY_ACTIONS = [
+  'status',
+  'reset-password',
+  'reset-2fa',
+  'device-code',
+  'cashier-account',
+] as const;
 export type EmergencyAction = (typeof EMERGENCY_ACTIONS)[number];
 
 export type EmergencyFailure =
@@ -33,6 +49,21 @@ export interface EmergencyDeps {
 
 const reasonOnly = z.object({ reason: z.string() });
 const passwordReset = z.object({ reason: z.string(), phoneLost: z.boolean() });
+const cashierAccount = z.object({
+  /** The launcher's check after the set-up; null when it could not run. */
+  check: cashierCheckSchema.nullable(),
+  /** Why the set-up stopped, if it did (never a password: the launcher never prints one). */
+  setupError: z.string().max(500).nullable(),
+  /** The owner's enrollment was moved to the whole-PC file this time. */
+  enrollmentMoved: z.boolean(),
+});
+
+/** The Windows account running the emergency tool (an administrator): DOMAIN\name. */
+function windowsUser(): string {
+  const domain = process.env.USERDOMAIN;
+  const name = userInfo().username;
+  return (domain ? `${domain}\\${name}` : name).slice(0, 100);
+}
 
 /** The written reason, as the console asks for it: at least 3 characters. */
 function reasonOf(reason: string): string | null {
@@ -112,6 +143,56 @@ export async function runEmergencyAction(
         if (!(await activeOwner(deps.db))) return fail('no_owner');
         const username = await resetOwnerTwoStep(deps.db, `emergency tool — ${reason}`);
         return { ok: true, result: { username } };
+      }
+      case 'cashier-account': {
+        const parsed = cashierAccount.safeParse(input);
+        if (!parsed.success) return fail('bad_input');
+        const { check, setupError, enrollmentMoved } = parsed.data;
+        const who = windowsUser();
+        const outcome = setupError ? 'failed' : (check?.state ?? 'not checked');
+        const reason = `emergency tool — cashier account set up / repaired by ${who}: ${outcome}`;
+        await withBusinessTx(
+          deps.db,
+          { userId: 1n, requestId: randomUUID(), reason },
+          async (trx) => {
+            await trx
+              .updateTable('ops.server_health')
+              .set({
+                cashier_account_setup_at: sql<Date>`now()`,
+                ...(check
+                  ? {
+                      cashier_account_state: check.state,
+                      cashier_account_missing: check.missing,
+                      cashier_account_checked_at: sql<Date>`now()`,
+                    }
+                  : {}),
+              })
+              .where('id', '=', 1)
+              .execute();
+            await recordEvent(trx, 'system.cashier_account_setup', {
+              entityType: 'ops.server_health',
+              entityId: 1n,
+              reason,
+              data: {
+                state: check?.state ?? null,
+                missing: check?.missing ?? [],
+                setupError,
+                enrollmentMoved,
+                windowsUser: who,
+                pc: hostname(),
+              },
+            });
+          },
+        );
+        return {
+          ok: true,
+          result: {
+            state: check?.state ?? null,
+            missing: check?.missing ?? [],
+            setupError,
+            enrollmentMoved,
+          },
+        };
       }
       case 'device-code': {
         const { code, expiresAt } = await createConsoleCode(
