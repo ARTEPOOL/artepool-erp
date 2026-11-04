@@ -4,7 +4,7 @@
 
 **In plain words:**
 
-- **The libraries with known security warnings are updated:** the Windows app's update library (and the zip reader inside it), the server's data checks (zod), the server itself (fastify), and the secure connection libraries (rustls). Smaller ones too (time, tokio, and a few that only some parts use). Nothing changes on the screens.
+- **The libraries with known security warnings are updated:** the Windows app's update library (and the zip reader inside it), the server's data checks (zod), the server itself (fastify), and the secure connection libraries (rustls). Smaller ones too (time, tokio, and a few that only some parts use). Nothing changes on the screens. In version 0.9.2.
 - **The updater still checks every download's signature** and refuses a file without a valid signature, as before. The tests that prove it pass.
 - **A weekly check every Monday morning** looks for new warnings in the libraries that are installed on the shop's PCs. When one is serious (critical or high), the check turns red and opens one issue in Arabic on GitHub, so you get an email. A smaller warning, or one in a tool only used to build and test the program, does not stop anything. When all is well again, the issue closes by itself.
 - One medium warning stays (minimatch, inside the Excel library). It has no fix yet, and the part it is about is not used by the program.
@@ -19,7 +19,7 @@
 
 - When Google Drive is connected but the backup key has not been created yet, the Google Drive line now says "Create the backup key first (the line above) so that Upload now works", instead of a grey button with no reason.
 - The date and time of the last copy ("03/11/2026 18:18") no longer spill out of their tile in Arabic. They go on two lines when the tile is narrow.
-- Both ship with the next version.
+- Both ship in version 0.9.2.
 
 - `BackupPanel`: the note next to "Connected" while `offsite.keySet` is false; the tiles' text box may shrink (`min-inline-size: 0`) and wraps between the date and the time; tiles are at least 12rem wide. Arabic and English. Tests: the note without a key, none with one; checked in a browser at three widths.
 
