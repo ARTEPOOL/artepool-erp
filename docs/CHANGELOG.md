@@ -1,5 +1,28 @@
 # Changelog
 
+## The cashier's Windows account, simplified (M6.4) (2026-11-04)
+
+**In plain words:**
+
+- **A Windows account for the cashier, «الكاشير»:** a standard account, not an administrator. The PC signs in to it by itself, and the app opens on the PIN screen with its usual lock.
+- **The shop's data stays closed to it:** the cashier's account cannot open or change the data, the backups, the keys or the logs, and cannot stop the server. The Windows test on GitHub signs in as the cashier and checks this every time.
+- **One button in the Emergency tool, «اعمل / صلّح حساب الكاشير»:** it sets the account up or repairs it, and writes what it did to the audit log.
+- **One line in System health:** «حساب الكاشير: تمام» or «محتاج تصليح». The server PC checks it every hour.
+- **Windows Update** never restarts the PC from 8 in the morning to midnight.
+- **Uninstalling** turns automatic sign-in off and disables the account (it is never deleted).
+- **Two things needed so the cashier really "signs in and works":**
+  - the PC's enrollment is now kept for the whole server PC, so both Windows accounts use it (the Emergency tool moves the current one; no new enrollment);
+  - the receipt printer is chosen once in the cashier's Windows session.
+- **A security gap closed on the way:** the main ARTEPOOL data folder kept Windows' default rules, which let any Windows account create files in it, including in the folder the updater uses. It is now read-only for standard accounts (new installations at once; the shop PC with the button above).
+- **Not in this step (owner's choice):** no limits on Task Manager, the command prompt, Settings, the browser, shutdown, sign-out or USB. They can be added later.
+
+- **Files and records:**
+  - Plan: `docs/milestones/m6.4-cashier-windows-account.md`; decision 0085 updated; PRD 1.50; CLAUDE.md.
+  - Launcher: `artepool-svc cashier-account check | setup | disable` (`apps/desktop/src-tauri/svc/src/cashier*.rs`).
+  - The whole-PC enrollment: `apps/desktop/src-tauri/bridge/src/store.rs`.
+  - Migration 0051 (System health columns); the updater's hourly check; the emergency action `cashier-account` (audited).
+  - Guides: `install-server.md` part 8, `emergency-tool.md`, `vm-test-part-f.md` part 5b. Windows CI: `test-install.ps1`.
+
 ## Printed documents never come out blank; unit price excluding VAT; one spelling of the name (2026-11-04)
 
 **In plain words:**
