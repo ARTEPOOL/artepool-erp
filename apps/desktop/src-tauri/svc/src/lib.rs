@@ -26,6 +26,9 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use zeroize::Zeroizing;
 
+pub mod cashier;
+#[cfg(windows)]
+pub mod cashier_windows;
 pub mod config;
 #[cfg(windows)]
 pub mod windows;
