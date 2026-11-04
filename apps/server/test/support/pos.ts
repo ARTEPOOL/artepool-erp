@@ -28,7 +28,7 @@ export async function addPosItem(
       const company = await trx.selectFrom('sys.company_profile').select('id').executeTakeFirst();
       if (!company) {
         await saveCompany(trx, {
-          legalNameAr: 'آرتي بول لحمامات السباحة',
+          legalNameAr: 'آرتيبول لحمامات السباحة',
           legalNameEn: 'ARTEPOOL Swimming Pools',
           vatRegistered: true,
           trn: '100123456789012',

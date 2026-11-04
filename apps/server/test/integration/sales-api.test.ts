@@ -235,7 +235,7 @@ beforeAll(async () => {
   for (const r of rows) ids[r.kind] ??= r.id;
   await ok(
     owner('PUT', '/api/v1/company', {
-      legalNameAr: 'آرتي بول لحمامات السباحة',
+      legalNameAr: 'آرتيبول لحمامات السباحة',
       legalNameEn: 'ARTEPOOL Swimming Pools',
       vatRegistered: true,
       trn: '100123456789012',

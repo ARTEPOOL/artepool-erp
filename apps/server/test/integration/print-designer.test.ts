@@ -110,7 +110,7 @@ beforeAll(async () => {
   accountant = actor(pc, (await openSession(server, { userId: accId, deviceId: pc.id })).token);
   await ok(
     owner('PUT', '/api/v1/company', {
-      legalNameAr: 'آرتي بول لحمامات السباحة',
+      legalNameAr: 'آرتيبول لحمامات السباحة',
       legalNameEn: 'ARTEPOOL Swimming Pools',
       vatRegistered: true,
       trn: '100123456789012',
@@ -540,7 +540,7 @@ describe('the barcode label design (decision 0097)', () => {
     expect(first.canEdit).toBe(false);
     expect(first.design).toEqual(defaultLabelDesign());
     expect(first.shopName).toEqual({
-      ar: 'آرتي بول لحمامات السباحة',
+      ar: 'آرتيبول لحمامات السباحة',
       en: 'ARTEPOOL Swimming Pools',
     });
 

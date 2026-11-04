@@ -179,7 +179,7 @@ const accountRow = (code: string) => screen.findByTestId(`account-${code}`);
 describe('Accounting → Chart of accounts', () => {
   it('warns that the chart is provisional and shows it as a tree', async () => {
     await openAccounting(signedInBridge(['ledger.view']));
-    expect(screen.getByText(/حتى يوافق عليهما محاسب أرتيبول/)).toBeTruthy();
+    expect(screen.getByText(/حتى يوافق عليهما محاسب آرتيبول/)).toBeTruthy();
     await accountRow('1000');
     const rows = screen.getAllByTestId(/^account-/);
     expect(rows.map((r) => r.dataset.testid?.replace('account-', ''))).toEqual([

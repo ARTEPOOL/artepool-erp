@@ -77,7 +77,7 @@ beforeAll(async () => {
 afterAll(() => server.close());
 
 const company = {
-  legalNameAr: 'آرتي بول لحمامات السباحة',
+  legalNameAr: 'آرتيبول لحمامات السباحة',
   legalNameEn: 'ARTEPOOL Swimming Pools',
   vatRegistered: true,
   trn: '100 1234 5678 9012',

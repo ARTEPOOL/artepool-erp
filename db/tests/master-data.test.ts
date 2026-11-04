@@ -715,7 +715,7 @@ describe('company details (decision 0037)', () => {
     run(
       `INSERT INTO sys.company_profile (id, legal_name_ar, legal_name_en, vat_registered, trn,
                                         address_ar, address_en, logo, logo_mime)
-       VALUES (1, 'آرتي بول', 'ARTEPOOL', $1::text IS NOT NULL, $1, 'العين', 'Al Ain',
+       VALUES (1, 'آرتيبول', 'ARTEPOOL', $1::text IS NOT NULL, $1, 'العين', 'Al Ain',
                CASE WHEN $2::text IS NULL THEN NULL ELSE '\\x89504e47'::bytea END, $2)`,
       [trn, mime],
       owner,
