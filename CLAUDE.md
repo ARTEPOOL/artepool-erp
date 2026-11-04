@@ -57,6 +57,7 @@ It runs client–server on the local network: PostgreSQL and the API service on 
   - Each item has one sale price (4 dp) with a "price includes VAT" switch.
   - An inclusive price is split back into net and VAT; an exclusive price has VAT added.
   - Every tax invoice shows net, VAT and total for every customer.
+  - A4 documents print the unit price and the discount **excluding VAT** (189.00 incl. → 180.00), like the taxable amount; shelf, label and POS keep the price paid. (0117)
   - Prices live in `md.item_prices` per price level. Only `STANDARD` exists now; a level by customer type can be added later. (0032)
 - **VAT categories:** four fixed UAE categories (SR 5%, ZR, EX, OS). Only the owner changes a rate, with a reason; it applies to new documents only. (0033)
 

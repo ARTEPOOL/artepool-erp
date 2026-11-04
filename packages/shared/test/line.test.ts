@@ -7,6 +7,7 @@ import {
   parse4dp,
   parseFils,
   parseQuantity,
+  unitPriceExclVat4dp,
 } from '../src/money';
 import { sharedVectors } from './vectors';
 
@@ -95,6 +96,45 @@ describe('line amounts', () => {
           expect(line.netFils + line.vatFils).toBe(line.grossFils);
           expect(line.netFils >= 0n && line.vatFils >= 0n).toBe(true);
           expect(line.discountExclVatFils <= lineDiscountFils).toBe(true);
+        },
+      ),
+    );
+  });
+});
+
+describe('the unit price excluding VAT, as tax documents print it', () => {
+  it('splits an inclusive price back: 189.00 incl. 5% → 180.00; 10.00 → 9.5238', () => {
+    expect(unitPriceExclVat4dp(parse4dp('189.00'), true, 500n)).toBe(parse4dp('180.00'));
+    expect(unitPriceExclVat4dp(parse4dp('10.00'), true, 500n)).toBe(parse4dp('9.5238'));
+  });
+
+  it('keeps an exclusive price, and an inclusive one at 0%, as it is', () => {
+    expect(unitPriceExclVat4dp(parse4dp('12.3456'), false, 500n)).toBe(parse4dp('12.3456'));
+    expect(unitPriceExclVat4dp(parse4dp('50.00'), true, 0n)).toBe(parse4dp('50.00'));
+  });
+
+  it('refuses a rate outside 0–100%', () => {
+    expect(() => unitPriceExclVat4dp(1n, true, 10_001n)).toThrow(RangeError);
+  });
+
+  it("times the quantity, matches the line's taxable amount within half a fils per unit", () => {
+    fc.assert(
+      fc.property(
+        fc.bigInt({ min: 1n, max: 100_000n }),
+        fc.bigInt({ min: 0n, max: 99_999_999n }),
+        fc.constantFrom(0n, 500n),
+        (quantity, price, rate) => {
+          const line = computeLine({
+            quantity,
+            unitPrice4dp: price,
+            pricesIncludeVat: true,
+            vatRateBp: rate,
+          });
+          const shown = lineAmountFils(quantity, unitPriceExclVat4dp(price, true, rate));
+          // Rounding the price to 4 decimals and the line to the fils: at most 1 fils apart per unit.
+          const units = quantity / 1000n + 1n;
+          const diff = shown > line.netFils ? shown - line.netFils : line.netFils - shown;
+          expect(diff <= units).toBe(true);
         },
       ),
     );

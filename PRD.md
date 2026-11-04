@@ -1,6 +1,6 @@
 # ARTÉPOOL ERP — Product Requirements Document (PRD)
 
-**Version:** 1.48
+**Version:** 1.49
 **Date:** 2026-11-04
 **Owner:** Mohammed Yasser Al Huraidi (partner, ARTÉPOOL)
 **Status:** Scope approved. Owner and accountant decisions applied (see `docs/decisions/`). **Phase 1 plan approved (2026-10-07).**
@@ -368,6 +368,7 @@ Phase tags: **[P1]** to **[P4]** (see section 13).
   - If the price includes VAT, the system works the net and the VAT back out of it.
   - Otherwise it adds the VAT.
 - **Every tax invoice** (A4 or POS receipt), for every customer, shows net, VAT and total separately.
+- **A4 documents print the unit price and the discount excluding VAT,** like the taxable amount beside them (an item sold at 189.00 including VAT prints 180.00). The item's own price, the label and the POS keep the price the customer pays ([0117](docs/decisions/0117-unit-price-excl-vat-on-a4.md)).
 - **VAT is calculated per line.** Invoice VAT total = sum of line VAT. VAT is shown per line and in the total ([0009](docs/decisions/0009-vat-per-line.md)).
 - Rounding: half away from zero to the fils, per line, through the shared helper. **No cash rounding.**
 - **VAT on payments received:** see 9.4 and [0013](docs/decisions/0013-advance-and-progress-payments-vat.md).
@@ -465,6 +466,7 @@ Each phase ends with automated tests passing, a security review, an accountant r
 | 1.45 | 2026-10-31 | Decision 0115: fast updates — "Check now" in seconds, "Install now" starts at once, a progress bar, resumable downloads fetched in advance, an hourly check (0.8.0); split update packages, step-by-step install progress and laptop updates at sign-in planned for 0.9.0. |
 | 1.47 | 2026-11-02 | Decision 0095 updated, 0.9.1: the app's Google registration published "In production" with public pages (artepool.github.io), its values only as release secrets, carried by every release and read beside the programs at every start; an alert when Google refuses the saved Drive access. |
 | 1.48 | 2026-11-04 | Decision 0116: the order after go-live — P2 (money) first; then the AI & Online track (stages 2A–2D, its own track, not "Phase 2") interleaved with P3 as the owner decides; e-invoicing ready before 1 July 2027 (out of P4). M6.4 plan proposed; Arabic install guides; the accountant pack. |
+| 1.49 | 2026-11-04 | Decision 0117: A4 documents print the unit price and the discount excluding VAT, like the taxable amount beside them and like e-invoicing (PINT-AE). |
 | 1.46 | 2026-11-02 | Decision 0115, 0.9.0: small update packages (the server about 10 MB, the office app about 6 MB; PostgreSQL/Node only when they change), step-by-step install progress with a read-only status page while the server restarts, "Install after shift close", quiet laptop and office updates at sign-in (battery rule, WebView2 fallback). |
 | 1.44 | 2026-10-29 | Decision 0114: the customer's balance wherever a customer is chosen (banner by colour, amounts by permission), customers list column and overdue filter, customer page with open invoices and net position, the A4 invoice's account summary frozen at issue. |
 | 1.43 | 2026-10-29 | Decision 0113: receipts settle open invoices first (an advance only for the excess, or with its own permission and a reason); receiving from an invoice opens on it with a preview; one worked-out invoice status with overdue; Invoices tabs and a history on the invoice page. |

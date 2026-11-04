@@ -5,9 +5,11 @@
  * reprint is marked "Copy" (decision 0008, setting print.mark_reprints_as_copy).
  */
 import { sql, type Kysely, type Transaction } from 'kysely';
+import { unitPriceExclVat4dp } from '@artepool/shared';
 import {
   readTemplateSettings,
   type DesignedKind,
+  type SalesLine,
   type TemplateSettings,
 } from '@artepool/shared/contracts';
 import type { DB } from '../../platform/db/schema.generated';
@@ -23,10 +25,40 @@ import {
   vatLabel,
   type PrintBankAccount,
   type PrintDocument,
+  type PrintLine,
   type Seller,
 } from './templates';
 
 type Db = Kysely<DB> | Transaction<DB>;
+
+/**
+ * A line as the A4 documents print it. The unit price and the discount are shown excluding VAT,
+ * on the same basis as the taxable amount beside them, also for an item whose price includes VAT
+ * (189.00 incl. → 180.00); a deduction of an earlier payment shows its net (decision 0013).
+ */
+function printLine(l: SalesLine): PrintLine {
+  const deduction = l.lineKind === 'advance_deduction';
+  return {
+    descriptionAr: l.descriptionAr,
+    descriptionEn: l.descriptionEn,
+    itemCode: l.itemCode,
+    quantityMilli: l.quantityMilli,
+    unitPrice4dp: (deduction
+      ? (BigInt(l.netFils) * 100_000n) / BigInt(l.quantityMilli)
+      : unitPriceExclVat4dp(BigInt(l.unitPrice4dp), l.priceIncludesVat, BigInt(l.vatRateBp))
+    ).toString(),
+    discountFils: l.discountExclVatFils,
+    netFils: l.netFils,
+    vatRateBp: l.vatRateBp,
+    vatFils: l.vatFils,
+    grossFils: l.grossFils,
+    ...(deduction ? { deduction: true } : {}),
+  };
+}
+
+/** The lines' discount excluding VAT, the "Total discount" the documents print. */
+const discountExclVat = (lines: SalesLine[]): bigint =>
+  lines.reduce((s, l) => s + BigInt(l.discountExclVatFils), 0n);
 
 export async function company(db: Db): Promise<{ seller: Seller; logo: string | null }> {
   const c = await db
@@ -177,25 +209,13 @@ export async function documentHtml(
           }
         : null,
     reason: isNote ? d.reasonText : null,
-    lines: d.lines.map((l) => ({
-      descriptionAr: l.descriptionAr,
-      descriptionEn: l.descriptionEn,
-      itemCode: l.itemCode,
-      quantityMilli: l.quantityMilli,
-      unitPrice4dp: l.unitPrice4dp,
-      discountFils: (BigInt(l.lineDiscountFils) + BigInt(l.docDiscountAllocFils)).toString(),
-      netFils: l.netFils,
-      vatRateBp: l.vatRateBp,
-      vatFils: l.vatFils,
-      grossFils: l.grossFils,
-      deduction: l.lineKind === 'advance_deduction',
-    })),
+    lines: d.lines.map(printLine),
     totals: [
-      ...(d.discountTotalFils !== '0'
+      ...(discountExclVat(d.lines) !== 0n
         ? [
             {
               label: ['إجمالي الخصم', 'Total discount'] as [string, string],
-              fils: d.discountTotalFils,
+              fils: discountExclVat(d.lines).toString(),
             },
           ]
         : []),
@@ -261,20 +281,7 @@ export async function quotationHtml(db: Db, id: bigint): Promise<{ html: string;
     customerPo: q.customerPo,
     salesperson: extra.display_name_ar || extra.display_name_en ? userName(extra) : null,
     reference: q.subject ? { label: ['الموضوع', 'Subject'], value: q.subject } : null,
-    lines: q.lines
-      .filter((l) => !l.isOptional)
-      .map((l) => ({
-        descriptionAr: l.descriptionAr,
-        descriptionEn: l.descriptionEn,
-        itemCode: l.itemCode,
-        quantityMilli: l.quantityMilli,
-        unitPrice4dp: l.unitPrice4dp,
-        discountFils: (BigInt(l.lineDiscountFils) + BigInt(l.docDiscountAllocFils)).toString(),
-        netFils: l.netFils,
-        vatRateBp: l.vatRateBp,
-        vatFils: l.vatFils,
-        grossFils: l.grossFils,
-      })),
+    lines: q.lines.filter((l) => !l.isOptional).map(printLine),
     totals: [
       { label: ['المبلغ قبل الضريبة', 'Amount before VAT'], fils: q.netFils },
       { label: vatLabel(q.lines.filter((l) => !l.isOptional)), fils: q.vatFils },

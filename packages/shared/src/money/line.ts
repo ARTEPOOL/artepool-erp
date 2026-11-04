@@ -1,6 +1,12 @@
 import { MoneyRuleError } from './errors';
 import { roundDiv } from './round';
-import type { Amount4dp, BasisPoints, Fils, QuantityMilli } from './units';
+import {
+  BASIS_POINTS,
+  type Amount4dp,
+  type BasisPoints,
+  type Fils,
+  type QuantityMilli,
+} from './units';
 import { vatInGross, vatOnNet } from './vat';
 
 /** quantity (3 decimals) × unit price (4 decimals) = 7 decimals; fils have 2, so divide by 10^5. */
@@ -31,6 +37,22 @@ export interface LineAmounts {
   netFils: Fils;
   vatFils: Fils;
   grossFils: Fils;
+}
+
+/**
+ * The unit price excluding VAT, as tax documents print it next to the taxable amount: an inclusive
+ * price split back (price ÷ (100% + rate), 4 decimals, half away from zero); an exclusive one as is.
+ */
+export function unitPriceExclVat4dp(
+  unitPrice4dp: Amount4dp,
+  pricesIncludeVat: boolean,
+  vatRateBp: BasisPoints,
+): Amount4dp {
+  if (vatRateBp < 0n || vatRateBp > BASIS_POINTS) {
+    throw new RangeError(`VAT rate must be between 0 and 10000 basis points, got ${vatRateBp}`);
+  }
+  if (!pricesIncludeVat) return unitPrice4dp;
+  return roundDiv(unitPrice4dp * BASIS_POINTS, BASIS_POINTS + vatRateBp);
 }
 
 /**
