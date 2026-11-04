@@ -55,16 +55,19 @@ async function ok<T>(response: ReturnType<typeof call>, status = 200): Promise<T
   return r.json<T>();
 }
 
-/** What a person sees in the HTML: no styles, no tags, entities decoded, spaces collapsed. */
+/**
+ * What a person sees in the HTML: no styles, no tags, entities decoded once, spaces collapsed.
+ * `&amp;` is decoded last, so "&amp;lt;" stays the text "&lt;".
+ */
 function visibleText(html: string): string {
   return html
     .replace(/<style[\s\S]*?<\/style>/g, ' ')
     .replace(/<[^>]+>/g, ' ')
-    .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, '&')
     .replace(/\s+/g, ' ');
 }
 
