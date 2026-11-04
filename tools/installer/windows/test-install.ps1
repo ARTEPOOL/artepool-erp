@@ -175,17 +175,25 @@ try {
 } catch { $lines += 'OPEN device closed to the cashier' }
 $lines | Set-Content -Path $out -Encoding ASCII
 '@ | Set-Content -Path $probe -Encoding ASCII
-  Remove-Item $out -ErrorAction SilentlyContinue
+  $errors = Join-Path $env:PUBLIC 'artepool-cashier-probe.err'
+  Remove-Item $out, $errors -ErrorAction SilentlyContinue
+  # One string, each path in quotes: Start-Process does not quote "C:\Program Files\...".
+  $arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$probe`" `"$data`" `"$pf`" `"$out`""
   try {
-    Start-Process -FilePath 'powershell.exe' -Credential $cred -LoadUserProfile -Wait -WorkingDirectory $env:PUBLIC `
-      -ArgumentList '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $probe, $data, $pf, $out | Out-Null
+    $p = Start-Process -FilePath 'powershell.exe' -Credential $cred -LoadUserProfile -Wait -PassThru `
+      -WorkingDirectory $env:PUBLIC -RedirectStandardError $errors -ArgumentList $arguments
   } catch {
     return @("signin failed: $($_.Exception.Message)")
   } finally {
     Remove-Item $probe -ErrorAction SilentlyContinue
   }
+  if (-not (Test-Path $out)) {
+    $why = if (Test-Path $errors) { (Get-Content $errors -Raw) } else { '' }
+    Remove-Item $errors -ErrorAction SilentlyContinue
+    return @("OPEN probe wrote nothing (exit $($p.ExitCode)): $why")
+  }
   $lines = @(Get-Content $out)
-  Remove-Item $out -ErrorAction SilentlyContinue
+  Remove-Item $out, $errors -ErrorAction SilentlyContinue
   return $lines
 }
 
