@@ -507,13 +507,13 @@ A milestone is done only when its tests pass in CI.
 
 **Check by hand:** add a cashier → restart the POS PC → the PIN screen appears full screen → sell → "Lock screen" → resume with the PIN.
 
-#### M6.4 — Cashier Windows account hardening (0085)
+#### M6.4 — The cashier's Windows account, simplified (0085)
 
-**Status (2026-11-04):** task plan **proposed**, waiting for the owner's approval: [`milestones/m6.4-cashier-windows-account.md`](milestones/m6.4-cashier-windows-account.md).
+**Status (2026-11-04):** approved by the owner in a simplified scope, building: [`milestones/m6.4-cashier-windows-account.md`](milestones/m6.4-cashier-windows-account.md).
 
-**Delivers:** a standard (non-admin) Windows account created by the installer, with auto sign-in; Task Manager, Run and the command prompt turned off through the registry (works on Home, no Group Policy: 0106); no access to the database, backups, logs or `.secrets` folders; cannot stop the services; an owner-only administrator account; disk encryption recommended where the edition offers it (0106); the UPS reminder in the health screen. Turning the kiosk lock off (0089) lifts only the app lock; the Windows restrictions stay.
+**Delivers:** a standard (non-admin) Windows account «الكاشير» (`artepool-pos`) with a random password kept as the LSA secret and automatic sign-in; the app starts on the PIN screen (the kiosk lock of M5c unchanged); the PC's enrollment shared by both accounts on the server PC; Windows Update active hours 08:00–24:00; one emergency-tool action «اعمل / صلّح حساب الكاشير» (audited); uninstall disables automatic sign-in and the account (never deletes it); one System health line (OK / needs repair). No Windows limits (Task Manager, command prompt, Settings, browser, shutdown, sign-out/lock, USB) for now.
 
-**Key tests:** the cashier account cannot read the database folder or `.secrets`, or stop the services (scripted check on the Windows runner).
+**Key tests:** on the Windows runner, as the cashier: opening the data, secrets, backups and logs folders and stopping the services fail.
 
 #### M6.5 — The owner's laptop (0094)
 

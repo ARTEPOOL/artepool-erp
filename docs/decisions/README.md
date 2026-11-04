@@ -91,7 +91,7 @@ There is one short file per decision, numbered in order.
 | [0082](0082-app-mode-by-device-kind-and-pos-kiosk.md) | One app; the device kind decides the mode; POS PCs start in app-level kiosk mode (no closing, watchdog restart, exits audited and alerted) | Accepted |
 | [0083](0083-exiting-kiosk-mode-owner-only.md) | Leaving kiosk mode: owner only; from the owner's Office PC with 2-step, or the owner's code on the lock screen (at most 5 minutes) | Accepted |
 | [0084](0084-remote-access-through-private-vpn.md) | Remote access only through Tailscale (WireGuard), ACL: owner's laptop → API port only; never an open port; outside the LAN always password + 2-step | Deferred (0093) |
-| [0085](0085-server-on-the-pos-pc.md) | The server runs on the POS PC: services under their own accounts, restrictive permissions, standard cashier account, UPS reminder | Accepted |
+| [0085](0085-server-on-the-pos-pc.md) | The server runs on the POS PC: services under their own accounts, restrictive permissions, standard cashier account with automatic sign-in (simplified in M6.4: no other Windows limits for now; enrollment shared on the server PC; active hours 08:00–24:00), UPS reminder | Accepted (updated 2026-11-04) |
 | [0086](0086-backups-local-and-google-drive.md) | Backups: hourly local, daily age-encrypted to Google Drive (private key offline), weekly external drive, restore test | Accepted |
 | [0087](0087-cashiers-and-drawers-growth.md) | One cashier now; two cashiers on one PC and a second POS PC later, without redesign | Accepted |
 | [0088](0088-no-cloud-database-outbox-for-mobile.md) | No cloud database in Phase 1; an outbox for a read-only mobile dashboard in Phase 2 | Accepted |
