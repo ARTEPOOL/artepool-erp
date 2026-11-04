@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { LoginFrame } from '../../src/app/LoginFrame';
 import { i18n } from '../../src/i18n';
 import { Alert, Button, Chip, Note, ToastProvider, useToast } from '../../src/ui';
@@ -86,5 +86,38 @@ describe('UI pieces', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'إغلاق' }));
     expect(screen.getByRole('status').textContent).toContain('متصل بالخادم الرئيسي');
+  });
+
+  it('hides a toast after a while, and leaves no timer behind when the screen closes', () => {
+    vi.useFakeTimers();
+    try {
+      function Demo() {
+        const toast = useToast();
+        return (
+          <Button onPress={() => toast(i18n.t('shell:server.connected'))}>
+            {i18n.t('shell:close')}
+          </Button>
+        );
+      }
+      const view = render(
+        <ToastProvider>
+          <Demo />
+        </ToastProvider>,
+      );
+      fireEvent.click(screen.getByRole('button', { name: 'إغلاق' }));
+      expect(screen.getByRole('status').textContent).toContain('متصل بالخادم الرئيسي');
+      act(() => {
+        vi.advanceTimersByTime(3300);
+      });
+      expect(screen.getByRole('status').textContent).toBe('');
+
+      // Closed while a toast is still showing: its timer is stopped, nothing runs afterwards.
+      fireEvent.click(screen.getByRole('button', { name: 'إغلاق' }));
+      expect(vi.getTimerCount()).toBe(1);
+      view.unmount();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

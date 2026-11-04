@@ -165,6 +165,7 @@ It runs client–server on the local network: PostgreSQL and the API service on 
 
 - **Plan first.** For any non-trivial task, propose the plan (files, schema changes, tests) and wait for approval before writing code.
 - **Small steps.** One feature or fix at a time; run tests; then commit with a clear message.
+- **Pull requests only when the owner's batch is complete** (owner, 2026-11-03). Keep collecting the owner's requests on one branch (a draft pull request at most, so CI runs) and mark it ready for merging only after the owner says nothing more will be added. Merging is always the owner's.
 - **Ask, don't assume,** for anything that affects accounting treatment, VAT, document layout or security. List the question instead of guessing.
 - **Explain in plain language.** The owner is not a software engineer. Summarise what changed and why in simple terms, and say how to test it by hand.
 - **Never run destructive commands** on a database that may hold real data (drop, truncate, reset) without explicit confirmation.
@@ -228,6 +229,7 @@ Run from the repository root. Setup on a new PC: [`docs/runbooks/dev-setup-windo
 | Package the server PC's programs (bundle + resources + manifest, `dist/server`; `--windows` on Windows) | `pnpm build:server` |
 | Build the installers on Windows (after `pnpm build:server --windows`, the launcher and emergency tool in release, and `pnpm build:desktop`): `ARTEPOOL-Server-Setup` and `ARTEPOOL-Office-Setup` in `dist/installer`; `--test-upgrade` adds two never-published test upgrades for CI | `pnpm build:installer` |
 | Releases (decision 0108): the update key once / the release notes check / prepare the signed files / publish to `artepool-releases` (the release workflow runs these after the owner's approval) | `pnpm release keygen` / `pnpm release check` / `pnpm release prepare` / `pnpm release publish` |
+| Dependency check (weekly in GitHub Actions; fails only for a critical/high advisory in shipped code; Arabic summary in `deps-check-summary.md`) | `pnpm deps:check` |
 | On the installed server (elevated prompt): the console tools with the protected secrets / check the secrets / restore from a backup without the wizard (decision 0102) | `artepool-svc run owner-reset-password` (etc.) / `artepool-svc secrets check` / `artepool-svc run restore <copy>` |
 | On the installed server, run by the setup and the updater (decisions 0103, 0108): upgrade phases / reinstall over kept data / delete the data (DELETE + owner's password) / the updater | `artepool-svc run upgrade prepare\|apply` / `artepool-svc run install --reattach` / `artepool-svc run delete-data` / `artepool-svc run updater` |
 

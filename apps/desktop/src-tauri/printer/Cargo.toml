@@ -2,7 +2,7 @@
 name = "artepool-printer"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.90"
 publish = false
 license = "LicenseRef-ARTEPOOL-internal"
 description = "Silent receipt and label printing for ARTÉPOOL ERP: RAW bytes or images to a Windows printer (decisions 0008, 0055, 0070, 0096)."

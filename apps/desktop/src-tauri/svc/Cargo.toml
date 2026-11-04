@@ -2,7 +2,7 @@
 name = "artepool-svc"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.90"
 publish = false
 license = "LicenseRef-ARTEPOOL-internal"
 description = "The ARTÉPOOL server's service launcher: unlocks the DPAPI-protected secrets in memory and starts the bundled Node programs with them (decision 0103)."

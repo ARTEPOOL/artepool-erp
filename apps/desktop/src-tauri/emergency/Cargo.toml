@@ -2,7 +2,7 @@
 name = "artepool-emergency"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.90"
 publish = false
 license = "LicenseRef-ARTEPOOL-internal"
 description = "\"ARTÉPOOL – Emergency tool\" (decision 0107): asks for administrator rights, then opens the app's emergency window."

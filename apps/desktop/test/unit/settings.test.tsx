@@ -623,6 +623,64 @@ describe('Settings → System health (decision 0086)', () => {
     );
   });
 
+  it('says why "Upload now" waits: Google Drive is connected but there is no backup key yet', async () => {
+    const drive = (keySet: boolean) =>
+      health({
+        problems: keySet ? [] : ['offsite_not_set_up'],
+        offsite: {
+          last: null,
+          lastFailure: null,
+          maxAgeHours: 30,
+          keySet,
+          driveConnected: true,
+          google: { chooseAccount: true, code: true },
+          driveAccess: null,
+        },
+      });
+    const bridge = signedInBridge([
+      ...OWNER_PERMISSIONS,
+      'system.health.view',
+      'system.backup.manage',
+    ]).on('GET', '/api/v1/health/system', ok(drive(false)));
+    await signIn(bridge);
+    await openSettings();
+    fireEvent.click(screen.getByRole('link', { name: 'النسخ الاحتياطي' }));
+    expect(await screen.findByText(/اعمل مفتاح النسخ الأول/)).toBeTruthy();
+    expect(
+      screen.getByRole('button', { name: 'ارفع الآن' }).getAttribute('disabled'),
+    ).not.toBeNull();
+  });
+
+  it('shows no such note once the backup key exists', async () => {
+    const bridge = signedInBridge([
+      ...OWNER_PERMISSIONS,
+      'system.health.view',
+      'system.backup.manage',
+    ]).on(
+      'GET',
+      '/api/v1/health/system',
+      ok(
+        health({
+          problems: [],
+          offsite: {
+            last: null,
+            lastFailure: null,
+            maxAgeHours: 30,
+            keySet: true,
+            driveConnected: true,
+            google: { chooseAccount: true, code: true },
+            driveAccess: null,
+          },
+        }),
+      ),
+    );
+    await signIn(bridge);
+    await openSettings();
+    fireEvent.click(screen.getByRole('link', { name: 'النسخ الاحتياطي' }));
+    await screen.findByRole('button', { name: 'ارفع الآن' });
+    expect(screen.queryByTestId('key-first')).toBeNull();
+  });
+
   it('says when Google ended the saved Drive access, and offers to connect again', async () => {
     const refused = health({
       problems: ['drive_access_ended', 'offsite_failed'],

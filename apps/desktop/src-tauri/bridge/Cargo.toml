@@ -2,7 +2,7 @@
 name = "artepool-bridge"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.90"
 publish = false
 license = "LicenseRef-ARTEPOOL-internal"
 description = "The PC's secure side of ARTÉPOOL ERP: enrollment, TLS 1.3 with the pinned ARTÉPOOL CA, the device key."

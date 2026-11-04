@@ -785,6 +785,7 @@
     "driveConnected": "Connected",
     "driveNotConnected": "Not connected",
     "uploadNow": "Upload now",
+    "keyFirst": "Create the backup key first (the line above) so that “Upload now” works.",
     "disconnect": "Disconnect",
     "connectDrive": "Connect Google Drive",
     "reconnectDrive": "Connect Google Drive again",

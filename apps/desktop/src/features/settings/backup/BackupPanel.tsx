@@ -77,9 +77,9 @@ function Kpi(props: { icon: ReactNode; tone: Tone; label: string; value: string;
   return (
     <Card className={styles.kpi}>
       <Tile tone={props.tone}>{props.icon}</Tile>
-      <div>
+      <div className={styles.kpiText}>
         <span className={styles.muted}>{props.label}</span>
-        <b>
+        <b data-testid="kpi-value">
           <bdi>{props.value}</bdi>
         </b>
         <span className={styles.muted}>{props.sub}</span>
@@ -272,6 +272,12 @@ export function BackupPanel() {
                     {h.offsite.driveConnected
                       ? t('backup.driveConnected')
                       : t('backup.driveNotConnected')}
+                    {h.offsite.driveConnected && !h.offsite.keySet && (
+                      <>
+                        {' '}
+                        · <span data-testid="key-first">{t('backup.keyFirst')}</span>
+                      </>
+                    )}
                     {h.offsite.lastFailure?.errorMessage && has('offsite_failed') && (
                       <>
                         {' '}
