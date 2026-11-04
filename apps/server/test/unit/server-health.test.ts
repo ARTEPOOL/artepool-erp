@@ -11,6 +11,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { HEARTBEAT_FILE, readHeartbeat, writeHeartbeat } from '@artepool/backup';
 import type { ServerHealth } from '@artepool/shared/contracts';
 import {
+  cashierAccountOf,
   CERT_LEVELS,
   certificateLevel,
   diskLevel,
@@ -94,7 +95,42 @@ const healthy: ServerHealth = {
     durability: { ok: true, off: [] },
     startCheck: { status: 'ok', finishedAt: '2026-10-26T07:01:00.000Z' },
   },
+  cashierAccount: { state: 'ok', missing: [], checkedAt: null, setupAt: null },
 };
+
+describe("the cashier account's state (M6.4)", () => {
+  const row = (state: string | null, missing: string[]) => ({
+    cashier_account_state: state,
+    cashier_account_missing: missing,
+    cashier_account_checked_at: new Date('2026-11-04T10:00:00.000Z'),
+    cashier_account_setup_at: null,
+  });
+
+  it('is read as recorded, with its check time', () => {
+    expect(cashierAccountOf(row('repair', ['auto_sign_in', 'enrollment']))).toEqual({
+      state: 'repair',
+      missing: ['auto_sign_in', 'enrollment'],
+      checkedAt: '2026-11-04T10:00:00.000Z',
+      setupAt: null,
+    });
+  });
+
+  it('drops anything it does not know', () => {
+    expect(cashierAccountOf(row('fine', ['folders', 'something else']))).toMatchObject({
+      state: null,
+      missing: ['folders'],
+    });
+    expect(cashierAccountOf(row(null, []))).toMatchObject({ state: null, missing: [] });
+  });
+
+  it('raises no owner alert of its own: it is a line on System health', () => {
+    const broken: ServerHealth = {
+      ...healthy,
+      cashierAccount: { state: 'repair', missing: ['folders'], checkedAt: null, setupAt: null },
+    };
+    expect(healthAlerts(broken)).toEqual([]);
+  });
+});
 
 describe('owner alerts', () => {
   it('none when everything is fine', () => {

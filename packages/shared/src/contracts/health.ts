@@ -71,4 +71,33 @@ export interface ServerHealth {
     /** The integrity checks run once after that start; null while they have not run yet. */
     startCheck: { status: 'running' | 'ok' | 'issues' | 'error'; finishedAt: string | null } | null;
   };
+  /** The cashier's Windows account (M6.4), as the server PC's own programs last checked it. */
+  cashierAccount: CashierAccountHealth;
+}
+
+/** What `artepool-svc cashier-account check` names as missing (M6.4). */
+export const CASHIER_ACCOUNT_ITEMS = [
+  'account',
+  'enabled',
+  'standard',
+  'password_expiry',
+  'auto_sign_in',
+  'password_stored',
+  'plain_password',
+  'enrollment',
+  'folders',
+  'services',
+  'active_hours',
+] as const;
+export type CashierAccountItem = (typeof CASHIER_ACCOUNT_ITEMS)[number];
+export const CASHIER_ACCOUNT_STATES = ['ok', 'repair', 'not_set_up'] as const;
+export type CashierAccountState = (typeof CASHIER_ACCOUNT_STATES)[number];
+
+export interface CashierAccountHealth {
+  /** null: never checked (a development PC, or the updater has not run yet). */
+  state: CashierAccountState | null;
+  missing: CashierAccountItem[];
+  checkedAt: string | null;
+  /** The owner's last "Set up / repair" in the emergency tool. */
+  setupAt: string | null;
 }

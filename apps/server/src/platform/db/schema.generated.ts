@@ -985,6 +985,22 @@ export interface OpsOutbox {
 }
 
 export interface OpsServerHealth {
+  /**
+   * M6.4: when the account was last checked (hourly by the updater; not audited).
+   */
+  cashier_account_checked_at: Timestamp | null;
+  /**
+   * M6.4: what is missing, by name (account, standard, auto_sign_in, password_stored, enrollment, folders, services, active_hours, ...).
+   */
+  cashier_account_missing: Generated<string[]>;
+  /**
+   * M6.4: when the owner last ran "Set up / repair the cashier account" in the emergency tool.
+   */
+  cashier_account_setup_at: Timestamp | null;
+  /**
+   * M6.4: the cashier's Windows account as last checked: ok, repair (something missing) or not_set_up; null: never checked.
+   */
+  cashier_account_state: string | null;
   cert_expires_at: Timestamp | null;
   cert_renew_attempted_at: Timestamp | null;
   cert_renew_error: string | null;

@@ -2,7 +2,8 @@
  * System health → the server PC (M6.2 part H). Owner only. One line each, green, orange or red:
  * the last backup with its age, the backup key, the disks, the services and WAL archiving, the
  * server certificate (it renews itself) and the root CA (renewed by hand), the clock, the UPS, and
- * the protection from power cuts with the integrity check after the database's last start (part I).
+ * the protection from power cuts with the integrity check after the database's last start (part I),
+ * and the cashier's Windows account (M6.4).
  */
 import type { ReactNode } from 'react';
 import {
@@ -14,6 +15,7 @@ import {
   PlugZap,
   Server,
   ShieldCheck,
+  UserCheck,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
@@ -41,6 +43,13 @@ function databaseLevel(d: ServerHealth['database']): HealthLevel {
   if (d.startCheck && (d.startCheck.status === 'issues' || d.startCheck.status === 'error'))
     return 'urgent';
   return 'ok';
+}
+
+/** Red when it needs repair (the cashier may be stuck or the data open); orange until set up. */
+function cashierLevel(c: ServerHealth['cashierAccount']): HealthLevel {
+  if (c.state === 'ok') return 'ok';
+  if (c.state === 'repair') return 'urgent';
+  return 'warning';
 }
 
 /** "3 hours ago", "2 days ago": the age of the last backup. */
@@ -73,7 +82,7 @@ function Line(props: {
 }
 
 export function ServerHealthCard(props: { backup: HealthResponse; onCreateKey: () => void }) {
-  const { t } = useTranslation('settings');
+  const { t, i18n } = useTranslation('settings');
   const api = useApi();
   const can = useCan();
   const toast = useToast();
@@ -265,6 +274,38 @@ export function ServerHealthCard(props: { backup: HealthResponse; onCreateKey: (
                 </>
               }
               end={chip(databaseLevel(s.database))}
+            />
+            <Line
+              testId="health-cashier-account"
+              icon={<UserCheck aria-hidden="true" />}
+              tone={TONE[cashierLevel(s.cashierAccount)]}
+              title={t('serverHealth.cashierAccount.title')}
+              detail={
+                <>
+                  {s.cashierAccount.state === 'ok'
+                    ? t('serverHealth.cashierAccount.ok')
+                    : s.cashierAccount.state === 'repair'
+                      ? t('serverHealth.cashierAccount.repair', {
+                          list: new Intl.ListFormat(i18n.language).format(
+                            s.cashierAccount.missing.map((item) =>
+                              t(`serverHealth.cashierAccount.items.${item}`),
+                            ),
+                          ),
+                        })
+                      : s.cashierAccount.state === 'not_set_up'
+                        ? t('serverHealth.cashierAccount.notSetUp')
+                        : t('serverHealth.cashierAccount.unknown')}
+                  {s.cashierAccount.checkedAt && (
+                    <>
+                      <br />
+                      {t('serverHealth.cashierAccount.checked', {
+                        time: formatDateTime(s.cashierAccount.checkedAt),
+                      })}
+                    </>
+                  )}
+                </>
+              }
+              end={chip(cashierLevel(s.cashierAccount))}
             />
           </>
         )}

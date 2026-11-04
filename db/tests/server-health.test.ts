@@ -126,3 +126,92 @@ describe('the server health row', () => {
     }
   });
 });
+
+/** Migration 0051 (M6.4): the cashier's Windows account on System health. */
+describe("the cashier account's state", () => {
+  const auditCount = async () =>
+    Number(
+      (
+        await su.query<{ n: string }>(
+          `SELECT count(*) AS n FROM audit.log
+            WHERE entity_type = 'ops.server_health' AND action = 'update'`,
+        )
+      ).rows[0]!.n,
+    );
+
+  it('is written only by the server PC programs, as the system user', async () => {
+    const write = `UPDATE ops.server_health
+                      SET cashier_account_state = 'repair',
+                          cashier_account_missing = ARRAY['auto_sign_in', 'enrollment'],
+                          cashier_account_checked_at = now()
+                    WHERE id = 1`;
+    // The updater (backup role) and the emergency tool (API role), both as the system user.
+    expect(await attempt(backup, 1n, write)).toBeNull();
+    expect(
+      await attempt(
+        api,
+        1n,
+        `UPDATE ops.server_health SET cashier_account_state = 'ok', cashier_account_missing = '{}',
+                cashier_account_setup_at = now() WHERE id = 1`,
+      ),
+    ).toBeNull();
+    // A request from a screen, even the owner's, cannot make it look right.
+    expect(await attempt(api, owner, write)).toMatch(
+      /Only the server PC's own programs record the cashier account/,
+    );
+    // The updater never records a set-up: only the emergency tool does.
+    expect(
+      await attempt(
+        backup,
+        1n,
+        'UPDATE ops.server_health SET cashier_account_setup_at = now() WHERE id = 1',
+      ),
+    ).toMatch(/permission denied/);
+  });
+
+  it('accepts only known states and item names', async () => {
+    expect(
+      await attempt(
+        backup,
+        1n,
+        `UPDATE ops.server_health SET cashier_account_state = 'fine' WHERE id = 1`,
+      ),
+    ).not.toBeNull();
+    expect(
+      await attempt(
+        backup,
+        1n,
+        `UPDATE ops.server_health SET cashier_account_missing = ARRAY['password: x'] WHERE id = 1`,
+      ),
+    ).not.toBeNull();
+  });
+
+  it('audits a change of state, not the hourly check time', async () => {
+    const before = await auditCount();
+    expect(
+      await attempt(
+        backup,
+        1n,
+        'UPDATE ops.server_health SET cashier_account_checked_at = now() WHERE id = 1',
+      ),
+    ).toBeNull();
+    expect(await auditCount()).toBe(before);
+    expect(
+      await attempt(
+        backup,
+        1n,
+        `UPDATE ops.server_health SET cashier_account_state = 'not_set_up',
+                cashier_account_missing = ARRAY['account'], cashier_account_checked_at = now()
+          WHERE id = 1`,
+      ),
+    ).toBeNull();
+    expect(await auditCount()).toBe(before + 1);
+    const { rows } = await su.query<{ old: string; new: string }>(
+      `SELECT old_values ->> 'cashier_account_state' AS old,
+              new_values ->> 'cashier_account_state' AS new
+         FROM audit.log WHERE entity_type = 'ops.server_health' AND action = 'update'
+        ORDER BY id DESC LIMIT 1`,
+    );
+    expect(rows[0]).toEqual({ old: 'ok', new: 'not_set_up' });
+  });
+});

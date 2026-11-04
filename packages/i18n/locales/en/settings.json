@@ -1092,6 +1092,27 @@
         "pending": "the integrity check after it starts within a minute"
       }
     },
+    "cashierAccount": {
+      "title": "The cashier's Windows account",
+      "ok": "Signs in by itself as a standard account; the data folders and the services are closed to it",
+      "repair": "Needs repair ({list}): Emergency tool → \"Set up / repair the cashier account\"",
+      "notSetUp": "Not set up yet: Emergency tool → \"Set up / repair the cashier account\"",
+      "unknown": "Not checked yet (the server PC checks it every hour)",
+      "checked": "Last checked {time}",
+      "items": {
+        "account": "the account",
+        "enabled": "the account is disabled",
+        "standard": "it is an administrator",
+        "password_expiry": "its password expires",
+        "auto_sign_in": "automatic sign-in",
+        "password_stored": "the stored password",
+        "plain_password": "a password in plain text",
+        "enrollment": "the shared PC enrollment",
+        "folders": "the folder rules",
+        "services": "the services' rules",
+        "active_hours": "Windows Update active hours"
+      }
+    },
     "problem": {
       "disk_low": "A disk on the server PC is getting full.",
       "disk_urgent": "A disk on the server PC is almost full: free some space now.",
