@@ -22,6 +22,14 @@
 
 **ملحوظة:** موظف الواتساب الذكي، وإن الفاتورة توصل للعميل ونعرف ده، محتاجين الجسر السحابي (2ج) أو جزء منه. السبب إن واتساب بيبعت الرسايل الجاية للمحل على عنوان على الإنترنت، وجهاز المحل مقفول من الإنترنت (وده صح).
 
+**التكلفة الشهرية التقريبية** (حجم محل زي بتاعنا، أسعار نوفمبر 2026):
+- 2أ: حوالي 30–50 درهم؛
+- 2ب: حوالي 25–40 درهم رسايل، و10–30 للموظف الذكي؛
+- 2ج: حوالي 50–60 درهم (سيرفر في الإمارات)؛
+- 2د: مفيش زيادة.
+
+المجموع حوالي 120–200 درهم في الشهر لو كله شغال. وكل ميزة ليها زرار إيقاف.
+
 </div>
 
 ---
@@ -190,10 +198,63 @@ Already in place and reusable:
 
 | Stage | Effort (rough) | Running cost per month (rough) | What drives the cost |
 |---|---|---|---|
-| **2A** | 5–7 weeks: shared AI base (G1, G4–G7) ~1; calculator 1–1.5; posts ~1; accountant assistant 1–1.5; voice selling 1.5–2 | _to be filled_ | AI use per request; speech-to-text per minute (zero if run on the PC) |
-| **2B** | Sending + reminders ~2 weeks; the assistant 2–3 weeks (after the relay's receiving part). Meta's business verification can take days to weeks, outside our control. | _to be filled_ | WhatsApp's price per delivered template message (UAE rates); AI for the assistant |
-| **2C** | Relay + phone dashboard 3–4 weeks; technician app 4–6 weeks (after P3) | _to be filled_ | A small server and database in the cloud |
+| **2A** | 5–7 weeks: shared AI base (G1, G4–G7) ~1; calculator 1–1.5; posts ~1; accountant assistant 1–1.5; voice selling 1.5–2 | **≈ AED 30–50** (AI ≈ AED 35–45 + speech-to-text < AED 5); + ≈ AED 75 if the photo clean-up service is used | AI use per request; speech-to-text per minute; photo clean-up per image |
+| **2B** | Sending + reminders ~2 weeks; the assistant 2–3 weeks (after the relay's receiving part). Meta's business verification can take days to weeks, outside our control. | **≈ AED 25–40** for messages; + ≈ AED 10–30 AI for the assistant | WhatsApp's price per delivered template message (UAE rates); AI for the assistant |
+| **2C** | Relay + phone dashboard 3–4 weeks; technician app 4–6 weeks (after P3) | **≈ AED 50–60** in a UAE region (recommended), or ≈ AED 22–30 in Europe | A small server and database in the cloud |
 | **2D** | 1–2 weeks (after the relay) | ~0 extra | Uses the relay |
+
+**All four stages together:** roughly **AED 120–200 a month** at this shop's size. Every feature has its own switch, so a feature that is off costs nothing.
+
+### How the costs were estimated (prices checked 2026-11-05; USD × 3.6725)
+
+Assumed shop size: 20–60 sales a day, a few hundred customers.
+
+**AI (Claude API)**, per million tokens (input / output):
+- Haiku 5.5: $0.10 / $0.50;
+- Sonnet 5.5: $2 / $10;
+- Opus 5.5: $4 / $20.
+
+Batch runs are 50% off, and the repeated instructions can be cached.
+
+Assumed use per month:
+- 1,200 voice commands understood by Haiku;
+- 600 explanations and accountant-assistant answers on Sonnet;
+- 30 post drafts.
+
+That is ≈ $9–12. Doing everything with the largest model would be ≈ AED 60–90.
+
+Claude reads images but **not audio**, so voice selling needs a separate speech-to-text service.
+
+**Speech-to-text**, per minute:
+- OpenAI $0.003–0.006;
+- Google $0.016 ($0.003 in batch);
+- Azure $1 an hour real-time, with 5 free hours a month.
+
+About 80 minutes a month costs under AED 5.
+
+Running it on the PC (Whisper) is free and private, but a vendor's published comparison shows it still gets roughly half the words wrong in Gulf Arabic. So the cloud option is the realistic start, kept behind the switch.
+
+**WhatsApp (Cloud API):**
+- Billing is per delivered template message. UAE rates from 1 Oct 2026, from two resellers' copies of Meta's rate card (Meta's own card could not be opened):
+  - utility (invoices, receipts, reminders): ≈ $0.0157 (AED 0.058);
+  - marketing: ≈ $0.0576 (AED 0.21).
+- **Changes since 1 Oct 2026:**
+  - utility templates are charged even inside a customer's 24-hour window;
+  - replies to customers are free up to 1,000 a month per number, then charged.
+- Example: 300 invoices/receipts + 100 reminders ≈ AED 23–25 with VAT. A reminder with promotional wording counts as marketing, about four times the price.
+- A reseller's (BSP) platform fee, if one is used, is extra.
+
+**Cloud relay**, one small server:
+- Azure UAE North (Dubai) ≈ $15 a month with disk and address;
+- AWS UAE ≈ $7.5 + disk;
+- Hetzner or DigitalOcean in Europe ≈ $6–7.
+
+A UAE region costs about AED 30 more but keeps the data in the country (see section 9). Oracle's free tier exists, but it can reclaim a lightly used server, so it is not recommended for the relay.
+
+**Photo clean-up:**
+- Photoroom's API is ≈ $0.02 per image;
+- remove.bg is ≈ $0.16–0.23 per image;
+- the free local tool (rembg): its default model needs a paid licence for commercial use, so it would be checked first.
 
 ---
 
@@ -210,6 +271,17 @@ Already in place and reusable:
 | **2C — dashboard** | Totals and alerts. | Customer names only where the owner needs them (overdue list); otherwise totals. Hosting in a UAE region, encrypted, owner sign-in with 2-step. |
 | **2C — technician app** | Customer address, the visit, pool photos (homes). | Kept on the relay only until the ERP takes them in, then deleted (e.g. after 30 days). Only the technician's own visits on the phone. |
 | **2D — website** | What the visitor types in the form. | Privacy notice and consent box on the website; spam limits; deleted from the relay once the ERP has it. |
+
+**What the law says today (checked 2026-11-05; to be confirmed by the accountant or a lawyer):**
+- **The PDPL** (Federal Decree-Law 45 of 2021) is in force, but its executive regulations still seem unpublished, and there is no list yet of countries approved for data transfers.
+- **Sending personal data abroad** is allowed only with one of these:
+  - a contract that binds the receiver to the same protection;
+  - the person's express consent;
+  - when the data is needed to perform a contract with that person.
+
+  Meta (WhatsApp), an AI provider abroad and hosting in Europe all count as sending abroad. A UAE hosting region avoids that question for the relay.
+- **Marketing messages** need consent (Cabinet Resolution 56/2024, fines up to AED 150,000 under 57/2024), and people can refuse direct marketing at any time.
+- **WhatsApp's own rules:** Meta asks for a clear opt-in that names the business. A number already used on regular WhatsApp cannot be registered on the API until it is removed there.
 
 **General:**
 - one written list of what each provider receives;
