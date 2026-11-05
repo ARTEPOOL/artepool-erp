@@ -5,6 +5,7 @@
 | **Status** | Accepted (delivered in Phase 2) |
 | **Date** | 2026-10-06 |
 | **Decided by** | Owner / accountant |
+| **Refined by** | [0119](0119-vat-period-archive.md) (2026-11-05): the sales half comes earlier as an automatic PDF archive per VAT tax period; the setting becomes `vat.period_start_month`, `vat.period_months`, `vat.period_effective_from` |
 
 ## Decision
 - **Every quarter:** an export package in **Excel + PDF** containing:
