@@ -38,6 +38,7 @@ import {
   type TestDevice,
   type TestServer,
 } from '../support/server';
+import { checksAfter, failing, integrityChecks } from '../support/integrity';
 
 type Method = 'GET' | 'POST' | 'PUT' | 'PATCH';
 type Actor = ((
@@ -1113,5 +1114,60 @@ describe('stuck shifts (decision 0069)', () => {
     );
     expect(devices.devices.find((d) => d.id === fresh.id.toString())?.drawer?.code).toBe(oldDrawer);
     expect(devices.devices.find((d) => d.id === old.pc.id.toString())?.drawer).toBeNull();
+  });
+});
+
+describe('the integrity checks on this day of POS work (M7, decision 0119)', () => {
+  it('every check passes', async () => {
+    expect(failing(await integrityChecks(server))).toEqual({});
+  });
+
+  it('every Z report keeps the audit chain’s anchor (§6.3 step 6)', async () => {
+    const { rows } = await server.admin.query<{
+      shifts: string;
+      anchored: string;
+      anchors: string;
+    }>(
+      `SELECT count(*)::text AS shifts, count(audit_anchor_seq)::text AS anchored,
+              (SELECT count(*) FROM audit.anchors WHERE anchor_kind = 'z_report')::text AS anchors
+         FROM cash.shifts WHERE status = 'closed'`,
+    );
+    expect(Number(rows[0]!.shifts)).toBeGreaterThan(0);
+    expect(rows[0]!.anchored).toBe(rows[0]!.shifts);
+    expect(rows[0]!.anchors).toBe(rows[0]!.shifts);
+  });
+
+  it('each catches its own break', async () => {
+    const shift = (
+      await server.admin.query<{ id: string }>(
+        `SELECT id FROM cash.shifts WHERE status = 'closed' ORDER BY id LIMIT 1`,
+      )
+    ).rows[0]!.id;
+    // A closed shift whose expected cash no longer matches its payments and movements.
+    expect(
+      (
+        await checksAfter(server, [
+          `UPDATE cash.shifts SET expected_cash_fils = expected_cash_fils + 100,
+                                  variance_fils = variance_fils - 100 WHERE id = ${shift}`,
+        ])
+      ).cash_shifts,
+    ).toMatchObject({ ok: false, problems: 1 });
+    // A Z report's anchor that no longer matches the chain.
+    expect(
+      (
+        await checksAfter(server, [
+          `UPDATE audit.anchors SET chain_hash = '\\x00'::bytea
+            WHERE id = (SELECT min(id) FROM audit.anchors WHERE anchor_kind = 'z_report')`,
+        ])
+      ).audit_anchors,
+    ).toMatchObject({ ok: false, problems: 1 });
+    expect(
+      (
+        await checksAfter(server, [
+          `UPDATE cash.shifts SET audit_anchor_hash = '\\x00'::bytea WHERE id = ${shift}`,
+        ])
+      ).audit_anchors,
+    ).toMatchObject({ ok: false, problems: 1 });
+    expect(failing(await integrityChecks(server))).toEqual({});
   });
 });

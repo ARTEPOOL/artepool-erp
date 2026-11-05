@@ -953,6 +953,8 @@ export interface OpsIntegrityRuns {
   database_name: string;
   finished_at: Timestamp | null;
   id: Generated<bigint>;
+  period_from: string | null;
+  period_to: string | null;
   results: Generated<Json>;
   row_version: Generated<number>;
   run_kind: string;

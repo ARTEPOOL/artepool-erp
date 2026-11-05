@@ -41,6 +41,7 @@ import {
   type TestDevice,
   type TestServer,
 } from '../support/server';
+import { checksAfter, failing, integrityChecks } from '../support/integrity';
 
 type Method = 'GET' | 'POST' | 'PUT' | 'PATCH';
 type Actor = (method: Method, url: string, body?: unknown) => ReturnType<typeof call>;
@@ -1563,5 +1564,82 @@ describe("the customer's balance (decision 0114)", () => {
     expect(await refusal(cashier('GET', '/api/v1/customers?sort=outstanding'))).toMatchObject({
       status: 403,
     });
+  });
+});
+
+describe('the integrity checks on this A4 work (M7, decision 0119)', () => {
+  it('every check passes', async () => {
+    expect(failing(await integrityChecks(server))).toEqual({});
+  });
+
+  const one = async (query: string) =>
+    (await server.admin.query<{ id: string }>(query)).rows[0]!.id;
+
+  it('each catches its own break', async () => {
+    const invoice = await one(
+      `SELECT id FROM sales.documents WHERE status = 'issued' AND doc_type = 'invoice'
+          AND channel = 'office' ORDER BY id LIMIT 1`,
+    );
+    // A document whose total no longer matches its lines.
+    expect(
+      (
+        await checksAfter(server, [
+          `UPDATE sales.documents SET net_fils = net_fils + 100, total_fils = total_fils + 100
+            WHERE id = ${invoice}`,
+        ])
+      ).document_totals,
+    ).toMatchObject({ ok: false, problems: 1 });
+    // An invoice numbered in the credit notes' series.
+    expect(
+      (
+        await checksAfter(server, [
+          `UPDATE sales.documents SET series_id = (SELECT id FROM sys.document_series WHERE code = 'CN'),
+                                      seq_no = 999999 WHERE id = ${invoice}`,
+        ])
+      ).invoice_formats,
+    ).toMatchObject({ ok: false });
+    // Output VAT moved in the books without a document.
+    const vatLine = await one(
+      `SELECT l.id FROM gl.journal_lines l
+         JOIN gl.account_mappings m ON m.key = 'vat_output' AND m.account_id = l.account_id
+        WHERE l.credit_fils > 0 ORDER BY l.id LIMIT 1`,
+    );
+    expect(
+      (
+        await checksAfter(server, [
+          `UPDATE gl.journal_lines SET credit_fils = credit_fils + 100 WHERE id = ${vatLine}`,
+        ])
+      ).vat_ledger,
+    ).toMatchObject({ ok: false, problems: 1 });
+    // A payment whose journal entry is gone.
+    const paymentEntry = await one(
+      `SELECT id FROM gl.journal_entries WHERE source_type = 'payment' ORDER BY id LIMIT 1`,
+    );
+    expect(
+      (
+        await checksAfter(server, [
+          `DELETE FROM gl.journal_lines WHERE entry_id = ${paymentEntry}`,
+          `DELETE FROM gl.journal_entries WHERE id = ${paymentEntry}`,
+        ])
+      ).postings,
+    ).toMatchObject({ ok: false });
+    // A receivable moved to another customer, and an advance shown as never used.
+    const arLine = await one(
+      `SELECT l.id FROM gl.journal_lines l
+         JOIN gl.account_mappings m ON m.key = 'ar_control' AND m.account_id = l.account_id
+        WHERE l.debit_fils > 0 AND l.customer_id IS NOT NULL ORDER BY l.id LIMIT 1`,
+    );
+    const moved = await checksAfter(server, [
+      `UPDATE gl.journal_lines SET customer_id = (SELECT min(id) FROM md.customers
+                                                   WHERE id <> customer_id) WHERE id = ${arLine}`,
+    ]);
+    expect(moved.receivables).toMatchObject({ ok: false, problems: 2 });
+    const unused = await checksAfter(server, [
+      `UPDATE sales.documents SET advance_used_net_fils = 0, advance_used_vat_fils = 0
+        WHERE doc_type = 'advance_invoice' AND advance_used_net_fils > 0`,
+    ]);
+    expect(unused.receivables!.examples.join()).toMatch(/customer advances account/);
+    // Nothing above stayed: every change was rolled back.
+    expect(failing(await integrityChecks(server))).toEqual({});
   });
 });

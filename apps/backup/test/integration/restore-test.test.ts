@@ -50,12 +50,19 @@ describe('the restore test', () => {
     expect(result.ok).toBe(true);
     expect(result.fileName).toBe(copy.fileName);
     expect(Object.keys(result.results).sort()).toEqual([
+      'audit_anchors',
       'audit_chain',
+      'cash_shifts',
+      'document_totals',
+      'invoice_formats',
       'journals_balanced',
       'numbering_gaps',
+      'postings',
+      'receivables',
       'settlements',
       'stock_vs_ledger',
       'trial_balance',
+      'vat_ledger',
     ]);
     const run = await client.query<{ status: string; target: string }>(
       `SELECT status, target FROM ops.backup_runs WHERE id = $1`,
