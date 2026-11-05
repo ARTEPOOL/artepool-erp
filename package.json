@@ -18,6 +18,7 @@
     "test:unit": "vitest run --configLoader runner --project unit --project desktop",
     "test:integration": "vitest run --configLoader runner --project integration",
     "test:e2e": "pnpm --filter @artepool/desktop test:e2e",
+    "acceptance:day": "tsx apps/server/src/rehearsal/cli.ts",
     "db:setup": "tsx tools/dev-db/src/cli.ts",
     "db:migrate": "tsx tools/migrate/src/cli.ts up",
     "db:status": "tsx tools/migrate/src/cli.ts status",

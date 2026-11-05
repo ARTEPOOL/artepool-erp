@@ -144,7 +144,7 @@ The existing checks stay:
    - **cash:** paid in and paid out, a cash drop, an X report;
    - **stock:** an adjustment, a count with variances;
    - **labels:** print jobs recorded, with no printer;
-   - **printing:** every document type rendered to PDF by the real renderer, checked for its required fields.
+   - **printing:** every document type rendered to PDF by the real renderer, each checked to be a real PDF with text on it (never blank); which required fields each type prints is checked in CI by the print test of every document type.
 4. **Then:**
    - every check of part A;
    - a backup of the rehearsal database → restore → the checks again on the restored copy;
@@ -157,7 +157,7 @@ The existing checks stay:
   - while an update is installing;
   - while another rehearsal runs;
   - with less than 2 GB of free disk.
-- **The updater** (SYSTEM, already every minute, and woken at once like "Install now") starts `artepool-svc run rehearsal <run>` as a separate process, at low priority. It connects with the backup role (CREATEDB, as the restore test does) and the migrator.
+- **The updater** (SYSTEM, already every minute, and woken at once like "Install now") starts `artepool-svc run rehearsal <run>` as a separate process, at low priority. It connects with the superuser only to create and drop its own database (as the restore program does), the migrator for the migrations, the API role for the day, and the backup role for the checks, the backup and the restore.
 - **The screen** shows the progress step by step, then the result. The report prints for the accountant (`reports.reconciliation`).
 - **The laptop:** the script plays the office PC through the same API. Driving the laptop's own screens would need remote control, which the shop doesn't allow (0093). The laptop gets an optional step in the hardware check instead.
 

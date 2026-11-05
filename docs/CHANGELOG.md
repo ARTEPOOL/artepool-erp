@@ -1,5 +1,21 @@
 # Changelog
 
+## The automated rehearsal plays a whole shop day; two problems it found are fixed (2026-11-05)
+
+**In plain words:**
+
+- **The rehearsal's engine is ready** (M7 part B, decision 0119). On its own database, through the server's real programs, it plays a whole day of the shop with nobody at the PCs:
+  - the PCs enrolled with codes, the owner, the accountant, a supervisor, the storekeeper and the cashiers signing in (password and phone code, or the cashier's PIN);
+  - the tills selling at the same time while the office works: cash, card, split, discounts within and above the limit, removed lines, an oversell and its review, items by the kilo, a service visit, zero-rated, exempt and a bundle;
+  - a quotation → an advance → a progress payment → the final invoice with the payments deducted; a credit invoice, a receipt, a bounced cheque, a credit note and a debit note;
+  - returns to the shelf and to defective stock, paid-in/out, a cash drop, the X report, a stock count, labels, every document printed (and checked that it is not blank);
+  - every shift closed with its blind count, one recount with approval, the over/short accepted, and every Z report compared with what its till did.
+
+  Then every check of the books runs, the rehearsal database is backed up, restored and checked again, the speed is measured, and the rehearsal database is deleted. Every approval is given with a real one-time phone code.
+- **Fixed: selling a bundle (kit) at the POS failed** with an error. The server worked out each part's quantity with too many decimals and refused its own number. Bundles now sell; the parts leave the stock, and a missing part asks for the supervisor like any oversell.
+- **Fixed: two tills and the office saving at the same moment could block each other**, and one of them got "busy, try again". Each save took its numbers (invoice, journal, receipt) in a different order. Now every save takes one shared turn for numbering before its first number (migration 0053). Numbers stay gapless. Saves already took their journal numbers one at a time, so this adds no real waiting.
+- Still to come in part B: the busy day in GitHub (four tills, 800+ sales, 20,000 items) and the «ابدأ البروفة» button on System health.
+
 ## The reconciliation report; a PDF copy of every thermal receipt; the print test checks every required field (2026-11-05)
 
 **In plain words:**
