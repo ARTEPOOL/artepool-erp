@@ -31,6 +31,7 @@ import { money } from '../masterdata/format';
 import { localName, useReasonCodes } from '../masterdata/refs';
 import { POS_INVALIDATE, POS_PATHS } from './api';
 import { useReceiptLogo } from './receipt/logo';
+import type { ReceiptCopy } from './receipt/pdf';
 import { printReceipt, type PrintOutcome } from './receipt/printer';
 import styles from './pos.module.css';
 
@@ -63,6 +64,7 @@ export function ReturnDialog(props: { state: PosState; onClose: () => void }) {
   const [finished, setFinished] = useState<{
     result: PosReturnResponse;
     print: PrintOutcome;
+    pdf: ReceiptCopy;
     image: string;
   } | null>(null);
 
@@ -129,7 +131,7 @@ export function ReturnDialog(props: { state: PosState; onClose: () => void }) {
       i18n,
       kickDrawer: result.opensDrawer,
     });
-    setFinished({ result, print: printed.outcome, image: printed.imageUrl });
+    setFinished({ result, print: printed.outcome, pdf: printed.pdf, image: printed.imageUrl });
   };
 
   const submit = (event: FormEvent) => {
@@ -165,6 +167,7 @@ export function ReturnDialog(props: { state: PosState; onClose: () => void }) {
             <img className={styles.preview} src={finished.image} alt={t('done.preview')} />
           </>
         )}
+        {finished.pdf === 'failed' && <Alert tone="warn">{t('done.pdfFailed')}</Alert>}
         <DialogFooter>
           <Button variant="primary" onPress={props.onClose}>
             {t('close')}

@@ -1,5 +1,26 @@
 # Changelog
 
+## A PDF copy of every thermal receipt; the print test checks every required field (2026-11-05)
+
+**In plain words:**
+
+- **Every thermal receipt is also saved as a PDF on the PC, by itself** (decision 0120).
+  - It covers sales and POS returns, and it is the same picture the printer gets.
+  - It is saved even if the printer is off or out of paper.
+  - **Where:** Public Documents › ARTEPOOL › Receipts, with a folder per month (`2026-11`), so the owner's and the cashier's Windows accounts both find it.
+  - **File name:** `POS-000123 - 05-11-2026.pdf`. One file per receipt: printing it again never replaces it, and only puts it back if it was deleted.
+  - If the copy cannot be saved, the sale is still saved and a short message says so.
+- **The print test of every document type** (added with the blank credit-note fix in 0.9.3) now also checks each document against the official list of required tax fields. If a required field is ever missing on a printed invoice or note, the test fails.
+- **The M7 plan is approved:**
+  - the rehearsal is fully automated, on the shop's server PC, in its own throwaway database (decision 0119);
+  - a 5-minute hardware check is the only manual step;
+  - go-live starts from a clean database.
+
+- **Files and records:**
+  - Decisions 0119, 0120; PRD 1.52; `docs/milestones/m7-acceptance-tools.md`.
+  - The copy: `apps/desktop/src/features/pos/receipt/pdf.ts` (the PDF); `apps/desktop/src-tauri/printer/src/receipt_copy.rs` (the folder, the name checks, never overwriting); the app command `receipt_pdf_save`.
+  - Tests: `receipt-pdf.test.ts` (desktop), the Rust tests of `receipt_copy`, `print-documents.test.ts` (the required fields of each template).
+
 ## The cashier's Windows account, simplified (M6.4) (2026-11-04) — in version 0.9.3
 
 **In plain words:**

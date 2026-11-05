@@ -122,7 +122,8 @@ function LastSale({ last }: { last: PosState['lastSale'] }) {
     try {
       // The receipt as the server has it: after a first print, it is marked as a copy.
       const receipt = await api.get<ReceiptData>(POS_PATHS.receipt(last.id));
-      const { outcome } = await printReceipt(receipt, { logo, i18n, kickDrawer: false });
+      const { outcome, pdf } = await printReceipt(receipt, { logo, i18n, kickDrawer: false });
+      if (pdf === 'failed') toast(t('done.pdfFailed'));
       if (outcome.printed) {
         await api.post(
           POS_PATHS.receiptPrinted(last.id),

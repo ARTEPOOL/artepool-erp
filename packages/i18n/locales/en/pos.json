@@ -113,6 +113,7 @@
     "title": "Paid",
     "receipt": "Receipt",
     "printed": "The receipt was printed.",
+    "pdfFailed": "The receipt's PDF copy could not be saved on this PC (Public Documents › ARTEPOOL › Receipts). The sale is saved; print again to retry the copy.",
     "notPrinted": {
       "browser": "Printing works in the Windows app only. This is the receipt as it will print:",
       "no_printer": "No receipt printer is chosen for this PC (Settings → Devices). The receipt:",

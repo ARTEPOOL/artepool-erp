@@ -536,6 +536,33 @@ async fn printer_print_image(
     .map_err(|e| e.to_string())
 }
 
+/// Saves the PDF copy of a thermal receipt (decision 0120) in this PC's Public Documents
+/// (`ARTEPOOL\Receipts\<month>\<file name>`): "saved", or "exists" when the document already has
+/// its copy (never overwritten).
+#[tauri::command]
+async fn receipt_pdf_save(
+    month: String,
+    file_name: String,
+    data_base64: String,
+) -> Result<&'static str, String> {
+    use artepool_printer::receipt_copy;
+    use base64::Engine as _;
+    let pdf = base64::engine::general_purpose::STANDARD
+        .decode(data_base64.as_bytes())
+        .map_err(|_| "The receipt copy is not valid".to_string())?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let root = receipt_copy::receipts_root()?;
+        receipt_copy::save(&root, &month, &file_name, &pdf)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+    .map(|saved| match saved {
+        receipt_copy::Saved::Written(_) => "saved",
+        receipt_copy::Saved::Exists => "exists",
+    })
+    .map_err(|e| e.to_string())
+}
+
 /// Prints barcode labels (an image at the label printer's dots, base64) through the printer's own
 /// Windows driver at the label's exact size, one page per label, silently (decision 0096).
 #[tauri::command]
@@ -730,7 +757,8 @@ pub fn run() {
             printer_list,
             printer_print,
             printer_print_image,
-            printer_print_label
+            printer_print_label,
+            receipt_pdf_save
         ])
         .build(tauri::generate_context!())
         .unwrap_or_else(|error| {

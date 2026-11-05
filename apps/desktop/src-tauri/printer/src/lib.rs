@@ -13,6 +13,8 @@
 
 use std::path::PathBuf;
 
+pub mod receipt_copy;
+
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum PrintError {
     #[error("No printer is chosen for receipts on this PC")]

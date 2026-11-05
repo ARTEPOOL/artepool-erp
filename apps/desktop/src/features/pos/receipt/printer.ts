@@ -13,6 +13,7 @@ import type { i18n as I18n } from 'i18next';
 import type { ReceiptData } from '@artepool/shared/contracts';
 import { drawerKickJob, receiptJob, toBase64 } from './escpos';
 import { receiptModel, type ReceiptLanguage } from './layout';
+import { saveReceiptCopy, type ReceiptCopy } from './pdf';
 import { renderReceipt, type ReceiptImage } from './render';
 
 const PRINTER_KEY = 'artepool.receiptPrinter';
@@ -106,7 +107,8 @@ export async function printImage(
 
 /**
  * Draws and prints a receipt with the template version stored on its document (decision 0064):
- * its language, paper width and fields. Returns the outcome and the image (for a preview).
+ * its language, paper width and fields, and keeps its PDF copy on this PC (decision 0120), printed
+ * or not. Returns the outcome, the copy's outcome and the image (for a preview).
  */
 export async function printReceipt(
   data: ReceiptData,
@@ -117,14 +119,15 @@ export async function printReceipt(
     kickDrawer: boolean;
     logo?: HTMLImageElement | null;
   },
-): Promise<{ outcome: PrintOutcome; imageUrl: string }> {
+): Promise<{ outcome: PrintOutcome; pdf: ReceiptCopy; imageUrl: string }> {
   const model = receiptModel(data, data.template?.language ?? opts.language ?? 'both', {
     ar: opts.i18n.getFixedT('ar', 'pos'),
     en: opts.i18n.getFixedT('en', 'pos'),
   });
   const image = renderReceipt(model, undefined, opts.logo ?? null);
   const outcome = await printImage(image, data.document.docNumber ?? 'receipt', opts.kickDrawer);
-  return { outcome, imageUrl: image.canvas.toDataURL('image/png') };
+  const pdf = await saveReceiptCopy({ ...image, widthDots: image.canvas.width }, data.document);
+  return { outcome, pdf, imageUrl: image.canvas.toDataURL('image/png') };
 }
 
 /** Prints an image already drawn (the print designer's test receipt); never opens the drawer. */
