@@ -1,6 +1,6 @@
 # ARTÉPOOL ERP — Product Requirements Document (PRD)
 
-**Version:** 1.52
+**Version:** 1.51
 **Date:** 2026-11-05
 **Owner:** Mohammed Yasser Al Huraidi (partner, ARTÉPOOL)
 **Status:** Scope approved. Owner and accountant decisions applied (see `docs/decisions/`). **Phase 1 plan approved (2026-10-07).**
@@ -307,12 +307,6 @@ Phase tags: **[P1]** to **[P4]** (see section 13).
   - The fiscal year runs January–December ([0035](docs/decisions/0035-fiscal-year-and-provisional-chart.md)).
 - **[P1]** Automatic journal postings from every P1 module, following the posting map. The chart of accounts and posting map are **pending accountant review** before go-live ([0018](docs/decisions/0018-chart-of-accounts-and-posting-map.md)).
 - **[P1]** Monthly accounting periods and period lock.
-- **[P1, plan proposed]** **VAT period archive** ([0119](docs/decisions/0119-vat-period-archive.md), plan [`docs/milestones/vat-period-archive.md`](docs/milestones/vat-period-archive.md)):
-  - a setting (owner only, audited) for the VAT tax period start month, as in EmaraTax, and the frequency (quarterly by default, monthly);
-  - a folder per tax period, `VAT DD-MM-YYYY TO DD-MM-YYYY`, made with the period's first sales tax document (Asia/Dubai dates);
-  - every POS invoice, A4 invoice, advance payment invoice, credit note and debit note saved there as a PDF automatically (subfolders `POS`, `A4`, `Credit notes`, `Debit notes`; `<number> - DD-MM-YYYY.pdf`), from the stored data and design version, so it matches a reprint;
-  - at period end a "VAT summary" PDF + Excel: totals per document type, net/VAT per tax category, credit notes deducted, the VAT201 boxes (box 1a Abu Dhabi), and every document number with no gaps;
-  - a protected folder on the server, in the local and encrypted Google Drive backups; a background queue that never blocks a sale; missing files on System health with "Regenerate"; an archive screen and "Export period (ZIP)" for the owner and the accountant.
 - **[P2]** Manual journal entries with approval.
 - **[P2]** Accounts receivable / payable with **aging** reports.
 - **[P2]** Bank and cash accounts; basic bank reconciliation.
@@ -321,7 +315,7 @@ Phase tags: **[P1]** to **[P4]** (see section 13).
 ### 9.10 Reports [P2]
 - Profit & loss (including by line of business), sales by period/category/item/user, top items by revenue and margin, discounts given.
 - **VAT return report** (output VAT, input VAT, net payable) in the layout the accountant needs.
-- **Quarterly VAT export package** in **Excel + PDF** ([0017](docs/decisions/0017-quarterly-vat-export-and-annual-archive.md)); its sales half comes earlier with the VAT period archive ([0119](docs/decisions/0119-vat-period-archive.md), §9.9):
+- **Quarterly VAT export package** in **Excel + PDF** ([0017](docs/decisions/0017-quarterly-vat-export-and-annual-archive.md)):
   - sales invoices (including advance/progress payment invoices)
   - credit notes
   - purchases with input VAT
@@ -388,8 +382,7 @@ Phase tags: **[P1]** to **[P4]** (see section 13).
 
 ### 10.3 Record retention
 - Policy: **never delete**. Old periods can be archived but stay queryable.
-- The legally required retention period is to be confirmed with the accountant (likely 5 years after the end of the tax period). It does not affect the design, because nothing is deleted.
-- Sales tax documents are also kept as PDFs in one folder per VAT tax period, with the period's VAT summary, and never deleted ([0119](docs/decisions/0119-vat-period-archive.md)).
+- The legally required retention period is to be confirmed with the accountant. It does not affect the design, because nothing is deleted.
 
 ### 10.4 E-invoicing ([0019](docs/decisions/0019-einvoicing-via-accredited-provider.md))
 - The **ERP remains the system of record**. E-invoicing will be done by **integrating with an accredited service provider (ASP) via API**. The provider only transmits documents to the tax authority.
@@ -473,7 +466,6 @@ Each phase ends with automated tests passing, a security review, an accountant r
 | 1.45 | 2026-10-31 | Decision 0115: fast updates — "Check now" in seconds, "Install now" starts at once, a progress bar, resumable downloads fetched in advance, an hourly check (0.8.0); split update packages, step-by-step install progress and laptop updates at sign-in planned for 0.9.0. |
 | 1.47 | 2026-11-02 | Decision 0095 updated, 0.9.1: the app's Google registration published "In production" with public pages (artepool.github.io), its values only as release secrets, carried by every release and read beside the programs at every start; an alert when Google refuses the saved Drive access. |
 | 1.48 | 2026-11-04 | Decision 0116: the order after go-live — P2 (money) first; then the AI & Online track (stages 2A–2D, its own track, not "Phase 2") interleaved with P3 as the owner decides; e-invoicing ready before 1 July 2027 (out of P4). M6.4 plan proposed; Arabic install guides; the accountant pack. |
-| 1.52 | 2026-11-05 | Decision 0119 (requirement accepted, plan proposed): an automatic PDF archive per VAT tax period: a tax period setting (start month as in EmaraTax, quarterly or monthly), a `VAT DD-MM-YYYY TO DD-MM-YYYY` folder per period with every sales tax document as a PDF, a VAT summary (PDF + Excel, VAT201 boxes, no-gap number list) at period end, protected and backed up, never blocking a sale. 0017's sales half comes earlier; VAT points pending accountant review. |
 | 1.51 | 2026-11-05 | Decision 0118: the AI & Online track plan (`docs/ai-online-track.md`, from the owner's draft) and its nine ground rules; WhatsApp moves from P4 to stage 2B; the mobile dashboard is stage 2C. The M7 acceptance tools plan proposed (`docs/milestones/m7-acceptance-tools.md`). |
 | 1.50 | 2026-11-04 | M6.4 simplified (owner): a standard cashier Windows account with automatic sign-in and the app on the PIN screen; the PC's enrollment shared on the server PC; active hours 08:00–24:00; one emergency-tool action (audited); uninstall disables the account; one System health line. No Windows limits for now. |
 | 1.49 | 2026-11-04 | Decision 0117: A4 documents print the unit price and the discount excluding VAT, like the taxable amount beside them and like e-invoicing (PINT-AE). |
