@@ -16,12 +16,15 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { sql } from 'kysely';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import type {
-  CustomerDetail,
-  DocumentDetail,
-  ItemDetail,
-  QuotationDetail,
-  ReceivePaymentResponse,
+import {
+  LOCKED_BY_KIND,
+  type CustomerDetail,
+  type DesignedKind,
+  type DocumentDetail,
+  type ItemDetail,
+  type LockedField,
+  type QuotationDetail,
+  type ReceivePaymentResponse,
 } from '@artepool/shared/contracts';
 import {
   documentHtml,
@@ -93,12 +96,33 @@ async function pdfText(name: string, html: string): Promise<{ text: string | nul
 const today = new Date().toISOString().slice(0, 10);
 const printedDate = `${today.slice(8, 10)}/${today.slice(5, 7)}/${today.slice(0, 4)}`;
 /**
+ * A tax document's required fields (decision 0064): for every field its template locks, the texts
+ * that show it was printed, or why the field does not apply to this document.
+ */
+type Required = Partial<Record<LockedField, readonly string[] | { na: string }>>;
+const isTexts = (v: readonly string[] | { na: string }): v is readonly string[] => Array.isArray(v);
+
+/** The seller's required lines, the same on every tax document. */
+const SELLER: Required = {
+  sellerName: ['ARTEPOOL Swimming Pools'],
+  sellerAddressTrn: ['Al Ain, Abu Dhabi', '100123456789012'],
+};
+
+/**
  * What each printed document must show. `pairs`: a label and its own value, side by side in the
  * HTML (in the PDF the value sits beside the Arabic label, so there both are looked for apart).
+ * `template` and `required`: the tax documents, checked against their template's locked fields.
  */
 const printed: Record<
   string,
-  { html: string; must: string[]; mustNot?: string[]; pairs?: [string, string][] }
+  {
+    html: string;
+    must: string[];
+    mustNot?: string[];
+    pairs?: [string, string][];
+    template?: DesignedKind;
+    required?: Required;
+  }
 > = {};
 
 beforeAll(async () => {
@@ -243,6 +267,18 @@ beforeAll(async () => {
     ],
     // The unit price is printed excluding VAT, like the taxable amount beside it.
     mustNot: ['189.00'],
+    template: 'tax_invoice_a4',
+    required: {
+      ...SELLER,
+      title: ['Simplified Tax Invoice'],
+      customerFull: { na: 'a cash customer: a simplified invoice needs no name, address or TRN' },
+      numberAndDates: [aIssued.docNumber!, 'Issue date', printedDate],
+      lines: ['Description', 'Qty', 'Unit price', 'Taxable', 'Chlorine tablets 25 kg', '180.00'],
+      discount: ['Discount'],
+      vat: ['VAT %', '20.50'],
+      totals: ['Taxable amount', '410.00', 'Total payable', '430.50'],
+      deductions: { na: 'no earlier payment to deduct' },
+    },
   };
 
   // A full tax invoice: a VAT-registered company on credit, a line discount.
@@ -285,6 +321,18 @@ beforeAll(async () => {
       '78.25',
       '1,643.25',
     ],
+    template: 'tax_invoice_a4',
+    required: {
+      ...SELLER,
+      title: ['Tax Invoice'],
+      customerFull: ['Al Waha Contracting', 'Industrial Area 1, Al Ain', '100987654321003'],
+      numberAndDates: [b.docNumber!, 'Issue date', printedDate],
+      lines: ['Description', 'Qty', 'Unit price', 'Taxable', 'Pool pump 1.5 HP', '1,250.00'],
+      discount: ['Discount', 'Total discount', '35.00'],
+      vat: ['VAT %', '78.25'],
+      totals: ['Taxable amount', '1,565.00', 'Total payable', '1,643.25'],
+      deductions: { na: 'no earlier payment to deduct' },
+    },
   };
   const sandLine = b.lines.find((l) => l.itemId === sand.id)!;
   const pumpLine = b.lines.find((l) => l.itemId === pump.id)!;
@@ -323,6 +371,18 @@ beforeAll(async () => {
       ['Original invoice', b.docNumber!],
       ['Original invoice date', printedDate],
     ],
+    template: 'credit_note_a4',
+    required: {
+      ...SELLER,
+      title: ['Tax Credit Note'],
+      customerFull: ['Al Waha Contracting', 'Industrial Area 1, Al Ain', '100987654321003'],
+      numberAndDates: [cn.docNumber!, 'Issue date', printedDate],
+      originalInvoice: ['Original invoice', b.docNumber!, 'Original invoice date'],
+      lines: ['Description', 'Qty', 'Unit price', 'Taxable', 'Filter sand 25 kg', '35.00'],
+      vat: ['VAT %', '3.15'],
+      totals: ['Taxable amount', '63.00', 'Total payable', '66.15'],
+      reason: ['Reason', 'Two bags returned unopened'],
+    },
   };
 
   // A debit note: 5.00 more on the pump; the same references are required.
@@ -355,6 +415,19 @@ beforeAll(async () => {
       ['Original invoice', b.docNumber!],
       ['Original invoice date', printedDate],
     ],
+    // A debit note prints with the tax invoice's design (only credit notes have their own).
+    template: 'tax_invoice_a4',
+    required: {
+      ...SELLER,
+      title: ['Tax Debit Note'],
+      customerFull: ['Al Waha Contracting', 'Industrial Area 1, Al Ain', '100987654321003'],
+      numberAndDates: [dn.docNumber!, 'Issue date', printedDate],
+      lines: ['Description', 'Qty', 'Unit price', 'Taxable', 'Pool pump 1.5 HP', '5.00'],
+      discount: ['Discount'],
+      vat: ['VAT %', '0.25'],
+      totals: ['Taxable amount', '5.00', 'Total payable', '5.25'],
+      deductions: { na: 'a debit note deducts no earlier payment' },
+    },
   };
 
   // A receipt that settles part of the full invoice.
@@ -430,6 +503,19 @@ beforeAll(async () => {
       '1,500.00',
       '31,500.00',
     ],
+    template: 'tax_invoice_a4',
+    required: {
+      ...SELLER,
+      title: ['Payment Received'],
+      // An unregistered customer: name and address printed, no TRN (decisions 0010, 0071).
+      customerFull: ['Ahmed Mohammed villa', 'Al Jimi, Al Ain'],
+      numberAndDates: [advance.docNumber!, 'Issue date', printedDate],
+      lines: ['Description', 'Qty', 'Unit price', 'Taxable', q.docNumber, '30,000.00'],
+      discount: ['Discount'],
+      vat: ['VAT %', '1,500.00'],
+      totals: ['Taxable amount', '30,000.00', 'Total payable', '31,500.00'],
+      deductions: { na: 'the advance payment invoice is itself the payment later deducted' },
+    },
   };
   const draftFinal = await ok<DocumentDetail>(
     owner('POST', `/api/v1/sales/quotations/${q.id}/convert`, { rowVersion: sent.rowVersion }),
@@ -461,6 +547,18 @@ beforeAll(async () => {
       '3,500.00',
       '73,500.00',
     ],
+    template: 'tax_invoice_a4',
+    required: {
+      ...SELLER,
+      title: ['Tax Invoice'],
+      customerFull: ['Ahmed Mohammed villa', 'Al Jimi, Al Ain'],
+      numberAndDates: [final.docNumber!, 'Issue date', printedDate],
+      lines: ['Description', 'Qty', 'Unit price', 'Taxable', 'Pool construction 10 x 5 m'],
+      discount: ['Discount'],
+      vat: ['VAT %', '3,500.00'],
+      totals: ['Total before deductions', '105,000.00', 'Total payable', '73,500.00'],
+      deductions: [`Less: payment ${advance.docNumber!}`, 'Less: earlier payments', '-31,500.00'],
+    },
   };
   // The deduction's unit price is its net, like the taxable amount beside it: -30,000.00 twice on
   // its line (unit price, taxable amount), while -31,500.00 is only the total of earlier payments.
@@ -528,6 +626,46 @@ describe('every printed document carries its required fields', () => {
         ...[...must, ...pairs.flat()].filter((f) => /^[\x20-\x7e]+$/.test(f)),
       ]) {
         expect(flat, field).toContain(field);
+      }
+    },
+    60_000,
+  );
+});
+
+/** The tax documents, each checked against its template's locked (required) fields. */
+const TAX_KINDS = ['simplified', 'full', 'creditNote', 'debitNote', 'advance', 'final'];
+
+describe('every tax document prints each required field of its template (decision 0064)', () => {
+  it.each(TAX_KINDS)(
+    '%s: each locked field has its expected text, or a reason it does not apply',
+    (kind) => {
+      const { template, required } = printed[kind]!;
+      expect(template, 'the template the document prints with').toBeDefined();
+      for (const field of LOCKED_BY_KIND[template!]) {
+        const expected = required?.[field];
+        expect(expected, `${kind}: locked field "${field}"`).toBeDefined();
+        if (Array.isArray(expected)) expect(expected.length, field).toBeGreaterThan(0);
+        else expect((expected as { na: string }).na.length, field).toBeGreaterThan(10);
+      }
+    },
+  );
+
+  it.each(TAX_KINDS)(
+    '%s: the required fields are in the HTML and in the PDF',
+    async (kind) => {
+      const { html, template, required } = printed[kind]!;
+      const shown = visibleText(html);
+      const { text } = await pdfText(`required-${kind}`, html);
+      const flat = text?.replace(/\s+/g, ' ') ?? null;
+      for (const field of LOCKED_BY_KIND[template!]) {
+        const expected = required![field]!;
+        if (!isTexts(expected)) continue;
+        for (const value of expected) {
+          expect(shown, `${kind} ${field}: ${value} (HTML)`).toContain(value);
+          // The PDF's Latin text; the Arabic is drawn as shaped glyphs pdftotext reads apart.
+          if (flat !== null && /^[\x20-\x7e]+$/.test(value))
+            expect(flat, `${kind} ${field}: ${value} (PDF)`).toContain(value);
+        }
       }
     },
     60_000,
