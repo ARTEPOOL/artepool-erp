@@ -101,6 +101,8 @@ export async function reconciliationHtml(
   db: Db,
   report: ReconciliationReport,
   auth: { permissions: ReadonlySet<string> } | null,
+  /** A rehearsal's report (decision 0119): its figures come from the rehearsal's own database. */
+  options: { rehearsal?: boolean } = {},
 ): Promise<string> {
   const { seller } = await company(db);
   const seesCost = auth?.permissions.has('stock.view_cost') ?? false;
@@ -155,7 +157,14 @@ td { border-top: 0.2mm solid #ddd; padding: 1mm; }
 td.num { text-align: end; white-space: nowrap; }
 </style></head><body>
 <h1>${escapeHtml(seller.legal_name_ar)} <span class="en">${escapeHtml(seller.legal_name_en)}</span></h1>
-<h2>${label(['تقرير المطابقة', 'Reconciliation report'], '')}</h2>
+<h2>${label(['تقرير المطابقة', 'Reconciliation report'], '')}${
+    options.rehearsal ? ` — ${label(['بروفة', 'rehearsal'], '')}` : ''
+  }</h2>
+${
+  options.rehearsal
+    ? `<p class="meta">${label(['من قاعدة بيانات البروفة نفسها، واتمسحت بعد البروفة', 'From the rehearsal’s own database, deleted after the rehearsal'], '')}</p>`
+    : ''
+}
 <p class="meta">${label(['الفترة', 'Period'], '')}: <bdi>${escapeHtml(date(report.from))} – ${escapeHtml(
     date(report.to),
   )}</bdi> · ${label(['وقت التشغيل', 'Run at'], '')}: <bdi>${escapeHtml(

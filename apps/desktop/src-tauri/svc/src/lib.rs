@@ -134,18 +134,19 @@ pub const SECRETS: [Secret; 6] = [
     },
     // The installation sets PostgreSQL's superuser password to this value. Only the installation
     // program, the restore from a backup and the upgrade need it (they create databases and roles,
-    // or rename databases); the services never get it.
+    // or rename databases), and the rehearsal (it creates and drops its own throwaway database,
+    // decision 0119); the services never get it.
     Secret {
         name: "pg-superuser-password",
         file: "pg-superuser-password.dpapi",
         env: "PG_SUPERUSER_PASSWORD",
         kind: SecretKind::Password,
-        programs: Some(&["install", "restore", "upgrade"]),
+        programs: Some(&["install", "restore", "upgrade", "rehearsal"]),
     },
 ];
 
 /// The bundled programs `run` may start (`<name>.mjs` in the server folder).
-pub const PROGRAMS: [&str; 13] = [
+pub const PROGRAMS: [&str; 14] = [
     "server",
     "backup",
     "migrate",
@@ -159,6 +160,7 @@ pub const PROGRAMS: [&str; 13] = [
     "upgrade",
     "delete-data",
     "updater",
+    "rehearsal",
 ];
 
 pub fn secret_named(name: &str) -> Result<Secret, SvcError> {
@@ -702,8 +704,8 @@ mod tests {
                 ("ARTEPOOL_API_PASSWORD".into(), "real".into()),
             ]
         );
-        // The superuser's password goes to the restore alone.
-        let restore = prepare(&layout, "restore", &[], parent, secrets()).unwrap();
+        // The superuser's password goes to the restore (and install, upgrade, rehearsal) alone.
+        let restore = prepare(&layout, "restore", &[], parent.clone(), secrets()).unwrap();
         let names: Vec<&str> = restore.env.iter().map(|(n, _)| n.as_str()).collect();
         assert_eq!(
             names,
@@ -717,6 +719,26 @@ mod tests {
             ]
         );
         assert_eq!(restore.env[5].1.as_str(), "superuser");
+        // The rehearsal creates and drops its own throwaway database (decision 0119); the
+        // services never get the superuser's password.
+        let rehearsal = prepare(
+            &layout,
+            "rehearsal",
+            &["7".to_string()],
+            parent.clone(),
+            secrets(),
+        )
+        .unwrap();
+        assert!(
+            rehearsal
+                .env
+                .iter()
+                .any(|(n, v)| n == "PG_SUPERUSER_PASSWORD" && v.as_str() == "superuser")
+        );
+        for service in ["server", "backup", "updater"] {
+            let launch = prepare(&layout, service, &[], parent.clone(), secrets()).unwrap();
+            assert!(!launch.env.iter().any(|(n, _)| n == "PG_SUPERUSER_PASSWORD"));
+        }
         assert!(matches!(
             prepare(&layout, "../evil", &[], Vec::new(), Vec::new()).err(),
             Some(SvcError::UnknownProgram(..))

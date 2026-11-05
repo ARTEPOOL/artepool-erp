@@ -11,10 +11,18 @@
   - returns to the shelf and to defective stock, paid-in/out, a cash drop, the X report, a stock count, labels, every document printed (and checked that it is not blank);
   - every shift closed with its blind count, one recount with approval, the over/short accepted, and every Z report compared with what its till did.
 
-  Then every check of the books runs, the rehearsal database is backed up, restored and checked again, the speed is measured, and the rehearsal database is deleted. Every approval is given with a real one-time phone code.
+  Then every check of the books runs, the rehearsal database is backed up, restored and checked again, the accountant's seven-step reconciliation report runs, the speed is measured, and the rehearsal database is deleted. Every approval is given with a real one-time phone code.
 - **Fixed: selling a bundle (kit) at the POS failed** with an error. The server worked out each part's quantity with too many decimals and refused its own number. Bundles now sell; the parts leave the stock, and a missing part asks for the supervisor like any oversell.
 - **Fixed: two tills and the office saving at the same moment could block each other**, and one of them got "busy, try again". Each save took its numbers (invoice, journal, receipt) in a different order. Now every save takes one shared turn for numbering before its first number (migration 0053). Numbers stay gapless. Saves already took their journal numbers one at a time, so this adds no real waiting.
-- Still to come in part B: the busy day in GitHub (four tills, 800+ sales, 20,000 items) and the «ابدأ البروفة» button on System health.
+- **«ابدأ البروفة» on System health** (owner only, permission `system.rehearsal`, migration 0054):
+  - a confirmation first: about 10–20 minutes, and the shop keeps working;
+  - refused, with the reason, while a shift is open, while an update is installing, while another rehearsal runs, or with less than 2 GB free on the server PC;
+  - the server PC's updater starts it within seconds, as its own program at low priority;
+  - the steps show as they end with a progress bar, then **green** or **red** with the reason, the checks, the restored backup, the speed and the seven-step reconciliation report;
+  - **«اطبع تقرير المطابقة»** prints the rehearsal's reconciliation report (marked «بروفة») for the owner and the accountant;
+  - a rehearsal cut off half way (a power cut) is shown red, and its leftover database is deleted at the next one.
+- **Searching and scanning items is about 4–5 times faster** with many items (found by the busy day). With 20,000 items, a name search took about 60 ms and a barcode scan about 70 ms on an idle server, and about 0.2 s with four tills busy. Now about 17 ms and 14 ms: the search uses its indexes, and stock is totalled only for the items on the screen.
+- **The busy day in GitHub** (`pnpm acceptance:day`): four tills at once, 800+ sales, 20,000 items, every night and before every release. A red step or a speed above the targets stops the release; the table is in the run's summary.
 
 ## The reconciliation report; a PDF copy of every thermal receipt; the print test checks every required field (2026-11-05)
 

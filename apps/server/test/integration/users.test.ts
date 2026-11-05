@@ -306,10 +306,10 @@ describe('looking after accounts', () => {
 describe('roles and permissions', () => {
   it('lists every permission with owner-only ones marked', async () => {
     const { roles, permissions } = (await owner('GET', '/api/v1/roles')).json<RolesResponse>();
-    expect(permissions).toHaveLength(79);
+    expect(permissions).toHaveLength(80);
     expect(permissions.filter((p) => p.ownerOnly).map((p) => p.code)).toContain('users.manage');
     expect(roles.find((r) => r.code === 'owner')).toMatchObject({ requires2fa: true });
-    expect(roles.find((r) => r.code === 'owner')!.permissions).toHaveLength(79);
+    expect(roles.find((r) => r.code === 'owner')!.permissions).toHaveLength(80);
   });
 
   it('creates a role by copying another, never copying owner-only permissions', async () => {
@@ -324,7 +324,7 @@ describe('roles and permissions', () => {
     expect(fromOwner.permissions).toContain('pos.sell');
     expect(fromOwner.permissions).not.toContain('users.manage');
     expect(fromOwner.permissions).not.toContain('system.company.edit'); // decision 0030
-    expect(fromOwner.permissions).toHaveLength(60); // 79 minus the 19 owner-only ones
+    expect(fromOwner.permissions).toHaveLength(60); // 80 minus the 20 owner-only ones
   });
 
   it('edits permissions and discount limits; the owner role and owner-only permissions stay locked', async () => {

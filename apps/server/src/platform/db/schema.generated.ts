@@ -986,6 +986,23 @@ export interface OpsOutbox {
   uuid: Generated<string>;
 }
 
+export interface OpsRehearsalRuns {
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  failure: string | null;
+  finished_at: Timestamp | null;
+  heartbeat_at: Timestamp | null;
+  id: Generated<bigint>;
+  report: Json | null;
+  row_version: Generated<number>;
+  size: Generated<string>;
+  started_at: Timestamp | null;
+  status: Generated<string>;
+  steps: Generated<Json>;
+  updated_at: Generated<Timestamp>;
+  updated_by: bigint;
+}
+
 export interface OpsServerHealth {
   /**
    * M6.4: when the account was last checked (hourly by the updater; not audited).
@@ -1582,6 +1599,7 @@ export interface DB {
   "ops.backup_runs": OpsBackupRuns;
   "ops.integrity_runs": OpsIntegrityRuns;
   "ops.outbox": OpsOutbox;
+  "ops.rehearsal_runs": OpsRehearsalRuns;
   "ops.server_health": OpsServerHealth;
   "ops.update_requests": OpsUpdateRequests;
   "ops.update_state": OpsUpdateState;

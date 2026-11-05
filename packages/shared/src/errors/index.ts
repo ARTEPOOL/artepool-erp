@@ -210,6 +210,7 @@ export const RULE_CODES = [
   'LABEL_PRICE_CHANGED',
   'CLOCK_BACKWARDS',
   'SETUP_ALREADY_DONE',
+  'REHEARSAL_BLOCKED',
 ] as const;
 
 export type RuleCode = (typeof RULE_CODES)[number];

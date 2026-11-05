@@ -9,6 +9,7 @@
  */
 import { execFile, spawn } from 'node:child_process';
 import { mkdirSync, readFileSync } from 'node:fs';
+import { constants, setPriority } from 'node:os';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
@@ -23,6 +24,7 @@ import { recordCashierAccount } from './updater/cashier-account';
 import { renewServerCertificate } from './updater/certificate';
 import { resumableDownload } from './updater/download';
 import { outcomeChanged, runUpdater } from './updater/steps';
+import { claimRehearsal } from '../rehearsal/shop';
 
 function required(name: string): string {
   const value = process.env[name];
@@ -130,6 +132,28 @@ try {
       now: () => new Date(),
     });
     if (cashier === 'changed' || cashier === 'failed') log.line(`Cashier account: ${cashier}.`);
+
+    // The owner's «ابدأ البروفة» (M7, decision 0119): its own program, at low priority, so the
+    // shop's server keeps answering first. Never while an update is starting or running.
+    const claim = await claimRehearsal(client);
+    if (claim.kind === 'start') {
+      const child = spawn(
+        join(programDir, 'artepool-svc.exe'),
+        ['--data', dataDir, 'run', 'rehearsal', claim.id],
+        { detached: true, stdio: 'ignore', windowsHide: true },
+      );
+      if (child.pid) {
+        try {
+          setPriority(child.pid, constants.priority.PRIORITY_BELOW_NORMAL);
+        } catch {
+          // Normal priority then: the rehearsal still runs.
+        }
+      }
+      child.unref();
+      log.line(`Rehearsal ${claim.id}: started.`);
+    } else if (claim.kind === 'refused') {
+      log.line(`Rehearsal ${claim.id}: not started, a shift is open.`);
+    }
   }
 } catch (error) {
   const reason = error instanceof Error ? error.message : String(error);

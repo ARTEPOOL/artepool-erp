@@ -4,14 +4,18 @@
  */
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import type {
-  AuditEntry,
-  DeviceListItem,
-  PermissionInfo,
-  RoleInfo,
-  UserListItem,
+import {
+  REHEARSAL_STEPS,
+  type AuditEntry,
+  type DeviceListItem,
+  type PermissionInfo,
+  type RehearsalRun,
+  type RehearsalsResponse,
+  type RoleInfo,
+  type UserListItem,
 } from '@artepool/shared/contracts';
 import { App } from '../../src/app/App';
+import { stepStates } from '../../src/features/settings/backup/RehearsalCard';
 import { DownloadProgress } from '../../src/features/settings/backup/UpdatesCard';
 import { initI18n } from '../../src/i18n';
 import { FakeBridge, ok, sessionView, signInAnswer, userView } from '../support/fake-bridge';
@@ -1187,6 +1191,158 @@ describe('Settings → System health (decision 0086)', () => {
     await openSettings();
     const hub = screen.getByRole('navigation', { name: 'الإعدادات' });
     expect(within(hub).queryByRole('link', { name: /النسخ الاحتياطي/ })).toBeNull();
+  });
+});
+
+describe('Settings → System health → the automated rehearsal (M7, decision 0119)', () => {
+  const backupHealth = {
+    problems: [],
+    local: { last: null, lastFailure: null, maxAgeMinutes: 90, folder: 'D:\\ARTEPOOL\\backups' },
+    offsite: {
+      last: null,
+      lastFailure: null,
+      maxAgeHours: 30,
+      keySet: true,
+      driveConnected: true,
+      google: { chooseAccount: true, code: true },
+      driveAccess: null,
+    },
+    offline: { last: null, intervalDays: 7 },
+    restoreTest: { last: null, intervalDays: 30 },
+    integrity: { last: null },
+    disk: { freeBytes: 100 * 1024 ** 3, totalBytes: 500 * 1024 ** 3 },
+    requests: [],
+  };
+  const speed = {
+    search: { p95Ms: 40, samples: 30, targetMs: 300, slow: false },
+    scan: { p95Ms: 12, samples: 30, targetMs: 300, slow: false },
+    sale: { p95Ms: 380, samples: 150, targetMs: 2000, slow: false },
+  };
+  const passed: RehearsalRun = {
+    id: '7',
+    status: 'passed',
+    requestedAt: '2026-11-05T10:00:00.000Z',
+    startedAt: '2026-11-05T10:00:30.000Z',
+    finishedAt: '2026-11-05T10:14:00.000Z',
+    steps: REHEARSAL_STEPS.map((step) => ({ step, ok: true, ms: 1500 })),
+    result: {
+      checks: { audit_chain: { ok: true, problems: 0, examples: [] } },
+      restoredChecks: { audit_chain: { ok: true, problems: 0, examples: [] } },
+      speed,
+      totals: { posSales: 151 },
+      reconciliation: {
+        from: '2026-11-05',
+        to: '2026-11-05',
+        ranAt: '2026-11-05T10:13:00.000Z',
+        ok: true,
+        steps: [{ step: 'stock', ok: true, checks: [], figures: [] }],
+      },
+    },
+    failure: null,
+  };
+  const bridgeWith = (answer: RehearsalsResponse, permissions: string[] = []) =>
+    signedInBridge([...OWNER_PERMISSIONS, 'system.health.view', 'system.rehearsal', ...permissions])
+      .on('GET', '/api/v1/health/system', ok(backupHealth))
+      .on('GET', '/api/v1/system/rehearsals', ok(answer));
+  const openCard = async () => {
+    await openSettings();
+    fireEvent.click(screen.getByRole('link', { name: 'النسخ الاحتياطي' }));
+    return screen.findByTestId('rehearsal-card');
+  };
+
+  it('shows the last run: green, its checks, the speed, every step, and prints its report', async () => {
+    const bridge = bridgeWith({ latest: passed, history: [], blocked: 'shift_open' }, [
+      'reports.reconciliation',
+    ]).on(
+      'GET',
+      '/api/v1/system/rehearsals/7/reconciliation/pdf',
+      ok({ fileName: 'r.pdf', mime: 'application/pdf', dataBase64: 'JVBERi0=' }),
+    );
+    await signIn(bridge);
+    const card = await openCard();
+    expect(within(card).getByText('أخضر: كل حاجة سليمة')).toBeTruthy();
+    const result = within(card).getByTestId('rehearsal-result');
+    expect(result.textContent).toContain('فحوصات السلامة: 1 من 1 سليمة');
+    expect(result.textContent).toContain('النسخة الاحتياطية اترجعت واتفحصت');
+    expect(result.textContent).toContain('تقرير المطابقة: 1 من 1 خطوات مطابقة');
+    expect(result.textContent).toContain('البحث 40 مللي ثانية · البيع 380 مللي ثانية');
+    const steps = within(card).getByTestId('rehearsal-steps');
+    expect(within(steps).getAllByRole('listitem')).toHaveLength(REHEARSAL_STEPS.length);
+    expect(within(steps).getByLabelText('يوم البيع: الكاشيرات والمكتب مع بعض: تمت')).toBeTruthy();
+    // A shift is open: the button waits, and says why.
+    expect(within(card).getByTestId('rehearsal-blocked').textContent).toBe(
+      'اقفل كل الورديات المفتوحة الأول.',
+    );
+    expect(
+      within(card).getByRole<HTMLButtonElement>('button', { name: 'ابدأ البروفة' }).disabled,
+    ).toBe(true);
+    fireEvent.click(within(card).getByRole('button', { name: 'اطبع تقرير المطابقة' }));
+    await waitFor(() =>
+      expect(bridge.callsTo('GET', '/api/v1/system/rehearsals/7/reconciliation/pdf')).toHaveLength(
+        1,
+      ),
+    );
+  });
+
+  it('starts after a confirmation, then follows the steps with a progress bar', async () => {
+    const running: RehearsalRun = {
+      ...passed,
+      id: '8',
+      status: 'running',
+      finishedAt: null,
+      result: null,
+      steps: passed.steps.slice(0, 5),
+    };
+    const bridge = bridgeWith({ latest: null, history: [], blocked: null })
+      .on(
+        'POST',
+        '/api/v1/system/rehearsals',
+        ok({ ...running, status: 'requested', steps: [] }, 201),
+      )
+      .on(
+        'GET',
+        '/api/v1/system/rehearsals',
+        ok({ latest: null, history: [], blocked: null }),
+        ok({ latest: running, history: [], blocked: 'running' }),
+      );
+    await signIn(bridge);
+    const card = await openCard();
+    fireEvent.click(within(card).getByRole('button', { name: 'ابدأ البروفة' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog.textContent).toContain('حوالي 10–20 دقيقة');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'ابدأ البروفة' }));
+    await waitFor(() =>
+      expect(bridge.callsTo('POST', '/api/v1/system/rehearsals')).toHaveLength(1),
+    );
+    const progress = await within(card).findByTestId('rehearsal-progress');
+    const percent = Math.round((5 / REHEARSAL_STEPS.length) * 100);
+    expect(within(progress).getByRole('progressbar').getAttribute('aria-valuenow')).toBe(
+      String(percent),
+    );
+    expect(progress.textContent).toContain(`5 من ${REHEARSAL_STEPS.length} خطوة`);
+    expect(within(card).getByLabelText('فتح الورديات: شغالة')).toBeTruthy();
+  });
+
+  it('a red run shows the step that failed and why', () => {
+    const red: RehearsalRun = {
+      ...passed,
+      status: 'failed',
+      result: null,
+      failure: 'POST /api/v1/pos/sales: 422',
+      steps: [
+        { step: 'database', ok: true, ms: 1000 },
+        { step: 'server', ok: true, ms: 100 },
+        { step: 'pcs_and_people', ok: false, ms: 900, detail: 'POST /api/v1/pos/sales: 422' },
+      ],
+    };
+    expect(
+      stepStates(red)
+        .slice(0, 4)
+        .map((s) => s.state),
+    ).toEqual(['done', 'done', 'failed', 'pending']);
+    expect(stepStates({ ...red, status: 'running', steps: red.steps.slice(0, 2) })[2]!.state).toBe(
+      'running',
+    );
   });
 });
 

@@ -222,6 +222,7 @@ Run from the repository root. Setup on a new PC: [`docs/runbooks/dev-setup-windo
 | Unit tests / integration tests (real PostgreSQL) / all | `pnpm test:unit` / `pnpm test:integration` / `pnpm test` |
 | Screen tests in a real browser (Playwright, Arabic + English, light + dark; real API on a throwaway database) | `pnpm test:e2e` (once: `pnpm --filter @artepool/desktop exec playwright install chromium`) |
 | Verify the audit hash chain | `pnpm audit:verify` |
+| The automated rehearsal (decision 0119): the busy day (4 tills, 800+ sales, 20,000 items; nightly and before every release in GitHub) / the shop's size | `pnpm acceptance:day` / `pnpm acceptance:day --shop` |
 | Backups (decision 0086): the service / one local copy now / restore test / integrity checks / external-drive copy / open an encrypted copy with the private key (emergency manual restore) | `pnpm backup:run` / `pnpm backup:once` / `pnpm backup:restore-test` / `pnpm backup:check` / `pnpm backup:offline <folder>` / `pnpm backup:open <copy.age> <key file> <out.dump>` |
 | Tamper demonstration (throwaway database) | `pnpm demo:audit-tamper` |
 | Create the development master key (`.secrets/`, once per dev PC) | `pnpm dev:secrets` |
@@ -237,7 +238,7 @@ Run from the repository root. Setup on a new PC: [`docs/runbooks/dev-setup-windo
 | Releases (decision 0108): the update key once / the release notes check / prepare the signed files / publish to `artepool-releases` (the release workflow runs these after the owner's approval) | `pnpm release keygen` / `pnpm release check` / `pnpm release prepare` / `pnpm release publish` |
 | Dependency check (weekly in GitHub Actions; fails only for a critical/high advisory in shipped code; Arabic summary in `deps-check-summary.md`) | `pnpm deps:check` |
 | On the installed server (elevated prompt): the console tools with the protected secrets / check the secrets / restore from a backup without the wizard (decision 0102) | `artepool-svc run owner-reset-password` (etc.) / `artepool-svc secrets check` / `artepool-svc run restore <copy>` |
-| On the installed server, run by the setup and the updater (decisions 0103, 0108): upgrade phases / reinstall over kept data / delete the data (DELETE + owner's password) / the updater | `artepool-svc run upgrade prepare\|apply` / `artepool-svc run install --reattach` / `artepool-svc run delete-data` / `artepool-svc run updater` |
+| On the installed server, run by the setup and the updater (decisions 0103, 0108, 0119): upgrade phases / reinstall over kept data / delete the data (DELETE + owner's password) / the updater / the rehearsal the owner started | `artepool-svc run upgrade prepare\|apply` / `artepool-svc run install --reattach` / `artepool-svc run delete-data` / `artepool-svc run updater` / `artepool-svc run rehearsal <run>` |
 
 Rules for migrations: one file per change in `db/migrations/NNNN_name.sql`; no `BEGIN`/`COMMIT` inside (the runner wraps each file); every new table gets `sys.add_touch`/`sys.add_stamp`, `audit.enable_for`, `sys.forbid_delete` and explicit grants — `db/tests/privileges.test.ts` fails otherwise; run `pnpm db:codegen` and commit the regenerated types.
 

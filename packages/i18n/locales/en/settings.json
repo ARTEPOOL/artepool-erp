@@ -1022,6 +1022,64 @@
     "reason": "Reason: {reason}",
     "statusPage": "The status page answered the PCs from {start} to {end}."
   },
+  "rehearsal": {
+    "title": "Automated rehearsal",
+    "what": "A whole shop day, played by itself",
+    "whatNote": "It runs on a separate throwaway database on the server PC, deleted at the end; the shop’s real data is never touched. About 10–20 minutes; the screens keep working.",
+    "start": "Start rehearsal",
+    "confirm": "The rehearsal takes about 10–20 minutes. Work in the shop carries on, but the server may be a little slower until it ends. Start?",
+    "asked": "The rehearsal starts in a few seconds.",
+    "requested": "Asked for {date}",
+    "finished": "Ended {date}",
+    "progress": "Rehearsal progress",
+    "steps": "{done} of {total} steps",
+    "reason": "Reason",
+    "checks": "Integrity checks: {ok} of {total} right",
+    "restored": "The backup was restored and checked",
+    "reconciliation": "Reconciliation report: {ok} of {total} steps right",
+    "speed": "Speed (95%): search {search} ms · sale {sale} ms",
+    "print": "Print the reconciliation report",
+    "blocked": {
+      "shift_open": "Close every open shift first.",
+      "update_installing": "An update is installing; wait until it ends.",
+      "running": "A rehearsal is running now.",
+      "low_disk": "Less than 2 GB is free on the server PC."
+    },
+    "status": {
+      "requested": "Waiting for the server to start it…",
+      "running": "Rehearsal running…",
+      "passed": "Green: everything is right",
+      "failed": "Red: there is a problem"
+    },
+    "state": {
+      "done": "Done",
+      "running": "Running",
+      "failed": "Problem",
+      "pending": "Not yet"
+    },
+    "step": {
+      "database": "The rehearsal database",
+      "server": "The rehearsal server",
+      "pcs_and_people": "PCs enrolled, staff signed in",
+      "company_and_items": "Company and items",
+      "customers": "Customers",
+      "shifts_open": "Shifts opened",
+      "the_day": "The day: tills and office together",
+      "returns": "Returns",
+      "cash_movements": "Cash in and out, X report",
+      "stock": "Stock and count",
+      "labels": "Labels",
+      "oversell_review": "Oversell review",
+      "printing": "Every document printed",
+      "shifts_close": "Shifts closed, Z reports",
+      "day": "The whole day",
+      "checks": "Integrity checks",
+      "backup_restore": "Backup and restore",
+      "reconciliation": "Reconciliation report",
+      "speed": "Speed",
+      "unexpected": "Unexpected error"
+    }
+  },
   "serverHealth": {
     "title": "Server PC",
     "lastBackup": "Last backup",

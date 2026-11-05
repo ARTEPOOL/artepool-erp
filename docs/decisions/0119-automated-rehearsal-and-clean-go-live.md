@@ -45,10 +45,21 @@
 - **One rehearsal engine serves both runs:**
   - on the shop PC: the updater starts `artepool-svc run rehearsal` at low priority;
   - in CI: `pnpm acceptance:day`.
-- **Its own database only.** The engine creates `artepool_rehearsal_<run>`, migrates it, seeds it, and enrolls its tills and office PC through the normal enrollment flow. It can drop only a database with that prefix and its own marker.
-- **Refused** while a shift is open, while an update is installing, or with less than 2 GB of free disk.
+- **Its own database only.** The engine creates `artepool_rehearsal_<run>`, migrates it, seeds it, and enrolls its tills and office PC through the normal enrollment flow. It can drop only a database with that prefix and its own marker (the run's random token and the number of its process).
+  - A rehearsal database is **left over** only when the process in its marker is no longer running (a power cut, a closed program). The next run drops it, with the restored copy its restore test was making. Rehearsals running at the same time never drop each other's.
+  - The program gets the database superuser's password only to create and drop that database (as the restore program does). It plays the day as the API role, checks with the backup role, and writes nothing to the live database except its own row in `ops.rehearsal_runs`.
+  - The people sign in for real (password + 2-step code, or the cashier's PIN on a POS PC), and every approval is given with a real one-time code. The master key of the rehearsal exists only in memory.
+- **After the day:** every integrity check; a backup of the rehearsal database, restored into a throwaway copy and checked again; the **accountant runs the seven-step reconciliation report** for the day through the API; the speed figures.
+- **Refused** while a shift is open, while an update is installing, while another rehearsal waits or runs (one at a time, enforced by the database), or with less than 2 GB of free disk. A shift opened between the request and the start makes it red, with the reason. A run that stops writing its heartbeat for 5 minutes is marked red ("stopped half way").
+- **Printing:** every document type is rendered to PDF and checked not to be blank (text drawn on it). Which required tax fields each type prints is checked in CI by the print test of every document type.
+- **The rehearsal's reconciliation report prints** for the owner and the accountant (`reports.reconciliation`), marked «بروفة» and headed with the shop's company.
 - **Results** (each step, the seven-step report, speed) are kept in `ops.rehearsal_runs`. Hardware check results are kept in `ops.hardware_checks`. Both are audited.
 - **The laptop's screens are not driven automatically.** That would need remote control, which the shop doesn't allow ([0093](0093-no-remote-access-in-phase-1.md)). The office work runs as a simulated office PC, and the laptop has an optional A4 test page in the hardware check.
+
+## What the first runs found (fixed, 2026-11-05)
+
+- **Two tills and the office saving at the same moment could block each other** ("busy, try again"): each save took its numbers (invoice, journal, receipt) in a different order. Since migration 0053 every save takes one shared numbering turn before its first number.
+- **A bundle (kit) could not be sold at the POS**: the stock check worked out its parts' quantities with too many decimals. Fixed in the POS stock check, with a test.
 
 ## Consequences
 
