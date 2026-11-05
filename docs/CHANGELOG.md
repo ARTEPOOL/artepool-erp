@@ -1,6 +1,6 @@
 # Changelog
 
-## The cashier's Windows account, simplified (M6.4) (2026-11-04)
+## The cashier's Windows account, simplified (M6.4) (2026-11-04) — in version 0.9.3
 
 **In plain words:**
 
@@ -23,7 +23,7 @@
   - Migration 0051 (System health columns); the updater's hourly check; the emergency action `cashier-account` (audited).
   - Guides: `install-server.md` part 8, `emergency-tool.md`, `vm-test-part-f.md` part 5b. Windows CI: `test-install.ps1`.
 
-## Printed documents never come out blank; unit price excluding VAT; one spelling of the name (2026-11-04)
+## Printed documents never come out blank; unit price excluding VAT; one spelling of the name (2026-11-04) — in version 0.9.3
 
 **In plain words:**
 
