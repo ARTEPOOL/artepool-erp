@@ -452,6 +452,48 @@ describe('POS sales', () => {
     expect(rows[0]?.review_status).toBe('pending');
   });
 
+  it('a kit sells at the POS: its parts leave stock; a short part needs a supervisor (found by the M7 rehearsal)', async () => {
+    const part1 = await item('KIT-P1', '10000', '10000');
+    const part2 = await item('KIT-P2', '20000', '10000');
+    const kit = await ok<ItemDetail>(
+      owner('POST', '/api/v1/items', {
+        code: 'KIT-1',
+        itemType: 'bundle',
+        nameAr: 'طقم',
+        nameEn: 'Kit',
+        categoryId: ids.category,
+        unitId: ids.pcs,
+        vatCategoryId: ids.vat,
+        price: { price4dp: '105000', includesVat: true },
+        components: [
+          { itemId: part1, quantityMilli: '2000' },
+          { itemId: part2, quantityMilli: '1000' },
+        ],
+      }),
+      201,
+    );
+    const sold = await ok<PosSaleResponse>(
+      sale(cashier, {
+        lines: [{ itemId: kit.id, quantityMilli: '3000' }],
+        payments: [cashPart('3150')],
+      }),
+      201,
+    );
+    expect(sold.document.totalFils).toBe('3150');
+    expect(await stockOf(part1)).toBe('4000');
+    expect(await stockOf(part2)).toBe('7000');
+    const refused = await refusal(
+      sale(cashier, {
+        lines: [{ itemId: kit.id, quantityMilli: '3000' }],
+        payments: [cashPart('3150')],
+      }),
+    );
+    expect(refused).toMatchObject({ code: 'PERMISSION_DENIED', rule: 'OVERSELL_APPROVAL' });
+    expect((refused as Record<string, unknown>).shortages).toEqual([
+      expect.objectContaining({ code: 'KIT-P1', neededMilli: '6000', availableMilli: '4000' }),
+    ]);
+  });
+
   it('a cashier discounts up to 5%; above it a supervisor approves (0059)', async () => {
     const a = await item('POS-DISC', '1050000', '5000'); // 105.00
     const line = (bp: number) => [{ itemId: a, quantityMilli: '1000', lineDiscountBp: bp }];
