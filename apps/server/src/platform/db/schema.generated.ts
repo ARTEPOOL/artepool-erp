@@ -946,6 +946,18 @@ export interface OpsBackupRuns {
   updated_by: bigint;
 }
 
+export interface OpsHardwareChecks {
+  all_ok: boolean;
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  device_id: bigint;
+  id: Generated<bigint>;
+  results: Json;
+  row_version: Generated<number>;
+  updated_at: Generated<Timestamp>;
+  updated_by: bigint;
+}
+
 export interface OpsIntegrityRuns {
   backup_run_id: bigint | null;
   created_at: Generated<Timestamp>;
@@ -1597,6 +1609,7 @@ export interface DB {
   "md.warehouses": MdWarehouses;
   "ops.backup_requests": OpsBackupRequests;
   "ops.backup_runs": OpsBackupRuns;
+  "ops.hardware_checks": OpsHardwareChecks;
   "ops.integrity_runs": OpsIntegrityRuns;
   "ops.outbox": OpsOutbox;
   "ops.rehearsal_runs": OpsRehearsalRuns;

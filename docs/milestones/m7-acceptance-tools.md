@@ -182,7 +182,7 @@ The busy day measures with 20,000 items and fails above the target. The shop reh
 4. **Scan the barcode** printed on that test label. The app also checks that the scanned code matches.
 5. *(Optional, on the laptop)* print an A4 test page through the print dialog.
 
-**Records:** the result is kept (`ops.hardware_checks`, audited) and shown beside the last rehearsal.
+**Records:** the result is kept (`ops.hardware_checks`, audited, never changed) and shown beside the last rehearsal. It is recorded with `system.health.manage` (the owner's System health confirmations, like the UPS) on the PC it checks; the test label carries an in-store EAN-13 (prefix 2), so it never matches a real item.
 
 **Ready for go-live** means:
 - the last rehearsal is green;

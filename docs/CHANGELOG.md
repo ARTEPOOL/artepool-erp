@@ -4,6 +4,11 @@
 
 **In plain words:**
 
+- **The hardware check** (System health → «فحص الأجهزة», owner only, migration 0055; decision 0119), the only human step, about 5 minutes on each PC:
+  - **on the POS PC:** a test receipt, the drawer, a test label, and the scan of that label's barcode (the app says whether the code read matches the one printed; «تمام» only when it does);
+  - **on the laptop or an office PC:** an A4 test page through the print dialog (a frame at the margins and a 10 cm rule);
+  - each step «تمام» or «فيه مشكلة», with an optional note; the check is kept as made (never changed) and audited;
+  - System health shows the newest check of each PC, and **«جاهز للتشغيل الفعلي»** once the last rehearsal is green and the POS PC's check is all «تمام» (with the accountant's sign-off).
 - **The rehearsal's engine is ready** (M7 part B, decision 0119). On its own database, through the server's real programs, it plays a whole day of the shop with nobody at the PCs:
   - the PCs enrolled with codes, the owner, the accountant, a supervisor, the storekeeper and the cashiers signing in (password and phone code, or the cashier's PIN);
   - the tills selling at the same time while the office works: cash, card, split, discounts within and above the limit, removed lines, an oversell and its review, items by the kilo, a service visit, zero-rated, exempt and a bundle;

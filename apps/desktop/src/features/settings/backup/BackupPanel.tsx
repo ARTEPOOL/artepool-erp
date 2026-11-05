@@ -39,6 +39,7 @@ import { CardHead, NoAccess, PanelHeader, settingsClasses } from '../parts';
 import styles from './backup.module.css';
 import { DriveDialog } from './DriveDialog';
 import { KeyDialog } from './KeyDialog';
+import { HardwareCheckCard } from './HardwareCheckCard';
 import { RehearsalCard } from './RehearsalCard';
 import { ServerHealthCard } from './ServerHealthCard';
 import { UpdatesCard } from './UpdatesCard';
@@ -346,6 +347,8 @@ export function BackupPanel() {
           <UpdatesCard />
 
           {can('system.rehearsal') && <RehearsalCard />}
+
+          <HardwareCheckCard />
 
           {h.integrity.last && Object.keys(h.integrity.last.checks).length > 0 && (
             <Card rise index={2}>

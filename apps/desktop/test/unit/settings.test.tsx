@@ -3,11 +3,12 @@
  * users and temporary codes, deactivating with a reason, role permissions, PCs, the audit log.
  */
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, onTestFinished, vi } from 'vitest';
 import {
   REHEARSAL_STEPS,
   type AuditEntry,
   type DeviceListItem,
+  type HardwareCheck,
   type PermissionInfo,
   type RehearsalRun,
   type RehearsalsResponse,
@@ -15,7 +16,9 @@ import {
   type UserListItem,
 } from '@artepool/shared/contracts';
 import { App } from '../../src/app/App';
+import { scanMatches, testBarcode } from '../../src/features/settings/backup/HardwareCheckDialog';
 import { stepStates } from '../../src/features/settings/backup/RehearsalCard';
+import { isValidGtin } from '../../src/features/items/labels/barcode';
 import { DownloadProgress } from '../../src/features/settings/backup/UpdatesCard';
 import { initI18n } from '../../src/i18n';
 import { FakeBridge, ok, sessionView, signInAnswer, userView } from '../support/fake-bridge';
@@ -1343,6 +1346,177 @@ describe('Settings → System health → the automated rehearsal (M7, decision 0
     expect(stepStates({ ...red, status: 'running', steps: red.steps.slice(0, 2) })[2]!.state).toBe(
       'running',
     );
+  });
+});
+
+describe('Settings → System health → the hardware check (M7, decision 0119)', () => {
+  const backupHealth = {
+    problems: [],
+    local: { last: null, lastFailure: null, maxAgeMinutes: 90, folder: 'D:\\ARTEPOOL\\backups' },
+    offsite: {
+      last: null,
+      lastFailure: null,
+      maxAgeHours: 30,
+      keySet: true,
+      driveConnected: true,
+      google: { chooseAccount: true, code: true },
+      driveAccess: null,
+    },
+    offline: { last: null, intervalDays: 7 },
+    restoreTest: { last: null, intervalDays: 30 },
+    integrity: { last: null },
+    disk: { freeBytes: 100 * 1024 ** 3, totalBytes: 500 * 1024 ** 3 },
+    requests: [],
+  };
+  const check = (patch: Partial<HardwareCheck>): HardwareCheck => ({
+    id: '1',
+    deviceCode: 'COUNTER-01',
+    deviceName: 'Counter',
+    checkedAt: '2026-11-05T11:00:00.000Z',
+    checkedBy: { displayNameAr: 'محمد ياسر', displayNameEn: 'Mohammed Yasser' },
+    results: [
+      { step: 'receipt', outcome: 'ok', note: null },
+      { step: 'drawer', outcome: 'ok', note: null },
+      { step: 'label', outcome: 'ok', note: null },
+      { step: 'scan', outcome: 'ok', note: null },
+    ],
+    allOk: true,
+    ...patch,
+  });
+
+  it('a test label carries an in-store EAN-13; the scan must match it', () => {
+    const code = testBarcode();
+    expect(code).toMatch(/^2\d{12}$/);
+    expect(isValidGtin(code)).toBe(true);
+    expect(scanMatches(` ${code}\n`, code)).toBe(true);
+    expect(scanMatches('6291234567890', code)).toBe(false);
+  });
+
+  it('shows each PC’s newest check and whether the shop is ready for go-live', async () => {
+    const bridge = signedInBridge([
+      ...OWNER_PERMISSIONS,
+      'system.health.view',
+      'system.health.manage',
+      'system.rehearsal',
+    ])
+      .on('GET', '/api/v1/health/system', ok(backupHealth))
+      .on(
+        'GET',
+        '/api/v1/system/rehearsals',
+        ok({
+          latest: {
+            id: '7',
+            status: 'passed',
+            requestedAt: '2026-11-05T10:00:00.000Z',
+            startedAt: null,
+            finishedAt: '2026-11-05T10:14:00.000Z',
+            steps: [],
+            result: null,
+            failure: null,
+          },
+          history: [],
+          blocked: null,
+        }),
+      )
+      .on(
+        'GET',
+        '/api/v1/system/hardware-checks',
+        ok({
+          steps: ['a4'],
+          checks: [
+            check({}),
+            check({
+              id: '2',
+              deviceCode: 'LAPTOP-01',
+              allOk: false,
+              results: [{ step: 'a4', outcome: 'problem', note: 'الإطار ناقص من تحت' }],
+            }),
+          ],
+        }),
+      );
+    await signIn(bridge);
+    await openSettings();
+    fireEvent.click(screen.getByRole('link', { name: 'النسخ الاحتياطي' }));
+    const card = await screen.findByTestId('hardware-card');
+    expect(within(card).getByTestId('hardware-check-COUNTER-01').textContent).toContain('كله تمام');
+    const laptop = within(card).getByTestId('hardware-check-LAPTOP-01');
+    expect(laptop.textContent).toContain('فيه مشكلة');
+    expect(laptop.textContent).toContain('صفحة A4 تجربة: الإطار ناقص من تحت');
+    expect(within(card).getByTestId('go-live-ready').textContent).toContain('جاهز للتشغيل الفعلي');
+  });
+
+  it('guides the POS PC’s check step by step; a matching scan is OK; saving sends every step', async () => {
+    // The test label's code, known to the test.
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    onTestFinished(() => random.mockRestore());
+    const bridge = signedInBridge([
+      ...OWNER_PERMISSIONS,
+      'system.health.view',
+      'system.health.manage',
+    ])
+      .on('GET', '/api/v1/health/system', ok(backupHealth))
+      .on(
+        'GET',
+        '/api/v1/system/hardware-checks',
+        ok({ steps: ['receipt', 'drawer', 'label', 'scan'], checks: [] }),
+      )
+      .on('POST', '/api/v1/system/hardware-checks', ok(check({ allOk: false }), 201));
+    await signIn(bridge);
+    await openSettings();
+    fireEvent.click(screen.getByRole('link', { name: 'النسخ الاحتياطي' }));
+    const card = await screen.findByTestId('hardware-card');
+    expect(within(card).getByTestId('hardware-none')).toBeTruthy();
+    fireEvent.click(within(card).getByRole('button', { name: 'ابدأ فحص الأجهزة' }));
+    const dialog = await screen.findByTestId('hardware-dialog');
+    const save = within(dialog).getByRole('button', { name: 'احفظ الفحص' });
+    expect(save.hasAttribute('disabled') || save.getAttribute('aria-disabled') === 'true').toBe(
+      true,
+    );
+
+    // Outside the Windows app nothing prints: the step says so.
+    const receipt = within(dialog).getByTestId('hardware-step-receipt');
+    fireEvent.click(within(receipt).getByRole('button', { name: 'اطبع إيصال تجربة' }));
+    expect(await within(receipt).findByText('الطباعة بتشتغل في برنامج ويندوز بس.')).toBeTruthy();
+    fireEvent.click(within(receipt).getByRole('button', { name: 'تمام' }));
+    fireEvent.click(
+      within(within(dialog).getByTestId('hardware-step-drawer')).getByRole('button', {
+        name: 'تمام',
+      }),
+    );
+    const label = within(dialog).getByTestId('hardware-step-label');
+    fireEvent.click(within(label).getByRole('button', { name: 'فيه مشكلة' }));
+    fireEvent.change(within(label).getByLabelText('ملاحظة (اختياري)'), {
+      target: { value: 'الطباعة باهتة' },
+    });
+
+    // A code that is not the label's: not matching, not OK.
+    const scan = within(dialog).getByTestId('hardware-step-scan');
+    fireEvent.change(within(scan).getByLabelText('امسح الباركود هنا'), {
+      target: { value: '6291234567890' },
+    });
+    expect(within(scan).getByTestId('hardware-scan-result').textContent).toContain('مش مطابق');
+    expect(within(scan).queryByRole('button', { name: 'تمام' })).toBeNull();
+    // The label's own code: matching, and OK by itself.
+    fireEvent.change(within(scan).getByLabelText('امسح الباركود هنا'), {
+      target: { value: testBarcode(() => 0.5) },
+    });
+    expect(within(scan).getByTestId('hardware-scan-result').textContent).toContain('مطابق للي');
+    expect(within(scan).getByRole('button', { name: 'تمام' }).getAttribute('aria-pressed')).toBe(
+      'true',
+    );
+
+    fireEvent.click(save);
+    await waitFor(() =>
+      expect(bridge.callsTo('POST', '/api/v1/system/hardware-checks')).toHaveLength(1),
+    );
+    expect(bridge.callsTo('POST', '/api/v1/system/hardware-checks')[0]!.body).toEqual({
+      results: [
+        { step: 'receipt', outcome: 'ok', note: null },
+        { step: 'drawer', outcome: 'ok', note: null },
+        { step: 'label', outcome: 'problem', note: 'الطباعة باهتة' },
+        { step: 'scan', outcome: 'ok', note: null },
+      ],
+    });
   });
 });
 

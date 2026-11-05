@@ -24,6 +24,7 @@ import { registerListRoutes } from './modules/lists/routes';
 import { registerPartyRoutes } from './modules/parties/routes';
 import { registerReportsRoutes } from './modules/reports/routes';
 import { registerRehearsalRoutes } from './modules/rehearsal/routes';
+import { registerHardwareRoutes } from './modules/hardware/routes';
 import { registerSettingsRoutes } from './modules/settings/routes';
 import { registerUserRoutes } from './modules/users/routes';
 import type { AppDeps } from './platform/http/deps';
@@ -115,6 +116,7 @@ export function buildApp(options: AppOptions, deps: AppDeps): FastifyInstance {
   registerHealthRoutes(app);
   registerReportsRoutes(app);
   registerRehearsalRoutes(app);
+  registerHardwareRoutes(app);
   registerLedgerRoutes(app);
   registerInventoryRoutes(app);
   registerSalesRoutes(app);

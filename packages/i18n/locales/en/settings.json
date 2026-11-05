@@ -1080,6 +1080,63 @@
       "unexpected": "Unexpected error"
     }
   },
+  "hardware": {
+    "title": "Hardware check",
+    "intro": "About 5 minutes on this PC. Do each step, then choose «OK» or «Problem», with a note if you like.",
+    "ok": "OK",
+    "problem": "Problem",
+    "note": "Note (optional)",
+    "save": "Save the check",
+    "savedOk": "Check saved: everything is OK.",
+    "savedProblem": "Check saved; some steps need fixing.",
+    "sent": "Sent to the printer: look at the paper.",
+    "a4Sent": "The print dialog opened: print the page and look at it.",
+    "receiptTitle": "Hardware check",
+    "labelName": "Hardware check",
+    "scanHere": "Scan the barcode here",
+    "scanMatches": "The code matches the label",
+    "scanDiffers": "The code does not match: scan this check’s label",
+    "none": "No hardware check yet.",
+    "allOk": "All OK",
+    "hasProblem": "Problem",
+    "checkedBy": "{date} · {name}",
+    "thisPc": "This PC",
+    "start": "Start hardware check",
+    "ready": "Ready for go-live",
+    "notReady": "Not ready for go-live yet",
+    "readyRehearsal": "Rehearsal green",
+    "readyHardware": "POS PC check all OK",
+    "readyAccountant": "and the accountant’s sign-off",
+    "step": {
+      "receipt": "Test receipt",
+      "drawer": "Open the drawer",
+      "label": "Test label",
+      "scan": "Scan the label’s barcode",
+      "a4": "A4 test page"
+    },
+    "help": {
+      "receipt": "The receipt must print clearly in Arabic and English, and the paper is cut.",
+      "drawer": "The drawer must open by itself.",
+      "label": "The label prints at its size, with a clear barcode.",
+      "scan": "Scan the barcode on the test label with the scanner.",
+      "a4": "The whole frame shows, and the rule is exactly 10 cm."
+    },
+    "action": {
+      "receipt": "Print test receipt",
+      "drawer": "Open the drawer",
+      "label": "Print test label",
+      "scan": "Scan",
+      "a4": "Print A4 test page"
+    },
+    "printProblem": {
+      "browser": "Printing works in the Windows app only.",
+      "no_printer": "Choose the printer first in Settings → Devices.",
+      "failed": "The printer did not respond. Check that it is on, connected and has paper.",
+      "failed_direct": "The label printer did not take the job. Try again or switch it back to the Windows driver.",
+      "no_drawer": "The drawer opens only with a thermal receipt printer (ESC/POS).",
+      "no_size": "No label size is active."
+    }
+  },
   "serverHealth": {
     "title": "Server PC",
     "lastBackup": "Last backup",
