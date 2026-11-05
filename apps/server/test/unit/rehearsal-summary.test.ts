@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { RehearsalReport } from '../../src/rehearsal/run';
 import { speedOk } from '../../src/rehearsal/run';
-import { summaryMarkdown } from '../../src/rehearsal/summary';
+import { cellText, summaryMarkdown } from '../../src/rehearsal/summary';
 
 const speed = (p95: number | null, target: number) => ({
   p95Ms: p95,
@@ -60,6 +60,10 @@ describe('the rehearsal summary', () => {
     expect(md).toContain('## ❌ Rehearsal (busy): red');
     expect(md).toContain('| the_day | ❌ POST /x: 422 \\| RULE | 0.9 s |');
     expect(md).toContain('| settlements | ❌ 3 | — |');
+  });
+
+  it('a reason with backslashes, pipes or line breaks stays in its cell', () => {
+    expect(cellText('C:\\data | x\\|y\nnext')).toBe('C:\\\\data \\| x\\\\\\|y next');
   });
 
   it('speed is within the targets only when no figure is slow', () => {

@@ -8,6 +8,13 @@ import type { RehearsalReport } from './run';
 const seconds = (ms: number) => `${(ms / 1000).toFixed(1)} s`;
 const mark = (ok: boolean) => (ok ? '✅' : '❌');
 
+/** Text that stays inside its table cell: backslashes and pipes escaped, one line. */
+export const cellText = (text: string): string =>
+  text
+    .replace(/\\/g, '\\\\')
+    .replace(/\|/g, '\\|')
+    .replace(/\s*[\r\n]+\s*/g, ' ');
+
 export function summaryMarkdown(report: RehearsalReport): string {
   const out: string[] = [];
   out.push(
@@ -17,7 +24,7 @@ export function summaryMarkdown(report: RehearsalReport): string {
     '|---|---|---|',
     ...report.steps.map(
       (s) =>
-        `| ${s.step} | ${mark(s.ok)}${s.detail ? ` ${s.detail.replace(/\|/g, '\\|')}` : ''} | ${seconds(s.ms)} |`,
+        `| ${s.step} | ${mark(s.ok)}${s.detail ? ` ${cellText(s.detail)}` : ''} | ${seconds(s.ms)} |`,
     ),
   );
   if (report.checks) {
