@@ -3,7 +3,8 @@
  * minute as SYSTEM by the scheduled task "ARTEPOOL Updater", and at once when the server wakes it
  * (decision 0115); the steps are in
  * updater/steps.ts. It also renews the server certificate 60 days before it ends
- * (updater/certificate.ts, M6.2 part H3). Its lines go to `logs\install\updater.log`, only when
+ * (updater/certificate.ts, M6.2 part H3), and checks the cashier's Windows account once an hour
+ * (updater/cashier-account.ts, M6.4). Its lines go to `logs\install\updater.log`, only when
  * the outcome changes (no secret is ever written).
  */
 import { execFile, spawn } from 'node:child_process';
@@ -18,6 +19,7 @@ import { waitHealthy } from './install/health';
 import { InstallLog } from './install/log';
 import { windowsPlatform } from './install/windows';
 import { exec } from './restore-from-backup';
+import { recordCashierAccount } from './updater/cashier-account';
 import { renewServerCertificate } from './updater/certificate';
 import { resumableDownload } from './updater/download';
 import { outcomeChanged, runUpdater } from './updater/steps';
@@ -113,6 +115,21 @@ try {
       log: (line) => log.line(line),
     });
     if (renewal === 'renewed' || renewal === 'failed') log.line(`Certificate: ${renewal}.`);
+
+    // The cashier's Windows account (M6.4): checked once an hour, as SYSTEM (the LSA secret).
+    const cashier = await recordCashierAccount({
+      db: client,
+      runCheck: async () =>
+        (
+          await promisify(execFile)(
+            join(programDir, 'artepool-svc.exe'),
+            ['--data', dataDir, 'cashier-account', 'check'],
+            { windowsHide: true, timeout: 60_000 },
+          )
+        ).stdout,
+      now: () => new Date(),
+    });
+    if (cashier === 'changed' || cashier === 'failed') log.line(`Cashier account: ${cashier}.`);
   }
 } catch (error) {
   const reason = error instanceof Error ? error.message : String(error);

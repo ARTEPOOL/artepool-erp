@@ -32,9 +32,16 @@ let signInPc: TestDevice;
 let ownerId: bigint;
 let token: string;
 const shownOnce: string[] = [];
+/** The last audit row before this file's own writes (the migrations' rows, e.g. account 4900, come first). */
+let auditBefore = 0n;
 
 beforeAll(async () => {
   server = await startTestServer();
+  const last = await server.db
+    .selectFrom('audit.log')
+    .select((eb) => eb.fn.max('id').as('id'))
+    .executeTakeFirst();
+  auditBefore = BigInt(last?.id ?? 0);
   office = await addDevice(server, { code: 'OFFICE-01' });
   pos = await addDevice(server, { code: 'COUNTER-01', kind: 'pos' });
   signInPc = await addDevice(server, { code: 'SIGNIN-PC' });
@@ -385,9 +392,14 @@ describe('temporary codes', () => {
   it('are never written to the logs or the audit log', async () => {
     const audit = await server.db
       .selectFrom('audit.log')
-      .select(['old_values', 'new_values'])
+      .select(['id', 'old_values', 'new_values'])
       .execute();
-    const values = JSON.stringify(audit);
+    const values = JSON.stringify(audit.map((r) => [r.old_values, r.new_values]));
+    // A 4-digit PIN can equal a 4-digit text the migrations wrote (an account code such as
+    // "4900"), so PINs are looked for in the rows written by this file's own actions.
+    const ours = audit.filter((r) => BigInt(r.id) > auditBefore);
+    expect(ours.length).toBeGreaterThan(0);
+    const written = JSON.stringify(ours.map((r) => [r.old_values, r.new_values]));
     const logs = server.logs.join('\n');
     expect(shownOnce.length).toBeGreaterThanOrEqual(3);
     for (const code of shownOnce) {
@@ -395,7 +407,7 @@ describe('temporary codes', () => {
         expect(logs).not.toContain(code);
         expect(values).not.toContain(code);
       } else {
-        expect(values).not.toContain(`"${code}"`);
+        expect(written).not.toContain(`"${code}"`);
         expect(logs).not.toContain(`"${code}"`);
       }
     }

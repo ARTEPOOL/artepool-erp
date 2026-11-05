@@ -1117,6 +1117,12 @@ describe('Settings → System health (decision 0086)', () => {
         durability: { ok: false, off: ['fsync'] },
         startCheck: { status: 'ok', finishedAt: new Date().toISOString() },
       },
+      cashierAccount: {
+        state: 'repair',
+        missing: ['auto_sign_in', 'enrollment'],
+        checkedAt: new Date().toISOString(),
+        setupAt: null,
+      },
     };
     const bridge = signedInBridge([
       ...OWNER_PERMISSIONS,
@@ -1151,6 +1157,13 @@ describe('Settings → System health (decision 0086)', () => {
     expect(database.textContent).toContain('متوقفة (fsync)');
     expect(database.textContent).toContain('فحص السلامة بعده سليم');
     expect(within(database).getByText('دلوقتي')).toBeTruthy();
+    // M6.4: the cashier's Windows account, red when it needs repair, with what is missing.
+    const cashier = within(card).getByTestId('health-cashier-account');
+    expect(cashier.textContent).toContain('حساب الكاشير في ويندوز');
+    expect(cashier.textContent).toContain('محتاج تصليح (الدخول التلقائي وتسجيل الجهاز المشترك)');
+    expect(cashier.textContent).toContain('أداة الطوارئ ← «اعمل / صلّح حساب الكاشير»');
+    expect(cashier.textContent).toContain('آخر فحص');
+    expect(within(cashier).getByText('دلوقتي')).toBeTruthy();
     const ups = within(card).getByTestId('health-ups');
     expect(ups.textContent).toContain('جهاز السيرفر متوصل بـ UPS؟');
     fireEvent.click(within(ups).getByRole('button', { name: 'أيوه، متوصل بـ UPS' }));

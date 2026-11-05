@@ -126,6 +126,29 @@ describe('the server PC in System health', () => {
     expect(h.problems).not.toContain('start_check_failed');
   });
 
+  it("shows the cashier's Windows account as the server PC's programs recorded it (M6.4)", async () => {
+    // A development PC: never checked.
+    expect((await health()).cashierAccount).toEqual({
+      state: null,
+      missing: [],
+      checkedAt: null,
+      setupAt: null,
+    });
+    await server.admin.query('BEGIN');
+    await server.admin.query("SELECT sys.set_context(1, p_reason => 'test: the updater')");
+    await server.admin.query(
+      `UPDATE ops.server_health SET cashier_account_state = 'repair',
+              cashier_account_missing = ARRAY['enrollment'], cashier_account_checked_at = now()
+        WHERE id = 1`,
+    );
+    await server.admin.query('COMMIT');
+    const h = await health();
+    expect(h.cashierAccount).toMatchObject({ state: 'repair', missing: ['enrollment'] });
+    expect(h.cashierAccount.checkedAt).not.toBeNull();
+    // A line on the card, not an alert of its own.
+    expect(h.problems).toEqual(expect.not.arrayContaining(['cashier_account' as never]));
+  });
+
   it('shows the backup service as running only with a fresh heartbeat', async () => {
     let h = await health();
     expect(h.services).toEqual({ backupHeartbeatAt: null, backupRunning: false });

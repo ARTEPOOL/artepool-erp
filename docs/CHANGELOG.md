@@ -1,5 +1,69 @@
 # Changelog
 
+## The cashier's Windows account, simplified (M6.4) (2026-11-04) — in version 0.9.3
+
+**In plain words:**
+
+- **A Windows account for the cashier, «الكاشير»:** a standard account, not an administrator. The PC signs in to it by itself, and the app opens on the PIN screen with its usual lock.
+- **The shop's data stays closed to it:** the cashier's account cannot open or change the data, the backups, the keys or the logs, and cannot stop the server. The Windows test on GitHub signs in as the cashier and checks this every time.
+- **One button in the Emergency tool, «اعمل / صلّح حساب الكاشير»:** it sets the account up or repairs it, and writes what it did to the audit log.
+- **One line in System health:** «حساب الكاشير: تمام» or «محتاج تصليح». The server PC checks it every hour.
+- **Windows Update** never restarts the PC from 8 in the morning to midnight.
+- **Uninstalling** turns automatic sign-in off and disables the account (it is never deleted).
+- **Two things needed so the cashier really "signs in and works":**
+  - the PC's enrollment is now kept for the whole server PC, so both Windows accounts use it (the Emergency tool moves the current one; no new enrollment);
+  - the receipt printer is chosen once in the cashier's Windows session.
+- **A security gap closed on the way:** the main ARTEPOOL data folder kept Windows' default rules, which let any Windows account create files in it, including in the folder the updater uses. It is now read-only for standard accounts (new installations at once; the shop PC with the button above).
+- **Not in this step (owner's choice):** no limits on Task Manager, the command prompt, Settings, the browser, shutdown, sign-out or USB. They can be added later.
+
+- **Files and records:**
+  - Plan: `docs/milestones/m6.4-cashier-windows-account.md`; decision 0085 updated; PRD 1.50; CLAUDE.md.
+  - Launcher: `artepool-svc cashier-account check | setup | disable` (`apps/desktop/src-tauri/svc/src/cashier*.rs`).
+  - The whole-PC enrollment: `apps/desktop/src-tauri/bridge/src/store.rs`.
+  - Migration 0051 (System health columns); the updater's hourly check; the emergency action `cashier-account` (audited).
+  - Guides: `install-server.md` part 8, `emergency-tool.md`, `vm-test-part-f.md` part 5b. Windows CI: `test-install.ps1`.
+
+## Printed documents never come out blank; unit price excluding VAT; one spelling of the name (2026-11-04) — in version 0.9.3
+
+**In plain words:**
+
+- **The blank credit note in the accountant pack:**
+  - The cause was not the credit note: the printer program made the PDF before the letters' font had finished loading, so any document could, at random, come out with only its lines and boxes (5 in 20 prints in a test).
+  - Now it waits until every font is ready, and stops with a message instead of ever printing an empty page.
+  - A new test prints every kind of document (simplified and full invoice, credit note, debit note, advance payment invoice, final invoice, receipt, quotation, statement) and fails if a required field is missing, in the PDF itself. A credit or debit note must show the original invoice's number and date.
+- **Unit price on A4 documents is now excluding VAT** (189.00 including VAT prints as 180.00), the same basis as the taxable amount beside it and as e-invoicing. The discount is printed excluding VAT too. The shelf price, the label and the POS keep the price the customer pays.
+- **One spelling of the company name:** آرتيبول.
+
+- **Files and records:**
+  - Renderer: `apps/server/src/modules/printing/render.ts`. Test: `apps/server/test/integration/print-documents.test.ts`; CI installs `poppler-utils` for it.
+  - Unit price: `unitPriceExclVat4dp` in `packages/shared/src/money/line.ts`, used by `printing/service.ts`. Decision 0117; PRD 1.49; CLAUDE.md.
+  - The accountant pack's sample (أ) shows the unit price excluding VAT.
+
+## Install guides, the M6.4 plan, the accountant pack, and the order after go-live (2026-11-04)
+
+**In plain words:**
+
+- **Two Arabic guides:**
+  - **Installing the server PC:** naming the PC, the router reservation, checking the downloaded file, the "Windows protected your PC" message (**More info → Run anyway**) and why it is safe, the installer and the first-run setup.
+  - **The laptop:** installing it, enrolling it with a code from the server, signing in, and revoking it if it is lost.
+- **The plan for locking the cashier's Windows account (M6.4)** is written and waits for your approval. Nothing is built yet.
+- **The accountant pack:** the chart of accounts, the posting map, five sample documents made and printed by the program itself with their journal entries, a VAT summary, and the open questions:
+  - VAT per line or on the total (e-invoicing);
+  - the final invoice after advance payments;
+  - an advance payment while invoices are open;
+  - the format of an advance payment invoice.
+- **The order after go-live:**
+  - Phase 2 (money: purchases and suppliers, expenses, accounting screens and reports, VAT return) comes first;
+  - then the **AI & Online track** (stages 2A–2D, a track of its own, not "Phase 2"), mixed with Phase 3 as you decide;
+  - e-invoicing ready **before 1 July 2027**.
+
+- **Files and records:**
+  - Guides: `docs/runbooks/install-server.md`, `docs/runbooks/install-office.md` (M6.2 part J).
+  - Plan: `docs/milestones/m6.4-cashier-windows-account.md`.
+  - Pack: `docs/accounting/accountant-pack-ar.md`. Its sample invoices were made on a throwaway test database by the real sales engine and printed by the A4 renderer.
+  - Decision 0116; decision 0019 updated with the deadline; PRD 1.48 (§10.4, §13 and the open questions); CLAUDE.md.
+- No code change.
+
 ## Library updates, and a weekly check of the libraries (2026-11-03)
 
 **In plain words:**

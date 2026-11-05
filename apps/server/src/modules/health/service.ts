@@ -9,13 +9,18 @@ import { readFile, statfs } from 'node:fs/promises';
 import { join } from 'node:path';
 import { sql, type Transaction } from 'kysely';
 import { HEARTBEAT_STALE_MS, readHeartbeat } from '@artepool/backup';
-import type {
-  CertificateInfo,
-  DiskInfo,
-  HealthLevel,
-  ServerDisk,
-  ServerHealth,
-  ServerHealthProblem,
+import {
+  CASHIER_ACCOUNT_ITEMS,
+  CASHIER_ACCOUNT_STATES,
+  type CashierAccountHealth,
+  type CashierAccountItem,
+  type CashierAccountState,
+  type CertificateInfo,
+  type DiskInfo,
+  type HealthLevel,
+  type ServerDisk,
+  type ServerHealth,
+  type ServerHealthProblem,
 } from '@artepool/shared/contracts';
 import { TLS_FILES } from '@artepool/tls';
 import { durabilityProblems, readDurability } from '../../platform/db/durability';
@@ -146,6 +151,28 @@ async function databaseState(deps: AppDeps, windows: boolean): Promise<ServerHea
   };
 }
 
+/** The cashier's Windows account as last recorded (M6.4); unknown values are dropped. */
+export function cashierAccountOf(row: {
+  cashier_account_state: string | null;
+  cashier_account_missing: string[];
+  cashier_account_checked_at: Date | null;
+  cashier_account_setup_at: Date | null;
+}): CashierAccountHealth {
+  const state = (CASHIER_ACCOUNT_STATES as readonly string[]).includes(
+    row.cashier_account_state ?? '',
+  )
+    ? (row.cashier_account_state as CashierAccountState)
+    : null;
+  return {
+    state,
+    missing: row.cashier_account_missing.filter((item): item is CashierAccountItem =>
+      (CASHIER_ACCOUNT_ITEMS as readonly string[]).includes(item),
+    ),
+    checkedAt: row.cashier_account_checked_at?.toISOString() ?? null,
+    setupAt: row.cashier_account_setup_at?.toISOString() ?? null,
+  };
+}
+
 export async function serverHealth(
   deps: AppDeps,
   now = Date.now(),
@@ -210,6 +237,7 @@ export async function serverHealth(
       reminderDays: UPS_REMINDER_DAYS,
     },
     database,
+    cashierAccount: cashierAccountOf(row),
   };
 }
 

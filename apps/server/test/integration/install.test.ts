@@ -63,6 +63,8 @@ function fakePlatform() {
     startService: (service) => Promise.resolve(void calls.push(`start ${service}`)),
     addFirewallRule: (port) => Promise.resolve(void calls.push(`firewall ${port}`)),
     registerUpdaterTask: () => Promise.resolve(void calls.push('updater task')),
+    closeDataRoot: (dir) => Promise.resolve(void calls.push(`close root ${dir}`)),
+    sharedDeviceFolder: (dir) => Promise.resolve(void calls.push(`shared device ${dir}`)),
   };
   return { platform, calls };
 }
@@ -126,13 +128,16 @@ describe('the server installation', () => {
     expect(calls.indexOf(`database ${paths.pgdata}`)).toBeLessThan(
       calls.indexOf('register server'),
     );
-    expect(calls.slice(-6)).toEqual([
+    expect(calls.slice(-8)).toEqual([
       `grant ${paths.wal} backup:read`,
       `grant ${paths.setup} server:modify`,
       'start server',
       'start backup',
       `firewall ${serverPort}`,
       'updater task',
+      // M6.4: last, after initdb made its folder inside it.
+      `close root ${paths.dataDir}`,
+      `shared device ${join(paths.dataDir, 'device')}`,
     ]);
     expect(calls).toContain(`grant ${join(paths.secrets, 'backup')} server:modify`);
     expect(calls.filter((c) => c.includes('Users') || c.includes('Everyone'))).toEqual([]);
@@ -219,11 +224,13 @@ describe('the server installation', () => {
 
     expect(calls).toContain(`restrict ${paths.pgdata} 0`);
     expect(calls).toContain(`database ${paths.pgdata}`);
-    expect(calls.slice(-4)).toEqual([
+    expect(calls.slice(-6)).toEqual([
       'start server',
       'start backup',
       expect.stringMatching(/^firewall /),
       'updater task',
+      `close root ${paths.dataDir}`,
+      `shared device ${join(paths.dataDir, 'device')}`,
     ]);
     // The PCs keep trusting the same CA; the finished setup stays closed.
     expect(await readFile(join(paths.tls, 'ca.crt'), 'utf8')).toBe(caBefore);

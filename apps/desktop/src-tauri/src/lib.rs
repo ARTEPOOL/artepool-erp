@@ -17,7 +17,7 @@ use artepool_bridge::{
 use tauri::{Emitter as _, Manager as _};
 
 #[cfg(windows)]
-type Store = artepool_bridge::store::CredentialStore;
+type Store = artepool_bridge::store::PcStore;
 #[cfg(not(windows))]
 type Store = artepool_bridge::store::FileStore;
 
@@ -40,8 +40,8 @@ fn open_store(app: &tauri::AppHandle) -> Result<Store, String> {
     #[cfg(windows)]
     {
         let _ = app;
-        artepool_bridge::store::CredentialStore::new("ARTEPOOL ERP", "device")
-            .map_err(|e| e.to_string())
+        // The server PC keeps it for the whole PC, so the cashier's Windows account finds it (M6.4).
+        artepool_bridge::store::pc_store("ARTEPOOL ERP", "device").map_err(|e| e.to_string())
     }
     #[cfg(not(windows))]
     {
@@ -331,6 +331,27 @@ async fn emergency_run(
     .map_err(|e| e.to_string())
 }
 
+/// «اعمل / صلّح حساب الكاشير» (M6.4): set up, share the enrollment, check, record.
+#[tauri::command]
+async fn emergency_cashier_account() -> Result<serde_json::Value, String> {
+    let installation = emergency_installation()?;
+    tauri::async_runtime::spawn_blocking(move || {
+        artepool_bridge::emergency::cashier_account(&installation, share_enrollment)
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
+#[cfg(windows)]
+fn share_enrollment() -> Result<bool, String> {
+    artepool_bridge::store::share_enrollment("ARTEPOOL ERP", "device").map_err(|e| e.to_string())
+}
+
+#[cfg(not(windows))]
+fn share_enrollment() -> Result<bool, String> {
+    Ok(false)
+}
+
 /// Opens `C:\ProgramData\ARTEPOOL\logs` in File Explorer, to send to support.
 #[tauri::command]
 fn emergency_open_logs() -> Result<(), String> {
@@ -563,7 +584,7 @@ pub fn command_line() -> Option<i32> {
 /// This PC is enrolled as a point of sale (read before any window opens).
 #[cfg(windows)]
 fn enrolled_as_pos() -> bool {
-    artepool_bridge::store::CredentialStore::new("ARTEPOOL ERP", "device")
+    artepool_bridge::store::pc_store("ARTEPOOL ERP", "device")
         .ok()
         .map(|store| Bridge::new(store, env!("CARGO_PKG_VERSION"), computer_name()))
         .and_then(|bridge| bridge.local_device().ok())
@@ -700,6 +721,7 @@ pub fn run() {
             emergency_info,
             emergency_check,
             emergency_run,
+            emergency_cashier_account,
             emergency_open_logs,
             kiosk_refresh,
             google_signin_start,

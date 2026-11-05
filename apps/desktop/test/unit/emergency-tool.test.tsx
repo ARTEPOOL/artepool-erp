@@ -7,6 +7,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type {
+  CashierAccountResult,
   EmergencyAnswer,
   EmergencyCheck,
   EmergencyInfo,
@@ -38,6 +39,12 @@ class FakeEmergency implements EmergencyBridge {
   openLogs() {
     this.logsOpened += 1;
     return Promise.resolve(true);
+  }
+  cashierRuns = 0;
+  cashierAnswer: EmergencyAnswer<CashierAccountResult> = { ok: false, reason: 'launch_failed' };
+  cashierAccount() {
+    this.cashierRuns += 1;
+    return Promise.resolve(this.cashierAnswer);
   }
 }
 
@@ -140,5 +147,53 @@ describe('emergency tool (decision 0107)', () => {
     expect(screen.getByText('بتتفتح')).toBeTruthy();
     expect(screen.getByText('mohammed · كود الموبايل شغال')).toBeTruthy();
     expect(screen.getByText(/في حاجة مش شغالة/)).toBeTruthy();
+  });
+
+  it("sets up the cashier's Windows account with one button and says what to do next (M6.4)", async () => {
+    const bridge = new FakeEmergency();
+    bridge.cashierAnswer = {
+      ok: true,
+      result: {
+        state: 'ok',
+        missing: [],
+        setupError: null,
+        enrollmentMoved: true,
+        recorded: true,
+      },
+    };
+    render(<EmergencyTool bridge={bridge} />);
+    await screen.findByRole('button', { name: 'اعمل / صلّح حساب الكاشير' });
+    press('اعمل / صلّح حساب الكاشير');
+    expect(await screen.findByRole('heading', { name: 'حساب الكاشير في ويندوز' })).toBeTruthy();
+    press('اعمل / صلّح حساب الكاشير');
+    const result = await screen.findByTestId('cashier-result');
+    expect(bridge.cashierRuns).toBe(1);
+    expect(result.textContent).toContain('تمام. حساب «الكاشير» جاهز.');
+    expect(result.textContent).toContain('تسجيل الجهاز اتنقل');
+    expect(result.textContent).toContain('اعمل ريستارت للجهاز');
+    expect(result.textContent).toContain('اختار طابعة الإيصالات');
+
+    // Something still missing, and a set-up that stopped: said in plain words.
+    bridge.cashierAnswer = {
+      ok: true,
+      result: {
+        state: 'repair',
+        missing: ['auto_sign_in', 'folders'],
+        setupError: 'The cashier account could not be created: Access is denied.',
+        enrollmentMoved: false,
+        recorded: false,
+      },
+    };
+    press('اعمل / صلّح حساب الكاشير');
+    await waitFor(() => expect(bridge.cashierRuns).toBe(2));
+    const again = await screen.findByTestId('cashier-result');
+    await waitFor(() =>
+      expect(again.textContent).toContain(
+        'لسه فيه حاجات ناقصة: الدخول التلقائي وصلاحيات الفولدرات',
+      ),
+    );
+    expect(again.textContent).toContain('التظبيط وقف: The cashier account could not be created');
+    expect(again.textContent).toContain('ما اتسجلش في سجل المراجعة');
+    expect(again.textContent).not.toContain('اعمل ريستارت للجهاز');
   });
 });

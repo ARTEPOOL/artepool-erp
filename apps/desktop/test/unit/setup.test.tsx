@@ -26,7 +26,7 @@ const OWNER = [
 const ACCOUNTANT = ['ledger.view', 'periods.manage'];
 
 const company = (patch: Partial<CompanyProfile> = {}): CompanyProfile => ({
-  legalNameAr: 'أرتيبول لتجارة المسابح ذ.م.م',
+  legalNameAr: 'آرتيبول لتجارة المسابح ذ.م.م',
   legalNameEn: 'ARTEPOOL Swimming Pools Trading LLC',
   tradeNameAr: null,
   tradeNameEn: null,
@@ -182,7 +182,7 @@ describe('Settings → Company (owner only)', () => {
     // The logo waits for the details to exist.
     expect(screen.getByText('احفظ بيانات الشركة أولًا، ثم ارفع الشعار.')).toBeTruthy();
 
-    type('الاسم القانوني بالعربية *', 'أرتيبول لتجارة المسابح ذ.م.م');
+    type('الاسم القانوني بالعربية *', 'آرتيبول لتجارة المسابح ذ.م.م');
     type('الاسم القانوني بالإنجليزية *', 'ARTEPOOL Swimming Pools Trading LLC');
     type('العنوان بالعربية *', 'العين، أبوظبي');
     type('العنوان بالإنجليزية *', 'Al Ain, Abu Dhabi');
@@ -196,7 +196,7 @@ describe('Settings → Company (owner only)', () => {
     const call = bridge.callsTo('PUT', '/api/v1/company')[0]!;
     expect(call.body).not.toHaveProperty('rowVersion');
     expect(call.body).toMatchObject({
-      legalNameAr: 'أرتيبول لتجارة المسابح ذ.م.م',
+      legalNameAr: 'آرتيبول لتجارة المسابح ذ.م.م',
       legalNameEn: 'ARTEPOOL Swimming Pools Trading LLC',
       vatRegistered: true,
       trn: '100 123 456 789 012',

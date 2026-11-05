@@ -26,6 +26,12 @@
 # Reinstall over the kept data (part G3): an older setup refused, the same version's setup uses
 # the database and the CA as they were, no wizard. Deleting the data (part G4): refused without
 # the owner's password; with it the database, secrets and settings go and the backups stay.
+# The cashier's Windows account (M6.4): not set up on a new installation (the updater records
+# it); set up by the launcher (a standard user, automatic sign-in without a plain password, active
+# hours); then, signed in as the cashier, reading or writing the data, secrets, backups and logs,
+# writing in the ARTEPOOL and program folders and stopping the services all fail, while the shared
+# enrollment folder works; a new set-up changes the password; the emergency tool's record; the
+# uninstall turns automatic sign-in off and disables the account; set up again after the reinstall.
 # The install logs are searched for every secret (and the emergency temporary password): none
 # may appear.
 param([Parameter(Mandatory = $true)][string]$Installer)
@@ -134,6 +140,63 @@ function Emergency-Shortcuts {
     Where-Object { $shell.CreateShortcut($_.FullName).TargetPath -like '*\artepool-emergency.exe' }
 }
 
+# The launcher's cashier-account command (M6.4): its JSON line.
+function Cashier([string]$command) {
+  $out = @(& $svc --data $data cashier-account $command 2>&1 | ForEach-Object { "$_" })
+  $script:cashierExit = $LASTEXITCODE
+  return ($out | Where-Object { $_ -like '{*' } | Select-Object -Last 1 | ConvertFrom-Json)
+}
+
+# Runs the probe below as the cashier and returns its lines (each "closed ..." or "OPEN ...").
+function As-Cashier([string]$password) {
+  $cred = New-Object System.Management.Automation.PSCredential('artepool-pos', (ConvertTo-SecureString $password -AsPlainText -Force))
+  $probe = Join-Path $env:PUBLIC 'artepool-cashier-probe.ps1'
+  $out = Join-Path $env:PUBLIC 'artepool-cashier-probe.txt'
+  @'
+param($data, $pf, $out)
+$lines = @()
+$groups = [Security.Principal.WindowsIdentity]::GetCurrent().Groups | ForEach-Object { $_.Value }
+$lines += $(if ($groups -contains 'S-1-5-32-544') { 'OPEN administrator' } else { 'closed administrator' })
+foreach ($folder in 'pgdata', 'secrets', 'backups', 'logs', 'config', 'wal', 'setup', 'updates') {
+  $path = Join-Path $data $folder
+  try { Get-ChildItem $path -ErrorAction Stop | Out-Null; $lines += "OPEN read $folder" } catch { $lines += "closed read $folder" }
+  try { [IO.File]::WriteAllText((Join-Path $path 'cashier-probe.txt'), 'x'); $lines += "OPEN write $folder" } catch { $lines += "closed write $folder" }
+}
+try { [IO.File]::WriteAllText((Join-Path $data 'cashier-probe.txt'), 'x'); $lines += 'OPEN write the ARTEPOOL folder' } catch { $lines += 'closed write the ARTEPOOL folder' }
+try { [IO.File]::WriteAllText((Join-Path $pf 'cashier-probe.txt'), 'x'); $lines += 'OPEN write the programs' } catch { $lines += 'closed write the programs' }
+foreach ($name in 'ArtepoolDatabase', 'ArtepoolServer', 'ArtepoolBackup') {
+  $text = & sc.exe stop $name 2>&1 | Out-String
+  if ($text -match 'FAILED 5') { $lines += "closed stop $name" } else { $lines += "OPEN stop $name ($($text.Trim()))" }
+}
+try {
+  $file = Join-Path $data 'device\cashier-probe.txt'
+  [IO.File]::WriteAllText($file, 'x'); Remove-Item $file
+  $lines += 'shared device'
+} catch { $lines += 'OPEN device closed to the cashier' }
+$lines | Set-Content -Path $out -Encoding ASCII
+'@ | Set-Content -Path $probe -Encoding ASCII
+  $errors = Join-Path $env:PUBLIC 'artepool-cashier-probe.err'
+  Remove-Item $out, $errors -ErrorAction SilentlyContinue
+  # One string, each path in quotes: Start-Process does not quote "C:\Program Files\...".
+  $arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$probe`" `"$data`" `"$pf`" `"$out`""
+  try {
+    $p = Start-Process -FilePath 'powershell.exe' -Credential $cred -LoadUserProfile -Wait -PassThru `
+      -WorkingDirectory $env:PUBLIC -RedirectStandardError $errors -ArgumentList $arguments
+  } catch {
+    return @("signin failed: $($_.Exception.Message)")
+  } finally {
+    Remove-Item $probe -ErrorAction SilentlyContinue
+  }
+  if (-not (Test-Path $out)) {
+    $why = if (Test-Path $errors) { (Get-Content $errors -Raw) } else { '' }
+    Remove-Item $errors -ErrorAction SilentlyContinue
+    return @("OPEN probe wrote nothing (exit $($p.ExitCode)): $why")
+  }
+  $lines = @(Get-Content $out)
+  Remove-Item $out, $errors -ErrorAction SilentlyContinue
+  return $lines
+}
+
 # One emergency action through the launcher, as the emergency window runs it: JSON in, JSON out.
 function Emergency([string]$action, [string]$json) {
   $lines = $json | & $svc run emergency $action
@@ -212,6 +275,7 @@ Ok ((Psql 'SELECT current_version IS NOT NULL FROM ops.update_state') -eq 't') '
 Ok ((Psql 'SELECT checked_at IS NOT NULL FROM ops.update_state') -eq 't') 'the updater checked the update list'
 Ok ((Psql "SELECT coalesce(check_error, '') NOT LIKE '%update key is not set%' FROM ops.update_state") -eq 't') 'the update key is built in'
 Ok ((Psql "SELECT coalesce(waiting_reason, '') <> 'installing' FROM ops.update_state") -eq 't') 'the updater started no setup'
+Ok ((Psql 'SELECT cashier_account_state FROM ops.server_health') -eq 'not_set_up') "the updater checked the cashier's account: not set up yet"
 
 # ---- The desktop app: start at sign-in and the watchdog (decisions 0082, 0083) ----
 $appDir = Join-Path $env:ProgramFiles 'ARTEPOOL ERP'
@@ -291,6 +355,46 @@ Copy-Item $copy.FullName "$work\local.dump"
 & pnpm exec tsx "$repo\tools\installer\windows\make-bundle.ts" "$work\local.dump" $oldKey $work
 Ok ($LASTEXITCODE -eq 0) 'the encrypted off-site copy is made'
 
+# ---- The cashier's Windows account (M6.4) ----
+$before = Cashier 'check'
+Ok ($before.state -eq 'not_set_up') "cashier: not set up on a new installation ($($before.state))"
+Ok (Test-Path "$data\device") 'cashier: the new installation made the shared enrollment folder'
+$setup = Cashier 'setup'
+Ok ($cashierExit -eq 0) "cashier: set up (exit $($cashierExit): $($setup | ConvertTo-Json -Compress))"
+# No app has shared an enrollment on the runner: that is the only item missing.
+Ok ((@($setup.missing) -join ',') -eq 'enrollment') "cashier: everything is right but the enrollment ($(@($setup.missing) -join ','); open: $(@($setup.openFolders) -join ', ') $(@($setup.openServices) -join ', '))"
+$account = Get-LocalUser -Name 'artepool-pos'
+Ok ($account.Enabled) 'cashier: the account is enabled'
+Ok ($null -eq $account.PasswordExpires) 'cashier: its password never expires'
+$winlogon = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon'
+Ok ($winlogon.AutoAdminLogon -eq '1' -and $winlogon.DefaultUserName -eq 'artepool-pos') 'cashier: the PC signs in to it by itself'
+Ok ($null -eq $winlogon.PSObject.Properties['DefaultPassword']) 'cashier: no password in plain text in the registry'
+$hours = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings'
+Ok ($hours.ActiveHoursStart -eq 8 -and $hours.ActiveHoursEnd -eq 0) 'Windows Update active hours 08:00-24:00'
+
+# Signed in as the cashier: a known password for this step only (a new set-up replaces it).
+$known = 'Ci-Cashier-' + [guid]::NewGuid().ToString('N').Substring(0, 16) + '!'
+$script:alsoSecret += $known
+Set-LocalUser -Name 'artepool-pos' -Password (ConvertTo-SecureString $known -AsPlainText -Force)
+$probe = @(As-Cashier $known)
+$probe | ForEach-Object { Write-Host "  as the cashier: $_" }
+Ok ($probe.Count -ge 20) "cashier: the checks ran as the cashier ($($probe.Count) lines)"
+Ok (@($probe | Where-Object { $_ -like 'OPEN*' -or $_ -like 'signin*' }).Count -eq 0) 'cashier: the data, secrets, backups, logs and services are closed to it, it is no administrator'
+Ok ($probe -contains 'shared device') 'cashier: it can read and renew the shared enrollment'
+foreach ($name in 'ArtepoolDatabase', 'ArtepoolServer', 'ArtepoolBackup') {
+  Ok ((Get-Service $name).Status -eq 'Running') "cashier: $name still runs"
+}
+$again = Cashier 'setup'
+Ok ($cashierExit -eq 0 -and (@($again.missing) -join ',') -eq 'enrollment') 'cashier: a second set-up changes nothing else'
+Ok (@(As-Cashier $known)[0] -like 'signin failed*') 'cashier: the new set-up replaced the known password with a new random one'
+
+# The emergency tool's record: System health at once, and the audit log.
+$record = Emergency 'cashier-account' '{"check":{"state":"repair","missing":["enrollment"]},"setupError":null,"enrollmentMoved":false}'
+Ok ($record.ok -eq $true) 'emergency: the cashier account set-up is recorded'
+Ok ((Psql "SELECT cashier_account_state || ':' || array_to_string(cashier_account_missing, ',') FROM ops.server_health") -eq 'repair:enrollment') 'System health shows the cashier account'
+Ok ((Psql "SELECT count(*) FROM audit.log WHERE action = 'event:system.cashier_account_setup' AND reason LIKE 'emergency tool % cashier account set up / repaired by %'") -eq '1') 'the set-up is in the audit log with the Windows administrator'
+Check-Logs-Hold-No-Secret 'after the cashier account:'
+
 # ---- Upgrades (decision 0103): one that works, an older setup, one whose migration fails ----
 $tests = @(Get-ChildItem (Join-Path (Split-Path $Installer) 'test') -Filter 'ARTEPOOL-Server-Setup-*.exe' |
   Sort-Object { [version](Version-Of $_) })
@@ -344,6 +448,9 @@ Check-Logs-Hold-No-Secret 'after the upgrades:'
 
 # ---- 4. Uninstall keeps the data; reinstall uses it; then deleting the data ----
 Uninstall-Server 'first'
+$winlogon = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon'
+Ok ($winlogon.AutoAdminLogon -eq '0') "uninstall turned the cashier's automatic sign-in off"
+Ok (-not (Get-LocalUser -Name 'artepool-pos').Enabled) 'uninstall disabled the cashier account (it is kept)'
 $caHash = (Get-FileHash "$data\secrets\tls\ca.crt").Hash
 $exit = Run-Setup $Installer
 Ok ($exit -eq 4) "an older setup does not reinstall over data of a newer version (exit $exit)"
@@ -357,6 +464,10 @@ Ok ((Psql 'SELECT state FROM sys.setup_state') -eq 'complete') 'the first-run se
 Ok (-not (Test-Path "$data\setup\token")) 'no setup token'
 Ok ((Get-FileHash "$data\secrets\tls\ca.crt").Hash -eq $caHash) 'the PCs keep trusting the same CA'
 Ok (@(Get-ChildItem "$data\backups\pre-upgrade" -Filter '*-before-reinstall.dump').Count -eq 1) 'a checked copy was made before the reinstall'
+$disabled = Cashier 'check'
+Ok ($disabled.state -eq 'repair' -and @($disabled.missing) -contains 'enabled' -and @($disabled.missing) -contains 'auto_sign_in') "after the reinstall the cashier account needs its set-up again ($(@($disabled.missing) -join ','))"
+$setup = Cashier 'setup'
+Ok ($cashierExit -eq 0 -and (Get-LocalUser -Name 'artepool-pos').Enabled) 'the set-up turns the cashier account on again'
 foreach ($name in 'ArtepoolDatabase', 'ArtepoolServer', 'ArtepoolBackup') {
   Ok ((Get-Service $name).Status -eq 'Running') "$name runs after the reinstall"
 }

@@ -57,6 +57,7 @@ It runs client–server on the local network: PostgreSQL and the API service on 
   - Each item has one sale price (4 dp) with a "price includes VAT" switch.
   - An inclusive price is split back into net and VAT; an exclusive price has VAT added.
   - Every tax invoice shows net, VAT and total for every customer.
+  - A4 documents print the unit price and the discount **excluding VAT** (189.00 incl. → 180.00), like the taxable amount; shelf, label and POS keep the price paid. (0117)
   - Prices live in `md.item_prices` per price level. Only `STANDARD` exists now; a level by customer type can be added later. (0032)
 - **VAT categories:** four fixed UAE categories (SR 5%, ZR, EX, OS). Only the owner changes a rate, with a reason; it applies to new documents only. (0033)
 
@@ -102,7 +103,7 @@ It runs client–server on the local network: PostgreSQL and the API service on 
 **Security and access**
 - **Sign-in:** cashiers use a 4-digit PIN **only on PCs enrolled as POS** (weak PINs refused; 5 wrong → blocked until the owner unblocks). Office PCs always need a password. (0021)
 - **Approvals:** every supervisor approval is given with the one-time 6-digit code from the approver's 2-step app (accepted once); only 2-step users approve; 5 wrong codes block that person's approvals (not their sign-in) until the owner unblocks. (0074)
-- **Server and remote:** the POS PC is also the server (services under own accounts, ACLs, standard cashier Windows account whose Windows restrictions stay when the kiosk lock is off, UPS reminder). **No remote access in Phase 1:** no VPN, no open router ports, no remote-desktop tools; the laptop works on the shop LAN; keep the design VPN-agnostic (0084 deferred). No cloud database in Phase 1; outbox for a Phase 2 read-only mobile dashboard. (0085, 0088, 0093)
+- **Server and remote:** the POS PC is also the server (services under own accounts, ACLs, standard cashier Windows account «الكاشير» with automatic sign-in, no other Windows limits for now, set up/repaired from the emergency tool (audited), disabled by uninstall, the PC's enrollment shared by both accounts on the server PC, Windows Update active hours 08:00–24:00, one System health line (M6.4); UPS reminder). **No remote access in Phase 1:** no VPN, no open router ports, no remote-desktop tools; the laptop works on the shop LAN; keep the design VPN-agnostic (0084 deferred). No cloud database in Phase 1; outbox for a Phase 2 read-only mobile dashboard. (0085, 0088, 0093)
 - **First-run setup:** a one-time wizard on the server PC after install, locked in the database, only on the server PC with the installer's token:
   - **New setup**: company, owner, 2-step, recovery codes, enroll this PC as POS;
   - **Restore from backup**: copy from PC/USB (a Google Drive copy is downloaded first) + private key, all integrity checks pass before it replaces anything; the master key travels inside the age-encrypted copies; the other PCs enroll again.
@@ -159,7 +160,8 @@ It runs client–server on the local network: PostgreSQL and the API service on 
 - **Periods** are monthly and are locked after close. Nothing is ever deleted. (0016)
 - **Fiscal year** runs January–December. Months are kept 3 months ahead. (0035)
 - **Chart of accounts and posting map** are provisional and **pending accountant review**; go-live waits for the approval. Account mappings must stay configurable data, never hard-coded. (0018, 0035)
-- **E-invoicing** goes through an accredited service provider API. The ERP stays the system of record. The go-live date is **pending** and lives in the setting `einvoice.mandatory_from`. (0019)
+- **E-invoicing** goes through an accredited service provider API. The ERP stays the system of record. The go-live date is **pending** and lives in the setting `einvoice.mandatory_from`; the owner's deadline: **ready before 1 July 2027**. (0019, 0116)
+- **Order after go-live:** P2 (money: purchases and suppliers, expenses, accounting screens and reports, VAT return) first; then the **AI & Online track** (stages 2A–2D; its own track, never called "Phase 2") interleaved with P3 (contracts, visits, service jobs, projects) as the owner decides. (0116)
 
 ## How to work
 

@@ -131,11 +131,16 @@ fn failure(reason: &str, detail: Option<String>) -> Value {
 }
 
 /// Starts `launcher run emergency <action>` with `input` on its standard input and returns its
-/// answer (`{"ok": true, "result": …}` or `{"ok": false, "reason": …}`).
+/// answer (`{"ok": true, "result": …}` or `{"ok": false, "reason": …}`). Only the window's own
+/// actions: the cashier account's record is sent by `cashier_account` below, never by the screen.
 pub fn run_action(launcher: &Path, action: &str, input: &Value) -> Value {
     if action != "status" && !ACTIONS.contains(&action) {
         return failure("unknown_action", None);
     }
+    run_program(launcher, action, input)
+}
+
+fn run_program(launcher: &Path, action: &str, input: &Value) -> Value {
     let mut command = Command::new(launcher);
     command
         .args(["run", "emergency", action])
@@ -177,6 +182,70 @@ pub fn run_action(launcher: &Path, action: &str, input: &Value) -> Value {
             ),
         ),
     }
+}
+
+/// The launcher's `cashier-account <command>` (M6.4): its JSON line, or `{"state": "error"}`.
+fn cashier_command(installation: &Installation, command: &str) -> Value {
+    let output = hidden(
+        Command::new(installation.launcher())
+            .arg("--data")
+            .arg(&installation.data_dir)
+            .args(["cashier-account", command]),
+    )
+    .stdin(Stdio::null())
+    .output();
+    let error = |why: String| json!({ "state": "error", "error": why });
+    match output {
+        Ok(out) => last_json_line(&String::from_utf8_lossy(&out.stdout)).unwrap_or_else(|| {
+            error(
+                String::from_utf8_lossy(&out.stderr)
+                    .lines()
+                    .rev()
+                    .find(|l| !l.trim().is_empty())
+                    .unwrap_or("The launcher stopped without an answer.")
+                    .to_string(),
+            )
+        }),
+        Err(e) => error(format!("{}: {e}", installation.launcher().display())),
+    }
+}
+
+/// «اعمل / صلّح حساب الكاشير» (M6.4): set the account up (or repair it), share the PC's
+/// enrollment with it (`share_enrollment` moves the owner's copy, from this window that runs as
+/// the owner), check everything, then record the result in System health and the audit log.
+/// The answer never holds a password: the launcher never prints one.
+pub fn cashier_account(
+    installation: &Installation,
+    share_enrollment: impl FnOnce() -> Result<bool, String>,
+) -> Value {
+    let short = |text: &str| text.chars().take(500).collect::<String>();
+    let setup = cashier_command(installation, "setup");
+    let mut setup_error = (setup["state"] == "error")
+        .then(|| short(setup["error"].as_str().unwrap_or("The set-up stopped.")));
+    let moved = match share_enrollment() {
+        Ok(moved) => moved,
+        Err(why) => {
+            setup_error.get_or_insert_with(|| {
+                short(&format!("The PC's enrollment could not be shared: {why}"))
+            });
+            false
+        }
+    };
+    let checked = cashier_command(installation, "check");
+    let check = (checked["state"] != "error")
+        .then(|| json!({ "state": checked["state"], "missing": checked["missing"] }));
+    let recorded = run_program(
+        &installation.launcher(),
+        "cashier-account",
+        &json!({ "check": check, "setupError": setup_error, "enrollmentMoved": moved }),
+    );
+    json!({
+        "state": check.as_ref().map_or(Value::Null, |c| c["state"].clone()),
+        "missing": check.as_ref().map_or(json!([]), |c| c["missing"].clone()),
+        "setupError": setup_error,
+        "enrollmentMoved": moved,
+        "recorded": recorded["ok"] == true,
+    })
 }
 
 /// `artepool-svc secrets check`: whether the six protected secrets open (never their values).
@@ -277,6 +346,68 @@ mod tests {
         std::fs::write(&path, format!("#!/bin/sh\n{body}\n")).unwrap();
         std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
         path
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn sets_up_the_cashier_account_then_checks_and_records_it() {
+        let _turn = crate::restore::tests::SPAWNING
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let dir = temp_dir("cashier");
+        let installation = Installation {
+            program_dir: dir.clone(),
+            data_dir: dir.join("data"),
+        };
+        // setup and check answer as the launcher does; the record echoes what it was sent.
+        let script = |setup: &str| {
+            format!(
+                r#"case "$3 $4" in
+  "cashier-account setup") echo '{setup}' ;;
+  "cashier-account check") echo '{{"state":"ok","missing":[],"account":"artepool-pos"}}' ;;
+  *) input=$(cat); printf '{{"ok":true,"result":{{"args":"%s","input":%s}}}}\n' "$*" "$input" ;;
+esac"#
+            )
+        };
+        fake_launcher(
+            &dir,
+            &script(r#"{"state":"ok","missing":[],"done":["account created"]}"#),
+        );
+        let mut shared = false;
+        let answer = cashier_account(&installation, || {
+            shared = true;
+            Ok(true)
+        });
+        assert!(shared, "the enrollment is shared after the set-up");
+        assert_eq!(
+            answer,
+            json!({ "state": "ok", "missing": [], "setupError": null,
+                    "enrollmentMoved": true, "recorded": true })
+        );
+
+        // A set-up that stops is still checked and recorded, with its reason.
+        fake_launcher(
+            &dir,
+            &script(
+                r#"{"state":"error","error":"The cashier account could not be created: Access is denied."}"#,
+            ),
+        );
+        let answer = cashier_account(&installation, || Err("no folder".into()));
+        assert_eq!(
+            answer["setupError"],
+            "The cashier account could not be created: Access is denied."
+        );
+        assert_eq!(answer["enrollmentMoved"], false);
+        assert_eq!(answer["state"], "ok");
+        assert_eq!(answer["recorded"], true);
+
+        // The screen cannot send the record itself.
+        let launcher = installation.launcher();
+        assert_eq!(
+            run_action(&launcher, "cashier-account", &json!({}))["reason"],
+            "unknown_action"
+        );
+        std::fs::remove_dir_all(dir).unwrap();
     }
 
     #[cfg(unix)]

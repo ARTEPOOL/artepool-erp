@@ -11,6 +11,7 @@
 - **E-invoicing is done by integrating with an accredited service provider (ASP) via its API.** The provider only transmits documents to the tax authority.
 - **The outbox design stays in the Phase 1 database.**
 - **ARTÉPOOL's e-invoicing go-live date is pending** from the accountant. It may move the integration earlier than P4.
+- **Update 2026-11-04 ([0116](0116-order-after-go-live.md)):** the owner's deadline is **ready before 1 July 2027**; e-invoicing no longer waits for P4.
 
 ## How it works
 - **Ready from day one:** every issued tax document (invoice, payment invoice, credit note, debit note) gets a UUID and is stored in a structured form that can be converted to the required e-invoice format.

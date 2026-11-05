@@ -6,6 +6,8 @@
 //!   artepool-svc secrets check           every secret present, opening, well protected
 //!   artepool-svc config init [--port N] [--database-port N|auto]   the settings file (installation;
 //!                                        auto: 5432, or the next free port up to 5442)
+//!   artepool-svc cashier-account check|setup|disable   the cashier's Windows account (M6.4); one
+//!                                        JSON line on the standard output, never a password
 //!
 //! `--data <folder>` (before the command) replaces `C:\ProgramData\ARTEPOOL`.
 
@@ -16,7 +18,8 @@ const USAGE: &str = "Usage:
   artepool-svc [--data <folder>] secrets init
   artepool-svc [--data <folder>] secrets set <name>   (the value is read from the standard input)
   artepool-svc [--data <folder>] secrets check
-  artepool-svc [--data <folder>] config init [--port <n>] [--database-port <n>|auto]";
+  artepool-svc [--data <folder>] config init [--port <n>] [--database-port <n>|auto]
+  artepool-svc [--data <folder>] cashier-account check|setup|disable";
 
 #[cfg(windows)]
 fn main() -> ExitCode {
@@ -111,6 +114,7 @@ fn main() -> ExitCode {
                 return ExitCode::from(2);
             }
         },
+        ["cashier-account", command] => return cashier_account(&layout, command),
         ["secrets", "check"] => load(&secrets_dir, &Dpapi, &WindowsAccess).map(|loaded| {
             println!(
                 "OK: {} secrets present, opening on this PC, and well protected.",
@@ -127,6 +131,43 @@ fn main() -> ExitCode {
         Ok(code) => ExitCode::from(u8::try_from(code).unwrap_or(1)),
         Err(error) => {
             eprintln!("{error}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+/// `cashier-account check|setup|disable` (M6.4): one JSON line, read by the emergency tool, the
+/// updater and the Windows CI. `check` and `setup` end with what is on the PC now.
+#[cfg(windows)]
+fn cashier_account(layout: &artepool_svc::Layout, command: &str) -> ExitCode {
+    use artepool_svc::cashier::report;
+    use artepool_svc::cashier_windows::{disable, observe, setup};
+    use serde_json::{Value, json};
+    let answer: Result<Value, artepool_svc::SvcError> = match command {
+        "check" => observe(layout).map(|o| report(&o)),
+        "setup" => setup(layout).and_then(|done| {
+            observe(layout).map(|o| {
+                let mut value = report(&o);
+                value["done"] = json!(done);
+                value
+            })
+        }),
+        "disable" => disable().map(|done| json!({ "state": "disabled", "done": done })),
+        _ => {
+            eprintln!("{USAGE}");
+            return ExitCode::from(2);
+        }
+    };
+    match answer {
+        Ok(value) => {
+            println!("{value}");
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            println!(
+                "{}",
+                json!({ "state": "error", "error": error.to_string() })
+            );
             ExitCode::FAILURE
         }
     }

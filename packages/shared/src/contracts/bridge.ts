@@ -9,6 +9,7 @@
  * - In development in a browser it is the Vite dev server (`@artepool/dev-bridge`).
  */
 import { z } from 'zod';
+import type { CashierAccountItem, CashierAccountState } from './health';
 
 /** Only API paths (and the health check) can be requested: the bridge is not a general proxy. */
 export const BridgePath = z
@@ -263,6 +264,18 @@ export type ServiceState = 'running' | 'stopped' | 'starting' | 'missing' | 'unk
 export interface EmergencyDatabaseStatus {
   setupComplete: boolean;
   owner: { username: string; twoStep: boolean } | null;
+}
+
+/** «اعمل / صلّح حساب الكاشير» (M6.4): what the native side did. Never a password. */
+export interface CashierAccountResult {
+  state: CashierAccountState | null;
+  missing: CashierAccountItem[];
+  /** Why the set-up stopped, if it did. */
+  setupError: string | null;
+  /** The owner's enrollment was moved to the whole-PC file this time. */
+  enrollmentMoved: boolean;
+  /** Written to the audit log and System health. */
+  recorded: boolean;
 }
 
 /** "Check the system": each line green or red, never a value of a secret. */
