@@ -95,6 +95,7 @@ It runs client–server on the local network: PostgreSQL and the API service on 
 - **Card:** amount + terminal approval code only; never any card digits. (0061)
 - **Receipt** in Arabic and English; cash customer by default, a VAT-registered customer → full invoice with TRN. (0062)
 - **Printing:** the POS prints thermal receipts silently. The "Invoices (A4)" section prints through the print dialog. A POS sale can be reprinted in A4 with the same number. (0008)
+- **Receipt PDF copy:** every thermal receipt (sale or return) is also saved automatically as a PDF on that PC (`Public Documents\ARTEPOOL\Receipts\<YYYY-MM>\<number> - DD-MM-YYYY.pdf`), the same image as printed, even when the printer fails; one file per document, a reprint only re-saves a missing file. (0120)
 - **Print designer:** the owner customises print templates (logo, colour, language, optional fields, texts, margins) in Settings → Print designer. Tax-required fields are locked (list per document type in 0064, pending accountant review); seller address on every tax invoice and customer address on full tax invoices are locked, and a full tax invoice is refused without the customer's address. Receipts and statements use the A4 invoice design; the thermal receipt's language is set there too. Templates are versioned; each document stores its template version, but a reprint uses today's design (content unchanged, 0071). No QR code until e-invoicing. The thermal receipt can have its own logo (Print designer → Thermal receipt; empty = the company logo). Logo in the middle on a bilingual A4 document: Arabic details right, logo centre, English left. (0020, 0064, 0067, 0075, 0076)
 - **Bank accounts:** several per company (bank, account name, UAE IBAN with checksum, optional SWIFT), owner only, audited; the template chooses which one prints. (0065)
 - **Customer PO number:** optional on A4 invoices and quotations; prints only when filled. (0066)
@@ -154,6 +155,7 @@ It runs client–server on the local network: PostgreSQL and the API service on 
 
 **Reports**
 - **Owner dashboard** (side menu → Reports, owner only): total sales, sales without VAT, VAT due (no input VAT until purchases exist), gross profit from the cost stored on each line; period with comparison; daily chart; POS/A4, payment methods, unpaid, per employee; top items/customers; cash in drawers and safe, receivables and overdue, stock value and reorder. (0039, 0081)
+- **Acceptance (M7):** reconciliation report for owner + accountant (`reports.reconciliation`); its checks also run nightly; a fully automated rehearsal ("Start rehearsal", owner only, on the shop's server PC in its own `artepool_rehearsal_<run>` database, dropped afterwards; never while a shift is open) and the CI busy day (4 tills, 800+ sales); a permanent speed line on System health; a guided hardware check (receipt, drawer, label, scan) is the only human step; go-live from a clean database. (0119)
 
 **Accounting**
 - **Defective returns** are held at cost in "Inventory – defective" until written off. (0015)

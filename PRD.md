@@ -1,6 +1,6 @@
 # ARTÉPOOL ERP — Product Requirements Document (PRD)
 
-**Version:** 1.51
+**Version:** 1.52
 **Date:** 2026-11-05
 **Owner:** Mohammed Yasser Al Huraidi (partner, ARTÉPOOL)
 **Status:** Scope approved. Owner and accountant decisions applied (see `docs/decisions/`). **Phase 1 plan approved (2026-10-07).**
@@ -264,6 +264,7 @@ Phase tags: **[P1]** to **[P4]** (see section 13).
 - Cash customer by default; a VAT-registered customer gets a full tax invoice with their TRN automatically ([0062](docs/decisions/0062-pos-receipt-and-customer.md)).
 - **Returns:** a "Return" button with supervisor approval issues a credit note linked to the original invoice, reverses stock and refunds from the currently open shift (card sales as card) ([0060](docs/decisions/0060-pos-returns.md)).
 - **Thermal receipt (80 mm) prints automatically** (silent printing) after each sale, in Arabic and English together, on standard ESC/POS printers ([0055](docs/decisions/0055-thermal-printer-esc-pos.md), [0062](docs/decisions/0062-pos-receipt-and-customer.md)). A4 copies are printed from the Invoices (A4) section.
+- **A PDF copy of every thermal receipt** (sale or return) is saved automatically on that PC, in `Public Documents\ARTEPOOL\Receipts\<YYYY-MM>\<number> - DD-MM-YYYY.pdf`, even when the printer fails; one file per document ([0120](docs/decisions/0120-thermal-receipt-pdf-copy.md)).
 - Each sale creates an invoice (`POS-` series) and deducts stock in the same transaction.
 - Out-of-stock sale with supervisor approval (see 9.3).
 - Hold/resume cart.
@@ -425,7 +426,7 @@ Exact models must be chosen before Phase 1 POS work (milestone M6) so they can b
 
 | Phase | Scope | Done when |
 |---|---|---|
-| **P1 — Core** | Architecture, database, migrations, security, users/roles/audit, master data, inventory, quotations, invoices (POS- and INV-), advance/progress payment tax invoices, credit notes, POS, cash drawer and shifts, **automatic double-entry postings (ledger core)**, backups, i18n | A full day of real-style sales on 2+ terminals reconciles exactly: stock, cash count, invoices, VAT, journals and audit chain all verified. A backup is restored successfully to a test database. |
+| **P1 — Core** | Architecture, database, migrations, security, users/roles/audit, master data, inventory, quotations, invoices (POS- and INV-), advance/progress payment tax invoices, credit notes, POS, cash drawer and shifts, **automatic double-entry postings (ledger core)**, backups, i18n | The automated rehearsal on the shop's server PC and the CI busy day (4 tills, 800+ sales) reconcile exactly: stock, cash count, invoices, VAT, journals and audit chain all verified; a backup is restored successfully; the guided hardware check passes ([0119](docs/decisions/0119-automated-rehearsal-and-clean-go-live.md)). |
 | **P2 — Money** | Purchasing, suppliers, expenses, accounting screens, reports, VAT return, quarterly VAT export package and annual archive, dashboard | The accountant reproduces a month's VAT return and P&L from the system without manual fixes |
 | **P3 — Operations** | Pool profiles, maintenance/cleaning contracts, visits, technician stock, service jobs, construction projects | One real contract, one service job and one project run end to end and bill correctly |
 | **P4 — Extensions** | Email sending, promotions, loyalty, multi-warehouse UI, standby server (WhatsApp moved to the AI & Online track, stage 2B, [0118](docs/decisions/0118-ai-online-ground-rules.md)) | Each feature accepted individually |
@@ -466,6 +467,7 @@ Each phase ends with automated tests passing, a security review, an accountant r
 | 1.45 | 2026-10-31 | Decision 0115: fast updates — "Check now" in seconds, "Install now" starts at once, a progress bar, resumable downloads fetched in advance, an hourly check (0.8.0); split update packages, step-by-step install progress and laptop updates at sign-in planned for 0.9.0. |
 | 1.47 | 2026-11-02 | Decision 0095 updated, 0.9.1: the app's Google registration published "In production" with public pages (artepool.github.io), its values only as release secrets, carried by every release and read beside the programs at every start; an alert when Google refuses the saved Drive access. |
 | 1.48 | 2026-11-04 | Decision 0116: the order after go-live — P2 (money) first; then the AI & Online track (stages 2A–2D, its own track, not "Phase 2") interleaved with P3 as the owner decides; e-invoicing ready before 1 July 2027 (out of P4). M6.4 plan proposed; Arabic install guides; the accountant pack. |
+| 1.52 | 2026-11-05 | M7 plan approved with the rehearsal fully automated (decision 0119): "Start rehearsal" on the shop's server PC with its own throwaway database, the CI busy day, a guided 5-minute hardware check as the only human step, go-live from a clean database (items, customers and suppliers exported; opening stock and balances on go-live day by the owner); P1 acceptance updated. Decision 0120: every thermal receipt also saved as a PDF on the PC. |
 | 1.51 | 2026-11-05 | Decision 0118: the AI & Online track plan (`docs/ai-online-track.md`, from the owner's draft) and its nine ground rules; WhatsApp moves from P4 to stage 2B; the mobile dashboard is stage 2C. The M7 acceptance tools plan proposed (`docs/milestones/m7-acceptance-tools.md`). |
 | 1.50 | 2026-11-04 | M6.4 simplified (owner): a standard cashier Windows account with automatic sign-in and the app on the PIN screen; the PC's enrollment shared on the server PC; active hours 08:00–24:00; one emergency-tool action (audited); uninstall disables the account; one System health line. No Windows limits for now. |
 | 1.49 | 2026-11-04 | Decision 0117: A4 documents print the unit price and the discount excluding VAT, like the taxable amount beside them and like e-invoicing (PINT-AE). |
