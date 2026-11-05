@@ -96,6 +96,11 @@ const healthy: ServerHealth = {
     startCheck: { status: 'ok', finishedAt: '2026-10-26T07:01:00.000Z' },
   },
   cashierAccount: { state: 'ok', missing: [], checkedAt: null, setupAt: null },
+  speed: {
+    search: { p95Ms: 80, samples: 40, targetMs: 300, slow: false },
+    scan: { p95Ms: null, samples: 0, targetMs: 300, slow: false },
+    sale: { p95Ms: 400, samples: 12, targetMs: 2000, slow: false },
+  },
 };
 
 describe("the cashier account's state (M6.4)", () => {

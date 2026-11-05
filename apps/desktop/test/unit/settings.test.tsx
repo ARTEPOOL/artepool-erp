@@ -1123,6 +1123,11 @@ describe('Settings → System health (decision 0086)', () => {
         checkedAt: new Date().toISOString(),
         setupAt: null,
       },
+      speed: {
+        search: { p95Ms: 80, samples: 40, targetMs: 300, slow: false },
+        scan: { p95Ms: null, samples: 0, targetMs: 300, slow: false },
+        sale: { p95Ms: 2600, samples: 12, targetMs: 2000, slow: true },
+      },
     };
     const bridge = signedInBridge([
       ...OWNER_PERMISSIONS,
@@ -1164,6 +1169,11 @@ describe('Settings → System health (decision 0086)', () => {
     expect(cashier.textContent).toContain('أداة الطوارئ ← «اعمل / صلّح حساب الكاشير»');
     expect(cashier.textContent).toContain('آخر فحص');
     expect(within(cashier).getByText('دلوقتي')).toBeTruthy();
+    // M7: the server's own speed, a warning when a sale takes longer than the 2 s target.
+    const speed = within(card).getByTestId('health-speed');
+    expect(speed.textContent).toContain('السرعة');
+    expect(speed.textContent).toContain('البحث 0.08 ث · البيع 2.60 ث');
+    expect(speed.textContent).not.toContain('الباركود');
     const ups = within(card).getByTestId('health-ups');
     expect(ups.textContent).toContain('جهاز السيرفر متوصل بـ UPS؟');
     fireEvent.click(within(ups).getByRole('button', { name: 'أيوه، متوصل بـ UPS' }));

@@ -4,6 +4,7 @@
  * certificate and the root CA with their expiry dates; the server clock; and the owner's UPS
  * confirmation. The server's check every few minutes raises one alert per problem per day.
  */
+import { speedFigures } from '../../platform/http/speed';
 import { randomUUID, X509Certificate } from 'node:crypto';
 import { readFile, statfs } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -238,6 +239,7 @@ export async function serverHealth(
     },
     database,
     cashierAccount: cashierAccountOf(row),
+    speed: speedFigures(),
   };
 }
 
