@@ -4,6 +4,12 @@
 
 **In plain words:**
 
+- **Export to Excel for go-live** (M7 part E, decision 0119; permission `data.export`, every export in the audit log):
+  - **Items** and **Suppliers** get «تصدير Excel», like Customers. The file has the import's own columns, so it goes straight back in.
+  - Items: every barcode (extra ones as `code` or `code*6` when one scan counts 6), the sale pack and the reorder quantity come along; the import now reads these too. Purchase prices only for whoever may see them. Inactive items stay behind. Kits are listed on their own sheet with their parts, to be made again by hand.
+  - **Fixed:** the customers export included the walk-in customer, who has no phone, so importing the file back was refused. It is left out now (every database makes its own).
+  - Tested end to end: items, customers and suppliers exported from one server and imported into a new, empty one come back the same.
+- **The go-live guide** in Arabic, step by step: [`docs/runbooks/go-live.md`](runbooks/go-live.md) (export, uninstall with the data, install, new setup, the cashier account, printers, Google Drive, users, the laptop, the print design, import, opening stock, customer opening balances, the first real sale).
 - **The hardware check** (System health → «فحص الأجهزة», owner only, migration 0055; decision 0119), the only human step, about 5 minutes on each PC:
   - **on the POS PC:** a test receipt, the drawer, a test label, and the scan of that label's barcode (the app says whether the code read matches the one printed; «تمام» only when it does);
   - **on the laptop or an office PC:** an A4 test page through the print dialog (a frame at the margins and a 10 cm rule);

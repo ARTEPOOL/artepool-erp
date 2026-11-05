@@ -18,6 +18,10 @@ import { quantityFromDb } from '@artepool/shared';
 import { AppError } from '../../platform/errors/app-error';
 import { createAdjustment, warehouseOf } from '../inventory/service';
 import * as items from './service';
+import { recordEvent } from '../../platform/audit/events';
+import { withBusinessTx } from '../../platform/db/tx';
+import { contextOf } from '../../platform/http/context';
+import { exportItems } from '../imports/service';
 
 const Params = z.object({ id: IdText });
 const view = { kind: 'permission', permission: 'items.view' } as const;
@@ -34,6 +38,20 @@ export function registerItemRoutes(app: FastifyInstance): void {
     query: ItemsQuery,
     handler: ({ query, request }) =>
       items.listItems(db, query, request.auth?.permissions.has('stock.view_cost') ?? false),
+  });
+  // Every active item in the import's columns (M7 part E): exports are permission-controlled and
+  // logged; purchase prices only for those who may see them (0038).
+  defineRoute(app, {
+    method: 'GET',
+    url: '/api/v1/items/export',
+    access: { kind: 'permission', permission: 'data.export' },
+    handler: async ({ request }) => {
+      const { file, rows } = await exportItems(db, items.canSeeCost(request.auth));
+      await withBusinessTx(db, contextOf(request), (trx) =>
+        recordEvent(trx, 'data.exported', { data: { entity: 'items', rows } }),
+      );
+      return file;
+    },
   });
   defineRoute(app, {
     method: 'GET',

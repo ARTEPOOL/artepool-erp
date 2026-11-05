@@ -59,6 +59,12 @@ export const COLUMNS: Readonly<Record<ImportEntity, readonly ColumnSpec[]>> = {
     { key: 'business_line', ar: 'قسم العمل', en: 'Line of business' },
     { key: 'description_ar', ar: 'الوصف بالعربية', en: 'Arabic description' },
     { key: 'description_en', ar: 'الوصف بالإنجليزية', en: 'English description' },
+    // M7 part E: what the items export writes, so it goes straight back in (decision 0119).
+    // More barcodes: separated by spaces; "code*6" when one scan counts 6.
+    { key: 'more_barcodes', ar: 'باركودات إضافية', en: 'More barcodes' },
+    { key: 'pack_ar', ar: 'العبوة بالعربية', en: 'Sale pack (Arabic)' },
+    { key: 'pack_en', ar: 'العبوة بالإنجليزية', en: 'Sale pack (English)' },
+    { key: 'reorder_qty', ar: 'كمية إعادة الطلب', en: 'Reorder quantity' },
   ],
   item_prices: [
     { key: 'code', ar: 'الكود', en: 'Code' },
@@ -103,7 +109,7 @@ export const COLUMNS: Readonly<Record<ImportEntity, readonly ColumnSpec[]>> = {
 };
 
 /** Columns Excel must keep as text (a leading 0 or 15 digits must survive). */
-export const TEXT_COLUMNS = ['code', 'barcode', 'phone', 'phone_alt', 'trn'];
+export const TEXT_COLUMNS = ['code', 'barcode', 'more_barcodes', 'phone', 'phone_alt', 'trn'];
 
 /** Columns that must be filled in every row. */
 const REQUIRED: Readonly<Record<ImportEntity, readonly string[]>> = {
@@ -126,6 +132,8 @@ const MAX_TEXT: Readonly<Record<string, number>> = {
   notes: 2000,
   description_ar: 1000,
   description_en: 1000,
+  pack_ar: 40,
+  pack_en: 40,
 };
 
 const YES = ['yes', 'y', '1', 'true', 'نعم'];
@@ -306,6 +314,38 @@ export class Checker {
       return null;
     }
     return value;
+  }
+
+  /** More barcodes of an item: "code" or "code*quantity" (one scan counts that many), by spaces. */
+  moreBarcodes(
+    row: SheetRow,
+    decimals: number | null,
+  ): { barcode: string; qtyPerScanMilli: bigint }[] {
+    const value = cell(row, 'more_barcodes');
+    if (value === null) return [];
+    const out: { barcode: string; qtyPerScanMilli: bigint }[] = [];
+    for (const token of value.split(/[\s,;،]+/).filter(Boolean)) {
+      const parts = token.split('*');
+      const code = parts[0]!;
+      if (parts.length > 2 || !BARCODE_PATTERN.test(code)) {
+        this.add(row.row, 'more_barcodes', 'invalid');
+        return [];
+      }
+      let qty = 1000n;
+      if (parts.length === 2) {
+        try {
+          qty = parseQuantity(parts[1]!);
+        } catch {
+          qty = 0n;
+        }
+        if (qty <= 0n || (decimals !== null && !fitsUnitDecimals(qty, decimals))) {
+          this.add(row.row, 'more_barcodes', 'invalid_quantity');
+          return [];
+        }
+      }
+      out.push({ barcode: code, qtyPerScanMilli: qty });
+    }
+    return out;
   }
 
   choice<T>(row: SheetRow, key: string, choices: Readonly<Record<string, T>>): T | null {

@@ -194,7 +194,7 @@ The busy day measures with 20,000 items and fails above the target. The shop reh
 **The export.** Items → **«تصدير إلى Excel»**, and the same for suppliers:
 - *Who:* `data.export`, the same permission as the customers export.
 - *Format:* the import template's columns, so the file goes straight back in. For items, that means code, type, Arabic/English names, category, unit, VAT category, sale price, includes-VAT, purchase price (only for those allowed to see it, 0038), barcode, reorder level, for sale, line of business, descriptions.
-- *More than one barcode:* an item with several barcodes gets one row per extra barcode, if the import accepts that; otherwise the import gains it.
+- *More than one barcode:* the import gains a «باركودات إضافية / More barcodes» column (codes by spaces; `code*6` when one scan counts 6), with the sale pack and the reorder quantity, so nothing of an item is lost. Inactive items stay behind; kits go on their own sheet with their parts (the import does not make kits). The walk-in customer is left out of the customers export.
 - *Logging:* every export is an audit event.
 - *Check:* the customers export is checked against its import template.
 - *Test:* export → import into an empty database → the same items, customers and suppliers.

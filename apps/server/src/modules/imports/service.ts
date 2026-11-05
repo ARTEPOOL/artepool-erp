@@ -5,7 +5,7 @@
  */
 import { createHash } from 'node:crypto';
 import { sql, type Kysely, type Transaction } from 'kysely';
-import { formatFils, nextCode, quantityToDb } from '@artepool/shared';
+import { format4dp, formatFils, nextCode, quantityToDb } from '@artepool/shared';
 import {
   IMPORT_MAX_BYTES,
   IMPORT_MAX_ROWS,
@@ -93,6 +93,10 @@ interface ItemRecord {
   isSellable: boolean;
   descriptionAr: string | null;
   descriptionEn: string | null;
+  moreBarcodes: { barcode: string; qtyPerScanMilli: bigint }[];
+  packAr: string | null;
+  packEn: string | null;
+  reorderQty: bigint | null;
 }
 
 async function checkItems(
@@ -145,8 +149,19 @@ async function checkItems(
     if (reorderLevel !== null && itemType !== null && itemType !== 'stock') {
       c.add(row.row, 'reorder_level', 'stock_fields_for_stock_only');
     }
+    const reorderQty = c.quantity(row, 'reorder_qty', unit?.decimals ?? null);
+    if (reorderQty === 0n) c.add(row.row, 'reorder_qty', 'invalid_quantity');
+    if (reorderQty !== null && itemType !== null && itemType !== 'stock') {
+      c.add(row.row, 'reorder_qty', 'stock_fields_for_stock_only');
+    }
+    const more = c.moreBarcodes(row, unit?.decimals ?? null);
+    for (const b of more) {
+      if (refs.activeBarcodes.has(b.barcode.toUpperCase()))
+        c.add(row.row, 'more_barcodes', 'already_exists');
+    }
     codes.push({ row: row.row, value: code });
     barcodes.push({ row: row.row, value: barcode });
+    for (const b of more) barcodes.push({ row: row.row, value: b.barcode });
     if (c.isBad(row.row) || !itemType || !category || !unit || !vat) continue;
     out.push({
       row: row.row,
@@ -167,6 +182,10 @@ async function checkItems(
       isSellable,
       descriptionAr: cell(row, 'description_ar'),
       descriptionEn: cell(row, 'description_en'),
+      moreBarcodes: more,
+      packAr: cell(row, 'pack_ar'),
+      packEn: cell(row, 'pack_en'),
+      reorderQty,
     });
   }
   c.uniqueInFile(codes, 'code');
@@ -484,7 +503,7 @@ function chunks<T>(list: readonly T[]): T[][] {
   return out;
 }
 
-async function standardLevel(trx: Transaction<DB>): Promise<bigint> {
+async function standardLevel(trx: Kysely<DB>): Promise<bigint> {
   return (
     await trx
       .selectFrom('md.price_levels')
@@ -521,8 +540,11 @@ async function saveItems(trx: Transaction<DB>, records: ItemRecord[]): Promise<v
             vat_category_id: r.vatCategoryId,
             default_business_line_id: r.businessLineId,
             reorder_level: r.reorderLevel === null ? null : quantityToDb(r.reorderLevel),
+            reorder_qty: r.reorderQty === null ? null : quantityToDb(r.reorderQty),
             fallback_unit_cost_4dp: r.purchaseCost4dp,
             is_sellable: r.isSellable,
+            pack_ar: r.packAr,
+            pack_en: r.packEn,
           }),
         ),
       )
@@ -555,6 +577,24 @@ async function saveItems(trx: Transaction<DB>, records: ItemRecord[]): Promise<v
               item_id: idOf.get(r.code!)!,
               barcode: r.barcode!,
               is_primary: true,
+            }),
+          ),
+        )
+        .execute();
+    }
+    const more = part.flatMap((r) =>
+      r.moreBarcodes.map((b) => ({ itemId: idOf.get(r.code!)!, ...b })),
+    );
+    if (more.length > 0) {
+      await trx
+        .insertInto('md.item_barcodes')
+        .values(
+          more.map((b) =>
+            stamped('md.item_barcodes', {
+              item_id: b.itemId,
+              barcode: b.barcode,
+              qty_per_scan: quantityToDb(b.qtyPerScanMilli),
+              is_primary: false,
             }),
           ),
         )
@@ -757,7 +797,13 @@ export async function template(db: Kysely<DB>, entity: ImportEntity): Promise<Fi
 export async function exportCustomers(
   db: Kysely<DB>,
 ): Promise<{ file: FilePayload; rows: number }> {
-  const rows = await db.selectFrom('md.customers').selectAll().orderBy('code').execute();
+  // The walk-in customer is made by every database itself (and has no phone to import).
+  const rows = await db
+    .selectFrom('md.customers')
+    .selectAll()
+    .where('is_walk_in', '=', false)
+    .orderBy('code')
+    .execute();
   const columns = [
     { key: 'code', ar: 'الكود', en: 'Code' },
     ...COLUMNS.customers,
@@ -797,6 +843,192 @@ export async function exportCustomers(
     rows: rows.length,
     file: {
       fileName: 'artepool-customers.xlsx',
+      mime: XLSX_MIME,
+      dataBase64: file.toString('base64'),
+    },
+  };
+}
+
+/** A number for a person to read and the import to read back: trailing zeros dropped. */
+const plain = (text: string, keep = 0): string => {
+  if (!text.includes('.')) return text;
+  const [whole, fraction] = text.split('.') as [string, string];
+  const trimmed = fraction.replace(/0+$/, '').padEnd(keep, '0');
+  return trimmed ? `${whole}.${trimmed}` : whole;
+};
+
+/**
+ * Every active item as an Excel file in the import's own columns (M7 part E, decision 0119): it
+ * goes straight back in, e.g. into the clean database at go-live. Purchase prices only for
+ * someone allowed to see them (0038). Kits cannot be imported: they are listed on their own sheet,
+ * with their parts, to be made again by hand. Permission `data.export`; the export is audited.
+ */
+export async function exportItems(
+  db: Kysely<DB>,
+  canCost: boolean,
+): Promise<{ file: FilePayload; rows: number }> {
+  const level = await standardLevel(db);
+  const items = await db
+    .selectFrom('md.items as i')
+    .innerJoin('md.item_categories as c', 'c.id', 'i.category_id')
+    .innerJoin('md.units as u', 'u.id', 'i.unit_id')
+    .innerJoin('md.vat_categories as v', 'v.id', 'i.vat_category_id')
+    .leftJoin('md.business_lines as l', 'l.id', 'i.default_business_line_id')
+    .leftJoin('md.item_prices as p', (join) =>
+      join.onRef('p.item_id', '=', 'i.id').on('p.price_level_id', '=', level),
+    )
+    .select([
+      'i.id',
+      'i.code',
+      'i.item_type',
+      'i.name_ar',
+      'i.name_en',
+      'c.code as category',
+      'u.code as unit',
+      'v.code as vat',
+      'p.price_4dp',
+      'p.includes_vat',
+      'i.fallback_unit_cost_4dp',
+      sql<string | null>`i.reorder_level::text`.as('reorder_level'),
+      sql<string | null>`i.reorder_qty::text`.as('reorder_qty'),
+      'i.is_sellable',
+      'l.code as business_line',
+      'i.description_ar',
+      'i.description_en',
+      'i.pack_ar',
+      'i.pack_en',
+    ])
+    .where('i.is_active', '=', true)
+    .orderBy('i.code')
+    .execute();
+  const barcodes = await db
+    .selectFrom('md.item_barcodes')
+    .select(['item_id', 'barcode', 'is_primary', sql<string>`qty_per_scan::text`.as('qty')])
+    .where('is_active', '=', true)
+    .orderBy('item_id')
+    .orderBy('is_primary', 'desc')
+    .orderBy('id')
+    .execute();
+  const byItem = new Map<bigint, typeof barcodes>();
+  for (const b of barcodes) byItem.set(b.item_id, [...(byItem.get(b.item_id) ?? []), b]);
+  const components = await db
+    .selectFrom('md.bundle_components as k')
+    .innerJoin('md.items as ci', 'ci.id', 'k.component_item_id')
+    .select(['k.bundle_item_id', 'ci.code', sql<string>`k.quantity::text`.as('qty')])
+    .orderBy('ci.code')
+    .execute();
+
+  const price = (p: bigint | null) => (p === null ? null : plain(format4dp(p), 2));
+  const yes = (b: boolean | null) => (b === null ? null : b ? 'yes' : 'no');
+  const columns = COLUMNS.items.filter((c) => canCost || c.key !== 'purchase_price');
+  const importable = items.filter((i) => i.item_type !== 'bundle');
+  const kits = items.filter((i) => i.item_type === 'bundle');
+  const file = await writeWorkbook([
+    {
+      name: 'Items',
+      columns,
+      textColumns: TEXT_COLUMNS,
+      rows: importable.map((i) => {
+        const codes = byItem.get(i.id) ?? [];
+        const primary = codes.find((b) => b.is_primary) ?? null;
+        const more = codes
+          .filter((b) => b !== primary)
+          .map((b) => (plain(b.qty) === '1' ? b.barcode : `${b.barcode}*${plain(b.qty)}`));
+        const values: Record<string, string | number | null> = {
+          code: i.code,
+          type: i.item_type,
+          name_ar: i.name_ar,
+          name_en: i.name_en,
+          category: i.category,
+          unit: i.unit,
+          vat: i.vat,
+          price: price(i.price_4dp),
+          price_includes_vat: yes(i.includes_vat),
+          purchase_price: price(i.fallback_unit_cost_4dp),
+          barcode: primary?.barcode ?? null,
+          reorder_level: i.reorder_level === null ? null : plain(i.reorder_level),
+          sellable: yes(i.is_sellable),
+          business_line: i.business_line,
+          description_ar: i.description_ar,
+          description_en: i.description_en,
+          more_barcodes: more.length > 0 ? more.join(' ') : null,
+          pack_ar: i.pack_ar,
+          pack_en: i.pack_en,
+          reorder_qty: i.reorder_qty === null ? null : plain(i.reorder_qty),
+        };
+        return columns.map((c) => values[c.key] ?? null);
+      }),
+    },
+    {
+      name: 'Kits',
+      columns: [
+        { key: 'code', ar: 'الكود', en: 'Code' },
+        { key: 'name_ar', ar: 'الاسم بالعربية', en: 'Arabic name' },
+        { key: 'name_en', ar: 'الاسم بالإنجليزية', en: 'English name' },
+        { key: 'price', ar: 'سعر البيع', en: 'Sale price' },
+        { key: 'price_includes_vat', ar: 'السعر شامل الضريبة', en: 'Price includes VAT' },
+        {
+          key: 'parts',
+          ar: 'المكونات (كود×كمية) — تتعمل باليد',
+          en: 'Parts (code×quantity) — made by hand',
+        },
+      ],
+      textColumns: ['code'],
+      rows: kits.map((k) => [
+        k.code,
+        k.name_ar,
+        k.name_en,
+        price(k.price_4dp),
+        yes(k.includes_vat),
+        components
+          .filter((c) => c.bundle_item_id === k.id)
+          .map((c) => `${c.code}×${plain(c.qty)}`)
+          .join(' '),
+      ]),
+    },
+  ]);
+  return {
+    rows: items.length,
+    file: { fileName: 'artepool-items.xlsx', mime: XLSX_MIME, dataBase64: file.toString('base64') },
+  };
+}
+
+/** Every active supplier in the import's own columns (M7 part E); audited by the caller. */
+export async function exportSuppliers(
+  db: Kysely<DB>,
+): Promise<{ file: FilePayload; rows: number }> {
+  const rows = await db
+    .selectFrom('md.suppliers')
+    .selectAll()
+    .where('is_active', '=', true)
+    .orderBy('code')
+    .execute();
+  const file = await writeWorkbook([
+    {
+      name: 'Suppliers',
+      columns: [{ key: 'code', ar: 'الكود', en: 'Code' }, ...COLUMNS.suppliers],
+      textColumns: TEXT_COLUMNS,
+      rows: rows.map((r) => [
+        r.code,
+        r.name,
+        r.name_alt,
+        r.phone,
+        r.email,
+        r.address_line,
+        r.city,
+        r.emirate,
+        r.country_code,
+        r.is_vat_registered ? 'yes' : 'no',
+        r.trn,
+        r.payment_terms_days,
+        r.notes,
+      ]),
+    },
+  ]);
+  return {
+    rows: rows.length,
+    file: {
+      fileName: 'artepool-suppliers.xlsx',
       mime: XLSX_MIME,
       dataBase64: file.toString('base64'),
     },

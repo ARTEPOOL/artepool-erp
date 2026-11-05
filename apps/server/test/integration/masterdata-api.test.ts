@@ -572,7 +572,8 @@ describe('customers (design 14, decisions 0032, 0036, 0037)', () => {
     const { rows } = await server.admin.query<{ data: { entity: string; rows: number } }>(
       `SELECT new_values AS data FROM audit.log WHERE action = 'event:data.exported'`,
     );
-    expect(rows.map((r) => r.data)).toEqual([{ entity: 'customers', rows: 3 }]);
+    // The walk-in customer stays out: every database makes its own (M7 part E).
+    expect(rows.map((r) => r.data)).toEqual([{ entity: 'customers', rows: 2 }]);
   });
 });
 

@@ -14,7 +14,7 @@ import { recordEvent } from '../../platform/audit/events';
 import { withBusinessTx } from '../../platform/db/tx';
 import { contextOf } from '../../platform/http/context';
 import { defineActivation, defineRoute, defineWrite } from '../../platform/http/route';
-import { exportCustomers } from '../imports/service';
+import { exportCustomers, exportSuppliers } from '../imports/service';
 import * as customers from './customers';
 import * as suppliers from './suppliers';
 
@@ -97,6 +97,18 @@ export function registerPartyRoutes(app: FastifyInstance): void {
   });
 
   // Suppliers
+  defineRoute(app, {
+    method: 'GET',
+    url: '/api/v1/suppliers/export',
+    access: { kind: 'permission', permission: 'data.export' },
+    handler: async ({ request }) => {
+      const { file, rows } = await exportSuppliers(db);
+      await withBusinessTx(db, contextOf(request), (trx) =>
+        recordEvent(trx, 'data.exported', { data: { entity: 'suppliers', rows } }),
+      );
+      return file;
+    },
+  });
   defineRoute(app, {
     method: 'GET',
     url: '/api/v1/suppliers',
