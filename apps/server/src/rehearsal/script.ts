@@ -13,6 +13,7 @@
  */
 import { sql } from 'kysely';
 import { computeLine, lineAmountFils, roundDiv } from '@artepool/shared';
+import { REHEARSAL_DAY_STEPS, type RehearsalDayStep } from '@artepool/shared/contracts';
 import { newTotpSecret } from '../platform/auth/totp';
 import { RehearsalError, type Actor, type Pc, type RehearsalServer } from './harness';
 import { isPdf, pdfHasText } from './pdf';
@@ -28,21 +29,8 @@ export const SHOP_DAY: RehearsalSize = { name: 'shop', tills: 2, salesPerTill: 7
 /** The CI busy day: four tills at once, 800+ POS sales, 20,000 items (PRD §12). */
 export const BUSY_DAY: RehearsalSize = { name: 'busy', tills: 4, salesPerTill: 210, items: 20_000 };
 
-export const SCRIPT_STEPS = [
-  'pcs_and_people',
-  'company_and_items',
-  'customers',
-  'shifts_open',
-  'the_day',
-  'returns',
-  'cash_movements',
-  'stock',
-  'labels',
-  'oversell_review',
-  'printing',
-  'shifts_close',
-] as const;
-export type ScriptStep = (typeof SCRIPT_STEPS)[number];
+export const SCRIPT_STEPS = REHEARSAL_DAY_STEPS;
+export type ScriptStep = RehearsalDayStep;
 
 export interface StepOutcome {
   step: string;
@@ -51,6 +39,12 @@ export interface StepOutcome {
   detail?: string;
 }
 export type Progress = (outcome: StepOutcome) => void | Promise<void>;
+
+/** The day's steps, and the owner and accountant still signed in (for what comes after). */
+export interface ScriptedDay {
+  outcomes: StepOutcome[];
+  people: { owner: Actor; accountant: Actor } | null;
+}
 
 const PASSWORD = 'Rehearsal-Pool-Water-2026';
 const PINS = ['4829', '5837', '6941', '7253'];
@@ -210,8 +204,9 @@ export async function runScriptedDay(
   server: RehearsalServer,
   size: RehearsalSize,
   progress: Progress,
-): Promise<StepOutcome[]> {
+): Promise<ScriptedDay> {
   const outcomes: StepOutcome[] = [];
+  let signedIn: ScriptedDay['people'] = null;
   const step = async <T>(name: ScriptStep, work: () => Promise<T>): Promise<T> => {
     const started = Date.now();
     try {
@@ -294,6 +289,7 @@ export async function runScriptedDay(
       return { owner, accountant, storekeeper, tills };
     });
     const { owner, accountant, storekeeper, tills } = people;
+    signedIn = { owner, accountant };
     const ref = await referenceData(server);
 
     // ---- The company and the items -------------------------------------------------------------
@@ -904,7 +900,7 @@ export async function runScriptedDay(
   } catch (error) {
     if (!(error instanceof StopScript)) throw error;
   }
-  return outcomes;
+  return { outcomes, people: signedIn };
 }
 
 class StopScript extends Error {

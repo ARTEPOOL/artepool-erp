@@ -1,9 +1,11 @@
 /**
  * The rehearsal's own database (M7, decision 0119): `artepool_rehearsal_<run>`, created empty,
- * migrated like a new installation, marked with the run's random token in its comment, and
- * dropped at the end. Nothing here can touch any other database: the name and the mark are both
- * checked before a drop, and a rehearsal never writes to the live database except its own run
- * row (written by the caller).
+ * migrated like a new installation, marked in its comment with the run's random token and the
+ * number of the process running it, and dropped at the end. Nothing here can touch any other
+ * database: the name and the mark are both checked before a drop, and a rehearsal never writes to
+ * the live database except its own run row (written by the caller). A rehearsal database is left
+ * over only when the process in its mark is no longer running (a power cut, a closed program):
+ * rehearsals running at the same time (the tests, a busy day beside them) never drop each other's.
  */
 import { randomBytes } from 'node:crypto';
 import pg from 'pg';
@@ -13,7 +15,20 @@ import { connectionFor, migrationsDir } from '@artepool/node-kit';
 
 export const REHEARSAL_PREFIX = 'artepool_rehearsal_';
 const NAME = /^artepool_rehearsal_[0-9a-f]{12}$/;
-const MARK = (token: string) => `ARTEPOOL rehearsal ${token}`;
+const MARK = (token: string, pid = process.pid) => `ARTEPOOL rehearsal ${token} ${pid}`;
+const MARK_SHAPE = /^ARTEPOOL rehearsal ([0-9a-f]{32}) ([1-9][0-9]*)$/;
+
+/** Is this process still running on this PC? */
+export function processRunning(pid: number): boolean {
+  if (pid === process.pid) return true;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    // EPERM: it runs, as another user.
+    return (error as NodeJS.ErrnoException).code === 'EPERM';
+  }
+}
 
 export interface RehearsalDatabase {
   name: string;
@@ -62,10 +77,14 @@ export async function createRehearsalDatabase(): Promise<RehearsalDatabase> {
 }
 
 /**
- * Drops a rehearsal database: only when its name has the rehearsal's shape and its comment is
- * the rehearsal's mark (with this run's token, when given). Anything else is refused.
+ * Drops a rehearsal database: only when its name has the rehearsal's shape and its comment is the
+ * rehearsal's mark with this run's token (or, for a left-over one, any rehearsal's mark whose
+ * process no longer runs). Anything else is refused.
  */
-export async function dropRehearsalDatabase(name: string, token?: string): Promise<void> {
+export async function dropRehearsalDatabase(
+  name: string,
+  token: string | { leftover: true },
+): Promise<void> {
   if (!isRehearsalName(name))
     throw new Error(`Refusing to drop "${name}": not a rehearsal database`);
   const admin = await superuser();
@@ -75,27 +94,56 @@ export async function dropRehearsalDatabase(name: string, token?: string): Promi
       [name],
     );
     if (rows.length === 0) return;
-    const mark = rows[0]!.mark ?? '';
-    const ok = token ? mark === MARK(token) : mark.startsWith('ARTEPOOL rehearsal ');
-    if (!ok) throw new Error(`Refusing to drop "${name}": it does not carry the rehearsal's mark`);
+    const mark = MARK_SHAPE.exec(rows[0]!.mark ?? '');
+    if (!mark)
+      throw new Error(`Refusing to drop "${name}": it does not carry the rehearsal's mark`);
+    if (typeof token === 'string' ? mark[1] !== token : processRunning(Number(mark[2])))
+      throw new Error(`Refusing to drop "${name}": it carries another run's mark`);
     await admin.query(`DROP DATABASE ${admin.escapeIdentifier(name)} WITH (FORCE)`);
   } finally {
     await admin.end();
   }
 }
 
-/** Rehearsal databases left behind by a run that stopped half way (a power cut): dropped. */
+/** The throwaway copy the rehearsal's restore test makes of a rehearsal database. */
+const RESTORED = /^artepool_rehearsal_[0-9a-f]{12}_restore_test$/;
+
+/**
+ * Rehearsal databases left behind by a run that stopped half way (its process no longer runs):
+ * dropped, with the restored copy its restore test was making (named after it; the restore test
+ * drops it itself when it is not cut off). Databases of rehearsals still running stay.
+ */
 export async function dropLeftoverRehearsals(): Promise<string[]> {
   const admin = await superuser();
-  let names: string[];
+  const dropped: string[] = [];
   try {
-    const { rows } = await admin.query<{ datname: string }>(
-      `SELECT datname FROM pg_database WHERE datname LIKE 'artepool\\_rehearsal\\_%'`,
+    const { rows } = await admin.query<{ datname: string; mark: string | null }>(
+      `SELECT datname, shobj_description(oid, 'pg_database') AS mark
+         FROM pg_database WHERE datname LIKE 'artepool\\_rehearsal\\_%'`,
     );
-    names = rows.map((r) => r.datname).filter(isRehearsalName);
+    const marks = new Map(rows.map((r) => [r.datname, MARK_SHAPE.exec(r.mark ?? '')]));
+    const leftover = (name: string) => {
+      const mark = marks.get(name);
+      return !!mark && !processRunning(Number(mark[2]));
+    };
+    for (const { datname } of rows) {
+      const base = datname.replace(/_restore_test$/, '');
+      if (RESTORED.test(datname) && (!marks.has(base) || leftover(base))) {
+        await admin.query(`DROP DATABASE ${admin.escapeIdentifier(datname)} WITH (FORCE)`);
+        dropped.push(datname);
+      }
+    }
+    for (const { datname } of rows) {
+      if (isRehearsalName(datname) && leftover(datname)) {
+        await dropRehearsalDatabase(datname, { leftover: true });
+        dropped.push(datname);
+      }
+    }
   } finally {
     await admin.end();
   }
-  for (const name of names) await dropRehearsalDatabase(name);
-  return names;
+  return dropped;
 }
+
+/** The mark a rehearsal database carries (exported for the tests of a left-over database). */
+export const rehearsalMark = MARK;

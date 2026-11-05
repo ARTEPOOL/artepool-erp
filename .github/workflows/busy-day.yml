@@ -1,0 +1,77 @@
+name: Busy day
+
+# M7 (decision 0119; PRD §12): the automated rehearsal at its largest. Four tills at once, 800+ POS
+# sales, 20,000 items, played through the server's real API on a throwaway database; then every
+# integrity check, a backup restored and checked again, and the speed against the targets (search
+# and scan under 300 ms, a sale under 2 s, 95% of requests). Red or slow fails the run, and the
+# table is in the run's summary. Every night, before every release (release.yml), and by hand
+# (Actions -> Busy day -> Run workflow).
+
+on:
+  schedule:
+    - cron: '17 22 * * *' # 02:17 in Al Ain
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  busy-day:
+    name: Four tills, 800+ sales, 20,000 items
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      # Throwaway CI database only — not real credentials.
+      PGHOST: localhost
+      PGPORT: '5432'
+      PG_SUPERUSER: postgres
+      PG_SUPERUSER_PASSWORD: postgres
+      ARTEPOOL_DB: artepool_dev
+      ARTEPOOL_TEST_DB: artepool_test
+      ARTEPOOL_MIGRATOR_PASSWORD: ci-only-migrator
+      ARTEPOOL_API_PASSWORD: ci-only-api
+      ARTEPOOL_BACKUP_PASSWORD: ci-only-backup
+      ARTEPOOL_MAINT_PASSWORD: ci-only-maint
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Database roles
+        run: pnpm db:setup
+      - name: Chromium for the A4 PDF renderer
+        run: pnpm --filter @artepool/server exec playwright-core install --with-deps chromium-headless-shell
+      - name: PostgreSQL 18 programs (pg_dump / pg_restore for the backup and restore of the rehearsal)
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          # postgresql.org sometimes drops the connection half way: try again (curl's own retries).
+          sudo curl -fsS --retry 5 --retry-all-errors --retry-delay 10 --max-time 120 \
+            -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt noble-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          # apt.postgresql.org sometimes answers without its Release file for a minute: try again.
+          for attempt in 1 2 3 4; do
+            sudo apt-get update -qq && break
+            [ "$attempt" -lt 4 ] || exit 1
+            sleep $((attempt * 20))
+          done
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq postgresql-client-18
+          echo "ARTEPOOL_PG_BIN=/usr/lib/postgresql/18/bin" >> "$GITHUB_ENV"
+      - name: The busy day
+        run: pnpm acceptance:day

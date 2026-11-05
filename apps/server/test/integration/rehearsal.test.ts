@@ -6,12 +6,15 @@
 import pg from 'pg';
 import { describe, expect, it } from 'vitest';
 import { connectionFor } from '@artepool/node-kit';
+import { RECONCILIATION_STEPS } from '@artepool/shared/contracts';
 import {
   createRehearsalDatabase,
+  dropLeftoverRehearsals,
   dropRehearsalDatabase,
   isRehearsalName,
+  rehearsalMark,
 } from '../../src/rehearsal/database';
-import { runRehearsal } from '../../src/rehearsal/run';
+import { RUN_STEPS, runRehearsal } from '../../src/rehearsal/run';
 import { SCRIPT_STEPS, type RehearsalSize } from '../../src/rehearsal/script';
 
 const SMALL: RehearsalSize = { name: 'shop', tills: 2, salesPerTill: 12, items: 40 };
@@ -41,16 +44,10 @@ describe('the automated rehearsal', () => {
       const red = report.steps.filter((s) => !s.ok);
       expect(red, JSON.stringify(red, null, 2)).toEqual([]);
       expect(report.ok).toBe(true);
-      for (const name of [
-        ...SCRIPT_STEPS,
-        'database',
-        'server',
-        'day',
-        'checks',
-        'backup_restore',
-        'speed',
-      ])
-        expect(seen).toContain(name);
+      for (const name of [...SCRIPT_STEPS, ...RUN_STEPS]) expect(seen).toContain(name);
+      expect(report.reconciliation?.steps.map((s) => [s.step, s.ok])).toEqual(
+        RECONCILIATION_STEPS.map((step) => [step, true]),
+      );
       expect(Object.values(report.checks ?? {}).every((c) => c.ok)).toBe(true);
       expect(Object.keys(report.restoredChecks ?? {})).toEqual(Object.keys(report.checks ?? {}));
       expect(report.totals).toMatchObject({ shifts: SMALL.tills, labelPrints: 3 });
@@ -60,18 +57,9 @@ describe('the automated rehearsal', () => {
       expect(report.speed!.sale.samples).toBeGreaterThan(0);
 
       // Nothing is left behind.
-      let leftovers: string;
-      const admin = new pg.Client({ ...connectionFor('superuser'), database: 'postgres' });
-      await admin.connect();
-      try {
-        const { rows } = await admin.query<{ datname: string }>(
-          `SELECT datname FROM pg_database WHERE datname LIKE 'artepool\\_rehearsal\\_%'`,
-        );
-        leftovers = rows.map((r) => r.datname).join(', ');
-      } finally {
-        await admin.end();
-      }
-      expect(leftovers).toBe('');
+      expect(report.database).toMatch(/^artepool_rehearsal_/);
+      expect(await databaseExists(report.database!)).toBe(false);
+      expect(await databaseExists(`${report.database!}_restore_test`)).toBe(false);
     },
   );
 
@@ -83,12 +71,17 @@ describe('the automated rehearsal', () => {
       'artepool_rehearsal_0123456789ab_restore_test',
     ])
       expect(isRehearsalName(name)).toBe(false);
-    await expect(dropRehearsalDatabase('artepool_dev')).rejects.toThrow(/not a rehearsal database/);
+    await expect(dropRehearsalDatabase('artepool_dev', 'f'.repeat(32))).rejects.toThrow(
+      /not a rehearsal database/,
+    );
 
     // A database with the right name but without the mark (or with another run's mark) stays.
     const own = await createRehearsalDatabase();
     try {
       await expect(dropRehearsalDatabase(own.name, 'f'.repeat(32))).rejects.toThrow(/mark/);
+      // Its process (this one) still runs: it is not left over.
+      await expect(dropRehearsalDatabase(own.name, { leftover: true })).rejects.toThrow(/mark/);
+      expect(await dropLeftoverRehearsals()).not.toContain(own.name);
       expect(await databaseExists(own.name)).toBe(true);
     } finally {
       await dropRehearsalDatabase(own.name, own.token);
@@ -98,12 +91,29 @@ describe('the automated rehearsal', () => {
     const admin = new pg.Client({ ...connectionFor('superuser'), database: 'postgres' });
     await admin.connect();
     const unmarked = 'artepool_rehearsal_aaaaaaaaaaaa';
+    const leftover = 'artepool_rehearsal_bbbbbbbbbbbb';
     try {
       await admin.query(`CREATE DATABASE ${unmarked}`);
-      await expect(dropRehearsalDatabase(unmarked)).rejects.toThrow(/mark/);
+      await expect(dropRehearsalDatabase(unmarked, { leftover: true })).rejects.toThrow(/mark/);
+      expect(await dropLeftoverRehearsals()).not.toContain(unmarked);
       expect(await databaseExists(unmarked)).toBe(true);
+
+      // Left by a run whose process is gone (a power cut): dropped, with its restored copy.
+      const gone = 2 ** 22 + 12_345; // above any process number Linux or Windows gives out
+      await admin.query(`CREATE DATABASE ${leftover}`);
+      await admin.query(`CREATE DATABASE ${leftover}_restore_test`);
+      await admin.query(
+        `COMMENT ON DATABASE ${leftover} IS '${rehearsalMark('c'.repeat(32), gone)}'`,
+      );
+      expect(await dropLeftoverRehearsals()).toEqual(
+        expect.arrayContaining([leftover, `${leftover}_restore_test`]),
+      );
+      expect(await databaseExists(leftover)).toBe(false);
+      expect(await databaseExists(`${leftover}_restore_test`)).toBe(false);
     } finally {
       await admin.query(`DROP DATABASE IF EXISTS ${unmarked}`);
+      await admin.query(`DROP DATABASE IF EXISTS ${leftover}_restore_test`);
+      await admin.query(`DROP DATABASE IF EXISTS ${leftover}`);
       await admin.end();
     }
   });

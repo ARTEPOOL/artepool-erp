@@ -4,7 +4,7 @@
  * restored into a throwaway copy and checked again → the speed figures → the database dropped.
  * The live database is never touched here: the caller records the progress and the result.
  */
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import pg from 'pg';
@@ -16,21 +16,23 @@ import {
   runChecks,
   type CheckResults,
 } from '@artepool/backup';
-import type { SpeedFigures } from '@artepool/shared/contracts';
+import type { ReconciliationReport, RehearsalStep, SpeedFigures } from '@artepool/shared/contracts';
 import { connectionFor } from '@artepool/node-kit';
 import { resetSpeed, speedFigures } from '../platform/http/speed';
 import { createRehearsalDatabase, dropRehearsalDatabase } from './database';
 import { RehearsalServer } from './harness';
 import { runScriptedDay, type RehearsalSize, type StepOutcome } from './script';
 
+/** The run's own steps around the scripted day (every step, in order: REHEARSAL_STEPS). */
 export const RUN_STEPS = [
   'database',
   'server',
   'day',
   'checks',
   'backup_restore',
+  'reconciliation',
   'speed',
-] as const;
+] as const satisfies readonly RehearsalStep[];
 
 export interface RehearsalTotals {
   posSales: number;
@@ -47,6 +49,8 @@ export interface RehearsalTotals {
 export interface RehearsalReport {
   size: RehearsalSize['name'];
   ok: boolean;
+  /** The rehearsal's own database (dropped at the end). */
+  database: string | null;
   startedAt: string;
   finishedAt: string;
   /** Every step: the run's own (database, checks, …) and the scripted day's, in order. */
@@ -57,11 +61,15 @@ export interface RehearsalReport {
   restoredChecks: CheckResults | null;
   speed: SpeedFigures | null;
   totals: RehearsalTotals | null;
+  /** The seven-step reconciliation report, run by the accountant at the end of the day. */
+  reconciliation: ReconciliationReport | null;
 }
 
 export interface RunHooks {
   /** Hears each step as it ends (the shop's screen shows the progress from it). */
   progress?: (outcome: StepOutcome, report: RehearsalReport) => void | Promise<void>;
+  /** Where the backup of the rehearsal database is written for a moment (default: the temp folder). */
+  workDir?: string;
 }
 
 /** Speed figures within the targets (PRD §12): search and scan 300 ms, a sale 2 s (95%). */
@@ -103,6 +111,7 @@ export async function runRehearsal(
   const report: RehearsalReport = {
     size: size.name,
     ok: false,
+    database: null,
     startedAt: new Date().toISOString(),
     finishedAt: '',
     steps: [],
@@ -110,6 +119,7 @@ export async function runRehearsal(
     restoredChecks: null,
     speed: null,
     totals: null,
+    reconciliation: null,
   };
   const record = async (outcome: StepOutcome) => {
     report.steps.push(outcome);
@@ -138,17 +148,16 @@ export async function runRehearsal(
   try {
     database = await step('database', createRehearsalDatabase);
     const db = database;
+    report.database = db.name;
     server = await step('server', () => RehearsalServer.start(db.name));
     resetSpeed();
     const day = await runScriptedDay(server, size, (outcome) => record(outcome));
-    const dayOk = day.every((s) => s.ok);
-    await step('day', () => {
-      if (!dayOk) throw new Error('The scripted day stopped at a red step');
-      return Promise.resolve();
+    const people = await step('day', () => {
+      if (!day.people || !day.outcomes.every((s) => s.ok))
+        throw new Error('The scripted day stopped at a red step');
+      return Promise.resolve(day.people);
     });
     const speed = speedFigures();
-    await server.close();
-    server = null;
 
     report.totals = await totalsOf(db.name);
     report.checks = await step('checks', async () => {
@@ -164,7 +173,9 @@ export async function runRehearsal(
       }
     });
     await step('backup_restore', async () => {
-      backupDir = await mkdtemp(join(tmpdir(), 'artepool-rehearsal-'));
+      const parent = hooks.workDir ?? tmpdir();
+      await mkdir(parent, { recursive: true });
+      backupDir = await mkdtemp(join(parent, 'artepool-rehearsal-'));
       const config = { ...configFromEnv(db.name), backupDir };
       const client = new pg.Client({ ...config.connection });
       await client.connect();
@@ -177,6 +188,19 @@ export async function runRehearsal(
         await client.end();
       }
     });
+    // The accountant runs the reconciliation report for the day, as at the shop (part A).
+    await step('reconciliation', async () => {
+      const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Dubai' });
+      const result = (await people.accountant('POST', '/api/v1/reports/reconciliation', {
+        from: today,
+        to: today,
+      })) as ReconciliationReport;
+      report.reconciliation = result;
+      const red = result.steps.filter((s) => !s.ok).map((s) => s.step);
+      if (red.length > 0) throw new Error(`Red steps: ${red.join(', ')}`);
+    });
+    await server.close();
+    server = null;
     report.speed = speed;
     await step('speed', () => {
       if (!speedOk(speed)) throw new Error('Slower than the targets');

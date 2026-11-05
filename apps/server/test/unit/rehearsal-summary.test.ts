@@ -13,6 +13,7 @@ const speed = (p95: number | null, target: number) => ({
 const report = (over: Partial<RehearsalReport> = {}): RehearsalReport => ({
   size: 'busy',
   ok: true,
+  database: 'artepool_rehearsal_0123456789ab',
   startedAt: '2026-11-05T10:00:00Z',
   finishedAt: '2026-11-05T10:12:00Z',
   steps: [
@@ -33,6 +34,7 @@ const report = (over: Partial<RehearsalReport> = {}): RehearsalReport => ({
     journalEntries: 1800,
     auditEntries: 20_000,
   },
+  reconciliation: null,
   ...over,
 });
 
