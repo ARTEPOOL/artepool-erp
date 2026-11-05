@@ -1,6 +1,6 @@
 # Changelog
 
-## The automated rehearsal plays a whole shop day; two problems it found are fixed (2026-11-05)
+## The automated rehearsal, the hardware check and the export for go-live; problems they found are fixed (2026-11-05) — in version 0.10.0
 
 **In plain words:**
 
@@ -35,7 +35,7 @@
 - **Searching and scanning items is about 4–5 times faster** with many items (found by the busy day). With 20,000 items, a name search took about 60 ms and a barcode scan about 70 ms on an idle server, and about 0.2 s with four tills busy. Now about 17 ms and 14 ms: the search uses its indexes, and stock is totalled only for the items on the screen.
 - **The busy day in GitHub** (`pnpm acceptance:day`): four tills at once, 800+ sales, 20,000 items, every night and before every release. A red step or a speed above the targets stops the release; the table is in the run's summary.
 
-## The reconciliation report; a PDF copy of every thermal receipt; the print test checks every required field (2026-11-05)
+## The reconciliation report; a PDF copy of every thermal receipt; the print test checks every required field (2026-11-05) — in version 0.10.0
 
 **In plain words:**
 
