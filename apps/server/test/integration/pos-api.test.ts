@@ -23,6 +23,7 @@ import type {
   PosReturnResponse,
   PosSaleResponse,
   PosState,
+  ReconciliationReport,
   ShiftReport,
   ShiftsResponse,
   ShiftSummary,
@@ -1135,6 +1136,65 @@ describe('the integrity checks on this day of POS work (M7, decision 0119)', () 
     expect(Number(rows[0]!.shifts)).toBeGreaterThan(0);
     expect(rows[0]!.anchored).toBe(rows[0]!.shifts);
     expect(rows[0]!.anchors).toBe(rows[0]!.shifts);
+  });
+
+  it('the reconciliation report: seven steps, owner and accountant only, kept and printed', async () => {
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Dubai' });
+    const body = { from: today, to: today };
+    const report = await ok<ReconciliationReport>(
+      owner('POST', '/api/v1/reports/reconciliation', body),
+    );
+    expect(report.steps.map((s) => s.step)).toEqual([
+      'stock',
+      'cash',
+      'invoices',
+      'vat',
+      'accounts',
+      'audit',
+      'backup',
+    ]);
+    // Every integrity check passes. The period's own checks may wait on people here (a variance
+    // not accepted, an oversell not reviewed), and no restore test ran on this test database.
+    const waitsOnPeople = ['variances_accepted', 'oversells_reviewed', 'restore_test'];
+    for (const step of report.steps)
+      for (const c of step.checks.filter((c) => !waitsOnPeople.includes(c.name)))
+        expect({ check: c.name, ok: c.ok, examples: c.examples }).toEqual({
+          check: c.name,
+          ok: true,
+          examples: [],
+        });
+    const backup = report.steps.find((s) => s.step === 'backup')!;
+    expect(backup.ok).toBe(false);
+    expect(backup.checks[0]!.examples[0]).toMatch(/no restore test/);
+    // The period's VAT on the documents equals the output VAT account's movement.
+    const vat = report.steps.find((s) => s.step === 'vat')!;
+    const figure = (key: string) => vat.figures.find((f) => f.key === key)!.value;
+    expect(figure('vatDocuments')).toBe(figure('vatAccount'));
+    expect(BigInt(figure('vatDocuments')!)).toBeGreaterThan(0n);
+    // The series used today, first to last.
+    const invoices = report.steps.find((s) => s.step === 'invoices')!;
+    expect(invoices.figures.find((f) => f.key === 'series:POS')?.value).toMatch(
+      /^POS-0+1 … POS-\d+ \(\d+\)$/,
+    );
+
+    // The accountant may run it too; a cashier may not.
+    expect((await accountant('POST', '/api/v1/reports/reconciliation', body)).statusCode).toBe(200);
+    const cashier = await signedIn('cash.recon', ['cashier']);
+    expect((await cashier('POST', '/api/v1/reports/reconciliation', body)).statusCode).toBe(403);
+
+    // Kept (and audited), and printed as a PDF for the accountant.
+    const kept = await server.admin.query<{ n: string }>(
+      `SELECT count(*)::text AS n FROM ops.integrity_runs WHERE run_kind = 'reconciliation'`,
+    );
+    expect(Number(kept.rows[0]!.n)).toBeGreaterThanOrEqual(2);
+    const pdf = await ok<{ fileName: string; mime: string; dataBase64: string }>(
+      owner('GET', `/api/v1/reports/reconciliation/${report.id}/pdf`),
+    );
+    expect(pdf.mime).toBe('application/pdf');
+    expect(Buffer.from(pdf.dataBase64, 'base64').subarray(0, 5).toString()).toBe('%PDF-');
+    expect(
+      (await cashier('GET', `/api/v1/reports/reconciliation/${report.id}/pdf`)).statusCode,
+    ).toBe(403);
   });
 
   it('each catches its own break', async () => {

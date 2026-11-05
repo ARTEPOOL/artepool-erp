@@ -36,6 +36,7 @@ import { PosPage } from '../features/pos/PosPage';
 import { ShiftPage } from '../features/pos/shift/ShiftPage';
 import { ShiftsPage } from '../features/pos/shift/ShiftsPage';
 import { OwnerDashboard } from '../features/reports/OwnerDashboard';
+import { Reconciliation } from '../features/reports/Reconciliation';
 import { Shell } from './Shell';
 
 const root = createRootRoute({ component: Shell });
@@ -99,6 +100,11 @@ const reports = createRoute({
   getParentRoute: () => root,
   path: 'reports',
   component: OwnerDashboard,
+});
+const reconciliation = createRoute({
+  getParentRoute: () => root,
+  path: 'reconciliation',
+  component: Reconciliation,
 });
 const items = createRoute({ getParentRoute: () => root, path: 'items', component: ItemsPage });
 // Stock pages reached from Items & stock (design 07) and the dashboard alerts.
@@ -174,6 +180,7 @@ const print = createRoute({
 
 const routeTree = root.addChildren([
   reports,
+  reconciliation,
   home,
   pos,
   posShift,

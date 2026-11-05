@@ -1,9 +1,25 @@
 # Changelog
 
-## A PDF copy of every thermal receipt; the print test checks every required field (2026-11-05)
+## The reconciliation report; a PDF copy of every thermal receipt; the print test checks every required field (2026-11-05)
 
 **In plain words:**
 
+- **Reconciliation report** (Reports → «تقرير المطابقة», for the owner and the accountant; decision 0119):
+  - Seven steps, each green or red: stock, cash, invoices, VAT, accounts, audit log, backup.
+  - Figures side by side, e.g. the period's VAT on the documents against the VAT account.
+  - The problems found, by document or shift number.
+  - It prints as a PDF for the accountant, and every run is kept.
+- **Seven new checks of the books:**
+  - cash of every closed shift;
+  - each document's total against its lines;
+  - the invoice format and series;
+  - VAT against the VAT account;
+  - everything posted;
+  - customer balances and advances;
+  - the anchors kept on Z reports and backups.
+
+  They run with the existing ones every night, after every database start and in every restore test, and System health warns if one fails.
+- **Every Z report now keeps the audit log's fingerprint** (its anchor), so a log changed later can never match it.
 - **Every thermal receipt is also saved as a PDF on the PC, by itself** (decision 0120).
   - It covers sales and POS returns, and it is the same picture the printer gets.
   - It is saved even if the printer is off or out of paper.
@@ -18,6 +34,7 @@
 
 - **Files and records:**
   - Decisions 0119, 0120; PRD 1.52; `docs/milestones/m7-acceptance-tools.md`.
+  - The checks: `apps/backup/src/integrity.ts`; migration 0052 (the report's permission and runs, the Z report's anchor); the report: `apps/server/src/modules/reports/reconciliation*.ts`, `apps/desktop/src/features/reports/Reconciliation.tsx`.
   - The copy: `apps/desktop/src/features/pos/receipt/pdf.ts` (the PDF); `apps/desktop/src-tauri/printer/src/receipt_copy.rs` (the folder, the name checks, never overwriting); the app command `receipt_pdf_save`.
   - Tests: `receipt-pdf.test.ts` (desktop), the Rust tests of `receipt_copy`, `print-documents.test.ts` (the required fields of each template).
 

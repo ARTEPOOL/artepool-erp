@@ -13,6 +13,12 @@ export interface CheckResult {
 }
 export type CheckResults = Record<string, CheckResult>;
 
+/**
+ * What the checks need from a connection: the backup service's own client, or the API's
+ * connection when the owner or the accountant runs the reconciliation report (M7).
+ */
+export type Queryable = Pick<pg.ClientBase, 'query'>;
+
 const APP_SCHEMAS = ['sys', 'auth', 'audit', 'md', 'inv', 'sales', 'cash', 'gl', 'ops'];
 
 const result = (examples: string[], problems = examples.length): CheckResult => ({
@@ -22,7 +28,7 @@ const result = (examples: string[], problems = examples.length): CheckResult => 
 });
 
 /** The audit log's hash chain is unbroken (nothing changed, nothing removed). */
-async function auditChain(client: pg.Client): Promise<CheckResult> {
+async function auditChain(client: Queryable): Promise<CheckResult> {
   const { rows } = await client.query<{
     ok: boolean;
     first_bad_seq: string | null;
@@ -33,7 +39,7 @@ async function auditChain(client: pg.Client): Promise<CheckResult> {
 }
 
 /** Every journal entry balances, and its lines add up to its totals. */
-async function journalsBalanced(client: pg.Client): Promise<CheckResult> {
+async function journalsBalanced(client: Queryable): Promise<CheckResult> {
   const { rows } = await client.query<{ entry_number: string }>(
     `SELECT e.entry_number
        FROM gl.journal_entries e
@@ -47,7 +53,7 @@ async function journalsBalanced(client: pg.Client): Promise<CheckResult> {
 }
 
 /** All the books together: total debits equal total credits. */
-async function trialBalance(client: pg.Client): Promise<CheckResult> {
+async function trialBalance(client: Queryable): Promise<CheckResult> {
   const { rows } = await client.query<{ d: string; c: string }>(
     'SELECT coalesce(sum(debit_fils), 0)::text AS d, coalesce(sum(credit_fils), 0)::text AS c FROM gl.journal_lines',
   );
@@ -56,7 +62,7 @@ async function trialBalance(client: pg.Client): Promise<CheckResult> {
 }
 
 /** Stock on hand equals the sum of the stock movements (golden rule 9). */
-async function stockVsLedger(client: pg.Client): Promise<CheckResult> {
+async function stockVsLedger(client: Queryable): Promise<CheckResult> {
   const { rows } = await client.query<{ k: string }>(
     `WITH m AS (SELECT item_id, warehouse_id, stock_status, sum(quantity) AS q, sum(value_fils) AS v
                   FROM inv.movements GROUP BY 1, 2, 3)
@@ -71,7 +77,7 @@ async function stockVsLedger(client: pg.Client): Promise<CheckResult> {
 }
 
 /** Every numbered series is gapless: each number from the start to the last one used once. */
-async function numberingGaps(client: pg.Client): Promise<CheckResult> {
+async function numberingGaps(client: Queryable): Promise<CheckResult> {
   const { rows: tables } = await client.query<{ t: string }>(
     `SELECT format('%I.%I', table_schema, table_name) AS t
        FROM information_schema.columns
@@ -109,7 +115,7 @@ async function numberingGaps(client: pg.Client): Promise<CheckResult> {
  * applied to it (a reversal takes back what it reverses). Decision 0113: an invoice's status
  * comes from these, never from a typed amount.
  */
-async function settlements(client: pg.Client): Promise<CheckResult> {
+async function settlements(client: Queryable): Promise<CheckResult> {
   const { rows } = await client.query<{ k: string }>(
     `WITH paid AS (SELECT a.document_id, a.opening_balance_id,
                           sum(CASE WHEN p.payment_kind = 'reversal' THEN -a.amount_fils
@@ -142,7 +148,7 @@ async function settlements(client: pg.Client): Promise<CheckResult> {
  * M7 (decision 0119): every closed shift's expected cash is still what its payments and cash
  * movements add up to, and its counted cash is its final count (a recount replaces the first).
  */
-async function cashShifts(client: pg.Client): Promise<CheckResult> {
+async function cashShifts(client: Queryable): Promise<CheckResult> {
   const { rows } = await client.query<{ k: string }>(
     `SELECT format('shift %s: expected %s fils, now %s; counted %s fils, final count %s',
                    s.shift_number, s.expected_cash_fils, x.expected, s.counted_cash_fils,
@@ -158,7 +164,7 @@ async function cashShifts(client: pg.Client): Promise<CheckResult> {
 }
 
 /** Every issued sales document's net and VAT are the sums of its lines (decision 0009). */
-async function documentTotals(client: pg.Client): Promise<CheckResult> {
+async function documentTotals(client: Queryable): Promise<CheckResult> {
   const { rows } = await client.query<{ k: string }>(
     `SELECT format('%s: net %s / VAT %s fils, lines %s / %s', d.doc_number, d.net_fils, d.vat_fils,
                    coalesce(l.net, 0), coalesce(l.vat, 0)) AS k
@@ -179,7 +185,7 @@ async function documentTotals(client: pg.Client): Promise<CheckResult> {
  * document is numbered in its own series: POS sales in POS-, A4 invoices and advance payment
  * invoices in INV-, credit and debit notes in theirs (0011).
  */
-async function invoiceFormats(client: pg.Client): Promise<CheckResult> {
+async function invoiceFormats(client: Queryable): Promise<CheckResult> {
   const { rows } = await client.query<{ k: string }>(
     `SELECT format('%s: %s', d.doc_number, CASE
               WHEN d.bill_to_trn IS NOT NULL AND d.invoice_format <> 'full'
@@ -212,7 +218,7 @@ async function invoiceFormats(client: pg.Client): Promise<CheckResult> {
  * account mapped as output VAT. An advance's VAT is counted once: the final invoice's deduction
  * lines take it back (0013). The account is read from the mappings, never hard-coded (0018).
  */
-async function vatLedger(client: pg.Client): Promise<CheckResult> {
+async function vatLedger(client: Queryable): Promise<CheckResult> {
   const { rows } = await client.query<{ docs: string; ledger: string }>(
     `SELECT (SELECT coalesce(sum(CASE WHEN doc_type = 'credit_note' THEN -vat_fils ELSE vat_fils END), 0)
                FROM sales.documents WHERE status = 'issued')::text AS docs,
@@ -232,7 +238,7 @@ async function vatLedger(client: pg.Client): Promise<CheckResult> {
  * account (receivables, customer advances, output VAT, inventory) is flagged: those accounts are
  * kept by the documents alone.
  */
-async function postings(client: pg.Client): Promise<CheckResult> {
+async function postings(client: Queryable): Promise<CheckResult> {
   const { rows } = await client.query<{ k: string }>(
     `SELECT 'document ' || d.doc_number || ' not posted' AS k FROM sales.documents d
       WHERE d.status = 'issued' AND NOT EXISTS (SELECT 1 FROM gl.journal_entries e
@@ -267,7 +273,7 @@ async function postings(client: pg.Client): Promise<CheckResult> {
  * opening balance add up to; no receivable line is without its customer. The customer advances
  * account equals the advance payment invoices not yet deducted or credited (0013).
  */
-async function receivables(client: pg.Client): Promise<CheckResult> {
+async function receivables(client: Queryable): Promise<CheckResult> {
   const { rows } = await client.query<{ k: string }>(
     `WITH ar AS (SELECT l.customer_id, sum(l.debit_fils - l.credit_fils) AS b
                    FROM gl.journal_lines l
@@ -307,7 +313,7 @@ async function receivables(client: pg.Client): Promise<CheckResult> {
  * Every anchor copied out of the audit chain (on Z reports and into backups) still matches the
  * chain at its position: a rewritten chain cannot match a copy kept elsewhere.
  */
-async function auditAnchors(client: pg.Client): Promise<CheckResult> {
+async function auditAnchors(client: Queryable): Promise<CheckResult> {
   const { rows } = await client.query<{ k: string }>(
     `SELECT format('%s anchor %s at entry %s', x.anchor_kind, x.reference, x.chain_seq) AS k
        FROM audit.anchors x
@@ -327,7 +333,7 @@ async function auditAnchors(client: pg.Client): Promise<CheckResult> {
   return result(rows.map((r) => r.k));
 }
 
-const CHECKS: Record<string, (client: pg.Client) => Promise<CheckResult>> = {
+const CHECKS: Record<string, (client: Queryable) => Promise<CheckResult>> = {
   audit_chain: auditChain,
   audit_anchors: auditAnchors,
   journals_balanced: journalsBalanced,
@@ -347,7 +353,7 @@ const CHECKS: Record<string, (client: pg.Client) => Promise<CheckResult>> = {
 export const CHECK_NAMES = Object.keys(CHECKS);
 
 /** Runs every check on the database `client` is connected to. */
-export async function runChecks(client: pg.Client): Promise<CheckResults> {
+export async function runChecks(client: Queryable): Promise<CheckResults> {
   const results: CheckResults = {};
   for (const [name, check] of Object.entries(CHECKS)) {
     try {

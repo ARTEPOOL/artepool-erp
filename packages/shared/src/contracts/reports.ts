@@ -90,3 +90,57 @@ export interface DashboardResponse {
     })[];
   };
 }
+
+/**
+ * The reconciliation report (M7, decision 0119): the seven steps of the acceptance
+ * reconciliation, each green or red, with its checks and its figures. Owner and accountant.
+ */
+export const RECONCILIATION_STEPS = [
+  'stock',
+  'cash',
+  'invoices',
+  'vat',
+  'accounts',
+  'audit',
+  'backup',
+] as const;
+export type ReconciliationStep = (typeof RECONCILIATION_STEPS)[number];
+
+export const ReconciliationRequest = z
+  .object({ from: DateText, to: DateText })
+  .refine((q) => q.from <= q.to, { path: ['to'], message: 'before_from' });
+export type ReconciliationRequest = z.infer<typeof ReconciliationRequest>;
+
+/** One check: what it looked for, whether it passed, how many problems and a few examples. */
+export interface ReconciliationCheck {
+  name: string;
+  ok: boolean;
+  problems: number;
+  examples: string[];
+}
+
+/**
+ * One figure shown on the step: an amount in fils (as text), a count, a date or a text. `null`
+ * when the viewer may not see it (e.g. stock value without stock.view_cost).
+ */
+export interface ReconciliationFigure {
+  key: string;
+  kind: 'fils' | 'count' | 'date' | 'text';
+  value: string | null;
+}
+
+export interface ReconciliationStepResult {
+  step: ReconciliationStep;
+  ok: boolean;
+  checks: ReconciliationCheck[];
+  figures: ReconciliationFigure[];
+}
+
+export interface ReconciliationReport {
+  id: string;
+  from: string;
+  to: string;
+  ranAt: string;
+  ok: boolean;
+  steps: ReconciliationStepResult[];
+}

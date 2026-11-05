@@ -127,7 +127,7 @@ const LATIN = 'U+0020-007E, U+00A0-00FF, U+2013-2014, U+2018-201E, U+2022, U+202
 
 let fontsCss: string | null = null;
 /** The app's fonts, embedded, so Arabic is shaped the same on every server. */
-function fonts(): string {
+export function fonts(): string {
   fontsCss ??=
     `@font-face { font-family: 'ARTEPOOL Arabic'; font-weight: 100 900; unicode-range: ${ARABIC_LETTERS};
       src: url(data:font/otf;base64,${readFileSync(ARABIC_FONT).toString('base64')}) format('opentype'); }\n` +
