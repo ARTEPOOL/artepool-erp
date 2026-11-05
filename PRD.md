@@ -1,7 +1,7 @@
 # ARTÉPOOL ERP — Product Requirements Document (PRD)
 
-**Version:** 1.50
-**Date:** 2026-11-04
+**Version:** 1.51
+**Date:** 2026-11-05
 **Owner:** Mohammed Yasser Al Huraidi (partner, ARTÉPOOL)
 **Status:** Scope approved. Owner and accountant decisions applied (see `docs/decisions/`). **Phase 1 plan approved (2026-10-07).**
 
@@ -94,7 +94,7 @@ Full detail: [`docs/architecture.md`](docs/architecture.md).
 - **Standby server:** a second PC can hold a near-real-time replica and be promoted if the main one fails.
 - **Multi-warehouse / branch:** the schema is ready now; the UI comes later.
 - **E-invoicing (UAE):** see section 10.4. Invoices are stored in a structured, transmittable form, and an outbox queues them for later sync.
-- **Mobile dashboard (Phase 2):** no cloud database in Phase 1; summary figures go through an outbox to a read-only mobile dashboard later, nothing flows back ([0088](docs/decisions/0088-no-cloud-database-outbox-for-mobile.md)).
+- **Mobile dashboard (AI & Online track, stage 2C):** no cloud database in Phase 1; summary figures go through an outbox to a read-only mobile dashboard later, nothing flows back ([0088](docs/decisions/0088-no-cloud-database-outbox-for-mobile.md), [0118](docs/decisions/0118-ai-online-ground-rules.md)).
 
 ---
 
@@ -254,7 +254,7 @@ Phase tags: **[P1]** to **[P4]** (see section 13).
   - A4 invoices can print an **account summary** (previous balance / this invoice / paid now / total due), frozen at issue so a reprint shows the same numbers; on for credit customers by default (Print designer), never for the walk-in.
 - **Sections ([0045](docs/decisions/0045-sales-sections-in-the-side-menu.md)):** Invoices (A4), Quotations and Receipts each have their own entry in the side menu.
 - **Invoices (A4) section:** create, print (with print dialog) and reprint A4 documents. **Any POS sale can be reprinted in A4 format**: same document, same number, counted and logged as a reprint ([0008](docs/decisions/0008-printing-pos-silent-a4-section.md)).
-- Send PDF by WhatsApp/email when online [P4].
+- Send PDF by email when online [P4]; by WhatsApp in the AI & Online track, stage 2B ([0118](docs/decisions/0118-ai-online-ground-rules.md)).
 
 ### 9.5 Point of Sale [P1]
 - Fast item search and barcode scan, categories, cart, quantity edits.
@@ -428,8 +428,8 @@ Exact models must be chosen before Phase 1 POS work (milestone M6) so they can b
 | **P1 — Core** | Architecture, database, migrations, security, users/roles/audit, master data, inventory, quotations, invoices (POS- and INV-), advance/progress payment tax invoices, credit notes, POS, cash drawer and shifts, **automatic double-entry postings (ledger core)**, backups, i18n | A full day of real-style sales on 2+ terminals reconciles exactly: stock, cash count, invoices, VAT, journals and audit chain all verified. A backup is restored successfully to a test database. |
 | **P2 — Money** | Purchasing, suppliers, expenses, accounting screens, reports, VAT return, quarterly VAT export package and annual archive, dashboard | The accountant reproduces a month's VAT return and P&L from the system without manual fixes |
 | **P3 — Operations** | Pool profiles, maintenance/cleaning contracts, visits, technician stock, service jobs, construction projects | One real contract, one service job and one project run end to end and bill correctly |
-| **P4 — Extensions** | WhatsApp/email sending, promotions, loyalty, multi-warehouse UI, standby server | Each feature accepted individually |
-| **AI & Online track (2A–2D)** | A separate track, not "Phase 2": its stages 2A–2D are described in its own plan (`docs/ai-online-track.md`, to be added from the owner's draft) | Each stage accepted individually |
+| **P4 — Extensions** | Email sending, promotions, loyalty, multi-warehouse UI, standby server (WhatsApp moved to the AI & Online track, stage 2B, [0118](docs/decisions/0118-ai-online-ground-rules.md)) | Each feature accepted individually |
+| **AI & Online track (2A–2D)** | A separate track, not "Phase 2", described in its own plan [`docs/ai-online-track.md`](docs/ai-online-track.md): 2A inside the app (dosing calculator, social posts, accountant assistant, voice selling), 2B WhatsApp, 2C secure cloud relay (mobile dashboard, technician app), 2D website requests. Nine ground rules ([0118](docs/decisions/0118-ai-online-ground-rules.md)): offline-first, AI only suggests, minimal personal data, audited, a switch per feature, outbox, one-way cloud, no open ports, costs visible | Each stage accepted individually |
 | **E-invoicing (UAE)** | The ASP integration of [10.4](#104-e-invoicing-0019) | **Ready before 1 July 2027**, sending real documents through the provider |
 
 Each phase ends with automated tests passing, a security review, an accountant review (P1–P2) and a written changelog.
@@ -466,6 +466,7 @@ Each phase ends with automated tests passing, a security review, an accountant r
 | 1.45 | 2026-10-31 | Decision 0115: fast updates — "Check now" in seconds, "Install now" starts at once, a progress bar, resumable downloads fetched in advance, an hourly check (0.8.0); split update packages, step-by-step install progress and laptop updates at sign-in planned for 0.9.0. |
 | 1.47 | 2026-11-02 | Decision 0095 updated, 0.9.1: the app's Google registration published "In production" with public pages (artepool.github.io), its values only as release secrets, carried by every release and read beside the programs at every start; an alert when Google refuses the saved Drive access. |
 | 1.48 | 2026-11-04 | Decision 0116: the order after go-live — P2 (money) first; then the AI & Online track (stages 2A–2D, its own track, not "Phase 2") interleaved with P3 as the owner decides; e-invoicing ready before 1 July 2027 (out of P4). M6.4 plan proposed; Arabic install guides; the accountant pack. |
+| 1.51 | 2026-11-05 | Decision 0118: the AI & Online track plan (`docs/ai-online-track.md`, from the owner's draft) and its nine ground rules; WhatsApp moves from P4 to stage 2B; the mobile dashboard is stage 2C. The M7 acceptance tools plan proposed (`docs/milestones/m7-acceptance-tools.md`). |
 | 1.50 | 2026-11-04 | M6.4 simplified (owner): a standard cashier Windows account with automatic sign-in and the app on the PIN screen; the PC's enrollment shared on the server PC; active hours 08:00–24:00; one emergency-tool action (audited); uninstall disables the account; one System health line. No Windows limits for now. |
 | 1.49 | 2026-11-04 | Decision 0117: A4 documents print the unit price and the discount excluding VAT, like the taxable amount beside them and like e-invoicing (PINT-AE). |
 | 1.46 | 2026-11-02 | Decision 0115, 0.9.0: small update packages (the server about 10 MB, the office app about 6 MB; PostgreSQL/Node only when they change), step-by-step install progress with a read-only status page while the server restarts, "Install after shift close", quiet laptop and office updates at sign-in (battery rule, WebView2 fallback). |

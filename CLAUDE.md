@@ -103,7 +103,7 @@ It runs client–server on the local network: PostgreSQL and the API service on 
 **Security and access**
 - **Sign-in:** cashiers use a 4-digit PIN **only on PCs enrolled as POS** (weak PINs refused; 5 wrong → blocked until the owner unblocks). Office PCs always need a password. (0021)
 - **Approvals:** every supervisor approval is given with the one-time 6-digit code from the approver's 2-step app (accepted once); only 2-step users approve; 5 wrong codes block that person's approvals (not their sign-in) until the owner unblocks. (0074)
-- **Server and remote:** the POS PC is also the server (services under own accounts, ACLs, standard cashier Windows account «الكاشير» with automatic sign-in, no other Windows limits for now, set up/repaired from the emergency tool (audited), disabled by uninstall, the PC's enrollment shared by both accounts on the server PC, Windows Update active hours 08:00–24:00, one System health line (M6.4); UPS reminder). **No remote access in Phase 1:** no VPN, no open router ports, no remote-desktop tools; the laptop works on the shop LAN; keep the design VPN-agnostic (0084 deferred). No cloud database in Phase 1; outbox for a Phase 2 read-only mobile dashboard. (0085, 0088, 0093)
+- **Server and remote:** the POS PC is also the server (services under own accounts, ACLs, standard cashier Windows account «الكاشير» with automatic sign-in, no other Windows limits for now, set up/repaired from the emergency tool (audited), disabled by uninstall, the PC's enrollment shared by both accounts on the server PC, Windows Update active hours 08:00–24:00, one System health line (M6.4); UPS reminder). **No remote access in Phase 1:** no VPN, no open router ports, no remote-desktop tools; the laptop works on the shop LAN; keep the design VPN-agnostic (0084 deferred). No cloud database in Phase 1; outbox for the read-only mobile dashboard (AI & Online track, stage 2C). (0085, 0088, 0093)
 - **First-run setup:** a one-time wizard on the server PC after install, locked in the database, only on the server PC with the installer's token:
   - **New setup**: company, owner, 2-step, recovery codes, enroll this PC as POS;
   - **Restore from backup**: copy from PC/USB (a Google Drive copy is downloaded first) + private key, all integrity checks pass before it replaces anything; the master key travels inside the age-encrypted copies; the other PCs enroll again.
@@ -162,6 +162,7 @@ It runs client–server on the local network: PostgreSQL and the API service on 
 - **Chart of accounts and posting map** are provisional and **pending accountant review**; go-live waits for the approval. Account mappings must stay configurable data, never hard-coded. (0018, 0035)
 - **E-invoicing** goes through an accredited service provider API. The ERP stays the system of record. The go-live date is **pending** and lives in the setting `einvoice.mandatory_from`; the owner's deadline: **ready before 1 July 2027**. (0019, 0116)
 - **Order after go-live:** P2 (money: purchases and suppliers, expenses, accounting screens and reports, VAT return) first; then the **AI & Online track** (stages 2A–2D; its own track, never called "Phase 2") interleaved with P3 (contracts, visits, service jobs, projects) as the owner decides. (0116)
+- **AI & Online track** ([`docs/ai-online-track.md`](docs/ai-online-track.md); nothing built before go-live, each stage planned and approved first): 2A inside the app, 2B WhatsApp (moved from P4), 2C cloud relay, 2D website requests. Nine ground rules: offline-first stays; AI only suggests (nothing touching money, VAT, stock, prices, discounts, credit or promises is committed without a person); minimal personal data (PDPL); every suggestion and outbound message audited; a permission + owner-only switch per feature; everything outbound through the outbox; one-way cloud (inbound = requests waiting for approval); no open ports, keys sealed with the master key; costs on System health. Inbound webhooks (WhatsApp) need the relay. (0118)
 
 ## How to work
 
@@ -182,6 +183,7 @@ It runs client–server on the local network: PostgreSQL and the API service on 
 | `docs/database-schema.md` | Full Phase 1 database schema |
 | `docs/phase-1-plan.md` | Project structure, migrations order, build order, test plan |
 | `docs/accounting/` | Provisional chart of accounts and posting map (for the accountant) |
+| `docs/ai-online-track.md` | The AI & Online track (stages 2A–2D): ideas, ground rules, gaps, effort, running costs, privacy |
 | `docs/decisions/` | One file per decision, with its status |
 | `design/` | Approved UI design reference v2 (simple style): tokens for light and dark, component styles, design system, screens 01–14. Build the client screens to match it. |
 

@@ -114,7 +114,7 @@ It works in Arabic and English, without the internet, on as many PCs as you like
 **Not in Phase 1** (see PRD §13):
 - purchasing, expenses, accounting reports, the VAT return and the quarterly export package (P2)
 - contracts, visits, service jobs and projects (P3)
-- the e-invoice sender (P4 or earlier), WhatsApp/email, promotions, loyalty, standby server
+- the e-invoice sender (ready before 1 July 2027, 0116), email, promotions, loyalty, standby server; WhatsApp in the AI & Online track (0118)
 
 ---
 
@@ -523,9 +523,11 @@ A milestone is done only when its tests pass in CI.
 
 #### Dropped for Phase 1 — remote access (0093)
 
-No VPN (Tailscale or other), no router ports, no remote-desktop tools. The design stays VPN-agnostic so 0084 can be added later; remote monitoring comes with the Phase 2 mobile dashboard.
+No VPN (Tailscale or other), no router ports, no remote-desktop tools. The design stays VPN-agnostic so 0084 can be added later; remote monitoring comes with the mobile dashboard (AI & Online track, stage 2C, [0118](decisions/0118-ai-online-ground-rules.md)).
 
 ### M7 — Acceptance
+
+**Status (2026-11-05):** the task plan for the acceptance tools is proposed, waiting for the owner's approval: [`milestones/m7-acceptance-tools.md`](milestones/m7-acceptance-tools.md) (reconciliation checks and report, a simulated busy day in CI, speed measurements, the rehearsal day guide, the items export and the go-live guide, the security review).
 
 **Delivers:**
 - The full-day simulation on 2+ terminals (§6.3), run on the real hardware.
