@@ -96,6 +96,48 @@ impl Secret {
     }
 }
 
+/// The programs that work on the whole system (the migrations, the console and emergency tools,
+/// the installation, restore, upgrade, deleting the data, the rehearsal): every role's password.
+const WHOLE_SYSTEM: [&str; 11] = [
+    "migrate",
+    "owner-create",
+    "device-code",
+    "owner-reset-2fa",
+    "owner-reset-password",
+    "restore",
+    "install",
+    "emergency",
+    "upgrade",
+    "delete-data",
+    "rehearsal",
+];
+
+/// `WHOLE_SYSTEM` and one more program.
+const fn and(program: &'static str) -> [&'static str; 12] {
+    let mut out = [program; 12];
+    let mut i = 0;
+    while i < WHOLE_SYSTEM.len() {
+        out[i + 1] = WHOLE_SYSTEM[i];
+        i += 1;
+    }
+    out
+}
+
+const API_PROGRAMS: [&str; 12] = and("server");
+const BACKUP_PROGRAMS: [&str; 13] = {
+    let with_backup = and("backup");
+    let mut out = ["updater"; 13];
+    let mut i = 0;
+    while i < with_backup.len() {
+        out[i + 1] = with_backup[i];
+        i += 1;
+    }
+    out
+};
+
+// Each service gets only its own database role's password (security review, M7): the server
+// (the API) the api role's, the backup service and the updater the backup role's. A fault in one
+// of them never hands over the others' roles.
 pub const SECRETS: [Secret; 6] = [
     Secret {
         name: "master-key",
@@ -109,28 +151,28 @@ pub const SECRETS: [Secret; 6] = [
         file: "migrator-password.dpapi",
         env: "ARTEPOOL_MIGRATOR_PASSWORD",
         kind: SecretKind::Password,
-        programs: None,
+        programs: Some(&WHOLE_SYSTEM),
     },
     Secret {
         name: "api-password",
         file: "api-password.dpapi",
         env: "ARTEPOOL_API_PASSWORD",
         kind: SecretKind::Password,
-        programs: None,
+        programs: Some(&API_PROGRAMS),
     },
     Secret {
         name: "backup-password",
         file: "backup-password.dpapi",
         env: "ARTEPOOL_BACKUP_PASSWORD",
         kind: SecretKind::Password,
-        programs: None,
+        programs: Some(&BACKUP_PROGRAMS),
     },
     Secret {
         name: "maint-password",
         file: "maint-password.dpapi",
         env: "ARTEPOOL_MAINT_PASSWORD",
         kind: SecretKind::Password,
-        programs: None,
+        programs: Some(&WHOLE_SYSTEM),
     },
     // The installation sets PostgreSQL's superuser password to this value. Only the installation
     // program, the restore from a backup and the upgrade need it (they create databases and roles,
@@ -739,9 +781,50 @@ mod tests {
             let launch = prepare(&layout, service, &[], parent.clone(), secrets()).unwrap();
             assert!(!launch.env.iter().any(|(n, _)| n == "PG_SUPERUSER_PASSWORD"));
         }
+        assert!(
+            !prepare(&layout, "backup", &[], parent.clone(), secrets())
+                .unwrap()
+                .env
+                .iter()
+                .any(|(n, _)| n == "ARTEPOOL_API_PASSWORD"),
+            "the backup service never gets the api role's password"
+        );
         assert!(matches!(
             prepare(&layout, "../evil", &[], Vec::new(), Vec::new()).err(),
             Some(SvcError::UnknownProgram(..))
         ));
+    }
+
+    #[test]
+    fn each_service_gets_only_its_own_roles_password_the_whole_system_programs_every_one() {
+        let given = |program: &str| -> Vec<&str> {
+            SECRETS
+                .iter()
+                .filter(|s| s.given_to(program))
+                .map(|s| s.name)
+                .collect()
+        };
+        assert_eq!(given("server"), ["master-key", "api-password"]);
+        assert_eq!(given("backup"), ["master-key", "backup-password"]);
+        assert_eq!(given("updater"), ["master-key", "backup-password"]);
+        for program in WHOLE_SYSTEM {
+            let names = given(program);
+            for role in [
+                "migrator-password",
+                "api-password",
+                "backup-password",
+                "maint-password",
+            ] {
+                assert!(names.contains(&role), "{program} gets {role}");
+            }
+        }
+        // Every program the launcher may start is either a service or a whole-system program.
+        for program in PROGRAMS {
+            assert!(
+                ["server", "backup", "updater"].contains(&program)
+                    || WHOLE_SYSTEM.contains(&program),
+                "{program} is listed"
+            );
+        }
     }
 }
