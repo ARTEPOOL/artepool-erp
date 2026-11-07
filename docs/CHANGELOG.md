@@ -1,5 +1,40 @@
 # Changelog
 
+## Phase 1 in summary (M0–M7, 7 October – 7 November 2026)
+
+**In plain words: what the shop gets on go-live day.** The details are in the entries below, one per batch.
+
+- **Security and access (M1):**
+  - every PC enrolled with a one-time code, talking to the server over HTTPS (TLS 1.3) with the shop's own certificate authority;
+  - passwords for office PCs, a 4-digit PIN for cashiers only on POS PCs, the phone code (2-step) for the owner and every supervisor;
+  - approvals with the approver's one-time phone code;
+  - a hash-chained audit log of every change (who, which PC, when, before and after, why);
+  - nothing is ever deleted: users are deactivated, devices revoked, documents corrected with new documents.
+- **Master data (M2):** items with one sale price (including or excluding VAT), barcodes and purchase prices for the owner; customers with types, credit set with a reason; suppliers; lists; the four UAE VAT categories; Excel import (checked first, all or nothing) and export.
+- **Inventory (M3):** stock always worked out from its movements; opening stock once at go-live; adjustments, blind counts, defective stock; the posting engine that writes balanced journal entries for every document.
+- **Labels:** the 2-inch label printer, drawn by the app at the printer's dots, silent printing, the owner's label design, labels for many items and for changed prices.
+- **Sales on A4 (M4, M4b):** invoices (full or simplified tax invoices), quotations, receipts that settle open invoices oldest first, advance and progress payment invoices with VAT, final invoices that deduct them (only up to the invoice, the rest kept or refunded), credit and debit notes, cancelling an invoice by the owner, cheques and bounced cheques, statements, the customer's balance everywhere, and the print designer with bank accounts.
+- **Point of sale and cash (M5):**
+  - the POS in a kiosk lock;
+  - shifts with blind counts and one approved recount;
+  - drop alerts, paid-in and paid-out, oversell with approval, returns with approval;
+  - thermal receipts printed silently and also saved as PDF;
+  - the last invoice always shown, the owner dashboard.
+- **The shop's server and the PCs (M6):**
+  - installers for the server PC and the laptop, a first-run wizard (new setup or restore from a backup), the emergency tool, the cashier's Windows account;
+  - automatic signed updates at a safe time;
+  - backups every hour, every day encrypted to Google Drive, weekly to a drive, with restore tests;
+  - protection from power cuts and an integrity check after every start;
+  - System health.
+- **Acceptance (M7):** the reconciliation report (seven steps, owner and accountant), new checks of the books every night, the speed line, «ابدأ البروفة» (a whole shop day played by itself on a throwaway database), the busy day in GitHub before every release, the guided hardware check, «جاهز للتشغيل الفعلي», the export for go-live day and its Arabic guide, and a security review ([`docs/reviews/m7-security-review.md`](reviews/m7-security-review.md)).
+
+**Problems found and fixed by the rehearsal and the busy day:** saves from two tills and the office blocking each other, a kit that could not be sold at the POS, slow item search with many items, and the customers export refused by the import.
+
+**Still to do before go-live:**
+- the accountant's approval of the chart of accounts and the posting map, and answers to the pack's questions (Q1–Q7);
+- the VAT period archive (decision 0122), once its plan is approved;
+- at the shop: install, a green rehearsal, the hardware check, then go-live day by `docs/runbooks/go-live.md`.
+
 ## Advance payments larger than the final invoice (2026-11-07) — in version 0.10.0
 
 **In plain words** (decision 0121, the owner's answer; pending the accountant's review):
