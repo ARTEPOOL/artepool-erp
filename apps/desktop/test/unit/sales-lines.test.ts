@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 import type { ItemListItem } from '@artepool/shared/contracts';
 import {
   lineFromItem,
+  planDeductions,
   preview,
   readLine,
   toRequest,
@@ -110,5 +111,44 @@ describe('sales line editor arithmetic', () => {
       { itemId: '1', quantityMilli: '1000', lineDiscountFils: '750' },
     ]);
     expect(toRequest([line({ quantity: 'x' })], decimals)).toBeNull();
+  });
+});
+
+describe('earlier payments deducted from a final invoice (decisions 0013, 0121)', () => {
+  const adv = (id: string, net: bigint, vat: bigint) => ({
+    id,
+    netLeftFils: net,
+    vatLeftFils: vat,
+  });
+
+  it('in the order chosen, never more than the invoice; the rest stays as the advance', () => {
+    // Invoice 1,000.00 + 50.00 VAT; payments 600 + 30 and 800 + 40.
+    expect(
+      planDeductions({ netFils: 100000n, vatFils: 5000n }, [
+        adv('a', 60000n, 3000n),
+        adv('b', 80000n, 4000n),
+      ]),
+    ).toEqual([
+      { id: 'a', deductedFils: 63000n, staysFils: 0n },
+      { id: 'b', deductedFils: 42000n, staysFils: 42000n },
+    ]);
+  });
+
+  it('a payment chosen after the invoice is covered deducts nothing and stays whole', () => {
+    expect(
+      planDeductions({ netFils: 10000n, vatFils: 500n }, [
+        adv('a', 30000n, 1500n),
+        adv('b', 5000n, 250n),
+      ]),
+    ).toEqual([
+      { id: 'a', deductedFils: 10500n, staysFils: 21000n },
+      { id: 'b', deductedFils: 0n, staysFils: 5250n },
+    ]);
+  });
+
+  it('smaller payments are deducted in full', () => {
+    expect(planDeductions({ netFils: 100000n, vatFils: 5000n }, [adv('a', 30000n, 1500n)])).toEqual(
+      [{ id: 'a', deductedFils: 31500n, staysFils: 0n }],
+    );
   });
 });

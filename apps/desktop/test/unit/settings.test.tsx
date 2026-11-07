@@ -3,15 +3,22 @@
  * users and temporary codes, deactivating with a reason, role permissions, PCs, the audit log.
  */
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
-import type {
-  AuditEntry,
-  DeviceListItem,
-  PermissionInfo,
-  RoleInfo,
-  UserListItem,
+import { describe, expect, it, onTestFinished, vi } from 'vitest';
+import {
+  REHEARSAL_STEPS,
+  type AuditEntry,
+  type DeviceListItem,
+  type HardwareCheck,
+  type PermissionInfo,
+  type RehearsalRun,
+  type RehearsalsResponse,
+  type RoleInfo,
+  type UserListItem,
 } from '@artepool/shared/contracts';
 import { App } from '../../src/app/App';
+import { scanMatches, testBarcode } from '../../src/features/settings/backup/HardwareCheckDialog';
+import { stepStates } from '../../src/features/settings/backup/RehearsalCard';
+import { isValidGtin } from '../../src/features/items/labels/barcode';
 import { DownloadProgress } from '../../src/features/settings/backup/UpdatesCard';
 import { initI18n } from '../../src/i18n';
 import { FakeBridge, ok, sessionView, signInAnswer, userView } from '../support/fake-bridge';
@@ -1123,6 +1130,11 @@ describe('Settings → System health (decision 0086)', () => {
         checkedAt: new Date().toISOString(),
         setupAt: null,
       },
+      speed: {
+        search: { p95Ms: 80, samples: 40, targetMs: 300, slow: false },
+        scan: { p95Ms: null, samples: 0, targetMs: 300, slow: false },
+        sale: { p95Ms: 2600, samples: 12, targetMs: 2000, slow: true },
+      },
     };
     const bridge = signedInBridge([
       ...OWNER_PERMISSIONS,
@@ -1164,6 +1176,11 @@ describe('Settings → System health (decision 0086)', () => {
     expect(cashier.textContent).toContain('أداة الطوارئ ← «اعمل / صلّح حساب الكاشير»');
     expect(cashier.textContent).toContain('آخر فحص');
     expect(within(cashier).getByText('دلوقتي')).toBeTruthy();
+    // M7: the server's own speed, a warning when a sale takes longer than the 2 s target.
+    const speed = within(card).getByTestId('health-speed');
+    expect(speed.textContent).toContain('السرعة');
+    expect(speed.textContent).toContain('البحث 0.08 ث · البيع 2.60 ث');
+    expect(speed.textContent).not.toContain('الباركود');
     const ups = within(card).getByTestId('health-ups');
     expect(ups.textContent).toContain('جهاز السيرفر متوصل بـ UPS؟');
     fireEvent.click(within(ups).getByRole('button', { name: 'أيوه، متوصل بـ UPS' }));
@@ -1177,6 +1194,329 @@ describe('Settings → System health (decision 0086)', () => {
     await openSettings();
     const hub = screen.getByRole('navigation', { name: 'الإعدادات' });
     expect(within(hub).queryByRole('link', { name: /النسخ الاحتياطي/ })).toBeNull();
+  });
+});
+
+describe('Settings → System health → the automated rehearsal (M7, decision 0119)', () => {
+  const backupHealth = {
+    problems: [],
+    local: { last: null, lastFailure: null, maxAgeMinutes: 90, folder: 'D:\\ARTEPOOL\\backups' },
+    offsite: {
+      last: null,
+      lastFailure: null,
+      maxAgeHours: 30,
+      keySet: true,
+      driveConnected: true,
+      google: { chooseAccount: true, code: true },
+      driveAccess: null,
+    },
+    offline: { last: null, intervalDays: 7 },
+    restoreTest: { last: null, intervalDays: 30 },
+    integrity: { last: null },
+    disk: { freeBytes: 100 * 1024 ** 3, totalBytes: 500 * 1024 ** 3 },
+    requests: [],
+  };
+  const speed = {
+    search: { p95Ms: 40, samples: 30, targetMs: 300, slow: false },
+    scan: { p95Ms: 12, samples: 30, targetMs: 300, slow: false },
+    sale: { p95Ms: 380, samples: 150, targetMs: 2000, slow: false },
+  };
+  const passed: RehearsalRun = {
+    id: '7',
+    status: 'passed',
+    requestedAt: '2026-11-05T10:00:00.000Z',
+    startedAt: '2026-11-05T10:00:30.000Z',
+    finishedAt: '2026-11-05T10:14:00.000Z',
+    steps: REHEARSAL_STEPS.map((step) => ({ step, ok: true, ms: 1500 })),
+    result: {
+      checks: { audit_chain: { ok: true, problems: 0, examples: [] } },
+      restoredChecks: { audit_chain: { ok: true, problems: 0, examples: [] } },
+      speed,
+      totals: { posSales: 151 },
+      reconciliation: {
+        from: '2026-11-05',
+        to: '2026-11-05',
+        ranAt: '2026-11-05T10:13:00.000Z',
+        ok: true,
+        steps: [{ step: 'stock', ok: true, checks: [], figures: [] }],
+      },
+    },
+    failure: null,
+  };
+  const bridgeWith = (answer: RehearsalsResponse, permissions: string[] = []) =>
+    signedInBridge([...OWNER_PERMISSIONS, 'system.health.view', 'system.rehearsal', ...permissions])
+      .on('GET', '/api/v1/health/system', ok(backupHealth))
+      .on('GET', '/api/v1/system/rehearsals', ok(answer));
+  const openCard = async () => {
+    await openSettings();
+    fireEvent.click(screen.getByRole('link', { name: 'النسخ الاحتياطي' }));
+    return screen.findByTestId('rehearsal-card');
+  };
+
+  it('shows the last run: green, its checks, the speed, every step, and prints its report', async () => {
+    const bridge = bridgeWith({ latest: passed, history: [], blocked: 'shift_open' }, [
+      'reports.reconciliation',
+    ]).on(
+      'GET',
+      '/api/v1/system/rehearsals/7/reconciliation/pdf',
+      ok({ fileName: 'r.pdf', mime: 'application/pdf', dataBase64: 'JVBERi0=' }),
+    );
+    await signIn(bridge);
+    const card = await openCard();
+    expect(within(card).getByText('أخضر: كل حاجة سليمة')).toBeTruthy();
+    const result = within(card).getByTestId('rehearsal-result');
+    expect(result.textContent).toContain('فحوصات السلامة: 1 من 1 سليمة');
+    expect(result.textContent).toContain('النسخة الاحتياطية اترجعت واتفحصت');
+    expect(result.textContent).toContain('تقرير المطابقة: 1 من 1 خطوات مطابقة');
+    expect(result.textContent).toContain('البحث 40 مللي ثانية · البيع 380 مللي ثانية');
+    const steps = within(card).getByTestId('rehearsal-steps');
+    expect(within(steps).getAllByRole('listitem')).toHaveLength(REHEARSAL_STEPS.length);
+    expect(within(steps).getByLabelText('يوم البيع: الكاشيرات والمكتب مع بعض: تمت')).toBeTruthy();
+    // A shift is open: the button waits, and says why.
+    expect(within(card).getByTestId('rehearsal-blocked').textContent).toBe(
+      'اقفل كل الورديات المفتوحة الأول.',
+    );
+    expect(
+      within(card).getByRole<HTMLButtonElement>('button', { name: 'ابدأ البروفة' }).disabled,
+    ).toBe(true);
+    fireEvent.click(within(card).getByRole('button', { name: 'اطبع تقرير المطابقة' }));
+    await waitFor(() =>
+      expect(bridge.callsTo('GET', '/api/v1/system/rehearsals/7/reconciliation/pdf')).toHaveLength(
+        1,
+      ),
+    );
+  });
+
+  it('starts after a confirmation, then follows the steps with a progress bar', async () => {
+    const running: RehearsalRun = {
+      ...passed,
+      id: '8',
+      status: 'running',
+      finishedAt: null,
+      result: null,
+      steps: passed.steps.slice(0, 5),
+    };
+    const bridge = bridgeWith({ latest: null, history: [], blocked: null })
+      .on(
+        'POST',
+        '/api/v1/system/rehearsals',
+        ok({ ...running, status: 'requested', steps: [] }, 201),
+      )
+      .on(
+        'GET',
+        '/api/v1/system/rehearsals',
+        ok({ latest: null, history: [], blocked: null }),
+        ok({ latest: running, history: [], blocked: 'running' }),
+      );
+    await signIn(bridge);
+    const card = await openCard();
+    fireEvent.click(within(card).getByRole('button', { name: 'ابدأ البروفة' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog.textContent).toContain('حوالي 10–20 دقيقة');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'ابدأ البروفة' }));
+    await waitFor(() =>
+      expect(bridge.callsTo('POST', '/api/v1/system/rehearsals')).toHaveLength(1),
+    );
+    const progress = await within(card).findByTestId('rehearsal-progress');
+    const percent = Math.round((5 / REHEARSAL_STEPS.length) * 100);
+    expect(within(progress).getByRole('progressbar').getAttribute('aria-valuenow')).toBe(
+      String(percent),
+    );
+    expect(progress.textContent).toContain(`5 من ${REHEARSAL_STEPS.length} خطوة`);
+    expect(within(card).getByLabelText('فتح الورديات: شغالة')).toBeTruthy();
+  });
+
+  it('a red run shows the step that failed and why', () => {
+    const red: RehearsalRun = {
+      ...passed,
+      status: 'failed',
+      result: null,
+      failure: 'POST /api/v1/pos/sales: 422',
+      steps: [
+        { step: 'database', ok: true, ms: 1000 },
+        { step: 'server', ok: true, ms: 100 },
+        { step: 'pcs_and_people', ok: false, ms: 900, detail: 'POST /api/v1/pos/sales: 422' },
+      ],
+    };
+    expect(
+      stepStates(red)
+        .slice(0, 4)
+        .map((s) => s.state),
+    ).toEqual(['done', 'done', 'failed', 'pending']);
+    expect(stepStates({ ...red, status: 'running', steps: red.steps.slice(0, 2) })[2]!.state).toBe(
+      'running',
+    );
+  });
+});
+
+describe('Settings → System health → the hardware check (M7, decision 0119)', () => {
+  const backupHealth = {
+    problems: [],
+    local: { last: null, lastFailure: null, maxAgeMinutes: 90, folder: 'D:\\ARTEPOOL\\backups' },
+    offsite: {
+      last: null,
+      lastFailure: null,
+      maxAgeHours: 30,
+      keySet: true,
+      driveConnected: true,
+      google: { chooseAccount: true, code: true },
+      driveAccess: null,
+    },
+    offline: { last: null, intervalDays: 7 },
+    restoreTest: { last: null, intervalDays: 30 },
+    integrity: { last: null },
+    disk: { freeBytes: 100 * 1024 ** 3, totalBytes: 500 * 1024 ** 3 },
+    requests: [],
+  };
+  const check = (patch: Partial<HardwareCheck>): HardwareCheck => ({
+    id: '1',
+    deviceCode: 'COUNTER-01',
+    deviceName: 'Counter',
+    checkedAt: '2026-11-05T11:00:00.000Z',
+    checkedBy: { displayNameAr: 'محمد ياسر', displayNameEn: 'Mohammed Yasser' },
+    results: [
+      { step: 'receipt', outcome: 'ok', note: null },
+      { step: 'drawer', outcome: 'ok', note: null },
+      { step: 'label', outcome: 'ok', note: null },
+      { step: 'scan', outcome: 'ok', note: null },
+    ],
+    allOk: true,
+    ...patch,
+  });
+
+  it('a test label carries an in-store EAN-13; the scan must match it', () => {
+    const code = testBarcode();
+    expect(code).toMatch(/^2\d{12}$/);
+    expect(isValidGtin(code)).toBe(true);
+    expect(scanMatches(` ${code}\n`, code)).toBe(true);
+    expect(scanMatches('6291234567890', code)).toBe(false);
+  });
+
+  it('shows each PC’s newest check and whether the shop is ready for go-live', async () => {
+    const bridge = signedInBridge([
+      ...OWNER_PERMISSIONS,
+      'system.health.view',
+      'system.health.manage',
+      'system.rehearsal',
+    ])
+      .on('GET', '/api/v1/health/system', ok(backupHealth))
+      .on(
+        'GET',
+        '/api/v1/system/rehearsals',
+        ok({
+          latest: {
+            id: '7',
+            status: 'passed',
+            requestedAt: '2026-11-05T10:00:00.000Z',
+            startedAt: null,
+            finishedAt: '2026-11-05T10:14:00.000Z',
+            steps: [],
+            result: null,
+            failure: null,
+          },
+          history: [],
+          blocked: null,
+        }),
+      )
+      .on(
+        'GET',
+        '/api/v1/system/hardware-checks',
+        ok({
+          steps: ['a4'],
+          checks: [
+            check({}),
+            check({
+              id: '2',
+              deviceCode: 'LAPTOP-01',
+              allOk: false,
+              results: [{ step: 'a4', outcome: 'problem', note: 'الإطار ناقص من تحت' }],
+            }),
+          ],
+        }),
+      );
+    await signIn(bridge);
+    await openSettings();
+    fireEvent.click(screen.getByRole('link', { name: 'النسخ الاحتياطي' }));
+    const card = await screen.findByTestId('hardware-card');
+    expect(within(card).getByTestId('hardware-check-COUNTER-01').textContent).toContain('كله تمام');
+    const laptop = within(card).getByTestId('hardware-check-LAPTOP-01');
+    expect(laptop.textContent).toContain('فيه مشكلة');
+    expect(laptop.textContent).toContain('صفحة A4 تجربة: الإطار ناقص من تحت');
+    expect(within(card).getByTestId('go-live-ready').textContent).toContain('جاهز للتشغيل الفعلي');
+  });
+
+  it('guides the POS PC’s check step by step; a matching scan is OK; saving sends every step', async () => {
+    // The test label's code, known to the test.
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    onTestFinished(() => random.mockRestore());
+    const bridge = signedInBridge([
+      ...OWNER_PERMISSIONS,
+      'system.health.view',
+      'system.health.manage',
+    ])
+      .on('GET', '/api/v1/health/system', ok(backupHealth))
+      .on(
+        'GET',
+        '/api/v1/system/hardware-checks',
+        ok({ steps: ['receipt', 'drawer', 'label', 'scan'], checks: [] }),
+      )
+      .on('POST', '/api/v1/system/hardware-checks', ok(check({ allOk: false }), 201));
+    await signIn(bridge);
+    await openSettings();
+    fireEvent.click(screen.getByRole('link', { name: 'النسخ الاحتياطي' }));
+    const card = await screen.findByTestId('hardware-card');
+    expect(within(card).getByTestId('hardware-none')).toBeTruthy();
+    fireEvent.click(within(card).getByRole('button', { name: 'ابدأ فحص الأجهزة' }));
+    const dialog = await screen.findByTestId('hardware-dialog');
+    const save = within(dialog).getByRole('button', { name: 'احفظ الفحص' });
+    expect(save.hasAttribute('disabled') || save.getAttribute('aria-disabled') === 'true').toBe(
+      true,
+    );
+
+    // Outside the Windows app nothing prints: the step says so.
+    const receipt = within(dialog).getByTestId('hardware-step-receipt');
+    fireEvent.click(within(receipt).getByRole('button', { name: 'اطبع إيصال تجربة' }));
+    expect(await within(receipt).findByText('الطباعة بتشتغل في برنامج ويندوز بس.')).toBeTruthy();
+    fireEvent.click(within(receipt).getByRole('button', { name: 'تمام' }));
+    fireEvent.click(
+      within(within(dialog).getByTestId('hardware-step-drawer')).getByRole('button', {
+        name: 'تمام',
+      }),
+    );
+    const label = within(dialog).getByTestId('hardware-step-label');
+    fireEvent.click(within(label).getByRole('button', { name: 'فيه مشكلة' }));
+    fireEvent.change(within(label).getByLabelText('ملاحظة (اختياري)'), {
+      target: { value: 'الطباعة باهتة' },
+    });
+
+    // A code that is not the label's: not matching, not OK.
+    const scan = within(dialog).getByTestId('hardware-step-scan');
+    fireEvent.change(within(scan).getByLabelText('امسح الباركود هنا'), {
+      target: { value: '6291234567890' },
+    });
+    expect(within(scan).getByTestId('hardware-scan-result').textContent).toContain('مش مطابق');
+    expect(within(scan).queryByRole('button', { name: 'تمام' })).toBeNull();
+    // The label's own code: matching, and OK by itself.
+    fireEvent.change(within(scan).getByLabelText('امسح الباركود هنا'), {
+      target: { value: testBarcode(() => 0.5) },
+    });
+    expect(within(scan).getByTestId('hardware-scan-result').textContent).toContain('مطابق للي');
+    expect(within(scan).getByRole('button', { name: 'تمام' }).getAttribute('aria-pressed')).toBe(
+      'true',
+    );
+
+    fireEvent.click(save);
+    await waitFor(() =>
+      expect(bridge.callsTo('POST', '/api/v1/system/hardware-checks')).toHaveLength(1),
+    );
+    expect(bridge.callsTo('POST', '/api/v1/system/hardware-checks')[0]!.body).toEqual({
+      results: [
+        { step: 'receipt', outcome: 'ok', note: null },
+        { step: 'drawer', outcome: 'ok', note: null },
+        { step: 'label', outcome: 'problem', note: 'الطباعة باهتة' },
+        { step: 'scan', outcome: 'ok', note: null },
+      ],
+    });
   });
 });
 

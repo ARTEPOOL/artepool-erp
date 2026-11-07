@@ -394,7 +394,8 @@ export function registerSalesRoutes(app: FastifyInstance): void {
   defineRoute(app, {
     method: 'GET',
     url: '/api/v1/customers/:id/opening-balance',
-    access: allow('customers.view'),
+    // An amount owed (decision 0114): for those who take payments against it, not every viewer.
+    access: allow('payments.receive'),
     params: Params,
     handler: async ({ params }) => ({
       openingBalance: await statements.openingBalanceOf(db, BigInt(params.id)),

@@ -167,6 +167,14 @@ export async function advanceLeft(db: Db, advanceId: bigint, customerId: bigint)
   return { ...a, net_left: BigInt(a.net_left), vat_left: BigInt(a.vat_left) };
 }
 
+/**
+ * The deduction lines of a final invoice (decision 0013): each chosen payment invoice, in the order
+ * chosen, is deducted with its VAT, but never more than this invoice's own net and VAT in that VAT
+ * category (decision 0121): when the payments are more than the invoice, only the invoice's amount
+ * is deducted and the rest stays as the customer's advance (2120) for later invoices, or is
+ * refunded with a credit note on the payment invoice. A payment with nothing left to deduct here
+ * gets no line.
+ */
 async function insertDeductions(
   trx: Transaction<DB>,
   documentId: bigint,
@@ -174,11 +182,34 @@ async function insertDeductions(
   advances: bigint[],
   firstLineNo: number,
 ) {
+  if (advances.length === 0) return;
+  // Room per VAT category: the invoice's item lines, after their discounts.
+  const totals = await trx
+    .selectFrom('sales.document_lines')
+    .select([
+      'vat_category_id',
+      sql<string>`coalesce(sum(net_fils), 0)::text`.as('net'),
+      sql<string>`coalesce(sum(vat_fils), 0)::text`.as('vat'),
+    ])
+    .where('document_id', '=', documentId)
+    .where('line_kind', '=', 'item')
+    .groupBy('vat_category_id')
+    .execute();
+  const room = new Map(
+    totals.map((t) => [t.vat_category_id.toString(), { net: BigInt(t.net), vat: BigInt(t.vat) }]),
+  );
+  const min = (a: bigint, b: bigint) => (a < b ? a : b);
   let lineNo = firstLineNo;
   for (const advanceId of advances) {
     const a = await advanceLeft(trx, advanceId, customerId);
     if (a.net_left <= 0n && a.vat_left <= 0n) continue;
-    const gross = a.net_left + a.vat_left;
+    const r = room.get(BigInt(a.vat_category_id).toString()) ?? { net: 0n, vat: 0n };
+    const net = min(a.net_left, r.net > 0n ? r.net : 0n);
+    const vat = min(a.vat_left, r.vat > 0n ? r.vat : 0n);
+    if (net <= 0n && vat <= 0n) continue;
+    r.net -= net;
+    r.vat -= vat;
+    const gross = net + vat;
     await trx
       .insertInto('sales.document_lines')
       .values(
@@ -192,8 +223,8 @@ async function insertDeductions(
           quantity: '1.000',
           unit_price_4dp: -gross * 100n,
           vat_category_id: BigInt(a.vat_category_id),
-          net_fils: -a.net_left,
-          vat_fils: -a.vat_left,
+          net_fils: -net,
+          vat_fils: -vat,
           gross_fils: -gross,
           advance_document_id: a.id,
         }),

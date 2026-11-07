@@ -111,6 +111,23 @@ describe('backup runs', () => {
   });
 });
 
+describe('integrity runs (security review, M7: migration 0056)', () => {
+  it('the API records reconciliation reports only; the checks themselves come from the backup service', async () => {
+    const insert = (kind: string, client: 'api' | 'backup') => {
+      const sql = `INSERT INTO ops.integrity_runs (run_kind, database_name, finished_at, status, results${
+        kind === 'reconciliation' ? ', period_from, period_to' : ''
+      }) VALUES ($1, current_database(), now(), 'ok', '{}'${
+        kind === 'reconciliation' ? ', current_date, current_date' : ''
+      })`;
+      return client === 'api' ? asApi(sql, [kind], accountant) : asBackup(sql, [kind]);
+    };
+    for (const kind of ['nightly', 'after_start', 'restore_test', 'manual'])
+      await expect(insert(kind, 'api')).rejects.toMatchObject({ code: '42501' });
+    await insert('reconciliation', 'api');
+    await insert('nightly', 'backup');
+  });
+});
+
 describe('the encryption key setting', () => {
   it('holds only an age public key (or nothing)', async () => {
     const set = (value: string) =>

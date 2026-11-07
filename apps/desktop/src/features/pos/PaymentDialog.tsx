@@ -38,6 +38,7 @@ import { toRequest } from '../sales/lines';
 import { APPROVAL_FIELD, APPROVAL_FOR_RULE, POS_INVALIDATE, POS_PATHS } from './api';
 import { cartStore, useCart } from './cart';
 import { useReceiptLogo } from './receipt/logo';
+import type { ReceiptCopy } from './receipt/pdf';
 import { printReceipt, type PrintOutcome } from './receipt/printer';
 import styles from './pos.module.css';
 
@@ -90,6 +91,7 @@ export function PaymentDialog(props: {
   const [done, setDone] = useState<{
     sale: PosSaleResponse;
     print: PrintOutcome;
+    pdf: ReceiptCopy;
     image: string;
   } | null>(null);
   const total = props.totalFils;
@@ -181,7 +183,7 @@ export function PaymentDialog(props: {
         )
         .catch(() => undefined);
     }
-    setDone({ sale: result, print: printed.outcome, image: printed.imageUrl });
+    setDone({ sale: result, print: printed.outcome, pdf: printed.pdf, image: printed.imageUrl });
   };
 
   const submit = (event: FormEvent) => {
@@ -218,7 +220,7 @@ export function PaymentDialog(props: {
               },
             );
           }
-          setDone({ ...done, print: again.outcome, image: again.imageUrl });
+          setDone({ ...done, print: again.outcome, pdf: again.pdf, image: again.imageUrl });
         }}
       />
     );
@@ -352,13 +354,13 @@ export function PaymentDialog(props: {
 }
 
 function SaleDone(props: {
-  result: { sale: PosSaleResponse; print: PrintOutcome; image: string };
+  result: { sale: PosSaleResponse; print: PrintOutcome; pdf: ReceiptCopy; image: string };
   onNew: () => void;
   onA4: () => void;
   onReprint: () => Promise<void>;
 }) {
   const { t } = useTranslation('pos');
-  const { sale, print, image } = props.result;
+  const { sale, print, pdf, image } = props.result;
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Enter') {
@@ -401,6 +403,7 @@ function SaleDone(props: {
             <img className={styles.preview} src={image} alt={t('done.preview')} />
           </>
         )}
+        {pdf === 'failed' && <Alert tone="warn">{t('done.pdfFailed')}</Alert>}
       </div>
       <DialogFooter>
         <Button onPress={() => void props.onReprint()}>

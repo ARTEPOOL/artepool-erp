@@ -4,7 +4,7 @@
  * the accountant gives credit with a reason, the walk-in customer is locked, someone else's save
  * is reloaded, and suppliers are listed and added.
  */
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type {
   CustomerDetail,
@@ -244,6 +244,20 @@ describe('Customers', () => {
     expect(screen.queryByRole('button', { name: 'تغيير الائتمان' })).toBeNull();
   });
 
+  it('a credit customer seen by the cashier: credit and its terms, never the limit (0114)', async () => {
+    // The server leaves the amount out for someone without customers.balance.view.
+    const credit = customer({ creditMode: 'credit', creditLimitFils: null, paymentTermsDays: 30 });
+    await signIn(
+      signedInBridge(CASHIER)
+        .on('GET', '/api/v1/customers', ok(customersAnswer([WALK_IN, credit])))
+        .on('GET', '/api/v1/customers/12', ok(credit)),
+    );
+    await openPage('العملاء');
+    const panel = await detailPanel('فندق الواحة');
+    expect(within(panel).getByText('شروط الدفع')).toBeTruthy();
+    expect(within(panel).queryByText('حد الائتمان')).toBeNull();
+  });
+
   it('the customer type is required', async () => {
     const bridge = signedInBridge(CASHIER);
     await signIn(bridge);
@@ -464,6 +478,35 @@ describe('Suppliers', () => {
       isActive: s.isActive,
     })),
     total: list.length,
+  });
+
+  it('exports the suppliers to Excel with data.export only (M7 part E)', async () => {
+    const plain = signedInBridge(['suppliers.manage']).on(
+      'GET',
+      '/api/v1/suppliers',
+      ok(suppliersAnswer([supplier()])),
+    );
+    await signIn(plain);
+    await openPage('الموردون');
+    await row('شركة الخليج للكيماويات');
+    expect(screen.queryByRole('button', { name: 'تصدير Excel' })).toBeNull();
+    cleanup();
+
+    const bridge = signedInBridge(['suppliers.manage', 'data.export'])
+      .on('GET', '/api/v1/suppliers', ok(suppliersAnswer([supplier()])))
+      .on(
+        'GET',
+        '/api/v1/suppliers/export',
+        ok({
+          fileName: 'artepool-suppliers.xlsx',
+          mime: 'application/vnd.ms-excel',
+          dataBase64: 'UEs=',
+        }),
+      );
+    await signIn(bridge);
+    await openPage('الموردون');
+    fireEvent.click(await screen.findByRole('button', { name: 'تصدير Excel' }));
+    await waitFor(() => expect(bridge.callsTo('GET', '/api/v1/suppliers/export')).toHaveLength(1));
   });
 
   it('lists suppliers and adds one', async () => {

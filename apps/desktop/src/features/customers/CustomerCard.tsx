@@ -175,14 +175,19 @@ export function CustomerCard(props: {
         {c.creditMode === 'credit' ? (
           <DefinitionList
             rows={[
-              {
-                label: t('parties:detail.creditLimit'),
-                value: (
-                  <>
-                    <bdi>{money(BigInt(c.creditLimitFils))}</bdi> {t('parties:aed')}
-                  </>
-                ),
-              },
+              // The limit is an amount: shown only with customers.balance.view (0114).
+              ...(c.creditLimitFils === null
+                ? []
+                : [
+                    {
+                      label: t('parties:detail.creditLimit'),
+                      value: (
+                        <>
+                          <bdi>{money(BigInt(c.creditLimitFils))}</bdi> {t('parties:aed')}
+                        </>
+                      ),
+                    },
+                  ]),
               { label: t('parties:detail.terms'), value: termsText(c.paymentTermsDays) },
             ]}
           />

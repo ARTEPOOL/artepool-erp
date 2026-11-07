@@ -258,7 +258,11 @@ mod imp {
             Ok(sha) if sha == file.sha256 => {}
             _ => return refuse("the download does not match its SHA-256".into()),
         }
-        if let Err(why) = verify_file(UPDATE_KEY, &file.signature, &partial) {
+        let name = target
+            .file_name()
+            .and_then(|n| n.to_str())
+            .ok_or("the download has no file name")?;
+        if let Err(why) = verify_file(UPDATE_KEY, &file.signature, &partial, name) {
             return refuse(why);
         }
         std::fs::write(target.with_extension("exe.sig"), &file.signature)
@@ -394,7 +398,11 @@ mod imp {
         }
         let signature =
             std::fs::read_to_string(setup.with_extension("exe.sig")).unwrap_or_default();
-        if let Err(why) = verify_file(UPDATE_KEY, &signature, setup) {
+        let name = setup
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or_default();
+        if let Err(why) = verify_file(UPDATE_KEY, &signature, setup, name) {
             log(&dir, &format!("refused before running: {why}"));
             let _ = std::fs::remove_file(setup);
             return 1;

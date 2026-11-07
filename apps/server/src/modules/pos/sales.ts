@@ -74,7 +74,9 @@ async function stockNeeds(db: Db, documentId: bigint, warehouseId: bigint) {
         FROM sales.document_lines l JOIN md.items i ON i.id = l.item_id
        WHERE l.document_id = ${documentId} AND l.line_kind = 'item' AND i.item_type = 'stock'
       UNION ALL
-      SELECT c.component_item_id, l.quantity * c.quantity
+      -- Two 3-decimal quantities multiply to 6 decimals: back to thousandths, as the stock
+      -- movement of the issue counts them (sales/documents.ts: qty × part ÷ 1000).
+      SELECT c.component_item_id, trunc(l.quantity * c.quantity, 3)
         FROM sales.document_lines l
         JOIN md.items i ON i.id = l.item_id AND i.item_type = 'bundle'
         JOIN md.bundle_components c ON c.bundle_item_id = l.item_id

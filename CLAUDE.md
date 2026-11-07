@@ -52,7 +52,7 @@ It runs client–server on the local network: PostgreSQL and the API service on 
   - Credit notes, receipts and the rest each have their own series.
   - Tax documents get their number only at issue. (0011)
 - **Discounts** are stored per line (original price, discount, net). Revenue is posted net of discount. (0012)
-- **Advance and progress payments:** a payment that does not settle an already-issued tax invoice gets its own tax invoice with VAT. The final invoice deducts earlier payments and their VAT. (0013)
+- **Advance and progress payments:** a payment that does not settle an already-issued tax invoice gets its own tax invoice with VAT. The final invoice deducts earlier payments and their VAT, never more than its own net and VAT: the rest stays as the customer's advance (2120) or is refunded ("Refund the remainder": credit note on the payment invoice + refund); the screen says "X deducted from INV-…; Y stays". (0013, 0121)
 - **Prices:**
   - Each item has one sale price (4 dp) with a "price includes VAT" switch.
   - An inclusive price is split back into net and VAT; an exclusive price has VAT added.
@@ -95,6 +95,7 @@ It runs client–server on the local network: PostgreSQL and the API service on 
 - **Card:** amount + terminal approval code only; never any card digits. (0061)
 - **Receipt** in Arabic and English; cash customer by default, a VAT-registered customer → full invoice with TRN. (0062)
 - **Printing:** the POS prints thermal receipts silently. The "Invoices (A4)" section prints through the print dialog. A POS sale can be reprinted in A4 with the same number. (0008)
+- **Receipt PDF copy:** every thermal receipt (sale or return) is also saved automatically as a PDF on that PC (`Public Documents\ARTEPOOL\Receipts\<YYYY-MM>\<number> - DD-MM-YYYY.pdf`), the same image as printed, even when the printer fails; one file per document, a reprint only re-saves a missing file. (0120)
 - **Print designer:** the owner customises print templates (logo, colour, language, optional fields, texts, margins) in Settings → Print designer. Tax-required fields are locked (list per document type in 0064, pending accountant review); seller address on every tax invoice and customer address on full tax invoices are locked, and a full tax invoice is refused without the customer's address. Receipts and statements use the A4 invoice design; the thermal receipt's language is set there too. Templates are versioned; each document stores its template version, but a reprint uses today's design (content unchanged, 0071). No QR code until e-invoicing. The thermal receipt can have its own logo (Print designer → Thermal receipt; empty = the company logo). Logo in the middle on a bilingual A4 document: Arabic details right, logo centre, English left. (0020, 0064, 0067, 0075, 0076)
 - **Bank accounts:** several per company (bank, account name, UAE IBAN with checksum, optional SWIFT), owner only, audited; the template chooses which one prints. (0065)
 - **Customer PO number:** optional on A4 invoices and quotations; prints only when filled. (0066)
@@ -103,7 +104,7 @@ It runs client–server on the local network: PostgreSQL and the API service on 
 **Security and access**
 - **Sign-in:** cashiers use a 4-digit PIN **only on PCs enrolled as POS** (weak PINs refused; 5 wrong → blocked until the owner unblocks). Office PCs always need a password. (0021)
 - **Approvals:** every supervisor approval is given with the one-time 6-digit code from the approver's 2-step app (accepted once); only 2-step users approve; 5 wrong codes block that person's approvals (not their sign-in) until the owner unblocks. (0074)
-- **Server and remote:** the POS PC is also the server (services under own accounts, ACLs, standard cashier Windows account «الكاشير» with automatic sign-in, no other Windows limits for now, set up/repaired from the emergency tool (audited), disabled by uninstall, the PC's enrollment shared by both accounts on the server PC, Windows Update active hours 08:00–24:00, one System health line (M6.4); UPS reminder). **No remote access in Phase 1:** no VPN, no open router ports, no remote-desktop tools; the laptop works on the shop LAN; keep the design VPN-agnostic (0084 deferred). No cloud database in Phase 1; outbox for a Phase 2 read-only mobile dashboard. (0085, 0088, 0093)
+- **Server and remote:** the POS PC is also the server (services under own accounts, ACLs, standard cashier Windows account «الكاشير» with automatic sign-in, no other Windows limits for now, set up/repaired from the emergency tool (audited), disabled by uninstall, the PC's enrollment shared by both accounts on the server PC, Windows Update active hours 08:00–24:00, one System health line (M6.4); UPS reminder). **No remote access in Phase 1:** no VPN, no open router ports, no remote-desktop tools; the laptop works on the shop LAN; keep the design VPN-agnostic (0084 deferred). No cloud database in Phase 1; outbox for the read-only mobile dashboard (AI & Online track, stage 2C). (0085, 0088, 0093)
 - **First-run setup:** a one-time wizard on the server PC after install, locked in the database, only on the server PC with the installer's token:
   - **New setup**: company, owner, 2-step, recovery codes, enroll this PC as POS;
   - **Restore from backup**: copy from PC/USB (a Google Drive copy is downloaded first) + private key, all integrity checks pass before it replaces anything; the master key travels inside the age-encrypted copies; the other PCs enroll again.
@@ -154,6 +155,7 @@ It runs client–server on the local network: PostgreSQL and the API service on 
 
 **Reports**
 - **Owner dashboard** (side menu → Reports, owner only): total sales, sales without VAT, VAT due (no input VAT until purchases exist), gross profit from the cost stored on each line; period with comparison; daily chart; POS/A4, payment methods, unpaid, per employee; top items/customers; cash in drawers and safe, receivables and overdue, stock value and reorder. (0039, 0081)
+- **Acceptance (M7):** reconciliation report for owner + accountant (`reports.reconciliation`); its checks also run nightly; a fully automated rehearsal ("Start rehearsal", owner only, on the shop's server PC in its own `artepool_rehearsal_<run>` database, dropped afterwards; never while a shift is open) and the CI busy day (4 tills, 800+ sales); a permanent speed line on System health; a guided hardware check (receipt, drawer, label, scan) is the only human step; go-live from a clean database. (0119)
 
 **Accounting**
 - **Defective returns** are held at cost in "Inventory – defective" until written off. (0015)
@@ -162,6 +164,7 @@ It runs client–server on the local network: PostgreSQL and the API service on 
 - **Chart of accounts and posting map** are provisional and **pending accountant review**; go-live waits for the approval. Account mappings must stay configurable data, never hard-coded. (0018, 0035)
 - **E-invoicing** goes through an accredited service provider API. The ERP stays the system of record. The go-live date is **pending** and lives in the setting `einvoice.mandatory_from`; the owner's deadline: **ready before 1 July 2027**. (0019, 0116)
 - **Order after go-live:** P2 (money: purchases and suppliers, expenses, accounting screens and reports, VAT return) first; then the **AI & Online track** (stages 2A–2D; its own track, never called "Phase 2") interleaved with P3 (contracts, visits, service jobs, projects) as the owner decides. (0116)
+- **AI & Online track** ([`docs/ai-online-track.md`](docs/ai-online-track.md); nothing built before go-live, each stage planned and approved first): 2A inside the app, 2B WhatsApp (moved from P4), 2C cloud relay, 2D website requests. Nine ground rules: offline-first stays; AI only suggests (nothing touching money, VAT, stock, prices, discounts, credit or promises is committed without a person); minimal personal data (PDPL); every suggestion and outbound message audited; a permission + owner-only switch per feature; everything outbound through the outbox; one-way cloud (inbound = requests waiting for approval); no open ports, keys sealed with the master key; costs on System health. Inbound webhooks (WhatsApp) need the relay. (0118)
 
 ## How to work
 
@@ -182,7 +185,9 @@ It runs client–server on the local network: PostgreSQL and the API service on 
 | `docs/database-schema.md` | Full Phase 1 database schema |
 | `docs/phase-1-plan.md` | Project structure, migrations order, build order, test plan |
 | `docs/accounting/` | Provisional chart of accounts and posting map (for the accountant) |
+| `docs/ai-online-track.md` | The AI & Online track (stages 2A–2D): ideas, ground rules, gaps, effort, running costs, privacy |
 | `docs/decisions/` | One file per decision, with its status |
+| `docs/reviews/` | Security reviews: findings, status, decisions for the owner (M7: `m7-security-review.md`) |
 | `design/` | Approved UI design reference v2 (simple style): tokens for light and dark, component styles, design system, screens 01–14. Build the client screens to match it. |
 
 ## Tech stack (confirmed — decision 0001)
@@ -218,6 +223,7 @@ Run from the repository root. Setup on a new PC: [`docs/runbooks/dev-setup-windo
 | Unit tests / integration tests (real PostgreSQL) / all | `pnpm test:unit` / `pnpm test:integration` / `pnpm test` |
 | Screen tests in a real browser (Playwright, Arabic + English, light + dark; real API on a throwaway database) | `pnpm test:e2e` (once: `pnpm --filter @artepool/desktop exec playwright install chromium`) |
 | Verify the audit hash chain | `pnpm audit:verify` |
+| The automated rehearsal (decision 0119): the busy day (4 tills, 800+ sales, 20,000 items; nightly and before every release in GitHub) / the shop's size | `pnpm acceptance:day` / `pnpm acceptance:day --shop` |
 | Backups (decision 0086): the service / one local copy now / restore test / integrity checks / external-drive copy / open an encrypted copy with the private key (emergency manual restore) | `pnpm backup:run` / `pnpm backup:once` / `pnpm backup:restore-test` / `pnpm backup:check` / `pnpm backup:offline <folder>` / `pnpm backup:open <copy.age> <key file> <out.dump>` |
 | Tamper demonstration (throwaway database) | `pnpm demo:audit-tamper` |
 | Create the development master key (`.secrets/`, once per dev PC) | `pnpm dev:secrets` |
@@ -233,7 +239,7 @@ Run from the repository root. Setup on a new PC: [`docs/runbooks/dev-setup-windo
 | Releases (decision 0108): the update key once / the release notes check / prepare the signed files / publish to `artepool-releases` (the release workflow runs these after the owner's approval) | `pnpm release keygen` / `pnpm release check` / `pnpm release prepare` / `pnpm release publish` |
 | Dependency check (weekly in GitHub Actions; fails only for a critical/high advisory in shipped code; Arabic summary in `deps-check-summary.md`) | `pnpm deps:check` |
 | On the installed server (elevated prompt): the console tools with the protected secrets / check the secrets / restore from a backup without the wizard (decision 0102) | `artepool-svc run owner-reset-password` (etc.) / `artepool-svc secrets check` / `artepool-svc run restore <copy>` |
-| On the installed server, run by the setup and the updater (decisions 0103, 0108): upgrade phases / reinstall over kept data / delete the data (DELETE + owner's password) / the updater | `artepool-svc run upgrade prepare\|apply` / `artepool-svc run install --reattach` / `artepool-svc run delete-data` / `artepool-svc run updater` |
+| On the installed server, run by the setup and the updater (decisions 0103, 0108, 0119): upgrade phases / reinstall over kept data / delete the data (DELETE + owner's password) / the updater / the rehearsal the owner started | `artepool-svc run upgrade prepare\|apply` / `artepool-svc run install --reattach` / `artepool-svc run delete-data` / `artepool-svc run updater` / `artepool-svc run rehearsal <run>` |
 
 Rules for migrations: one file per change in `db/migrations/NNNN_name.sql`; no `BEGIN`/`COMMIT` inside (the runner wraps each file); every new table gets `sys.add_touch`/`sys.add_stamp`, `audit.enable_for`, `sys.forbid_delete` and explicit grants — `db/tests/privileges.test.ts` fails otherwise; run `pnpm db:codegen` and commit the regenerated types.
 

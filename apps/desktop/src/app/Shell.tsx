@@ -16,6 +16,7 @@ import {
   Users,
   Wallet,
   XCircle,
+  ShieldCheck,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Link, Outlet, useRouterState } from '@tanstack/react-router';
@@ -39,7 +40,8 @@ type NavItem =
         | '/accounting'
         | '/pos'
         | '/shifts'
-        | '/reports';
+        | '/reports'
+        | '/reconciliation';
       permission: string;
     }
   /** Arrives in a later milestone: shown, greyed, so the layout matches the design. */
@@ -86,6 +88,12 @@ const NAV: NavItem[] = [
     icon: <LineChart aria-hidden="true" />,
     to: '/reports',
     permission: 'reports.owner_dashboard',
+  },
+  {
+    key: 'reconciliation',
+    icon: <ShieldCheck aria-hidden="true" />,
+    to: '/reconciliation',
+    permission: 'reports.reconciliation',
   },
   {
     key: 'accounting',

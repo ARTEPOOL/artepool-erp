@@ -207,6 +207,7 @@ describe('the owner is protected (decisions 0025, 0026)', () => {
       'system.health.manage', // confirming the UPS on System health (M6.2 part H)
       'system.health.view',
       'system.integrity.run',
+      'system.rehearsal', // the automated rehearsal (decision 0119)
       'system.series.manage',
       'system.settings.edit',
       'system.update.manage',

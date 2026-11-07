@@ -20,4 +20,6 @@ export * from './reports';
 export * from './backup';
 export * from './updates';
 export * from './health';
+export * from './rehearsal';
+export * from './hardware';
 export * from './setup';

@@ -16,6 +16,7 @@ import {
   Server,
   ShieldCheck,
   UserCheck,
+  Gauge,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
@@ -46,6 +47,11 @@ function databaseLevel(d: ServerHealth['database']): HealthLevel {
 }
 
 /** Red when it needs repair (the cashier may be stuck or the data open); orange until set up. */
+/** The server's speed (M7): a warning when any 95th percentile is above its target. */
+function speedLevel(speed: ServerHealth['speed']): HealthLevel {
+  return Object.values(speed).some((f) => f.slow) ? 'warning' : 'ok';
+}
+
 function cashierLevel(c: ServerHealth['cashierAccount']): HealthLevel {
   if (c.state === 'ok') return 'ok';
   if (c.state === 'repair') return 'urgent';
@@ -306,6 +312,25 @@ export function ServerHealthCard(props: { backup: HealthResponse; onCreateKey: (
                 </>
               }
               end={chip(cashierLevel(s.cashierAccount))}
+            />
+            <Line
+              testId="health-speed"
+              icon={<Gauge aria-hidden="true" />}
+              tone={TONE[speedLevel(s.speed)]}
+              title={t('serverHealth.speed.title')}
+              detail={
+                (['search', 'scan', 'sale'] as const).every((k) => s.speed[k].p95Ms === null)
+                  ? t('serverHealth.speed.none')
+                  : (['search', 'scan', 'sale'] as const)
+                      .filter((k) => s.speed[k].p95Ms !== null)
+                      .map((k) =>
+                        t(`serverHealth.speed.${k}`, {
+                          seconds: (s.speed[k].p95Ms! / 1000).toFixed(2),
+                        }),
+                      )
+                      .join(' · ')
+              }
+              end={chip(speedLevel(s.speed))}
             />
           </>
         )}

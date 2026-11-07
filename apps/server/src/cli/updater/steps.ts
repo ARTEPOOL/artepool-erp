@@ -500,7 +500,7 @@ export async function runUpdater(deps: UpdaterDeps): Promise<UpdaterOutcome> {
         if ((await sha256(partial)) !== f.sha256) {
           throw new Error(`The downloaded ${f.name} does not match its SHA-256.`);
         }
-        await verifyFileSignature(deps.publicKey, f.signature, partial);
+        await verifyFileSignature(deps.publicKey, f.signature, partial, f.name);
         await writeFile(sigFile, f.signature);
         await rename(partial, target);
         await rm(note, { force: true });
@@ -553,6 +553,7 @@ export async function runUpdater(deps: UpdaterDeps): Promise<UpdaterOutcome> {
         deps.publicKey,
         await readFile(join(dir, `${f.name}.sig`), 'utf8'),
         join(dir, f.name),
+        f.name,
       );
     } catch (error) {
       await rm(join(dir, f.name), { force: true });

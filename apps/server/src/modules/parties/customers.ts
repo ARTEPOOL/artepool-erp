@@ -155,6 +155,19 @@ export async function getCustomer(db: Kysely<DB>, id: bigint): Promise<CustomerD
   };
 }
 
+/**
+ * A customer as the signed-in user may see it: the credit limit is an amount, so it goes only to
+ * customers.balance.view (decision 0114, security review M7); the mode and terms stay.
+ */
+export function customerForViewer(
+  customer: CustomerDetail,
+  auth: { permissions: ReadonlySet<string> } | null,
+): CustomerDetail {
+  return auth?.permissions.has('customers.balance.view')
+    ? customer
+    : { ...customer, creditLimitFils: null };
+}
+
 /** Phone, TRN and e-mail as stored, or the field that is not valid. */
 export function customerValues(body: CreateCustomerRequest) {
   const phone = normalizePhone(body.phone);

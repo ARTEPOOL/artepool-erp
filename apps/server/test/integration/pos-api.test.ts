@@ -23,6 +23,7 @@ import type {
   PosReturnResponse,
   PosSaleResponse,
   PosState,
+  ReconciliationReport,
   ShiftReport,
   ShiftsResponse,
   ShiftSummary,
@@ -38,6 +39,7 @@ import {
   type TestDevice,
   type TestServer,
 } from '../support/server';
+import { checksAfter, failing, integrityChecks } from '../support/integrity';
 
 type Method = 'GET' | 'POST' | 'PUT' | 'PATCH';
 type Actor = ((
@@ -448,6 +450,48 @@ describe('POS sales', () => {
       server.db,
     );
     expect(rows[0]?.review_status).toBe('pending');
+  });
+
+  it('a kit sells at the POS: its parts leave stock; a short part needs a supervisor (found by the M7 rehearsal)', async () => {
+    const part1 = await item('KIT-P1', '10000', '10000');
+    const part2 = await item('KIT-P2', '20000', '10000');
+    const kit = await ok<ItemDetail>(
+      owner('POST', '/api/v1/items', {
+        code: 'KIT-1',
+        itemType: 'bundle',
+        nameAr: 'طقم',
+        nameEn: 'Kit',
+        categoryId: ids.category,
+        unitId: ids.pcs,
+        vatCategoryId: ids.vat,
+        price: { price4dp: '105000', includesVat: true },
+        components: [
+          { itemId: part1, quantityMilli: '2000' },
+          { itemId: part2, quantityMilli: '1000' },
+        ],
+      }),
+      201,
+    );
+    const sold = await ok<PosSaleResponse>(
+      sale(cashier, {
+        lines: [{ itemId: kit.id, quantityMilli: '3000' }],
+        payments: [cashPart('3150')],
+      }),
+      201,
+    );
+    expect(sold.document.totalFils).toBe('3150');
+    expect(await stockOf(part1)).toBe('4000');
+    expect(await stockOf(part2)).toBe('7000');
+    const refused = await refusal(
+      sale(cashier, {
+        lines: [{ itemId: kit.id, quantityMilli: '3000' }],
+        payments: [cashPart('3150')],
+      }),
+    );
+    expect(refused).toMatchObject({ code: 'PERMISSION_DENIED', rule: 'OVERSELL_APPROVAL' });
+    expect((refused as Record<string, unknown>).shortages).toEqual([
+      expect.objectContaining({ code: 'KIT-P1', neededMilli: '6000', availableMilli: '4000' }),
+    ]);
   });
 
   it('a cashier discounts up to 5%; above it a supervisor approves (0059)', async () => {
@@ -916,6 +960,10 @@ describe('the shift (decisions 0004, 0006, 0056–0058)', () => {
     );
     await open(me, '12345');
     expect((await ok<PosState>(me('GET', '/api/v1/pos/state'))).expectedCashFils).toBe('12345');
+    // The same on the owner's X report.
+    expect(
+      (await ok<ShiftReport>(me('GET', '/api/v1/shifts/current/x-report'))).expectedCashFils,
+    ).toBe('12345');
   });
 });
 
@@ -982,9 +1030,24 @@ describe('A4 cash taken on the drawer (decision 0063)', () => {
       }),
       201,
     );
+    const expectedNow = async () =>
+      (
+        await sql<{ e: string }>`SELECT cash.expected_cash(${shift.id}::bigint)::text AS e`.execute(
+          server.db,
+        )
+      ).rows[0]!.e;
     const x2 = await ok<ShiftReport>(seller('GET', '/api/v1/shifts/current/x-report'));
     expect(x2.byMethod.find((m) => m.methodId === ids.card)?.receivedFils).toBe('2000');
-    expect(x2.expectedCashFils).toBe('20500');
+    expect(await expectedNow()).toBe('20500');
+    // The accountant counts blind on their own shift like everyone but the owner (0080); the owner
+    // looking at it from another PC sees the figure (security review, M7).
+    expect(x2.expectedCashFils).toBeNull();
+    expect(
+      (await ok<ShiftReport>(seller('GET', `/api/v1/shifts/${shift.id}`))).expectedCashFils,
+    ).toBeNull();
+    expect(
+      (await ok<ShiftReport>(owner('GET', `/api/v1/shifts/${shift.id}`))).expectedCashFils,
+    ).toBe('20500');
 
     // The same cash taken in the office (no drawer shift there) goes to the safe (0047).
     const before = await balance('1120');
@@ -997,9 +1060,7 @@ describe('A4 cash taken on the drawer (decision 0063)', () => {
       201,
     );
     expect((await balance('1120')) - before).toBe(1_000n);
-    expect(
-      (await ok<ShiftReport>(seller('GET', '/api/v1/shifts/current/x-report'))).expectedCashFils,
-    ).toBe('20500');
+    expect(await expectedNow()).toBe('20500');
   });
 });
 
@@ -1113,5 +1174,131 @@ describe('stuck shifts (decision 0069)', () => {
     );
     expect(devices.devices.find((d) => d.id === fresh.id.toString())?.drawer?.code).toBe(oldDrawer);
     expect(devices.devices.find((d) => d.id === old.pc.id.toString())?.drawer).toBeNull();
+  });
+});
+
+describe('the integrity checks on this day of POS work (M7, decision 0119)', () => {
+  it('every check passes', async () => {
+    expect(failing(await integrityChecks(server))).toEqual({});
+  });
+
+  it('every Z report keeps the audit chain’s anchor (§6.3 step 6)', async () => {
+    const { rows } = await server.admin.query<{
+      shifts: string;
+      anchored: string;
+      anchors: string;
+    }>(
+      `SELECT count(*)::text AS shifts, count(audit_anchor_seq)::text AS anchored,
+              (SELECT count(*) FROM audit.anchors WHERE anchor_kind = 'z_report')::text AS anchors
+         FROM cash.shifts WHERE status = 'closed'`,
+    );
+    expect(Number(rows[0]!.shifts)).toBeGreaterThan(0);
+    expect(rows[0]!.anchored).toBe(rows[0]!.shifts);
+    expect(rows[0]!.anchors).toBe(rows[0]!.shifts);
+  });
+
+  it('the reconciliation report: seven steps, owner and accountant only, kept and printed', async () => {
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Dubai' });
+    const body = { from: today, to: today };
+    const report = await ok<ReconciliationReport>(
+      owner('POST', '/api/v1/reports/reconciliation', body),
+    );
+    expect(report.steps.map((s) => s.step)).toEqual([
+      'stock',
+      'cash',
+      'invoices',
+      'vat',
+      'accounts',
+      'audit',
+      'backup',
+    ]);
+    // Every integrity check passes. The period's own checks may wait on people here (a variance
+    // not accepted, an oversell not reviewed), and no restore test ran on this test database.
+    const waitsOnPeople = ['variances_accepted', 'oversells_reviewed', 'restore_test'];
+    for (const step of report.steps)
+      for (const c of step.checks.filter((c) => !waitsOnPeople.includes(c.name)))
+        expect({ check: c.name, ok: c.ok, examples: c.examples }).toEqual({
+          check: c.name,
+          ok: true,
+          examples: [],
+        });
+    const backup = report.steps.find((s) => s.step === 'backup')!;
+    expect(backup.ok).toBe(false);
+    expect(backup.checks[0]!.examples[0]).toMatch(/no restore test/);
+    // The period's VAT on the documents equals the output VAT account's movement.
+    const vat = report.steps.find((s) => s.step === 'vat')!;
+    const figure = (key: string) => vat.figures.find((f) => f.key === key)!.value;
+    expect(figure('vatDocuments')).toBe(figure('vatAccount'));
+    expect(BigInt(figure('vatDocuments')!)).toBeGreaterThan(0n);
+    // The series used today, first to last.
+    const invoices = report.steps.find((s) => s.step === 'invoices')!;
+    expect(invoices.figures.find((f) => f.key === 'series:POS')?.value).toMatch(
+      /^POS-0+1 … POS-\d+ \(\d+\)$/,
+    );
+
+    // The accountant may run it too; a cashier may not.
+    expect((await accountant('POST', '/api/v1/reports/reconciliation', body)).statusCode).toBe(200);
+    const cashier = await signedIn('cash.recon', ['cashier']);
+    expect((await cashier('POST', '/api/v1/reports/reconciliation', body)).statusCode).toBe(403);
+
+    // One at a time on the server (security review, M7): a second request while one runs is
+    // answered "running"; the next one after it works again.
+    const [first, second] = await Promise.all([
+      owner('POST', '/api/v1/reports/reconciliation', body),
+      accountant('POST', '/api/v1/reports/reconciliation', body),
+    ]);
+    expect([first.statusCode, second.statusCode].sort()).toEqual([200, 422]);
+    expect(await refusal(Promise.resolve(first.statusCode === 422 ? first : second))).toMatchObject(
+      { rule: 'RECONCILIATION_RUNNING' },
+    );
+    expect((await accountant('POST', '/api/v1/reports/reconciliation', body)).statusCode).toBe(200);
+
+    // Kept (and audited), and printed as a PDF for the accountant.
+    const kept = await server.admin.query<{ n: string }>(
+      `SELECT count(*)::text AS n FROM ops.integrity_runs WHERE run_kind = 'reconciliation'`,
+    );
+    expect(Number(kept.rows[0]!.n)).toBeGreaterThanOrEqual(2);
+    const pdf = await ok<{ fileName: string; mime: string; dataBase64: string }>(
+      owner('GET', `/api/v1/reports/reconciliation/${report.id}/pdf`),
+    );
+    expect(pdf.mime).toBe('application/pdf');
+    expect(Buffer.from(pdf.dataBase64, 'base64').subarray(0, 5).toString()).toBe('%PDF-');
+    expect(
+      (await cashier('GET', `/api/v1/reports/reconciliation/${report.id}/pdf`)).statusCode,
+    ).toBe(403);
+  });
+
+  it('each catches its own break', async () => {
+    const shift = (
+      await server.admin.query<{ id: string }>(
+        `SELECT id FROM cash.shifts WHERE status = 'closed' ORDER BY id LIMIT 1`,
+      )
+    ).rows[0]!.id;
+    // A closed shift whose expected cash no longer matches its payments and movements.
+    expect(
+      (
+        await checksAfter(server, [
+          `UPDATE cash.shifts SET expected_cash_fils = expected_cash_fils + 100,
+                                  variance_fils = variance_fils - 100 WHERE id = ${shift}`,
+        ])
+      ).cash_shifts,
+    ).toMatchObject({ ok: false, problems: 1 });
+    // A Z report's anchor that no longer matches the chain.
+    expect(
+      (
+        await checksAfter(server, [
+          `UPDATE audit.anchors SET chain_hash = '\\x00'::bytea
+            WHERE id = (SELECT min(id) FROM audit.anchors WHERE anchor_kind = 'z_report')`,
+        ])
+      ).audit_anchors,
+    ).toMatchObject({ ok: false, problems: 1 });
+    expect(
+      (
+        await checksAfter(server, [
+          `UPDATE cash.shifts SET audit_anchor_hash = '\\x00'::bytea WHERE id = ${shift}`,
+        ])
+      ).audit_anchors,
+    ).toMatchObject({ ok: false, problems: 1 });
+    expect(failing(await integrityChecks(server))).toEqual({});
   });
 });

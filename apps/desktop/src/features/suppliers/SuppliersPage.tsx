@@ -24,6 +24,7 @@ import {
   ToolBar,
 } from '../../ui';
 import { useCan, useErrorText } from '../auth/context';
+import { ExportButton } from '../masterdata/ExportButton';
 import { partiesClasses as styles, Phone, useDebounced, useTermsText } from '../customers/parts';
 import { ImportDialog } from '../masterdata/ImportDialog';
 import { MD_KEYS } from '../masterdata/refs';
@@ -85,6 +86,7 @@ export function SuppliersPage() {
           {t('masterdata:actions.import')}
         </Button>
       )}
+      {can('data.export') && <ExportButton url="/api/v1/suppliers/export" />}
       <Button variant="primary" onPress={() => setDialog('new')}>
         <Plus className={iconClass.sm} aria-hidden="true" />
         {t('parties:suppliers.new')}

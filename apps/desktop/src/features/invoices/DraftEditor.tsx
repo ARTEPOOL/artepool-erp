@@ -43,7 +43,13 @@ import {
   useLineRefs,
   useLinesPreview,
 } from '../sales/LineEditor';
-import { lineFromSaved, readDocDiscount, toRequest, type EditorLine } from '../sales/lines';
+import {
+  lineFromSaved,
+  planDeductions,
+  readDocDiscount,
+  toRequest,
+  type EditorLine,
+} from '../sales/lines';
 import salesStyles from '../sales/sales.module.css';
 import { PrintButton } from './DocumentView';
 import { IssueDialog } from './IssueDialog';
@@ -158,9 +164,20 @@ export function DraftEditor({ doc }: { doc: DocumentDetail | null }) {
   );
   const leftOf = (a: (typeof advances)[number]) =>
     BigInt(a.advanceLeftNetFils ?? '0') + BigInt(a.advanceLeftVatFils ?? '0');
-  const deductedFils = advances
-    .filter((a) => state.deductions.includes(a.id))
-    .reduce((s, a) => s + leftOf(a), 0n);
+  // In the order chosen, never more than this invoice (decision 0121): the rest stays.
+  const plan = planDeductions(
+    { netFils: preview.netFils, vatFils: preview.vatFils },
+    state.deductions
+      .map((id) => advances.find((a) => a.id === id))
+      .filter((a) => a !== undefined)
+      .map((a) => ({
+        id: a.id,
+        netLeftFils: BigInt(a.advanceLeftNetFils ?? '0'),
+        vatLeftFils: BigInt(a.advanceLeftVatFils ?? '0'),
+      })),
+  );
+  const planOf = (id: string) => plan.find((p) => p.id === id);
+  const deductedFils = plan.reduce((s, p) => s + p.deductedFils, 0n);
 
   const dirty = savedKey === null || contentKey(state) !== savedKey;
 
@@ -292,6 +309,20 @@ export function DraftEditor({ doc }: { doc: DocumentDetail | null }) {
                     {a.issueDate && <bdi>{formatDate(a.issueDate)}</bdi>}{' '}
                     {t('form.advances.left', { amount: money(leftOf(a)) })}
                   </span>
+                  {planOf(a.id) && (
+                    <span data-testid={`advance-plan-${a.id}`}>
+                      {planOf(a.id)!.staysFils > 0n
+                        ? t('form.advances.split', {
+                            deducted: money(planOf(a.id)!.deductedFils),
+                            number: a.docNumber ?? '',
+                            stays: money(planOf(a.id)!.staysFils),
+                          })
+                        : t('form.advances.whole', {
+                            deducted: money(planOf(a.id)!.deductedFils),
+                            number: a.docNumber ?? '',
+                          })}
+                    </span>
+                  )}
                 </li>
               ))}
             </ul>

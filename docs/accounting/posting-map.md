@@ -11,10 +11,10 @@
 | 3 | **Customer pays** an issued invoice | Payment-method account: cash 1110 / card 1150 / bank 1140 / cheque 1160 | Customer receivable 1210 |
 | 4 | **Advance or progress payment received** (no issued invoice covers it): its own tax invoice `INV-` | Customer receivable 1210 (amount received) | Customer advances 2120 (net); VAT payable 2130 (VAT) |
 | 5 | … and the money itself | Payment-method account | Customer receivable 1210 |
-| 6 | **Final invoice** that deducts earlier payments | Customer receivable 1210 (balance due); Customer advances 2120 (net deducted) | Revenue 41xx–44xx (full net); VAT payable 2130 (only the VAT not yet charged) |
+| 6 | **Final invoice** that deducts earlier payments (never more than the invoice's own net and VAT; the rest stays on 2120, decision 0121) | Customer receivable 1210 (balance due); Customer advances 2120 (net deducted) | Revenue 41xx–44xx (full net); VAT payable 2130 (only the VAT not yet charged) |
 | 7 | **Credit note** (return or price correction) | Revenue 41xx–44xx (net); VAT payable 2130 (VAT) | Customer receivable 1210 |
 | 8 | … goods returned to stock | Inventory – sellable 1310, or Inventory – defective 1320 if broken (at the cost they left at) | Cost of sales 51xx–54xx |
-| 9 | **Credit note on an advance** (work cancelled) | Customer advances 2120 (net); VAT payable 2130 | Customer receivable 1210 |
+| 9 | **Credit note on an advance** (work cancelled, or "Refund the remainder" after the final invoice, 0121) | Customer advances 2120 (net); VAT payable 2130 | Customer receivable 1210 |
 | 10 | **Refund paid** to the customer | Customer receivable 1210 | Payment-method account |
 | 11 | **Payment reversed** (e.g. bounced cheque) | Customer receivable 1210 | Cheques in hand 1160 (or the original method's account) |
 | 12 | **Oversell approved** at the POS (missing stock added) | Inventory – sellable 1310 | Inventory adjustments 5600 |

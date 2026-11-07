@@ -73,7 +73,19 @@ export interface ServerHealth {
   };
   /** The cashier's Windows account (M6.4), as the server PC's own programs last checked it. */
   cashierAccount: CashierAccountHealth;
+  /** The server's own speed (M7, decision 0119): the 95th percentile of the last 1,000 of each. */
+  speed: SpeedFigures;
 }
+
+export type SpeedKind = 'search' | 'scan' | 'sale';
+export interface SpeedFigure {
+  /** null until one was measured since the server started. */
+  p95Ms: number | null;
+  samples: number;
+  targetMs: number;
+  slow: boolean;
+}
+export type SpeedFigures = Record<SpeedKind, SpeedFigure>;
 
 /** What `artepool-svc cashier-account check` names as missing (M6.4). */
 export const CASHIER_ACCOUNT_ITEMS = [

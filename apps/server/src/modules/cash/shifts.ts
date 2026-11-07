@@ -31,6 +31,7 @@ import { fieldError } from '../../platform/db/versioned';
 import { AppError, ruleError } from '../../platform/errors/app-error';
 import { requireAlso } from '../../platform/permissions';
 import { consumeApproval } from '../approvals/service';
+import { isOwner } from '../auth/owner';
 import { variancePosting } from '../ledger/cash-posting';
 import { postEntry } from '../ledger/posting';
 import {
@@ -463,6 +464,7 @@ async function countsOf(db: Db, shiftId: bigint): Promise<CashCountDetail[]> {
 /**
  * The shift's figures. `reveal`: show the expected cash (after the count, once closed, or to
  * someone who may see all shifts); otherwise it stays hidden for the blind count (0006).
+ * On one's own open shift only the owner sees it (0080): see `revealsOwnShift`.
  */
 export async function shiftReport(
   db: Db,
@@ -572,11 +574,22 @@ export async function shiftReport(
   };
 }
 
+/**
+ * Whether the expected cash shows before the count: on someone else's shift for whoever may see
+ * all shifts (a supervisor's look, 0006); on one's own open shift only for the owner, everyone
+ * else counts blind, the accountant too (0080, security review M7).
+ */
+async function revealFor(db: Db, auth: Auth, cashierId: bigint): Promise<boolean> {
+  if (!auth) return false;
+  if (cashierId === auth.userId) return isOwner(db, auth.userId);
+  return auth.permissions.has('shifts.view_all');
+}
+
 /** The X report of the user's own open shift. */
 export async function xReport(db: Db, request: FastifyRequest): Promise<ShiftReport> {
   const auth = request.auth!;
   const shift = await myOpenShift(db, request.device, auth.userId);
-  return shiftReport(db, shift.id, { reveal: auth.permissions.has('shifts.view_all') });
+  return shiftReport(db, shift.id, { reveal: await revealFor(db, auth, auth.userId) });
 }
 
 /** A shift's report: one's own, or any shift with shifts.view_all. */
@@ -588,7 +601,7 @@ export async function getShiftReport(db: Db, auth: Auth, id: bigint): Promise<Sh
     .executeTakeFirst();
   if (!s) throw new AppError('NOT_FOUND', 'No such shift');
   if (s.cashier_id !== auth?.userId) requireAlso(auth, 'shifts.view_all');
-  return shiftReport(db, id, { reveal: auth?.permissions.has('shifts.view_all') ?? false });
+  return shiftReport(db, id, { reveal: await revealFor(db, auth, s.cashier_id) });
 }
 
 export async function listShifts(db: Db, auth: Auth, query: ShiftsQuery): Promise<ShiftsResponse> {

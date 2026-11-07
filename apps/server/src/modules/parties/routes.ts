@@ -14,7 +14,8 @@ import { recordEvent } from '../../platform/audit/events';
 import { withBusinessTx } from '../../platform/db/tx';
 import { contextOf } from '../../platform/http/context';
 import { defineActivation, defineRoute, defineWrite } from '../../platform/http/route';
-import { exportCustomers } from '../imports/service';
+import { requireAlso } from '../../platform/permissions';
+import { exportCustomers, exportSuppliers } from '../imports/service';
 import * as customers from './customers';
 import * as suppliers from './suppliers';
 
@@ -44,7 +45,12 @@ export function registerPartyRoutes(app: FastifyInstance): void {
     url: '/api/v1/customers/export',
     access: { kind: 'permission', permission: 'data.export' },
     handler: async ({ request }) => {
-      const { file, rows } = await exportCustomers(db);
+      // An export never shows more than the screens would (security review, M7).
+      requireAlso(request.auth, 'customers.view');
+      const { file, rows } = await exportCustomers(
+        db,
+        request.auth?.permissions.has('customers.balance.view') ?? false,
+      );
       // Exports are permission-controlled and logged (PRD security requirements).
       await withBusinessTx(db, contextOf(request), (trx) =>
         recordEvent(trx, 'data.exported', { data: { entity: 'customers', rows } }),
@@ -57,16 +63,17 @@ export function registerPartyRoutes(app: FastifyInstance): void {
     url: '/api/v1/customers/:id',
     access: viewCustomers,
     params: Params,
-    handler: ({ params }) => customers.getCustomer(db, BigInt(params.id)),
+    handler: async ({ request, params }) =>
+      customers.customerForViewer(await customers.getCustomer(db, BigInt(params.id)), request.auth),
   });
   defineWrite(app, {
     method: 'POST',
     url: '/api/v1/customers',
     access: manageCustomers,
     body: CreateCustomerRequest,
-    handler: async ({ trx, body }) => ({
+    handler: async ({ trx, request, body }) => ({
       status: 201,
-      body: await customers.createCustomer(trx, body),
+      body: customers.customerForViewer(await customers.createCustomer(trx, body), request.auth),
     }),
   });
   defineWrite(app, {
@@ -75,8 +82,11 @@ export function registerPartyRoutes(app: FastifyInstance): void {
     access: manageCustomers,
     params: Params,
     body: UpdateCustomerRequest,
-    handler: async ({ trx, params, body }) => ({
-      body: await customers.updateCustomer(trx, BigInt(params.id), body),
+    handler: async ({ trx, request, params, body }) => ({
+      body: customers.customerForViewer(
+        await customers.updateCustomer(trx, BigInt(params.id), body),
+        request.auth,
+      ),
     }),
   });
   defineWrite(app, {
@@ -86,17 +96,37 @@ export function registerPartyRoutes(app: FastifyInstance): void {
     params: Params,
     body: SetCustomerCreditRequest,
     reason: ({ body }) => body.reason,
-    handler: async ({ trx, params, body }) => ({
-      body: await customers.setCustomerCredit(trx, BigInt(params.id), body),
+    handler: async ({ trx, request, params, body }) => ({
+      body: customers.customerForViewer(
+        await customers.setCustomerCredit(trx, BigInt(params.id), body),
+        request.auth,
+      ),
     }),
   });
   defineActivation(app, {
     base: '/api/v1/customers',
     access: manageCustomers,
-    setActive: customers.setCustomerActive,
+    setActive: async (trx, id, active, rowVersion, auth) =>
+      customers.customerForViewer(
+        await customers.setCustomerActive(trx, id, active, rowVersion),
+        auth,
+      ),
   });
 
   // Suppliers
+  defineRoute(app, {
+    method: 'GET',
+    url: '/api/v1/suppliers/export',
+    access: { kind: 'permission', permission: 'data.export' },
+    handler: async ({ request }) => {
+      requireAlso(request.auth, 'suppliers.manage');
+      const { file, rows } = await exportSuppliers(db);
+      await withBusinessTx(db, contextOf(request), (trx) =>
+        recordEvent(trx, 'data.exported', { data: { entity: 'suppliers', rows } }),
+      );
+      return file;
+    },
+  });
   defineRoute(app, {
     method: 'GET',
     url: '/api/v1/suppliers',

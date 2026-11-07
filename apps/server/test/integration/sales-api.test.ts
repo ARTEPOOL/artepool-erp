@@ -41,6 +41,7 @@ import {
   type TestDevice,
   type TestServer,
 } from '../support/server';
+import { checksAfter, failing, integrityChecks } from '../support/integrity';
 
 type Method = 'GET' | 'POST' | 'PUT' | 'PATCH';
 type Actor = (method: Method, url: string, body?: unknown) => ReturnType<typeof call>;
@@ -894,6 +895,75 @@ describe('fixes from the M4 screens review', () => {
     expect(later.advanceInvoice).toMatchObject({ totalFils: '2100' });
   });
 
+  it('payments larger than the final invoice: only its amount is deducted; the rest stays, is used later or refunded (0121)', async () => {
+    const cust = await customer('Large advance');
+    const svc = await item('SVC-ADV1', 'service', '1000000'); // 100.00 + VAT = 105.00
+    const paid = await ok<ReceivePaymentResponse>(
+      accountant('POST', '/api/v1/sales/payments', {
+        customerId: cust,
+        part: cash('31500'), // 300.00 + 15.00 VAT
+        asAdvance: true,
+      }),
+      201,
+    );
+    const advance = paid.advanceInvoice!;
+    const left = async () => {
+      const a = await ok<DocumentDetail>(owner('GET', `/api/v1/sales/documents/${advance.id}`));
+      return [a.advanceLeftNetFils, a.advanceLeftVatFils];
+    };
+    const finalOf = async (units: string) =>
+      ok<DocumentDetail>(
+        issue(
+          accountant,
+          await draft(accountant, {
+            customerId: cust,
+            lines: [{ itemId: svc.id, quantityMilli: units }],
+            deductions: [{ advanceDocumentId: advance.id }],
+          }),
+        ),
+      );
+
+    // 105.00 of the 315.00 is deducted: the invoice is covered, its own VAT only.
+    const first = await finalOf('1000');
+    expect(first).toMatchObject({ totalFils: '0', settlementStatus: 'settled' });
+    expect(first.lines.find((l) => l.lineKind === 'advance_deduction')).toMatchObject({
+      netFils: '-10000',
+      vatFils: '-500',
+      grossFils: '-10500',
+    });
+    const entry = await entryOf(first);
+    expect(entry['2120']).toBe(10000n); // the advance used
+    expect(entry['2130'] ?? 0n).toBe(0n); // its VAT was charged on the payment invoice
+    expect(entry['1210'] ?? 0n).toBe(0n);
+    expect(await left()).toEqual(['20000', '1000']);
+
+    // A later invoice uses part of what stays: 105.00, and 105.00 is still the customer's advance.
+    const second = await finalOf('1000');
+    expect(second).toMatchObject({ totalFils: '0' });
+    expect(await left()).toEqual(['10000', '500']);
+    const balance = await ok<{ amounts: { advancesFils: string } | null }>(
+      owner('GET', `/api/v1/customers/${cust}/balance`),
+    );
+    expect(balance.amounts?.advancesFils).toBe('10500');
+
+    // "Refund the remainder": a credit note on the payment invoice and the refund (lines 9, 10).
+    const note = await ok<DocumentDetail>(
+      owner('POST', '/api/v1/sales/notes', {
+        kind: 'credit_note',
+        originalDocumentId: advance.id,
+        reasonCodeId: ids.cnReturn,
+        reasonText: 'Advance left after the final invoice, refunded',
+        advanceAmountFils: '10500',
+        refund: [cash('10500')],
+      }),
+      201,
+    );
+    expect(note).toMatchObject({ totalFils: '10500', vatFils: '500', settlementStatus: 'settled' });
+    expect(await entryOf(note)).toMatchObject({ '2120': 10000n, '2130': 500n, '1210': -10500n });
+    expect(await left()).toEqual(['0', '0']);
+    expect(failing(await integrityChecks(server))).toEqual({});
+  });
+
   it('a reprint needs documents.reprint on the server too', async () => {
     const cust = await customer('Reprints', { credit: '10000000' });
     const svc = await item('SVC-R1', 'service', '1000000');
@@ -1563,5 +1633,82 @@ describe("the customer's balance (decision 0114)", () => {
     expect(await refusal(cashier('GET', '/api/v1/customers?sort=outstanding'))).toMatchObject({
       status: 403,
     });
+  });
+});
+
+describe('the integrity checks on this A4 work (M7, decision 0119)', () => {
+  it('every check passes', async () => {
+    expect(failing(await integrityChecks(server))).toEqual({});
+  });
+
+  const one = async (query: string) =>
+    (await server.admin.query<{ id: string }>(query)).rows[0]!.id;
+
+  it('each catches its own break', async () => {
+    const invoice = await one(
+      `SELECT id FROM sales.documents WHERE status = 'issued' AND doc_type = 'invoice'
+          AND channel = 'office' ORDER BY id LIMIT 1`,
+    );
+    // A document whose total no longer matches its lines.
+    expect(
+      (
+        await checksAfter(server, [
+          `UPDATE sales.documents SET net_fils = net_fils + 100, total_fils = total_fils + 100
+            WHERE id = ${invoice}`,
+        ])
+      ).document_totals,
+    ).toMatchObject({ ok: false, problems: 1 });
+    // An invoice numbered in the credit notes' series.
+    expect(
+      (
+        await checksAfter(server, [
+          `UPDATE sales.documents SET series_id = (SELECT id FROM sys.document_series WHERE code = 'CN'),
+                                      seq_no = 999999 WHERE id = ${invoice}`,
+        ])
+      ).invoice_formats,
+    ).toMatchObject({ ok: false });
+    // Output VAT moved in the books without a document.
+    const vatLine = await one(
+      `SELECT l.id FROM gl.journal_lines l
+         JOIN gl.account_mappings m ON m.key = 'vat_output' AND m.account_id = l.account_id
+        WHERE l.credit_fils > 0 ORDER BY l.id LIMIT 1`,
+    );
+    expect(
+      (
+        await checksAfter(server, [
+          `UPDATE gl.journal_lines SET credit_fils = credit_fils + 100 WHERE id = ${vatLine}`,
+        ])
+      ).vat_ledger,
+    ).toMatchObject({ ok: false, problems: 1 });
+    // A payment whose journal entry is gone.
+    const paymentEntry = await one(
+      `SELECT id FROM gl.journal_entries WHERE source_type = 'payment' ORDER BY id LIMIT 1`,
+    );
+    expect(
+      (
+        await checksAfter(server, [
+          `DELETE FROM gl.journal_lines WHERE entry_id = ${paymentEntry}`,
+          `DELETE FROM gl.journal_entries WHERE id = ${paymentEntry}`,
+        ])
+      ).postings,
+    ).toMatchObject({ ok: false });
+    // A receivable moved to another customer, and an advance shown as never used.
+    const arLine = await one(
+      `SELECT l.id FROM gl.journal_lines l
+         JOIN gl.account_mappings m ON m.key = 'ar_control' AND m.account_id = l.account_id
+        WHERE l.debit_fils > 0 AND l.customer_id IS NOT NULL ORDER BY l.id LIMIT 1`,
+    );
+    const moved = await checksAfter(server, [
+      `UPDATE gl.journal_lines SET customer_id = (SELECT min(id) FROM md.customers
+                                                   WHERE id <> customer_id) WHERE id = ${arLine}`,
+    ]);
+    expect(moved.receivables).toMatchObject({ ok: false, problems: 2 });
+    const unused = await checksAfter(server, [
+      `UPDATE sales.documents SET advance_used_net_fils = 0, advance_used_vat_fils = 0
+        WHERE doc_type = 'advance_invoice' AND advance_used_net_fils > 0`,
+    ]);
+    expect(unused.receivables!.examples.join()).toMatch(/customer advances account/);
+    // Nothing above stayed: every change was rolled back.
+    expect(failing(await integrityChecks(server))).toEqual({});
   });
 });

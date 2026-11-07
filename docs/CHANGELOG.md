@@ -1,5 +1,140 @@
 # Changelog
 
+## Phase 1 in summary (M0–M7, 7 October – 7 November 2026)
+
+**In plain words: what the shop gets on go-live day.** The details are in the entries below, one per batch.
+
+- **Security and access (M1):**
+  - every PC enrolled with a one-time code, talking to the server over HTTPS (TLS 1.3) with the shop's own certificate authority;
+  - passwords for office PCs, a 4-digit PIN for cashiers only on POS PCs, the phone code (2-step) for the owner and every supervisor;
+  - approvals with the approver's one-time phone code;
+  - a hash-chained audit log of every change (who, which PC, when, before and after, why);
+  - nothing is ever deleted: users are deactivated, devices revoked, documents corrected with new documents.
+- **Master data (M2):** items with one sale price (including or excluding VAT), barcodes and purchase prices for the owner; customers with types, credit set with a reason; suppliers; lists; the four UAE VAT categories; Excel import (checked first, all or nothing) and export.
+- **Inventory (M3):** stock always worked out from its movements; opening stock once at go-live; adjustments, blind counts, defective stock; the posting engine that writes balanced journal entries for every document.
+- **Labels:** the 2-inch label printer, drawn by the app at the printer's dots, silent printing, the owner's label design, labels for many items and for changed prices.
+- **Sales on A4 (M4, M4b):** invoices (full or simplified tax invoices), quotations, receipts that settle open invoices oldest first, advance and progress payment invoices with VAT, final invoices that deduct them (only up to the invoice, the rest kept or refunded), credit and debit notes, cancelling an invoice by the owner, cheques and bounced cheques, statements, the customer's balance everywhere, and the print designer with bank accounts.
+- **Point of sale and cash (M5):**
+  - the POS in a kiosk lock;
+  - shifts with blind counts and one approved recount;
+  - drop alerts, paid-in and paid-out, oversell with approval, returns with approval;
+  - thermal receipts printed silently and also saved as PDF;
+  - the last invoice always shown, the owner dashboard.
+- **The shop's server and the PCs (M6):**
+  - installers for the server PC and the laptop, a first-run wizard (new setup or restore from a backup), the emergency tool, the cashier's Windows account;
+  - automatic signed updates at a safe time;
+  - backups every hour, every day encrypted to Google Drive, weekly to a drive, with restore tests;
+  - protection from power cuts and an integrity check after every start;
+  - System health.
+- **Acceptance (M7):** the reconciliation report (seven steps, owner and accountant), new checks of the books every night, the speed line, «ابدأ البروفة» (a whole shop day played by itself on a throwaway database), the busy day in GitHub before every release, the guided hardware check, «جاهز للتشغيل الفعلي», the export for go-live day and its Arabic guide, and a security review ([`docs/reviews/m7-security-review.md`](reviews/m7-security-review.md)).
+
+**Problems found and fixed by the rehearsal and the busy day:** saves from two tills and the office blocking each other, a kit that could not be sold at the POS, slow item search with many items, and the customers export refused by the import.
+
+**Still to do before go-live:**
+- the accountant's approval of the chart of accounts and the posting map, and answers to the pack's questions (Q1–Q7);
+- the VAT period archive (decision 0122), once its plan is approved;
+- the three security items of the review, once the owner decides (one permission per secret file, the server PC's shared enrollment, the laptop's update folder);
+- at the shop: install, a green rehearsal, the hardware check, then go-live day by `docs/runbooks/go-live.md`.
+
+## The security review (2026-11-07) — in version 0.10.0
+
+**In plain words** ([`docs/reviews/m7-security-review.md`](reviews/m7-security-review.md)): three independent reviews of the whole system found **nothing critical or high**. Nobody on the network can reach the data without an enrolled PC, a signed-in user and the right permission. What was found is about someone already on a shop PC, or a fault in one of our programs, and these are fixed now:
+
+- **Amounts only for whoever may see them** (decision 0114): a customer's credit limit (on the customer page and in the export) only with «عرض أرصدة العملاء»; the opening balance only for whoever takes payments.
+- **The blind count stays blind for the accountant too** (0080): on their own open shift only the owner sees the expected cash on the X report.
+- **Exports** also need the permission to see what they export.
+- **One reconciliation report at a time**, so the tills never slow down because of it.
+- **Each service gets only its own password**, and the programs the updater starts get no secret at all.
+- **Updates:** a signed file is accepted only under its own name and version, so an older version can never be pushed to the laptop.
+- **The emergency tool** now records which Windows account and PC ran each action.
+- **More secret fields are kept out of the logs**, and the System health integrity line shows the nightly checks only (migration 0056).
+- **Three items for the owner to decide before go-live** (one permission per secret file, the server PC's shared enrollment, the laptop's update folder) and one smaller choice (the lock screen's owner code): listed at the end of the review with a plan each.
+
+## Advance payments larger than the final invoice (2026-11-07) — in version 0.10.0
+
+**In plain words** (decision 0121, the owner's answer; pending the accountant's review):
+
+- When the payments received earlier are **more than the final invoice**, only the invoice's amount is deducted, net and VAT. The invoice can come to 0.00 due.
+- **The rest stays as the customer's advance payment** (account 2120) for the next invoices.
+- Before saving, the invoice screen says it for each payment: «سيُخصم X من INV-…، ويبقى Y دفعة مقدمة للعميل».
+- **«ردّ المتبقي» / "Refund the remainder"** on the payment invoice pays back what is left in one step: a credit note on the payment invoice and the refund (posting map lines 9 and 10). It needs the refund permission.
+- The remaining advance shows on the customer page, the statement and the balance banner, on its own line, as before.
+- The accountant pack has the question, with a worked example (Q2).
+- Tested: an invoice smaller than the payment, a later invoice using part of the rest, and the refund of what stays, with the journal entries and every check of the books.
+
+## The automated rehearsal, the hardware check and the export for go-live; problems they found are fixed (2026-11-05) — in version 0.10.0
+
+**In plain words:**
+
+- **Export to Excel for go-live** (M7 part E, decision 0119; permission `data.export`, every export in the audit log):
+  - **Items** and **Suppliers** get «تصدير Excel», like Customers. The file has the import's own columns, so it goes straight back in.
+  - Items: every barcode (extra ones as `code` or `code*6` when one scan counts 6), the sale pack and the reorder quantity come along; the import now reads these too. Purchase prices only for whoever may see them. Inactive items stay behind. Kits are listed on their own sheet with their parts, to be made again by hand.
+  - **Fixed:** the customers export included the walk-in customer, who has no phone, so importing the file back was refused. It is left out now (every database makes its own).
+  - Tested end to end: items, customers and suppliers exported from one server and imported into a new, empty one come back the same.
+- **The go-live guide** in Arabic, step by step: [`docs/runbooks/go-live.md`](runbooks/go-live.md) (export, uninstall with the data, install, new setup, the cashier account, printers, Google Drive, users, the laptop, the print design, import, opening stock, customer opening balances, the first real sale).
+- **The hardware check** (System health → «فحص الأجهزة», owner only, migration 0055; decision 0119), the only human step, about 5 minutes on each PC:
+  - **on the POS PC:** a test receipt, the drawer, a test label, and the scan of that label's barcode (the app says whether the code read matches the one printed; «تمام» only when it does);
+  - **on the laptop or an office PC:** an A4 test page through the print dialog (a frame at the margins and a 10 cm rule);
+  - each step «تمام» or «فيه مشكلة», with an optional note; the check is kept as made (never changed) and audited;
+  - System health shows the newest check of each PC, and **«جاهز للتشغيل الفعلي»** once the last rehearsal is green and the POS PC's check is all «تمام» (with the accountant's sign-off).
+- **The rehearsal's engine is ready** (M7 part B, decision 0119). On its own database, through the server's real programs, it plays a whole day of the shop with nobody at the PCs:
+  - the PCs enrolled with codes, the owner, the accountant, a supervisor, the storekeeper and the cashiers signing in (password and phone code, or the cashier's PIN);
+  - the tills selling at the same time while the office works: cash, card, split, discounts within and above the limit, removed lines, an oversell and its review, items by the kilo, a service visit, zero-rated, exempt and a bundle;
+  - a quotation → an advance → a progress payment → the final invoice with the payments deducted; a credit invoice, a receipt, a bounced cheque, a credit note and a debit note;
+  - returns to the shelf and to defective stock, paid-in/out, a cash drop, the X report, a stock count, labels, every document printed (and checked that it is not blank);
+  - every shift closed with its blind count, one recount with approval, the over/short accepted, and every Z report compared with what its till did.
+
+  Then every check of the books runs, the rehearsal database is backed up, restored and checked again, the accountant's seven-step reconciliation report runs, the speed is measured, and the rehearsal database is deleted. Every approval is given with a real one-time phone code.
+- **Fixed: selling a bundle (kit) at the POS failed** with an error. The server worked out each part's quantity with too many decimals and refused its own number. Bundles now sell; the parts leave the stock, and a missing part asks for the supervisor like any oversell.
+- **Fixed: two tills and the office saving at the same moment could block each other**, and one of them got "busy, try again". Each save took its numbers (invoice, journal, receipt) in a different order. Now every save takes one shared turn for numbering before its first number (migration 0053). Numbers stay gapless. Saves already took their journal numbers one at a time, so this adds no real waiting.
+- **«ابدأ البروفة» on System health** (owner only, permission `system.rehearsal`, migration 0054):
+  - a confirmation first: about 10–20 minutes, and the shop keeps working;
+  - refused, with the reason, while a shift is open, while an update is installing, while another rehearsal runs, or with less than 2 GB free on the server PC;
+  - the server PC's updater starts it within seconds, as its own program at low priority;
+  - the steps show as they end with a progress bar, then **green** or **red** with the reason, the checks, the restored backup, the speed and the seven-step reconciliation report;
+  - **«اطبع تقرير المطابقة»** prints the rehearsal's reconciliation report (marked «بروفة») for the owner and the accountant;
+  - a rehearsal cut off half way (a power cut) is shown red, and its leftover database is deleted at the next one.
+- **Searching and scanning items is about 4–5 times faster** with many items (found by the busy day). With 20,000 items, a name search took about 60 ms and a barcode scan about 70 ms on an idle server, and about 0.2 s with four tills busy. Now about 17 ms and 14 ms: the search uses its indexes, and stock is totalled only for the items on the screen.
+- **The busy day in GitHub** (`pnpm acceptance:day`): four tills at once, 800+ sales, 20,000 items, every night and before every release. A red step or a speed above the targets stops the release; the table is in the run's summary.
+
+## The reconciliation report; a PDF copy of every thermal receipt; the print test checks every required field (2026-11-05) — in version 0.10.0
+
+**In plain words:**
+
+- **Reconciliation report** (Reports → «تقرير المطابقة», for the owner and the accountant; decision 0119):
+  - Seven steps, each green or red: stock, cash, invoices, VAT, accounts, audit log, backup.
+  - Figures side by side, e.g. the period's VAT on the documents against the VAT account.
+  - The problems found, by document or shift number.
+  - It prints as a PDF for the accountant, and every run is kept.
+- **Seven new checks of the books:**
+  - cash of every closed shift;
+  - each document's total against its lines;
+  - the invoice format and series;
+  - VAT against the VAT account;
+  - everything posted;
+  - customer balances and advances;
+  - the anchors kept on Z reports and backups.
+
+  They run with the existing ones every night, after every database start and in every restore test, and System health warns if one fails.
+- **Every Z report now keeps the audit log's fingerprint** (its anchor), so a log changed later can never match it.
+- **Every thermal receipt is also saved as a PDF on the PC, by itself** (decision 0120).
+  - It covers sales and POS returns, and it is the same picture the printer gets.
+  - It is saved even if the printer is off or out of paper.
+  - **Where:** Public Documents › ARTEPOOL › Receipts, with a folder per month (`2026-11`), so the owner's and the cashier's Windows accounts both find it.
+  - **File name:** `POS-000123 - 05-11-2026.pdf`. One file per receipt: printing it again never replaces it, and only puts it back if it was deleted.
+  - If the copy cannot be saved, the sale is still saved and a short message says so.
+- **The print test of every document type** (added with the blank credit-note fix in 0.9.3) now also checks each document against the official list of required tax fields. If a required field is ever missing on a printed invoice or note, the test fails.
+- **The M7 plan is approved:**
+  - the rehearsal is fully automated, on the shop's server PC, in its own throwaway database (decision 0119);
+  - a 5-minute hardware check is the only manual step;
+  - go-live starts from a clean database.
+
+- **Files and records:**
+  - Decisions 0119, 0120; PRD 1.52; `docs/milestones/m7-acceptance-tools.md`.
+  - The checks: `apps/backup/src/integrity.ts`; migration 0052 (the report's permission and runs, the Z report's anchor); the report: `apps/server/src/modules/reports/reconciliation*.ts`, `apps/desktop/src/features/reports/Reconciliation.tsx`.
+  - The copy: `apps/desktop/src/features/pos/receipt/pdf.ts` (the PDF); `apps/desktop/src-tauri/printer/src/receipt_copy.rs` (the folder, the name checks, never overwriting); the app command `receipt_pdf_save`.
+  - Tests: `receipt-pdf.test.ts` (desktop), the Rust tests of `receipt_copy`, `print-documents.test.ts` (the required fields of each template).
+
 ## The cashier's Windows account, simplified (M6.4) (2026-11-04) — in version 0.9.3
 
 **In plain words:**

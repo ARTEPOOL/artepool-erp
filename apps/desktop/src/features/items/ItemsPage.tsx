@@ -37,6 +37,7 @@ import {
   ToolBar,
 } from '../../ui';
 import { useCan, useErrorText } from '../auth/context';
+import { ExportButton } from '../masterdata/ExportButton';
 import { ImportDialog } from '../masterdata/ImportDialog';
 import {
   localName,
@@ -306,6 +307,7 @@ export function ItemsPage() {
           {t('import.items')}
         </Button>
       )}
+      {can('data.export') && <ExportButton url="/api/v1/items/export" />}
       {canImport && can('prices.manage') && (
         <Button onPress={() => setDialog({ kind: 'import', entity: 'item_prices' })}>
           <FileSpreadsheet className={iconClass.sm} aria-hidden="true" />

@@ -3,6 +3,7 @@
  * JSON answers: a reason is required, the changes are in the audit log, and nothing changes when
  * the input is wrong.
  */
+import { hostname } from 'node:os';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { runEmergencyAction, type EmergencyDeps } from '../../src/cli/emergency-actions';
 import { addOwnerWithTwoStep } from '../support/https';
@@ -22,7 +23,7 @@ const run = (action: string, input: unknown = {}) => runEmergencyAction(deps, ac
 const lastEvent = async (action: string) =>
   server.db
     .selectFrom('audit.log')
-    .select(['reason', 'action'])
+    .select(['reason', 'action', 'new_values'])
     .where('action', '=', `event:${action}`)
     .orderBy('id', 'desc')
     .executeTakeFirst();
@@ -77,6 +78,12 @@ describe('emergency tool actions (decision 0107)', () => {
     expect(temporary.length).toBeGreaterThanOrEqual(10);
     const event = await lastEvent('auth.owner_password_reset');
     expect(event?.reason).toBe('emergency tool — forgot it');
+    // The audit user is SYSTEM here, so the event says which Windows account and PC it was.
+    expect(event?.new_values).toMatchObject({
+      twoStepCleared: false,
+      windowsUser: expect.stringMatching(/\S/) as unknown,
+      pc: hostname(),
+    });
     const audit = await server.db.selectFrom('audit.log').selectAll().execute();
     expect(
       JSON.stringify(audit, (_k, v: unknown) => (typeof v === 'bigint' ? 0 : v)),
@@ -110,6 +117,13 @@ describe('emergency tool actions (decision 0107)', () => {
       .orderBy('id', 'desc')
       .executeTakeFirstOrThrow();
     expect(row.origin).toBe('console');
+    const audited = await server.db
+      .selectFrom('audit.log')
+      .select('reason')
+      .where('entity_type', '=', 'auth.enrollment_codes')
+      .orderBy('id', 'desc')
+      .executeTakeFirstOrThrow();
+    expect(audited.reason).toMatch(new RegExp(`\\(Windows: .+ on ${hostname()}\\)$`));
   });
 
   it("records the cashier account's set-up (M6.4): System health at once, one audit entry", async () => {

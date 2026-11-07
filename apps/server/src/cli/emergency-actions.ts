@@ -9,7 +9,7 @@
  * administrator who ran it (read here, not sent by the window).
  */
 import { randomUUID } from 'node:crypto';
-import { hostname, userInfo } from 'node:os';
+import { hostname } from 'node:os';
 import { sql } from 'kysely';
 import { z } from 'zod';
 import { recordEvent } from '../platform/audit/events';
@@ -17,7 +17,13 @@ import { withBusinessTx } from '../platform/db/tx';
 import type { SecretHasher } from '../platform/crypto/hashing';
 import type { Db } from '../platform/db/pool';
 import type { SettingsCache } from '../platform/settings';
-import { activeOwner, createConsoleCode, resetOwnerPassword, resetOwnerTwoStep } from './bootstrap';
+import {
+  activeOwner,
+  createConsoleCode,
+  resetOwnerPassword,
+  resetOwnerTwoStep,
+  windowsUser,
+} from './bootstrap';
 import { cashierCheckSchema } from './updater/cashier-account';
 
 export const EMERGENCY_ACTIONS = [
@@ -57,13 +63,6 @@ const cashierAccount = z.object({
   /** The owner's enrollment was moved to the whole-PC file this time. */
   enrollmentMoved: z.boolean(),
 });
-
-/** The Windows account running the emergency tool (an administrator): DOMAIN\name. */
-function windowsUser(): string {
-  const domain = process.env.USERDOMAIN;
-  const name = userInfo().username;
-  return (domain ? `${domain}\\${name}` : name).slice(0, 100);
-}
 
 /** The written reason, as the console asks for it: at least 3 characters. */
 function reasonOf(reason: string): string | null {

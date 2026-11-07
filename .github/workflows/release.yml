@@ -57,9 +57,15 @@ jobs:
             *)   echo "GitHub answered $status for the releases repository; try again later." >&2; exit 1 ;;
           esac
 
+  busy-day:
+    name: The busy day must be green first (M7)
+    needs: decide
+    if: needs.decide.outputs.release == 'true'
+    uses: ./.github/workflows/busy-day.yml
+
   release:
     name: Build, sign and publish (after the owner's approval)
-    needs: decide
+    needs: [decide, busy-day]
     if: needs.decide.outputs.release == 'true'
     runs-on: windows-latest
     environment: release

@@ -9,12 +9,13 @@
  */
 import { execFile, spawn } from 'node:child_process';
 import { mkdirSync, readFileSync } from 'node:fs';
+import { constants, setPriority } from 'node:os';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import pg from 'pg';
 import { LATEST_URL } from '@artepool/release';
-import { connectionFor, loadEnv, resourcePath } from '@artepool/node-kit';
+import { childEnv, connectionFor, loadEnv, resourcePath } from '@artepool/node-kit';
 import { waitHealthy } from './install/health';
 import { InstallLog } from './install/log';
 import { windowsPlatform } from './install/windows';
@@ -23,6 +24,7 @@ import { recordCashierAccount } from './updater/cashier-account';
 import { renewServerCertificate } from './updater/certificate';
 import { resumableDownload } from './updater/download';
 import { outcomeChanged, runUpdater } from './updater/steps';
+import { claimRehearsal } from '../rehearsal/shop';
 
 function required(name: string): string {
   const value = process.env[name];
@@ -79,12 +81,19 @@ try {
       await promisify(execFile)(tar, ['-xf', zip, '-C', to], {
         windowsHide: true,
         timeout: 10 * 60 * 1000,
+        env: childEnv({}),
       });
     },
     runSetup: (file, runtimeDir) => {
       // Detached: the setup replaces this program's folder, so the updater ends first.
       const args = ['/S', ...(runtimeDir ? [`/RUNTIME=${runtimeDir}`] : [])];
-      spawn(file, args, { detached: true, stdio: 'ignore', windowsHide: true }).unref();
+      // Never with this program's secrets: the setup asks the launcher for what it needs.
+      spawn(file, args, {
+        detached: true,
+        stdio: 'ignore',
+        windowsHide: true,
+        env: childEnv({}),
+      }).unref();
     },
     now: () => new Date(),
     log: (line) => log.line(line),
@@ -124,12 +133,34 @@ try {
           await promisify(execFile)(
             join(programDir, 'artepool-svc.exe'),
             ['--data', dataDir, 'cashier-account', 'check'],
-            { windowsHide: true, timeout: 60_000 },
+            { windowsHide: true, timeout: 60_000, env: childEnv({}) },
           )
         ).stdout,
       now: () => new Date(),
     });
     if (cashier === 'changed' || cashier === 'failed') log.line(`Cashier account: ${cashier}.`);
+
+    // The owner's «ابدأ البروفة» (M7, decision 0119): its own program, at low priority, so the
+    // shop's server keeps answering first. Never while an update is starting or running.
+    const claim = await claimRehearsal(client);
+    if (claim.kind === 'start') {
+      const child = spawn(
+        join(programDir, 'artepool-svc.exe'),
+        ['--data', dataDir, 'run', 'rehearsal', claim.id],
+        { detached: true, stdio: 'ignore', windowsHide: true, env: childEnv({}) },
+      );
+      if (child.pid) {
+        try {
+          setPriority(child.pid, constants.priority.PRIORITY_BELOW_NORMAL);
+        } catch {
+          // Normal priority then: the rehearsal still runs.
+        }
+      }
+      child.unref();
+      log.line(`Rehearsal ${claim.id}: started.`);
+    } else if (claim.kind === 'refused') {
+      log.line(`Rehearsal ${claim.id}: not started, a shift is open.`);
+    }
   }
 } catch (error) {
   const reason = error instanceof Error ? error.message : String(error);

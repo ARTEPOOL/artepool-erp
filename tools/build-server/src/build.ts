@@ -41,6 +41,7 @@ export const ENTRY_POINTS: Record<string, string> = {
   upgrade: 'apps/server/src/cli/upgrade.ts',
   'delete-data': 'apps/server/src/cli/delete-data.ts',
   updater: 'apps/server/src/cli/updater.ts',
+  rehearsal: 'apps/server/src/cli/rehearsal.ts',
 };
 
 /** Bundled alone, without shared chunks: it runs from a copy outside this folder (0115). */

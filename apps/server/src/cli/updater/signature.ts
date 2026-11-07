@@ -6,7 +6,9 @@
  *
  * Both the public key and the signature are given as Tauri gives them: base64 of the minisign
  * text. A signature is accepted only when it was made by that key, over exactly these bytes, and
- * its trusted comment is intact.
+ * its trusted comment is intact. For an installer, the trusted comment must also name the file
+ * it was signed as (Tauri writes `timestamp:<n>\tfile:<name>`): an older or another signed file
+ * offered under this version's name is refused (security review, M7).
  */
 import { createHash, createPublicKey, verify } from 'node:crypto';
 import { createReadStream } from 'node:fs';
@@ -54,26 +56,42 @@ export function verifySignature(publicKey: string, signature: string, data: Buff
   );
 }
 
-/** The same for a file (an installer), read in pieces: only the prehashed form ("ED"). */
+/**
+ * The same for a file (an installer), read in pieces: only the prehashed form ("ED"), and only
+ * when the signature was made for a file of the name `expectedName`.
+ */
 export async function verifyFileSignature(
   publicKey: string,
   signature: string,
   path: string,
+  expectedName: string,
 ): Promise<void> {
   const hash = createHash('blake2b512');
   for await (const chunk of createReadStream(path)) hash.update(chunk as Buffer);
   const digest = hash.digest();
-  verifyWith(publicKey, signature, (algorithm) => {
+  const comment = verifyWith(publicKey, signature, (algorithm) => {
     if (algorithm !== 'ED') throw new SignatureError('The update signature is not valid.');
     return digest;
   });
+  if (signedFileName(comment) !== expectedName) {
+    throw new SignatureError(
+      `The update signature was made for another file, not ${expectedName}.`,
+    );
+  }
 }
 
+/** The `file:` part of a trusted comment, or null. */
+export function signedFileName(trustedComment: string): string | null {
+  const part = trustedComment.split('\t').find((p) => p.startsWith('file:'));
+  return part === undefined ? null : part.slice('file:'.length);
+}
+
+/** Checks the signature; returns its trusted comment (already proven intact). */
 function verifyWith(
   publicKey: string,
   signature: string,
   messageFor: (algorithm: 'ED' | 'Ed') => Buffer,
-): void {
+): string {
   const key = parsePublicKey(publicKey);
   const text = lines(signature);
   const sigLine = text.find((l) => !l.includes('comment:'));
@@ -101,4 +119,5 @@ function verifyWith(
   if (!verify(null, Buffer.concat([signatureBytes, comment]), key.key, global)) {
     throw new SignatureError("The update signature's trusted comment was changed.");
   }
+  return comment.toString('utf8');
 }

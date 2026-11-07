@@ -66,8 +66,11 @@ export interface CustomerDetail extends CustomerListItem {
   emirate: Emirate | null;
   countryCode: string;
   paymentTermsDays: number;
-  /** Fils as whole-number text; "0" for cash customers. */
-  creditLimitFils: string;
+  /**
+   * Fils as whole-number text; "0" for cash customers. Null without customers.balance.view
+   * (decision 0114: the credit limit is an amount, like the balance).
+   */
+  creditLimitFils: string | null;
   preferredLanguage: 'ar' | 'en' | null;
   notes: string | null;
   rowVersion: number;

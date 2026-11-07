@@ -5,7 +5,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { MeResponse, SessionView, SignInResponse } from '@artepool/shared/contracts';
-import { ConsoleError, resetOwnerPassword } from '../../src/cli/bootstrap';
+import { ConsoleError, consoleOrigin, resetOwnerPassword } from '../../src/cli/bootstrap';
 import { totpCode } from '../../src/platform/auth/totp';
 import { RateLimiter } from '../../src/platform/http/rate-limit';
 import { addOwnerWithTwoStep } from '../support/https';
@@ -148,7 +148,10 @@ describe('emergency owner password reset on the server PC (decision 0029)', () =
       .select(['user_id', 'reason', 'new_values'])
       .where('action', '=', 'event:auth.owner_password_reset')
       .execute();
-    expect(events).toEqual([{ user_id: 1n, reason, new_values: { twoStepCleared: false } }]);
+    // The audit user is SYSTEM; the event says which Windows account and PC it was (M7).
+    expect(events).toEqual([
+      { user_id: 1n, reason, new_values: { twoStepCleared: false, ...consoleOrigin() } },
+    ]);
   });
 
   it('phone lost too: the 2-step setup and the old recovery codes are cleared', async () => {

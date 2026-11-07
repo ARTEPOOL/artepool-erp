@@ -177,6 +177,33 @@ describe('gapless numbering (golden rule 5)', () => {
     expect(Number(rows[0]!.n)).toBe(committed.length + 1);
   });
 
+  it('two transactions taking numbers from two series in opposite orders never block each other (0053)', async () => {
+    // Before 0053: one took RCT- then JV-, the other JV- then RCT-, each waited for the other's
+    // series and PostgreSQL cancelled one of them (deadlock, found by the M7 rehearsal).
+    const [rct, jv] = [await seriesId('RCT'), await seriesId('JV')];
+    const clients = await Promise.all([db.connect('api'), db.connect('api')]);
+    const take = async (client: pg.Client, first: string, second: string) => {
+      await client.query('BEGIN');
+      await setContext(client);
+      const a = await nextNumber(client, first);
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      const b = await nextNumber(client, second);
+      await client.query('COMMIT');
+      return [a.formatted, b.formatted];
+    };
+    try {
+      const [one, two] = await Promise.all([take(clients[0], rct, jv), take(clients[1], jv, rct)]);
+      expect([...one, ...two].sort()).toEqual([
+        'JV-000001',
+        'JV-000002',
+        'RCT-000001',
+        'RCT-000002',
+      ]);
+    } finally {
+      await Promise.all(clients.map((c) => c.end()));
+    }
+  });
+
   it('the counter cannot be moved by hand, and a series cannot be redefined', async () => {
     const cn = await seriesId('CN');
     await expect(

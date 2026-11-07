@@ -253,3 +253,30 @@ export const priceChanged = (l: EditorLine): boolean => {
   const p = tryParse(parse4dp, l.unitPrice);
   return p !== null && p !== BigInt(l.listPrice4dp);
 };
+
+/** A chosen payment invoice and what is left of it, with its VAT apart. */
+export interface AdvanceLeft {
+  id: string;
+  netLeftFils: bigint;
+  vatLeftFils: bigint;
+}
+
+/**
+ * What each chosen payment will deduct from this invoice (decisions 0013, 0121), in the order
+ * chosen, as the server does: never more than the invoice's own net and VAT; the rest of a payment
+ * stays as the customer's advance for later invoices (or is refunded).
+ */
+export function planDeductions(
+  room: { netFils: bigint; vatFils: bigint },
+  advances: AdvanceLeft[],
+): { id: string; deductedFils: bigint; staysFils: bigint }[] {
+  let net = room.netFils > 0n ? room.netFils : 0n;
+  let vat = room.vatFils > 0n ? room.vatFils : 0n;
+  return advances.map((a) => {
+    const n = a.netLeftFils < net ? a.netLeftFils : net;
+    const v = a.vatLeftFils < vat ? a.vatLeftFils : vat;
+    net -= n;
+    vat -= v;
+    return { id: a.id, deductedFils: n + v, staysFils: a.netLeftFils + a.vatLeftFils - n - v };
+  });
+}

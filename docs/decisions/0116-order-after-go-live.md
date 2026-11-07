@@ -30,5 +30,5 @@
 ## How it works
 - The PRD's phase table shows this order.
 - P4 keeps the remaining extensions: WhatsApp/email, promotions, loyalty, multi-warehouse screens, standby server.
-- The AI & Online track's stages 2A–2D are described in its own plan document, `docs/ai-online-track.md` (to be added from the owner's draft).
+- The AI & Online track's stages 2A–2D are described in its own plan document, [`docs/ai-online-track.md`](../ai-online-track.md) (added 2026-11-05 from the owner's draft, with its ground rules in [0118](0118-ai-online-ground-rules.md)).
 - Each stage is planned and approved before it is built, like every milestone.

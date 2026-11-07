@@ -946,6 +946,18 @@ export interface OpsBackupRuns {
   updated_by: bigint;
 }
 
+export interface OpsHardwareChecks {
+  all_ok: boolean;
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  device_id: bigint;
+  id: Generated<bigint>;
+  results: Json;
+  row_version: Generated<number>;
+  updated_at: Generated<Timestamp>;
+  updated_by: bigint;
+}
+
 export interface OpsIntegrityRuns {
   backup_run_id: bigint | null;
   created_at: Generated<Timestamp>;
@@ -953,6 +965,8 @@ export interface OpsIntegrityRuns {
   database_name: string;
   finished_at: Timestamp | null;
   id: Generated<bigint>;
+  period_from: string | null;
+  period_to: string | null;
   results: Generated<Json>;
   row_version: Generated<number>;
   run_kind: string;
@@ -982,6 +996,23 @@ export interface OpsOutbox {
   updated_at: Generated<Timestamp>;
   updated_by: bigint;
   uuid: Generated<string>;
+}
+
+export interface OpsRehearsalRuns {
+  created_at: Generated<Timestamp>;
+  created_by: bigint;
+  failure: string | null;
+  finished_at: Timestamp | null;
+  heartbeat_at: Timestamp | null;
+  id: Generated<bigint>;
+  report: Json | null;
+  row_version: Generated<number>;
+  size: Generated<string>;
+  started_at: Timestamp | null;
+  status: Generated<string>;
+  steps: Generated<Json>;
+  updated_at: Generated<Timestamp>;
+  updated_by: bigint;
 }
 
 export interface OpsServerHealth {
@@ -1578,8 +1609,10 @@ export interface DB {
   "md.warehouses": MdWarehouses;
   "ops.backup_requests": OpsBackupRequests;
   "ops.backup_runs": OpsBackupRuns;
+  "ops.hardware_checks": OpsHardwareChecks;
   "ops.integrity_runs": OpsIntegrityRuns;
   "ops.outbox": OpsOutbox;
+  "ops.rehearsal_runs": OpsRehearsalRuns;
   "ops.server_health": OpsServerHealth;
   "ops.update_requests": OpsUpdateRequests;
   "ops.update_state": OpsUpdateState;

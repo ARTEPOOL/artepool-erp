@@ -114,7 +114,7 @@ It works in Arabic and English, without the internet, on as many PCs as you like
 **Not in Phase 1** (see PRD §13):
 - purchasing, expenses, accounting reports, the VAT return and the quarterly export package (P2)
 - contracts, visits, service jobs and projects (P3)
-- the e-invoice sender (P4 or earlier), WhatsApp/email, promotions, loyalty, standby server
+- the e-invoice sender (ready before 1 July 2027, 0116), email, promotions, loyalty, standby server; WhatsApp in the AI & Online track (0118)
 
 ---
 
@@ -523,12 +523,16 @@ A milestone is done only when its tests pass in CI.
 
 #### Dropped for Phase 1 — remote access (0093)
 
-No VPN (Tailscale or other), no router ports, no remote-desktop tools. The design stays VPN-agnostic so 0084 can be added later; remote monitoring comes with the Phase 2 mobile dashboard.
+No VPN (Tailscale or other), no router ports, no remote-desktop tools. The design stays VPN-agnostic so 0084 can be added later; remote monitoring comes with the mobile dashboard (AI & Online track, stage 2C, [0118](decisions/0118-ai-online-ground-rules.md)).
 
 ### M7 — Acceptance
 
+**Status (2026-11-05):** the task plan for the acceptance tools is **approved, with the rehearsal fully automated** ([0119](decisions/0119-automated-rehearsal-and-clean-go-live.md)); building: [`milestones/m7-acceptance-tools.md`](milestones/m7-acceptance-tools.md). Order: the reconciliation report → the automated rehearsal, the CI busy day and the speed line → the guided hardware check → the export and the go-live guide.
+
 **Delivers:**
-- The full-day simulation on 2+ terminals (§6.3), run on the real hardware.
+- The automated rehearsal (§6.3) on the shop's server PC ("Start rehearsal", owner only, its own throwaway database) and the busy day in CI (4 tills, 800+ sales), both ending with the reconciliation report.
+- The guided hardware check (test receipt, drawer, test label, scan), the only human step.
+- The items, customers and suppliers export and the go-live guide (go-live from a clean database).
 - Performance measurements.
 - A security review.
 - The accountant's review of the chart of accounts, the posting map, invoice layouts and the VAT summary.
@@ -573,26 +577,26 @@ No VPN (Tailscale or other), no router ports, no remote-desktop tools. The desig
 | **Resilience** | Process killed mid-transaction → nothing partial; network drop after commit → retry returns the same result; server clock backwards → writes refused |
 | **Performance** (PRD §12) | Barcode/search < 300 ms (95th percentile) with 20,000 items; sale completion < 2 s (95th percentile) with 4 tills selling at once |
 
-### 6.3 Acceptance test: "a full day on 2+ tills"
+### 6.3 Acceptance test: an automated full day ([0119](decisions/0119-automated-rehearsal-and-clean-go-live.md))
 
-**Scripted on 2 or more terminals with real hardware:**
+**Scripted and fully automated** (no manual sales): on the shop's server PC with its own rehearsal database, and as the busy day in CI (4 tills at once, 800+ POS sales, 20,000 items). The real hardware is covered by the guided hardware check (test receipt, drawer, test label, scan). The script covers:
 - Opening floats.
-- 200+ POS sales with cash, card and split tenders, discounts within and above limits, and cart removals.
+- POS sales with cash, card and split tenders, discounts within and above limits, and cart removals (about 150 in the shop rehearsal, 800+ in CI).
 - 2 oversells with approval.
 - Returns: to sellable and to defective.
 - A4 work: a quotation, an advance payment, a progress payment, and a final invoice with deductions, for a VAT-registered customer (full invoice with TRN).
 - Cash: a refund, a bounced cheque reversal, paid-in/out, a cash drop, an X report.
-- A stock count with variances.
+- A stock count with variances; label print jobs.
 - Shift closes with one recount.
 
 **Reconciliation, all automatic and all required to pass:**
-1. **Stock:** balances = Σ movements; sample physical count matches; oversells reviewed.
+1. **Stock:** balances = Σ movements; the scripted count's variances posted; oversells reviewed.
 2. **Cash:** for each shift, counted = expected ± the recorded, approved variance.
 3. **Invoices:** every series gapless; totals = Σ lines; formats match VAT registration.
 4. **VAT:** VAT summary = Σ document VAT = movement on VAT payable (2130); advance VAT counted once.
 5. **Accounts:** every document posted exactly once; all entries balanced; AR control = Σ customer statements; customer advances = Σ undeducted payment invoices.
 6. **Audit:** the chain verifies end to end; anchors on the Z reports match.
-7. **Backup:** the latest backup restores into the test database and steps 1–6 pass there too.
+7. **Backup:** a backup of the rehearsal database restores and steps 1–6 pass there too.
 
 ### 6.4 Reviews
 

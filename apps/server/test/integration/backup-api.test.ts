@@ -99,6 +99,25 @@ describe('system health', () => {
     expect(health.disk?.totalBytes).toBeGreaterThan(0);
   });
 
+  it('the integrity line shows the checks of the books, never a reconciliation report (M7)', async () => {
+    await server.admin.query('BEGIN');
+    await server.admin.query("SELECT sys.set_context(1, p_reason => 'test')");
+    await server.admin.query(
+      `INSERT INTO ops.integrity_runs (run_kind, database_name, finished_at, status, results)
+       VALUES ('nightly', current_database(), now() - interval '1 hour', 'ok', '{"audit_chain": {"ok": true, "problems": 0, "examples": []}}')`,
+    );
+    await server.admin.query(
+      `INSERT INTO ops.integrity_runs (run_kind, database_name, finished_at, status, results, period_from, period_to)
+       VALUES ('reconciliation', current_database(), now(), 'issues', '{"steps": []}', current_date, current_date)`,
+    );
+    await server.admin.query('COMMIT');
+    const health = (await get()).json<HealthResponse>();
+    expect(health.integrity.last).toMatchObject({
+      status: 'ok',
+      checks: { audit_chain: { ok: true } },
+    });
+  });
+
   it('takes the owner’s requests, one open per kind', async () => {
     const first = await post('/api/v1/backup/requests', { kind: 'backup_now' });
     expect(first.statusCode).toBe(201);

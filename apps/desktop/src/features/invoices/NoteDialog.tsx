@@ -38,7 +38,7 @@ import { localName, useReasonCodes } from '../masterdata/refs';
 import { SALES_INVALIDATE, SALES_PATHS, useSalesPaymentMethods } from '../sales/api';
 import { useLineRefs } from '../sales/LineEditor';
 import salesStyles from '../sales/sales.module.css';
-import { PaymentPartsEditor, readParts, type PartDraft, type PartProblem } from './parts';
+import { PaymentPartsEditor, newPart, readParts, type PartDraft, type PartProblem } from './parts';
 import styles from './invoices.module.css';
 
 type Back = 'available' | 'defective' | 'none';
@@ -74,6 +74,8 @@ const needsNoteApproval = (error: unknown) =>
 export function NoteDialog(props: {
   kind: 'credit_note' | 'debit_note';
   original: DocumentDetail;
+  /** "Refund the remainder" of a payment invoice (decision 0121): the refund is ticked, for all of it. */
+  refundRemainder?: boolean;
   onClose: () => void;
   onCreated: (note: DocumentDetail) => void;
 }) {
@@ -96,8 +98,10 @@ export function NoteDialog(props: {
   const [reasonText, setReasonText] = useState('');
   const [lines, setLines] = useState<Record<string, LineDraft>>({});
   const [amount, setAmount] = useState(advance ? formatFils(advanceLeft) : '');
-  const [refunding, setRefunding] = useState(false);
-  const [parts, setParts] = useState<PartDraft[]>([]);
+  const [refunding, setRefunding] = useState(Boolean(props.refundRemainder));
+  const [parts, setParts] = useState<PartDraft[]>(
+    props.refundRemainder && advance ? [newPart('', formatFils(advanceLeft))] : [],
+  );
   const [partProblems, setPartProblems] = useState<Record<number, PartProblem>>({});
   const [lineProblems, setLineProblems] = useState<Record<string, LineProblem>>({});
   const [problem, setProblem] = useState<string | null>(null);

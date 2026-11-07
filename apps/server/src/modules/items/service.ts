@@ -47,41 +47,49 @@ async function standardLevelId(db: Kysely<DB>): Promise<bigint> {
 }
 
 /** The items list: search by name in either language (Arabic letter variants ignored), code or barcode. */
+/** Sellable and defective quantities and the sellable value, over the balances aliased `t`. */
+const stockTotalColumns = (t: string) => [
+  sql<string>`sum(${sql.ref(`${t}.quantity`)}) FILTER (WHERE ${sql.ref(`${t}.stock_status`)} = 'available')`.as(
+    'on_hand',
+  ),
+  sql<string>`sum(${sql.ref(`${t}.quantity`)}) FILTER (WHERE ${sql.ref(`${t}.stock_status`)} = 'defective')`.as(
+    'defective',
+  ),
+  sql<string>`sum(${sql.ref(`${t}.value_4dp`)}) FILTER (WHERE ${sql.ref(`${t}.stock_status`)} = 'available')`.as(
+    'value_4dp',
+  ),
+  sql<string>`max(${sql.ref(`${t}.avg_unit_cost_4dp`)}) FILTER (WHERE ${sql.ref(`${t}.stock_status`)} = 'available')`.as(
+    'last_avg',
+  ),
+];
+
 /** Per-item stock over all warehouses: sellable and defective quantities, and the sellable value. */
 const stockTotals = (db: Kysely<DB>) =>
   db
-    .selectFrom('inv.balances')
-    .select([
-      'item_id',
-      sql<string>`sum(quantity) FILTER (WHERE stock_status = 'available')`.as('on_hand'),
-      sql<string>`sum(quantity) FILTER (WHERE stock_status = 'defective')`.as('defective'),
-      sql<string>`sum(value_4dp) FILTER (WHERE stock_status = 'available')`.as('value_4dp'),
-      sql<string>`max(avg_unit_cost_4dp) FILTER (WHERE stock_status = 'available')`.as('last_avg'),
-    ])
-    .groupBy('item_id');
+    .selectFrom('inv.balances as t')
+    .select(['t.item_id', ...stockTotalColumns('t')])
+    .groupBy('t.item_id');
 
 export async function listItems(
   db: Kysely<DB>,
   query: ItemsQuery,
   showCost = false,
 ): Promise<ItemsResponse> {
-  let base = db
-    .selectFrom('md.items as i')
-    .leftJoin(stockTotals(db).as('s'), 's.item_id', 'i.id')
-    .leftJoin('md.price_levels as l', (join) => join.on('l.is_default', '=', true))
-    .leftJoin('md.item_prices as p', (join) =>
-      join.onRef('p.item_id', '=', 'i.id').onRef('p.price_level_id', '=', 'l.id'),
-    )
-    .leftJoin('md.item_barcodes as b', (join) =>
-      join.onRef('b.item_id', '=', 'i.id').on('b.is_primary', '=', true),
-    );
+  // The filters only: the stock totals, the price and the barcode are joined for the page's rows
+  // alone (M7 busy day: with 20,000 items, totalling every item's stock on each search, three
+  // times, made a scan at four busy tills take about 0.2 s).
+  let base = db.selectFrom('md.items as i');
   if (query.status !== 'all') base = base.where('i.is_active', '=', query.status === 'active');
   if (query.itemType) base = base.where('i.item_type', '=', query.itemType);
   if (query.toReorder) {
     base = base
       .where('i.item_type', '=', 'stock')
       .where('i.reorder_level', 'is not', null)
-      .where(sql<boolean>`coalesce(s.on_hand, 0) <= i.reorder_level`);
+      .where(
+        sql<boolean>`coalesce((SELECT sum(quantity) FROM inv.balances
+                                WHERE item_id = i.id AND stock_status = 'available'), 0)
+                     <= i.reorder_level`,
+      );
   }
   if (query.categoryId) {
     const root = BigInt(query.categoryId);
@@ -96,19 +104,21 @@ export async function listItems(
   }
   if (query.q) {
     const q = query.q;
-    base = base.where((eb) =>
-      eb.or([
-        matchesWords('i.search_key', q),
-        eb(
-          'i.id',
-          'in',
+    // The words in the name or code, or the barcode exactly: as two lookups joined, so each uses
+    // its index (the trigram index of the search key; the barcode index). Written as one OR,
+    // PostgreSQL read every item instead.
+    base = base.where('i.id', 'in', (eb) =>
+      eb
+        .selectFrom('md.items as w')
+        .select('w.id')
+        .where(matchesWords('w.search_key', q))
+        .union(
           eb
-            .selectFrom('md.item_barcodes')
-            .select('item_id')
-            .where('is_active', '=', true)
-            .where(sql<string>`upper(barcode)`, '=', q.toUpperCase()),
+            .selectFrom('md.item_barcodes as bc')
+            .select('bc.item_id as id')
+            .where('bc.is_active', '=', true)
+            .where(sql<string>`upper(bc.barcode)`, '=', q.toUpperCase()),
         ),
-      ]),
     );
   }
   const total = await base
@@ -137,6 +147,22 @@ export async function listItems(
     : undefined;
   const exactId = exact?.id ?? null;
   const rows = await base
+    .leftJoinLateral(
+      (eb) =>
+        eb
+          .selectFrom('inv.balances as sb')
+          .select(stockTotalColumns('sb'))
+          .whereRef('sb.item_id', '=', 'i.id')
+          .as('s'),
+      (join) => join.onTrue(),
+    )
+    .leftJoin('md.price_levels as l', (join) => join.on('l.is_default', '=', true))
+    .leftJoin('md.item_prices as p', (join) =>
+      join.onRef('p.item_id', '=', 'i.id').onRef('p.price_level_id', '=', 'l.id'),
+    )
+    .leftJoin('md.item_barcodes as b', (join) =>
+      join.onRef('b.item_id', '=', 'i.id').on('b.is_primary', '=', true),
+    )
     .select([
       'i.id',
       'i.code',
