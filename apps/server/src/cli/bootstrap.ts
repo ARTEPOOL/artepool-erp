@@ -154,7 +154,9 @@ export function createConsoleCode(
   settings: SettingsCache,
   reason = 'server console: enrollment code',
 ): Promise<{ code: string; expiresAt: Date }> {
-  return withBusinessTx(db, consoleContext(reason), (trx) =>
+  // The code's row is audited with this reason; it names the Windows account and PC (M7).
+  const { windowsUser: who, pc } = consoleOrigin();
+  return withBusinessTx(db, consoleContext(`${reason} (Windows: ${who} on ${pc})`), (trx) =>
     createEnrollmentCode(trx, { settings }, 'console'),
   );
 }

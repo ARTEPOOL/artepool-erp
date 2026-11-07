@@ -117,6 +117,13 @@ describe('emergency tool actions (decision 0107)', () => {
       .orderBy('id', 'desc')
       .executeTakeFirstOrThrow();
     expect(row.origin).toBe('console');
+    const audited = await server.db
+      .selectFrom('audit.log')
+      .select('reason')
+      .where('entity_type', '=', 'auth.enrollment_codes')
+      .orderBy('id', 'desc')
+      .executeTakeFirstOrThrow();
+    expect(audited.reason).toMatch(new RegExp(`\\(Windows: .+ on ${hostname()}\\)$`));
   });
 
   it("records the cashier account's set-up (M6.4): System health at once, one audit entry", async () => {

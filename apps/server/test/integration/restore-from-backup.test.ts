@@ -14,6 +14,7 @@ import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { configFromEnv, connect, encryptBundle, localBackup } from '@artepool/backup';
 import { connectionFor } from '@artepool/node-kit';
+import { consoleOrigin } from '../../src/cli/bootstrap';
 import {
   createDevice,
   createTestDatabase,
@@ -129,7 +130,9 @@ describe('the restore program', () => {
         `SELECT DISTINCT reason FROM audit.log WHERE entity_type = 'auth.enrollment_codes'`,
       );
       expect(reasons.rows).toEqual([
-        { reason: 'restore from backup: enrollment code for the new server PC' },
+        {
+          reason: `restore from backup: enrollment code for the new server PC (Windows: ${consoleOrigin().windowsUser} on ${consoleOrigin().pc})`,
+        },
       ]);
     } finally {
       await su.end();
