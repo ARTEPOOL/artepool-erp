@@ -1,5 +1,17 @@
 # Changelog
 
+## Advance payments larger than the final invoice (2026-11-07) — in version 0.10.0
+
+**In plain words** (decision 0121, the owner's answer; pending the accountant's review):
+
+- When the payments received earlier are **more than the final invoice**, only the invoice's amount is deducted, net and VAT. The invoice can come to 0.00 due.
+- **The rest stays as the customer's advance payment** (account 2120) for the next invoices.
+- Before saving, the invoice screen says it for each payment: «سيُخصم X من INV-…، ويبقى Y دفعة مقدمة للعميل».
+- **«ردّ المتبقي» / "Refund the remainder"** on the payment invoice pays back what is left in one step: a credit note on the payment invoice and the refund (posting map lines 9 and 10). It needs the refund permission.
+- The remaining advance shows on the customer page, the statement and the balance banner, on its own line, as before.
+- The accountant pack has the question, with a worked example (Q2).
+- Tested: an invoice smaller than the payment, a later invoice using part of the rest, and the refund of what stays, with the journal entries and every check of the books.
+
 ## The automated rehearsal, the hardware check and the export for go-live; problems they found are fixed (2026-11-05) — in version 0.10.0
 
 **In plain words:**

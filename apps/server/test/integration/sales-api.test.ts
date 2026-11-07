@@ -895,6 +895,75 @@ describe('fixes from the M4 screens review', () => {
     expect(later.advanceInvoice).toMatchObject({ totalFils: '2100' });
   });
 
+  it('payments larger than the final invoice: only its amount is deducted; the rest stays, is used later or refunded (0121)', async () => {
+    const cust = await customer('Large advance');
+    const svc = await item('SVC-ADV1', 'service', '1000000'); // 100.00 + VAT = 105.00
+    const paid = await ok<ReceivePaymentResponse>(
+      accountant('POST', '/api/v1/sales/payments', {
+        customerId: cust,
+        part: cash('31500'), // 300.00 + 15.00 VAT
+        asAdvance: true,
+      }),
+      201,
+    );
+    const advance = paid.advanceInvoice!;
+    const left = async () => {
+      const a = await ok<DocumentDetail>(owner('GET', `/api/v1/sales/documents/${advance.id}`));
+      return [a.advanceLeftNetFils, a.advanceLeftVatFils];
+    };
+    const finalOf = async (units: string) =>
+      ok<DocumentDetail>(
+        issue(
+          accountant,
+          await draft(accountant, {
+            customerId: cust,
+            lines: [{ itemId: svc.id, quantityMilli: units }],
+            deductions: [{ advanceDocumentId: advance.id }],
+          }),
+        ),
+      );
+
+    // 105.00 of the 315.00 is deducted: the invoice is covered, its own VAT only.
+    const first = await finalOf('1000');
+    expect(first).toMatchObject({ totalFils: '0', settlementStatus: 'settled' });
+    expect(first.lines.find((l) => l.lineKind === 'advance_deduction')).toMatchObject({
+      netFils: '-10000',
+      vatFils: '-500',
+      grossFils: '-10500',
+    });
+    const entry = await entryOf(first);
+    expect(entry['2120']).toBe(10000n); // the advance used
+    expect(entry['2130'] ?? 0n).toBe(0n); // its VAT was charged on the payment invoice
+    expect(entry['1210'] ?? 0n).toBe(0n);
+    expect(await left()).toEqual(['20000', '1000']);
+
+    // A later invoice uses part of what stays: 105.00, and 105.00 is still the customer's advance.
+    const second = await finalOf('1000');
+    expect(second).toMatchObject({ totalFils: '0' });
+    expect(await left()).toEqual(['10000', '500']);
+    const balance = await ok<{ amounts: { advancesFils: string } | null }>(
+      owner('GET', `/api/v1/customers/${cust}/balance`),
+    );
+    expect(balance.amounts?.advancesFils).toBe('10500');
+
+    // "Refund the remainder": a credit note on the payment invoice and the refund (lines 9, 10).
+    const note = await ok<DocumentDetail>(
+      owner('POST', '/api/v1/sales/notes', {
+        kind: 'credit_note',
+        originalDocumentId: advance.id,
+        reasonCodeId: ids.cnReturn,
+        reasonText: 'Advance left after the final invoice, refunded',
+        advanceAmountFils: '10500',
+        refund: [cash('10500')],
+      }),
+      201,
+    );
+    expect(note).toMatchObject({ totalFils: '10500', vatFils: '500', settlementStatus: 'settled' });
+    expect(await entryOf(note)).toMatchObject({ '2120': 10000n, '2130': 500n, '1210': -10500n });
+    expect(await left()).toEqual(['0', '0']);
+    expect(failing(await integrityChecks(server))).toEqual({});
+  });
+
   it('a reprint needs documents.reprint on the server too', async () => {
     const cust = await customer('Reprints', { credit: '10000000' });
     const svc = await item('SVC-R1', 'service', '1000000');

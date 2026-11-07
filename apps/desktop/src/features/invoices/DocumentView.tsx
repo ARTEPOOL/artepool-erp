@@ -105,7 +105,17 @@ function LinesTable({ doc }: { doc: DocumentDetail }) {
                   <td colSpan={4}>
                     <span>{t('sales:lines.deduction')}</span>
                     <span className={tbl.sub}>
-                      {l.advanceDocumentNumber && <bdi>{l.advanceDocumentNumber}</bdi>}
+                      {l.advanceDocumentNumber && l.advanceDocumentId ? (
+                        // The payment invoice: what is left of it, and its refund, are there.
+                        <Link
+                          to="/invoices/$documentId"
+                          params={{ documentId: l.advanceDocumentId }}
+                        >
+                          <bdi>{l.advanceDocumentNumber}</bdi>
+                        </Link>
+                      ) : (
+                        l.advanceDocumentNumber && <bdi>{l.advanceDocumentNumber}</bdi>
+                      )}
                     </span>
                   </td>
                   <td className={tbl.num}>
@@ -268,7 +278,7 @@ export function DocumentView({ doc }: { doc: DocumentDetail }) {
   const nameOf = useDisplayName();
   const navigate = useNavigate();
   const toast = useToast();
-  const [note, setNote] = useState<'credit_note' | 'debit_note' | null>(null);
+  const [note, setNote] = useState<'credit_note' | 'debit_note' | 'refund' | null>(null);
   const [cancelling, setCancelling] = useState<'cancel' | 'edit' | null>(null);
   const issued = doc.status === 'issued';
   const dueFils = BigInt(doc.totalFils) - BigInt(doc.settledFils);
@@ -278,6 +288,8 @@ export function DocumentView({ doc }: { doc: DocumentDetail }) {
   const canCredit =
     issued && can('invoices.create') && (isInvoice || (isAdvance && advanceLeft > 0n));
   const canDebit = issued && isInvoice && can('invoices.create') && can('invoices.issue');
+  // What stays of a payment after the final invoices (decision 0121) can be paid back.
+  const canRefundRemainder = canCredit && isAdvance && can('payments.refund');
   // Decision 0072: an issued A4 invoice is cancelled, or cancelled and copied to edit it.
   const canCancel =
     issued &&
@@ -411,6 +423,12 @@ export function DocumentView({ doc }: { doc: DocumentDetail }) {
                 {t('notes.debitButton')}
               </Button>
             )}
+            {canRefundRemainder && (
+              <Button onPress={() => setNote('refund')}>
+                <Wallet className={iconClass.sm} aria-hidden="true" />
+                {t('notes.refundRemainder', { amount: money(advanceLeft) })}
+              </Button>
+            )}
             {canCredit && (
               <Button onPress={() => setNote('credit_note')}>
                 <FileMinus className={iconClass.sm} aria-hidden="true" />
@@ -452,8 +470,9 @@ export function DocumentView({ doc }: { doc: DocumentDetail }) {
       )}
       {note && (
         <NoteDialog
-          kind={note}
+          kind={note === 'refund' ? 'credit_note' : note}
           original={doc}
+          refundRemainder={note === 'refund'}
           onClose={() => setNote(null)}
           onCreated={(created) => {
             setNote(null);

@@ -51,9 +51,11 @@
     },
     "advances": {
       "title": "Earlier payments to deduct",
-      "explain": "Payments received before this invoice already had VAT charged on them. Tick the ones this invoice should deduct; what is left of each is deducted.",
+      "explain": "Payments received before this invoice already had VAT charged on them. Tick the ones this invoice should deduct: they are deducted in the order ticked, never more than this invoice; the rest stays as the customer's advance.",
       "deduct": "Deduct {number}",
-      "left": "Left to deduct: {amount}"
+      "left": "Left to deduct: {amount}",
+      "split": "{deducted} will be deducted from {number}; {stays} stays as the customer's advance.",
+      "whole": "{deducted} will be deducted from {number} in full."
     },
     "dueDate": "Due date (optional)",
     "docDiscountHint": "An amount in AED; it is spread across the lines.",
@@ -168,7 +170,8 @@
       "tooMany": "At most {left}.",
       "decimals": "This unit does not take this many decimals.",
       "price": "Type a valid price."
-    }
+    },
+    "refundRemainder": "Refund the remainder ({amount})"
   },
   "cancel": {
     "editButton": "Edit invoice",

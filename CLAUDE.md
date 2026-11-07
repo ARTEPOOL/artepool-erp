@@ -52,7 +52,7 @@ It runs client–server on the local network: PostgreSQL and the API service on 
   - Credit notes, receipts and the rest each have their own series.
   - Tax documents get their number only at issue. (0011)
 - **Discounts** are stored per line (original price, discount, net). Revenue is posted net of discount. (0012)
-- **Advance and progress payments:** a payment that does not settle an already-issued tax invoice gets its own tax invoice with VAT. The final invoice deducts earlier payments and their VAT. (0013)
+- **Advance and progress payments:** a payment that does not settle an already-issued tax invoice gets its own tax invoice with VAT. The final invoice deducts earlier payments and their VAT, never more than its own net and VAT: the rest stays as the customer's advance (2120) or is refunded ("Refund the remainder": credit note on the payment invoice + refund); the screen says "X deducted from INV-…; Y stays". (0013, 0121)
 - **Prices:**
   - Each item has one sale price (4 dp) with a "price includes VAT" switch.
   - An inclusive price is split back into net and VAT; an exclusive price has VAT added.

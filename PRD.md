@@ -1,7 +1,7 @@
 # ARTÉPOOL ERP — Product Requirements Document (PRD)
 
-**Version:** 1.52
-**Date:** 2026-11-05
+**Version:** 1.53
+**Date:** 2026-11-07
 **Owner:** Mohammed Yasser Al Huraidi (partner, ARTÉPOOL)
 **Status:** Scope approved. Owner and accountant decisions applied (see `docs/decisions/`). **Phase 1 plan approved (2026-10-07).**
 
@@ -238,6 +238,7 @@ Phase tags: **[P1]** to **[P4]** (see section 13).
   - VAT is charged on every payment when it is received, if the payment is not settling an already-issued tax invoice. This applies whatever the stage: advance, during construction, after completion.
   - Each such payment produces its own **tax invoice for the payment received** (`INV-` series).
   - The **final invoice deducts the previous payments and their VAT**, so VAT is never counted twice.
+  - When the payments are more than the final invoice, only the invoice's amount (net and VAT) is deducted; the rest stays as the customer's advance for later invoices, or is refunded with a credit note on the payment invoice. The screen says what will be deducted and what stays ([0121](docs/decisions/0121-advances-larger-than-the-final-invoice.md)).
   - Payments that settle an already-issued tax invoice do not create VAT again.
 - **Credit notes** have their own number, reference the original invoice and reverse its VAT. The original invoice is never changed.
 - **Discounts** ([0012](docs/decisions/0012-discounts-net-revenue-per-line.md)):
@@ -468,6 +469,7 @@ Each phase ends with automated tests passing, a security review, an accountant r
 | 1.47 | 2026-11-02 | Decision 0095 updated, 0.9.1: the app's Google registration published "In production" with public pages (artepool.github.io), its values only as release secrets, carried by every release and read beside the programs at every start; an alert when Google refuses the saved Drive access. |
 | 1.48 | 2026-11-04 | Decision 0116: the order after go-live — P2 (money) first; then the AI & Online track (stages 2A–2D, its own track, not "Phase 2") interleaved with P3 as the owner decides; e-invoicing ready before 1 July 2027 (out of P4). M6.4 plan proposed; Arabic install guides; the accountant pack. |
 | 1.52 | 2026-11-05 | M7 plan approved with the rehearsal fully automated (decision 0119): "Start rehearsal" on the shop's server PC with its own throwaway database, the CI busy day, a guided 5-minute hardware check as the only human step, go-live from a clean database (items, customers and suppliers exported; opening stock and balances on go-live day by the owner); P1 acceptance updated. Decision 0120: every thermal receipt also saved as a PDF on the PC. |
+| 1.53 | 2026-11-07 | Decision 0121: earlier payments larger than the final invoice are deducted only up to the invoice's amount; the rest stays as the customer's advance or is refunded (credit note on the payment invoice + refund). |
 | 1.51 | 2026-11-05 | Decision 0118: the AI & Online track plan (`docs/ai-online-track.md`, from the owner's draft) and its nine ground rules; WhatsApp moves from P4 to stage 2B; the mobile dashboard is stage 2C. The M7 acceptance tools plan proposed (`docs/milestones/m7-acceptance-tools.md`). |
 | 1.50 | 2026-11-04 | M6.4 simplified (owner): a standard cashier Windows account with automatic sign-in and the app on the PIN screen; the PC's enrollment shared on the server PC; active hours 08:00–24:00; one emergency-tool action (audited); uninstall disables the account; one System health line. No Windows limits for now. |
 | 1.49 | 2026-11-04 | Decision 0117: A4 documents print the unit price and the discount excluding VAT, like the taxable amount beside them and like e-invoicing (PINT-AE). |

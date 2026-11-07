@@ -677,7 +677,11 @@ describe('Invoices (A4): a new invoice', () => {
     expect(within(advances).getByText('Left to deduct: 31,500.00')).toBeTruthy();
     fireEvent.click(within(advances).getByRole('checkbox', { name: 'Deduct INV-000201' }));
     expect(await screen.findByText('Less: earlier payments')).toBeTruthy();
-    expect(screen.getByText('-31,500.00')).toBeTruthy();
+    // The payment is more than this invoice (231.00): only 231.00 is deducted, the rest stays (0121).
+    expect(screen.getByText('-231.00')).toBeTruthy();
+    expect(screen.getByTestId('advance-plan-201').textContent).toBe(
+      "231.00 will be deducted from INV-000201; 31,269.00 stays as the customer's advance.",
+    );
     expect(screen.getByText('Save the draft before issuing it.')).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
@@ -932,6 +936,51 @@ describe('Invoices (A4): an issued document', () => {
         advanceDocumentNumber: 'INV-000250',
       }),
     ],
+  });
+
+  it('a payment invoice with something left offers "Refund the remainder": refund ticked, all of it (0121)', async () => {
+    const ADVANCE = detail({
+      id: '201',
+      docType: 'advance_invoice',
+      docNumber: 'INV-000201',
+      status: 'issued',
+      netFils: '30000',
+      vatFils: '1500',
+      totalFils: '31500',
+      settledFils: '31500',
+      settlementStatus: 'settled',
+      advanceLeftNetFils: '20000',
+      advanceLeftVatFils: '1000',
+    });
+    const bridge = bridgeFor([...OFFICE, 'payments.refund'], '/invoices/201').on(
+      'GET',
+      '/api/v1/sales/documents/201',
+      ok(ADVANCE),
+    );
+    await signIn(bridge, 'INV-000201');
+    fireEvent.click(await screen.findByRole('button', { name: 'Refund the remainder (210.00)' }));
+    const dialog = await screen.findByRole('dialog');
+    const refund = within(dialog).getByRole<HTMLInputElement>('checkbox', {
+      name: 'Pay the money back now',
+    });
+    expect(refund.checked).toBe(true);
+    expect(within(dialog).getAllByDisplayValue('210.00').length).toBeGreaterThan(0);
+  });
+
+  it('without payments.refund there is no "Refund the remainder"', async () => {
+    const ADVANCE = detail({
+      id: '202',
+      docType: 'advance_invoice',
+      docNumber: 'INV-000202',
+      status: 'issued',
+      advanceLeftNetFils: '20000',
+      advanceLeftVatFils: '1000',
+    });
+    await signIn(
+      bridgeFor(OFFICE, '/invoices/202').on('GET', '/api/v1/sales/documents/202', ok(ADVANCE)),
+      'INV-000202',
+    );
+    expect(screen.queryByRole('button', { name: /Refund the remainder/ })).toBeNull();
   });
 
   it('shows the deductions (decision 0013) and prints: the PDF, then the printed count', async () => {
