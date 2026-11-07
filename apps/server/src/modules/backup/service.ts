@@ -142,9 +142,12 @@ export async function healthStatus(deps: AppDeps, now = Date.now()): Promise<Hea
     deps.settings.number('backup.restore_test_interval_days'),
     deps.settings.number('backup.offline_copy_interval_days'),
   ]);
+  // The checks of the books (nightly, after a start, by hand, restore tests); a reconciliation
+  // report has its own screen and its own shape (security review, M7).
   const integrity = await db
     .selectFrom('ops.integrity_runs')
     .select(['status', 'finished_at', 'results'])
+    .where('run_kind', '<>', 'reconciliation')
     .orderBy('id', 'desc')
     .executeTakeFirst();
   const disk = await statfs(deps.backup.backupDir).then(

@@ -2,6 +2,8 @@
  * Logging that never contains secrets (golden rule 13). Request bodies are never logged; secret
  * headers are redacted; database errors lose their `detail` (it can contain row values).
  */
+import { SETUP_TOKEN_HEADER } from '@artepool/shared/contracts';
+
 export const DEVICE_HEADER = 'x-artepool-device';
 export const CLIENT_VERSION_HEADER = 'x-artepool-client';
 export const BACKGROUND_HEADER = 'x-artepool-background';
@@ -11,6 +13,7 @@ export const REDACT_PATHS = [
   'req.headers.authorization',
   'req.headers.cookie',
   `req.headers["${DEVICE_HEADER}"]`,
+  `req.headers["${SETUP_TOKEN_HEADER}"]`,
   '*.password',
   '*.newPassword',
   '*.currentPassword',
@@ -24,6 +27,14 @@ export const REDACT_PATHS = [
   '*.secret',
   '*.deviceKey',
   '*.totp',
+  // The security review (M7): never logged today (no body is logged), kept out all the same.
+  // `*.code` stays visible: an error's code is what the logs are read for.
+  '*.recoveryCodes',
+  '*.identity',
+  '*.current',
+  '*.*.password',
+  '*.*.pin',
+  '*.*.token',
 ];
 
 /** Fields of an error that are safe to log (no row values, queries or hints). */

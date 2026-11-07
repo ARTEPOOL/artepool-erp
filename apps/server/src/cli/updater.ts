@@ -15,7 +15,7 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import pg from 'pg';
 import { LATEST_URL } from '@artepool/release';
-import { connectionFor, loadEnv, resourcePath } from '@artepool/node-kit';
+import { childEnv, connectionFor, loadEnv, resourcePath } from '@artepool/node-kit';
 import { waitHealthy } from './install/health';
 import { InstallLog } from './install/log';
 import { windowsPlatform } from './install/windows';
@@ -81,12 +81,19 @@ try {
       await promisify(execFile)(tar, ['-xf', zip, '-C', to], {
         windowsHide: true,
         timeout: 10 * 60 * 1000,
+        env: childEnv({}),
       });
     },
     runSetup: (file, runtimeDir) => {
       // Detached: the setup replaces this program's folder, so the updater ends first.
       const args = ['/S', ...(runtimeDir ? [`/RUNTIME=${runtimeDir}`] : [])];
-      spawn(file, args, { detached: true, stdio: 'ignore', windowsHide: true }).unref();
+      // Never with this program's secrets: the setup asks the launcher for what it needs.
+      spawn(file, args, {
+        detached: true,
+        stdio: 'ignore',
+        windowsHide: true,
+        env: childEnv({}),
+      }).unref();
     },
     now: () => new Date(),
     log: (line) => log.line(line),
@@ -126,7 +133,7 @@ try {
           await promisify(execFile)(
             join(programDir, 'artepool-svc.exe'),
             ['--data', dataDir, 'cashier-account', 'check'],
-            { windowsHide: true, timeout: 60_000 },
+            { windowsHide: true, timeout: 60_000, env: childEnv({}) },
           )
         ).stdout,
       now: () => new Date(),
@@ -140,7 +147,7 @@ try {
       const child = spawn(
         join(programDir, 'artepool-svc.exe'),
         ['--data', dataDir, 'run', 'rehearsal', claim.id],
-        { detached: true, stdio: 'ignore', windowsHide: true },
+        { detached: true, stdio: 'ignore', windowsHide: true, env: childEnv({}) },
       );
       if (child.pid) {
         try {

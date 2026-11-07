@@ -13,6 +13,7 @@
  */
 import { spawn as spawnProcess } from 'node:child_process';
 import { existsSync } from 'node:fs';
+import { childEnv } from '@artepool/node-kit';
 import { copyFile, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import { z } from 'zod';
@@ -99,7 +100,13 @@ export function statusPageControl(options: StatusPageOptions): StatusPageControl
   const run =
     options.spawn ??
     ((command: string, args: string[]) =>
-      spawnProcess(command, args, { detached: true, stdio: 'ignore', windowsHide: true }).unref());
+      // The status page listens on the network while the server is stopped: never with secrets.
+      spawnProcess(command, args, {
+        detached: true,
+        stdio: 'ignore',
+        windowsHide: true,
+        env: childEnv({}),
+      }).unref());
 
   return {
     async start() {
