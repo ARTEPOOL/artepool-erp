@@ -187,6 +187,7 @@ It runs client–server on the local network: PostgreSQL and the API service on 
 | `docs/accounting/` | Provisional chart of accounts and posting map (for the accountant) |
 | `docs/ai-online-track.md` | The AI & Online track (stages 2A–2D): ideas, ground rules, gaps, effort, running costs, privacy |
 | `docs/decisions/` | One file per decision, with its status |
+| `docs/reviews/` | Security reviews: findings, status, decisions for the owner (M7: `m7-security-review.md`) |
 | `design/` | Approved UI design reference v2 (simple style): tokens for light and dark, component styles, design system, screens 01–14. Build the client screens to match it. |
 
 ## Tech stack (confirmed — decision 0001)

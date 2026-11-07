@@ -33,7 +33,22 @@
 **Still to do before go-live:**
 - the accountant's approval of the chart of accounts and the posting map, and answers to the pack's questions (Q1–Q7);
 - the VAT period archive (decision 0122), once its plan is approved;
+- the three security items of the review, once the owner decides (one permission per secret file, the server PC's shared enrollment, the laptop's update folder);
 - at the shop: install, a green rehearsal, the hardware check, then go-live day by `docs/runbooks/go-live.md`.
+
+## The security review (2026-11-07) — in version 0.10.0
+
+**In plain words** ([`docs/reviews/m7-security-review.md`](reviews/m7-security-review.md)): three independent reviews of the whole system found **nothing critical or high**. Nobody on the network can reach the data without an enrolled PC, a signed-in user and the right permission. What was found is about someone already on a shop PC, or a fault in one of our programs, and these are fixed now:
+
+- **Amounts only for whoever may see them** (decision 0114): a customer's credit limit (on the customer page and in the export) only with «عرض أرصدة العملاء»; the opening balance only for whoever takes payments.
+- **The blind count stays blind for the accountant too** (0080): on their own open shift only the owner sees the expected cash on the X report.
+- **Exports** also need the permission to see what they export.
+- **One reconciliation report at a time**, so the tills never slow down because of it.
+- **Each service gets only its own password**, and the programs the updater starts get no secret at all.
+- **Updates:** a signed file is accepted only under its own name and version, so an older version can never be pushed to the laptop.
+- **The emergency tool** now records which Windows account and PC ran each action.
+- **More secret fields are kept out of the logs**, and the System health integrity line shows the nightly checks only (migration 0056).
+- **Three items for the owner to decide before go-live** (one permission per secret file, the server PC's shared enrollment, the laptop's update folder) and one smaller choice (the lock screen's owner code): listed at the end of the review with a plan each.
 
 ## Advance payments larger than the final invoice (2026-11-07) — in version 0.10.0
 
