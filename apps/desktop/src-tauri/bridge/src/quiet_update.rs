@@ -87,8 +87,19 @@ pub fn release_file_name(url: &str) -> Option<String> {
     ok.then(|| name.to_string())
 }
 
-fn valid_file(file: &ListedFile) -> bool {
+/// A download of exactly this version: its folder and its name both say `version`, so an older
+/// installer is never taken for a newer one (security review, M7).
+fn of_version(url: &str, version: &str) -> bool {
+    url.strip_prefix(DOWNLOAD_PREFIX)
+        .and_then(|rest| rest.split_once('/'))
+        .is_some_and(|(folder, name)| {
+            folder == version && name.ends_with(&format!("-{version}.exe"))
+        })
+}
+
+fn valid_file(file: &ListedFile, version: &str) -> bool {
     release_file_name(&file.url).is_some()
+        && of_version(&file.url, version)
         && !file.signature.trim().is_empty()
         && file.sha256.len() == 64
         && file
@@ -104,8 +115,9 @@ pub fn parse_latest(text: &str) -> Result<Latest, String> {
     if parse_version(&latest.version).is_none() {
         return Err(format!("\"{}\" is not a version", latest.version));
     }
-    latest.office = latest.office.filter(valid_file);
-    latest.office_update = latest.office_update.filter(valid_file);
+    let version = latest.version.clone();
+    latest.office = latest.office.filter(|f| valid_file(f, &version));
+    latest.office_update = latest.office_update.filter(|f| valid_file(f, &version));
     Ok(latest)
 }
 
@@ -228,11 +240,24 @@ fn minisign_text(base64_text: &str) -> Result<String, String> {
 
 /// The update key's signature of the file (Tauri's format: base64 of the minisign text), read
 /// in pieces. Only the prehashed form is accepted, as Tauri's signer makes it.
-pub fn verify_file(public_key: &str, signature: &str, path: &Path) -> Result<(), String> {
+pub fn verify_file(
+    public_key: &str,
+    signature: &str,
+    path: &Path,
+    expected_name: &str,
+) -> Result<(), String> {
     let key = minisign_verify::PublicKey::decode(&minisign_text(public_key)?)
         .map_err(|e| format!("the update key is not valid: {e}"))?;
     let signature = minisign_verify::Signature::decode(&minisign_text(signature)?)
         .map_err(|e| format!("the signature is not valid: {e}"))?;
+    // Tauri's signer writes "timestamp:<n>\tfile:<name>": the signature is for that file only, so
+    // a genuine older installer cannot be offered under this version's name (security review,
+    // M7). The trusted comment itself is proven by the key in `finalize` below.
+    if signed_file_name(signature.trusted_comment()) != Some(expected_name) {
+        return Err(format!(
+            "the signature was made for another file, not {expected_name}"
+        ));
+    }
     let mut verifier = key
         .verify_stream(&signature)
         .map_err(|e| format!("the signature does not fit the update key: {e}"))?;
@@ -248,6 +273,13 @@ pub fn verify_file(public_key: &str, signature: &str, path: &Path) -> Result<(),
     verifier
         .finalize()
         .map_err(|e| format!("the signature does not match the file: {e}"))
+}
+
+/// The `file:` part of a signature's trusted comment.
+pub fn signed_file_name(trusted_comment: &str) -> Option<&str> {
+    trusted_comment
+        .split('\t')
+        .find_map(|part| part.strip_prefix("file:"))
 }
 
 /// The note beside a part of a download: which address and SHA-256 it belongs to.
@@ -426,6 +458,19 @@ mod tests {
         assert_eq!(latest.office_update, None);
         assert!(parse_latest(r#"{"version":"x"}"#).is_err());
         assert!(parse_latest("<html>").is_err());
+        // A list that says 0.9.2 but points at the 0.9.1 setup: never kept (no downgrade).
+        let older = serde_json::json!({
+            "version": "0.9.2",
+            "office": file("ARTEPOOL-Office-Setup-0.9.1.exe"),
+            "officeUpdate": {
+                "url": format!("{DOWNLOAD_PREFIX}0.9.2/ARTEPOOL-Office-Update-0.9.1.exe"),
+                "signature": "s",
+                "sha256": "a".repeat(64)
+            }
+        });
+        let latest = parse_latest(&older.to_string()).unwrap();
+        assert_eq!(latest.office, None);
+        assert_eq!(latest.office_update, None);
     }
 
     #[test]
@@ -558,11 +603,30 @@ mod tests {
     fn checks_the_update_keys_signature_of_a_file_read_in_pieces() {
         let key = std::fs::read_to_string(fixture("test.key.pub")).unwrap();
         let signature = std::fs::read_to_string(fixture("data.bin.sig")).unwrap();
-        assert_eq!(verify_file(&key, &signature, &fixture("data.bin")), Ok(()));
+        assert_eq!(
+            verify_file(&key, &signature, &fixture("data.bin"), "data.bin"),
+            Ok(())
+        );
         // Another file, rubbish, or no key: refused.
-        assert!(verify_file(&key, &signature, &fixture("test.key.pub")).is_err());
-        assert!(verify_file(&key, "bm90aGluZw==", &fixture("data.bin")).is_err());
-        assert!(verify_file("", &signature, &fixture("data.bin")).is_err());
+        assert!(verify_file(&key, &signature, &fixture("test.key.pub"), "data.bin").is_err());
+        assert!(verify_file(&key, "bm90aGluZw==", &fixture("data.bin"), "data.bin").is_err());
+        assert!(verify_file("", &signature, &fixture("data.bin"), "data.bin").is_err());
+        // The right file and key, offered under another name (an older setup as a new one).
+        assert!(
+            verify_file(
+                &key,
+                &signature,
+                &fixture("data.bin"),
+                "ARTEPOOL-Office-Setup-9.9.9.exe"
+            )
+            .unwrap_err()
+            .contains("another file")
+        );
+        assert_eq!(
+            signed_file_name("timestamp:1\tfile:data.bin"),
+            Some("data.bin")
+        );
+        assert_eq!(signed_file_name("timestamp:1"), None);
     }
 
     #[test]

@@ -4,6 +4,7 @@
  * are, i.e. on the server PC. Each is audited as SYSTEM with a "server console" reason.
  */
 import { randomUUID } from 'node:crypto';
+import { hostname, userInfo } from 'node:os';
 import { sql } from 'kysely';
 import { recordEvent } from '../platform/audit/events';
 import { checkPassword, type PasswordProblem } from '../platform/auth/password-policy';
@@ -21,6 +22,19 @@ export class ConsoleError extends Error {
 }
 
 const consoleContext = (reason: string) => ({ userId: 1n, requestId: randomUUID(), reason });
+
+/** The Windows account running the tool (an administrator on the server PC): DOMAIN\name. */
+export function windowsUser(): string {
+  const domain = process.env.USERDOMAIN;
+  const name = userInfo().username;
+  return (domain ? `${domain}\\${name}` : name).slice(0, 100);
+}
+
+/**
+ * Who ran a console or emergency-tool action, kept in its audit event (security review, M7): the
+ * audit log's user is SYSTEM for these, so the Windows account and the PC's name say who it was.
+ */
+export const consoleOrigin = () => ({ windowsUser: windowsUser(), pc: hostname().slice(0, 100) });
 
 export async function activeOwner(db: Db) {
   return db
@@ -125,7 +139,11 @@ export async function createFirstOwner(
       .executeTakeFirstOrThrow();
     await sql`INSERT INTO auth.user_roles (user_id, role_id)
               SELECT ${user.id}, id FROM auth.roles WHERE code = 'owner'`.execute(trx);
-    await recordEvent(trx, 'auth.owner_created', { entityType: 'auth.users', entityId: user.id });
+    await recordEvent(trx, 'auth.owner_created', {
+      entityType: 'auth.users',
+      entityId: user.id,
+      data: consoleOrigin(),
+    });
     return user.id;
   });
 }
@@ -172,6 +190,7 @@ export async function resetOwnerTwoStep(db: Db, reason: string): Promise<string>
         entityType: 'auth.users',
         entityId: owner.id,
         reason: reason.trim(),
+        data: consoleOrigin(),
       });
     },
   );
@@ -227,7 +246,7 @@ export async function resetOwnerPassword(
         entityType: 'auth.users',
         entityId: owner.id,
         reason,
-        data: { twoStepCleared: input.phoneLost },
+        data: { twoStepCleared: input.phoneLost, ...consoleOrigin() },
       });
     },
   );

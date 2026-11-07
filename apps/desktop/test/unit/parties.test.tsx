@@ -244,6 +244,20 @@ describe('Customers', () => {
     expect(screen.queryByRole('button', { name: 'تغيير الائتمان' })).toBeNull();
   });
 
+  it('a credit customer seen by the cashier: credit and its terms, never the limit (0114)', async () => {
+    // The server leaves the amount out for someone without customers.balance.view.
+    const credit = customer({ creditMode: 'credit', creditLimitFils: null, paymentTermsDays: 30 });
+    await signIn(
+      signedInBridge(CASHIER)
+        .on('GET', '/api/v1/customers', ok(customersAnswer([WALK_IN, credit])))
+        .on('GET', '/api/v1/customers/12', ok(credit)),
+    );
+    await openPage('العملاء');
+    const panel = await detailPanel('فندق الواحة');
+    expect(within(panel).getByText('شروط الدفع')).toBeTruthy();
+    expect(within(panel).queryByText('حد الائتمان')).toBeNull();
+  });
+
   it('the customer type is required', async () => {
     const bridge = signedInBridge(CASHIER);
     await signIn(bridge);

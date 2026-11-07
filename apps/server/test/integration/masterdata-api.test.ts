@@ -461,7 +461,8 @@ describe('customers (design 14, decisions 0032, 0036, 0037)', () => {
       phone: '+971501234567',
       customerType: 'contractor',
       creditMode: 'cash',
-      creditLimitFils: '0',
+      // An amount (decision 0114): the cashier has no customers.balance.view.
+      creditLimitFils: null,
       paymentTermsDays: 0,
     });
   });
@@ -539,6 +540,32 @@ describe('customers (design 14, decisions 0032, 0036, 0037)', () => {
     expect(rows).toEqual([{ reason: 'Contractor for 5 years' }]);
   });
 
+  it('show the credit limit only to customers.balance.view; the mode and terms to all (0114)', async () => {
+    const seen = async (who: Actor) =>
+      (await who('GET', `/api/v1/customers/${customer.id}`)).json<CustomerDetail>();
+    expect(await seen(owner)).toMatchObject({ creditMode: 'credit', creditLimitFils: '500000' });
+    expect(await seen(cashier)).toMatchObject({
+      creditMode: 'credit',
+      creditLimitFils: null,
+      paymentTermsDays: 30,
+    });
+    const technician = await signedIn('tech.two', ['technician']);
+    expect(await seen(technician)).toMatchObject({ creditLimitFils: null });
+    // A save by the cashier answers without the amount too.
+    const saved = await cashier('PUT', `/api/v1/customers/${customer.id}`, {
+      ...base,
+      notes: 'Gate 3',
+      rowVersion: customer.rowVersion,
+    });
+    expect(saved.statusCode).toBe(200);
+    customer = saved.json<CustomerDetail>();
+    expect(customer).toMatchObject({ notes: 'Gate 3', creditLimitFils: null });
+    // The opening balance is an amount owed: for those who take payments, not every viewer.
+    const opening = `/api/v1/customers/${customer.id}/opening-balance`;
+    expect((await technician('GET', opening)).statusCode).toBe(403);
+    expect((await cashier('GET', opening)).statusCode).toBe(200);
+  });
+
   it('keep the walk-in "Cash customer" locked', async () => {
     const list = (await cashier('GET', '/api/v1/customers')).json<CustomersResponse>();
     const walkIn = list.customers[0]!;
@@ -574,6 +601,23 @@ describe('customers (design 14, decisions 0032, 0036, 0037)', () => {
     );
     // The walk-in customer stays out: every database makes its own (M7 part E).
     expect(rows.map((r) => r.data)).toEqual([{ entity: 'customers', rows: 2 }]);
+  });
+
+  it('an export never shows more than the screens would (security review, M7)', async () => {
+    await withBusinessTx(server.db, { userId: 1n, requestId: randomUUID() }, async (trx) => {
+      await sql`INSERT INTO auth.roles (code, name_ar, name_en) VALUES ('export-only', 'تصدير فقط', 'Export only')`.execute(
+        trx,
+      );
+      await sql`INSERT INTO auth.role_permissions (role_id, permission_code)
+                SELECT id, 'data.export' FROM auth.roles WHERE code = 'export-only'`.execute(trx);
+    });
+    const exporter = await signedIn('export.only', ['export-only']);
+    for (const entity of ['customers', 'suppliers', 'items']) {
+      expect(await refusal(exporter('GET', `/api/v1/${entity}/export`))).toMatchObject({
+        status: 403,
+        code: 'PERMISSION_DENIED',
+      });
+    }
   });
 });
 

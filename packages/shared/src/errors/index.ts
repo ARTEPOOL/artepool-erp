@@ -211,6 +211,7 @@ export const RULE_CODES = [
   'CLOCK_BACKWARDS',
   'SETUP_ALREADY_DONE',
   'REHEARSAL_BLOCKED',
+  'RECONCILIATION_RUNNING',
 ] as const;
 
 export type RuleCode = (typeof RULE_CODES)[number];

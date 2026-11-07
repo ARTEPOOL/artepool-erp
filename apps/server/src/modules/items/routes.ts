@@ -22,6 +22,7 @@ import { recordEvent } from '../../platform/audit/events';
 import { withBusinessTx } from '../../platform/db/tx';
 import { contextOf } from '../../platform/http/context';
 import { exportItems } from '../imports/service';
+import { requireAlso } from '../../platform/permissions';
 
 const Params = z.object({ id: IdText });
 const view = { kind: 'permission', permission: 'items.view' } as const;
@@ -46,6 +47,7 @@ export function registerItemRoutes(app: FastifyInstance): void {
     url: '/api/v1/items/export',
     access: { kind: 'permission', permission: 'data.export' },
     handler: async ({ request }) => {
+      requireAlso(request.auth, 'items.view');
       const { file, rows } = await exportItems(db, items.canSeeCost(request.auth));
       await withBusinessTx(db, contextOf(request), (trx) =>
         recordEvent(trx, 'data.exported', { data: { entity: 'items', rows } }),

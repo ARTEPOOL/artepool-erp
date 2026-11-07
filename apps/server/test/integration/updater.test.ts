@@ -31,10 +31,11 @@ import {
 import { RUNTIME_ZIP_NAMES, testUpdateKey, zipWith } from '../support/update-key';
 
 const fixtures = join(import.meta.dirname, '..', 'fixtures', 'update-signature');
-const publicKey = await readFile(join(fixtures, 'test.key.pub'), 'utf8');
-const signature = await readFile(join(fixtures, 'data.bin.sig'), 'utf8');
 const setup = await readFile(join(fixtures, 'data.bin'));
 const setupSha = createHash('sha256').update(setup).digest('hex');
+/** Signs each setup as the release workflow does: under its own file name. */
+const updateKey = testUpdateKey();
+const publicKey = updateKey.publicKey;
 
 /** 12:00 and 03:00 in the shop (Asia/Dubai is UTC+4). */
 const NOON = new Date('2026-10-26T08:00:00Z');
@@ -54,7 +55,7 @@ function latest(version: string, overrides: Record<string, unknown> = {}) {
     notesEn: 'Improvements',
     server: {
       url: `https://github.com/ARTEPOOL/artepool-releases/releases/download/v${version}/${setupFileName(version)}`,
-      signature,
+      signature: updateKey.signFile(setup, setupFileName(version)),
       sha256: setupSha,
     },
     ...overrides,
@@ -300,6 +301,21 @@ describe('the server PC updater', () => {
     expect(await runUpdater(forged)).toBe('download_failed');
     expect((await state()).download_status).toBe('failed');
     expect(forged.started).toEqual([]);
+
+    // A genuine, signed older setup offered as the new version: its signature names the old
+    // file, so it is refused (security review, M7).
+    const older = deps({
+      fetchLatest: () =>
+        Promise.resolve(
+          latest('1.1.0', {
+            server: { ...latest('1.1.0').server, signature: latest('0.9.0').server.signature },
+          }),
+        ),
+      now: () => NIGHT,
+    });
+    expect(await runUpdater(older)).toBe('download_failed');
+    expect(existsSync(join(dir, setupFileName('1.1.0')))).toBe(false);
+    expect(older.started).toEqual([]);
   });
 
   it('never starts while a shift is open, even after "Install now"', async () => {

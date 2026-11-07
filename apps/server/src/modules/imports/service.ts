@@ -796,6 +796,8 @@ export async function template(db: Kysely<DB>, entity: ImportEntity): Promise<Fi
 /** Every customer as an Excel file (permission `data.export`; the export is audited). */
 export async function exportCustomers(
   db: Kysely<DB>,
+  /** Decision 0114: the credit limit is an amount (customers.balance.view); empty otherwise. */
+  canSeeAmounts = false,
 ): Promise<{ file: FilePayload; rows: number }> {
   // The walk-in customer is made by every database itself (and has no phone to import).
   const rows = await db
@@ -833,7 +835,7 @@ export async function exportCustomers(
         r.trn,
         r.notes,
         r.credit_mode,
-        formatFils(r.credit_limit_fils),
+        canSeeAmounts ? formatFils(r.credit_limit_fils) : null,
         r.payment_terms_days,
         r.is_active ? 'yes' : 'no',
       ]),

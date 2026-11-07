@@ -9,6 +9,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   SignatureError,
+  signedFileName,
   verifyFileSignature,
   verifySignature,
 } from '../../src/cli/updater/signature';
@@ -45,11 +46,24 @@ describe('the update signature', () => {
 
   it('checks a file read in pieces the same way', async () => {
     await expect(
-      verifyFileSignature(publicKey, signature, join(dir, 'data.bin')),
+      verifyFileSignature(publicKey, signature, join(dir, 'data.bin'), 'data.bin'),
     ).resolves.toBeUndefined();
     await expect(
-      verifyFileSignature(publicKey, signature, join(dir, 'test.key.pub')),
+      verifyFileSignature(publicKey, signature, join(dir, 'test.key.pub'), 'data.bin'),
     ).rejects.toThrow(SignatureError);
+  });
+
+  it('refuses a genuine file offered under another name (an older installer as a new one)', async () => {
+    await expect(
+      verifyFileSignature(
+        publicKey,
+        signature,
+        join(dir, 'data.bin'),
+        'ARTEPOOL-Server-Setup-9.9.9.exe',
+      ),
+    ).rejects.toThrow(/another file/);
+    expect(signedFileName('timestamp:1792923542\tfile:data.bin')).toBe('data.bin');
+    expect(signedFileName('timestamp:1792923542')).toBeNull();
   });
 
   it('refuses a changed file', () => {

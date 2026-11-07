@@ -21,6 +21,7 @@ import type {
 import type { Db } from '../../platform/db/pool';
 import { filledByDatabase } from '../../platform/db/stamped';
 import { withBusinessTx, type RequestContext } from '../../platform/db/tx';
+import { ruleError } from '../../platform/errors/app-error';
 
 /** The signed-in user's permissions, as the route guard loaded them. */
 type Auth = { permissions: ReadonlySet<string> } | null;
@@ -270,8 +271,32 @@ async function backupStep(db: Db) {
   };
 }
 
+/**
+ * One report at a time on this server (security review, M7): every check reads the whole books,
+ * so a second request while one runs is answered "running" instead of doubling the load on the
+ * shop's server PC. The API is one process, so a flag here is enough.
+ */
+let running = false;
+
 /** Runs the report for the period, records it and returns it. */
 export async function runReconciliation(
+  db: Db,
+  ctx: RequestContext,
+  auth: Auth,
+  request: ReconciliationRequest,
+): Promise<ReconciliationReport> {
+  if (running) {
+    throw ruleError('RECONCILIATION_RUNNING', 'A reconciliation report is already running');
+  }
+  running = true;
+  try {
+    return await reconciliationNow(db, ctx, auth, request);
+  } finally {
+    running = false;
+  }
+}
+
+async function reconciliationNow(
   db: Db,
   ctx: RequestContext,
   auth: Auth,

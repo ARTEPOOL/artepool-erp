@@ -960,6 +960,10 @@ describe('the shift (decisions 0004, 0006, 0056–0058)', () => {
     );
     await open(me, '12345');
     expect((await ok<PosState>(me('GET', '/api/v1/pos/state'))).expectedCashFils).toBe('12345');
+    // The same on the owner's X report.
+    expect(
+      (await ok<ShiftReport>(me('GET', '/api/v1/shifts/current/x-report'))).expectedCashFils,
+    ).toBe('12345');
   });
 });
 
@@ -1026,9 +1030,24 @@ describe('A4 cash taken on the drawer (decision 0063)', () => {
       }),
       201,
     );
+    const expectedNow = async () =>
+      (
+        await sql<{ e: string }>`SELECT cash.expected_cash(${shift.id}::bigint)::text AS e`.execute(
+          server.db,
+        )
+      ).rows[0]!.e;
     const x2 = await ok<ShiftReport>(seller('GET', '/api/v1/shifts/current/x-report'));
     expect(x2.byMethod.find((m) => m.methodId === ids.card)?.receivedFils).toBe('2000');
-    expect(x2.expectedCashFils).toBe('20500');
+    expect(await expectedNow()).toBe('20500');
+    // The accountant counts blind on their own shift like everyone but the owner (0080); the owner
+    // looking at it from another PC sees the figure (security review, M7).
+    expect(x2.expectedCashFils).toBeNull();
+    expect(
+      (await ok<ShiftReport>(seller('GET', `/api/v1/shifts/${shift.id}`))).expectedCashFils,
+    ).toBeNull();
+    expect(
+      (await ok<ShiftReport>(owner('GET', `/api/v1/shifts/${shift.id}`))).expectedCashFils,
+    ).toBe('20500');
 
     // The same cash taken in the office (no drawer shift there) goes to the safe (0047).
     const before = await balance('1120');
@@ -1041,9 +1060,7 @@ describe('A4 cash taken on the drawer (decision 0063)', () => {
       201,
     );
     expect((await balance('1120')) - before).toBe(1_000n);
-    expect(
-      (await ok<ShiftReport>(seller('GET', '/api/v1/shifts/current/x-report'))).expectedCashFils,
-    ).toBe('20500');
+    expect(await expectedNow()).toBe('20500');
   });
 });
 
@@ -1223,6 +1240,18 @@ describe('the integrity checks on this day of POS work (M7, decision 0119)', () 
     expect((await accountant('POST', '/api/v1/reports/reconciliation', body)).statusCode).toBe(200);
     const cashier = await signedIn('cash.recon', ['cashier']);
     expect((await cashier('POST', '/api/v1/reports/reconciliation', body)).statusCode).toBe(403);
+
+    // One at a time on the server (security review, M7): a second request while one runs is
+    // answered "running"; the next one after it works again.
+    const [first, second] = await Promise.all([
+      owner('POST', '/api/v1/reports/reconciliation', body),
+      accountant('POST', '/api/v1/reports/reconciliation', body),
+    ]);
+    expect([first.statusCode, second.statusCode].sort()).toEqual([200, 422]);
+    expect(await refusal(Promise.resolve(first.statusCode === 422 ? first : second))).toMatchObject(
+      { rule: 'RECONCILIATION_RUNNING' },
+    );
+    expect((await accountant('POST', '/api/v1/reports/reconciliation', body)).statusCode).toBe(200);
 
     // Kept (and audited), and printed as a PDF for the accountant.
     const kept = await server.admin.query<{ n: string }>(

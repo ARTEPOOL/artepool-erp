@@ -48,7 +48,11 @@ function formOf(c: CustomerDetail): Form {
   const listed = (TERMS as readonly number[]).includes(c.paymentTermsDays);
   return {
     mode: c.creditMode,
-    limit: credit ? money(BigInt(c.creditLimitFils)).replace(/,/g, '') : '',
+    // Null without customers.balance.view (0114): the new limit is typed afresh.
+    limit:
+      credit && c.creditLimitFils !== null
+        ? money(BigInt(c.creditLimitFils)).replace(/,/g, '')
+        : '',
     termsChoice: !credit || listed ? String(credit ? c.paymentTermsDays : 0) : OTHER,
     termsOther: credit && !listed ? String(c.paymentTermsDays) : '',
     reason: '',
@@ -158,7 +162,9 @@ export function CreditDialog(props: {
           <b>{base.name}</b>
           <span className={styles.sub}>
             {base.creditMode === 'credit'
-              ? t('parties:credit.nowCredit', { amount: money(BigInt(base.creditLimitFils)) })
+              ? base.creditLimitFils === null
+                ? t('parties:credit.nowCreditHidden')
+                : t('parties:credit.nowCredit', { amount: money(BigInt(base.creditLimitFils)) })
               : t('parties:credit.nowCash')}
           </span>
         </div>

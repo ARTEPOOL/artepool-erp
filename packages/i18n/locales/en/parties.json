@@ -59,6 +59,7 @@
     "mode": "Payment",
     "nowCash": "Now: cash",
     "nowCredit": "Now: credit, limit {amount} AED",
+    "nowCreditHidden": "Now: credit",
     "limit": "Credit limit (AED)",
     "limitInvalid": "Write a valid amount, e.g. 5000 or 5000.50.",
     "terms": "Payment terms",
